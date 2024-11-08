@@ -2,12 +2,12 @@ import os
 import importlib.util
 import cv2
 from typing import Any, List, Type, Dict, Union
-from pipeline import Pipeline
+from synapse.pipeline import Pipeline
 from cscore import CameraServer, UsbCamera
 import numpy as np
 import time  # Import time for FPS calculation
 import synapse
-from log import log
+from synapse.log import log
 
 
 class PipelineHandler:
@@ -170,11 +170,3 @@ class PipelineHandler:
         """
         cv2.destroyAllWindows()
         log("Cleaned up all resources.")
-
-
-if __name__ == "__main__":
-    synapse.Synapse()
-    handler = PipelineHandler(".")
-    handler.add_camera(0)
-    handler.set_pipeline_for_camera_by_name(0, "ApriltagPipeline")
-    handler.run()

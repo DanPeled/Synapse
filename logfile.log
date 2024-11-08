@@ -1,3 +1,28 @@
 [2024-11-07 18:51:50]: Camera 0 added successfully.
 [2024-11-07 18:51:50]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
 [2024-11-07 18:54:45]: Cleaned up all resources.
+[2024-11-08 08:54:51]: Error loading ./test_pipeline.py: No module named 'pipeline'
+[2024-11-08 08:54:51]: Failed to open camera 0.
+[2024-11-08 08:54:51]: Invalid pipeline name "ApriltagPipeline", avilable options are: []
+[2024-11-08 08:54:53]: Cleaned up all resources.
+[2024-11-08 08:55:45]: Error loading ./test_pipeline.py: No module named 'pipeline'
+[2024-11-08 08:55:45]: Failed to open camera 0.
+[2024-11-08 08:55:45]: Invalid pipeline name "ApriltagPipeline", avilable options are: []
+[2024-11-08 08:55:47]: Cleaned up all resources.
+[2024-11-08 08:55:59]: Error loading ./test_pipeline.py: No module named 'pipeline'
+[2024-11-08 08:55:59]: Failed to open camera 0.
+[2024-11-08 08:55:59]: Invalid pipeline name "ApriltagPipeline", avilable options are: []
+[2024-11-08 08:56:37]: Cleaned up all resources.
+[2024-11-08 08:56:38]: Error loading ../Synapse/test_pipeline.py: No module named 'pipeline'
+[2024-11-08 08:56:38]: Camera 0 added successfully.
+[2024-11-08 08:56:38]: Invalid pipeline name "ApriltagPipeline", avilable options are: []
+[2024-11-08 08:56:52]: Cleaned up all resources.
+[2024-11-08 08:57:04]: Camera 0 added successfully.
+[2024-11-08 08:57:04]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 08:58:54]: Cleaned up all resources.
+[2024-11-08 08:58:54]: Failed to open camera 0.
+[2024-11-08 08:58:54]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 08:59:09]: Cleaned up all resources.
+[2024-11-08 08:59:10]: Camera 0 added successfully.
+[2024-11-08 08:59:10]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 09:00:22]: Cleaned up all resources.

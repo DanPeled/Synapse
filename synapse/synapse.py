@@ -1,6 +1,8 @@
 import yaml
-from nt_client import NtClient
+from synapse.nt_client import NtClient
 from wpilib import SmartDashboard
+from synapse.pipline_handler import PipelineHandler
+from synapse.pipeline import Pipeline
 
 
 class Synapse:

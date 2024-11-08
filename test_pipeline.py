@@ -1,5 +1,5 @@
-from pipeline import Pipeline
 import robotpy_apriltag as apriltags
+from synapse.synapse import Pipeline
 import cv2
 import wpimath.units as units
 
