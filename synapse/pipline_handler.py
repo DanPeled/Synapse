@@ -6,7 +6,6 @@ from synapse.pipeline import Pipeline
 from cscore import CameraServer, UsbCamera
 import numpy as np
 import time  # Import time for FPS calculation
-import synapse
 from synapse.log import log
 
 
@@ -99,7 +98,7 @@ class PipelineHandler:
         if isinstance(pipeline, Type):
             pipeline = [pipeline]
         self.pipeline_instances[camera_index] = [
-            pipeline_cls() for pipeline_cls in pipeline
+            pipeline_cls(None) for pipeline_cls in pipeline
         ]
         log(f"Set pipeline(s) for camera {camera_index}: {pipeline}")
 

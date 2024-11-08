@@ -26,3 +26,15 @@
 [2024-11-08 08:59:10]: Camera 0 added successfully.
 [2024-11-08 08:59:10]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
 [2024-11-08 09:00:22]: Cleaned up all resources.
+[2024-11-08 09:03:21]: Camera 0 added successfully.
+[2024-11-08 09:03:21]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 09:03:22]: Cleaned up all resources.
+[2024-11-08 09:07:31]: Camera 0 added successfully.
+[2024-11-08 09:07:31]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 09:07:36]: Cleaned up all resources.
+[2024-11-08 09:12:53]: Camera 0 added successfully.
+[2024-11-08 09:12:53]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 09:12:55]: Cleaned up all resources.
+[2024-11-08 09:25:21]: Camera 0 added successfully.
+[2024-11-08 09:25:21]: Set pipeline(s) for camera 0: [<class 'test_pipeline.ApriltagPipeline'>]
+[2024-11-08 09:25:26]: Cleaned up all resources.

@@ -1,11 +1,12 @@
 import robotpy_apriltag as apriltags
+from synapse.pipeline_settings import PipelineSettings
 from synapse.synapse import Pipeline
 import cv2
 import wpimath.units as units
 
 
 class ApriltagPipeline(Pipeline):
-    def __init__(self):
+    def __init__(self, settings: PipelineSettings):
         self.detector = apriltags.AprilTagDetector()
         self.detector.addFamily("tag36h11")
         self.pose_estimator_config = apriltags.AprilTagPoseEstimator.Config(
@@ -15,7 +16,7 @@ class ApriltagPipeline(Pipeline):
             self.pose_estimator_config
         )
 
-    def process_frame(self, img, timestamp):
+    def process_frame(self, img, timestamp: float):
         if len(img.shape) == 3:
             img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         else:
