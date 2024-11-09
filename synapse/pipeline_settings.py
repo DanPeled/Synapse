@@ -24,3 +24,6 @@ class PipelineSettings:
 
     def __delitem__(self, key: str):
         del self.__settings[key]
+
+    def __str__(self) -> str:
+        return str(self.__settings)

@@ -7,6 +7,8 @@ import wpimath.units as units
 
 class ApriltagPipeline(Pipeline):
     def __init__(self, settings: PipelineSettings):
+        self.settings = settings
+        self.target_tag = settings["target_tag"]
         self.detector = apriltags.AprilTagDetector()
         self.detector.addFamily("tag36h11")
         self.pose_estimator_config = apriltags.AprilTagPoseEstimator.Config(
@@ -25,6 +27,10 @@ class ApriltagPipeline(Pipeline):
         detections = self.detector.detect(img_gray)
         img_gray = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2RGB)
         for detection in detections:
+            if detection.getId() != self.target_tag:
+                print(detection.getId())
+                continue
+
             center = detection.getCenter()
             cv2.putText(
                 img_gray,

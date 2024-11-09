@@ -2,3 +2,11 @@ network:
   server: true
   name: Vision-Py
   server_ip: 127.0.0.1
+
+pipeline_settings:
+  0: 
+    type: ApriltagPipeline
+    settings:
+      target_tag: 12
+      brightness: 100
+      exposure: 20
