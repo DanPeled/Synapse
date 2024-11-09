@@ -2,12 +2,12 @@ import os
 import importlib.util
 import cv2
 from typing import Any, List, Type, Dict, Union
-from pipeline import Pipeline
+from synapse.pipeline import Pipeline
 from cscore import CameraServer, UsbCamera
 import numpy as np
 import time  # Import time for FPS calculation
-import synapse
-from log import log
+from synapse.log import log
+from synapse.pipeline_settings import PipelineSettings
 
 
 class PipelineHandler:
@@ -21,6 +21,7 @@ class PipelineHandler:
         self.cameras: List[UsbCamera] = []
         self.pipeline_map: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipeline_instances: Dict[int, List[Pipeline]] = {}
+        self.pipeline_settings: Dict[int, PipelineSettings] = {}
 
     def load_pipelines(self) -> Dict[str, Type[Pipeline]]:
         """
@@ -99,7 +100,8 @@ class PipelineHandler:
         if isinstance(pipeline, Type):
             pipeline = [pipeline]
         self.pipeline_instances[camera_index] = [
-            pipeline_cls() for pipeline_cls in pipeline
+            pipeline_cls(self.pipeline_settings[camera_index])
+            for pipeline_cls in pipeline
         ]
         log(f"Set pipeline(s) for camera {camera_index}: {pipeline}")
 
@@ -164,17 +166,30 @@ class PipelineHandler:
         finally:
             self.cleanup()
 
+    def load_settings(self):
+        import yaml
+
+        with open(r"./internal_files/settings.yml") as file:
+            settings = yaml.full_load(file)
+            pipeline_settings = settings["pipeline_settings"]
+
+            for index, camera in enumerate(self.cameras):
+                self.set_pipeline_settings(index, pipeline_settings[index]["settings"])
+                self.set_pipeline_for_camera_by_name(
+                    index, pipline_name=pipeline_settings[index]["type"]
+                )
+                self.set_camera_configs(settings, camera)
+
+    def set_camera_configs(self, settings: Dict[str, Any], camera: UsbCamera):
+        camera.setBrightness(settings.get("brightness", 100))
+        # TODO: more configs
+
+    def set_pipeline_settings(self, camera_index: int, settings):
+        self.pipeline_settings[camera_index] = PipelineSettings(settings)
+
     def cleanup(self):
         """
         Releases all cameras and closes OpenCV windows.
         """
         cv2.destroyAllWindows()
         log("Cleaned up all resources.")
-
-
-if __name__ == "__main__":
-    synapse.Synapse()
-    handler = PipelineHandler(".")
-    handler.add_camera(0)
-    handler.set_pipeline_for_camera_by_name(0, "ApriltagPipeline")
-    handler.run()
