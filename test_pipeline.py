@@ -3,6 +3,8 @@ import json
 import os
 from pipeline import Pipeline
 import robotpy_apriltag as apriltags
+from synapse.pipeline_settings import PipelineSettings
+from synapse.synapse import Pipeline
 import cv2
 import wpimath.units as units
 from wpilib import SmartDashboard
@@ -13,7 +15,9 @@ import math
 
 class ApriltagPipeline(Pipeline):
     
-    def __init__(self):
+    def __init__(self, settings: PipelineSettings):
+        self.settings = settings
+        self.target_tag = settings["target_tag"]
         self.detector = apriltags.AprilTagDetector()
         self.detector.addFamily("tag36h11")
         self.pose_estimator_config = apriltags.AprilTagPoseEstimator.Config(
@@ -22,39 +26,8 @@ class ApriltagPipeline(Pipeline):
         self.pose_estimator = apriltags.AprilTagPoseEstimator(
             self.pose_estimator_config
         )
-        with open('internal_files/fmap.json') as fmap:
-            self.apmap = json.load(fmap) 
-        self.field = Field2d()
 
-        self.screen = turtle.Screen()
-        self.screen.bgpic('internal_files/feild.gif')  # Optional, set background color
-        self.screen.screensize(225, 400)
-        # Create a turtle object
-        self.my_turtle = turtle.Turtle()
-        self.my_turtle.shapesize(2)
-        self.speakerp = turtle.Turtle()
-
-    @classmethod
-    def calculatePoseOnFeild(cls, estimation, tag_id, fmap, z_dis, x_dis):
-        tag_transform = None
-        for fiducial in fmap['fiducials']:
-            if fiducial['id'] == tag_id:
-                tag_transform = fiducial['transform']
-                break
-
-        if tag_transform:
-            #ry = math.degrees(math.atan2(tag_transform[0], tag_transform[1])) +90 -estimation.rotation().y_degrees
-            ry = math.degrees(math.atan2(tag_transform[0], tag_transform[1])) +90
-            x = (tag_transform[3] +8.308467) + (x_dis * math.sin(math.radians(ry))) - (z_dis * math.cos(math.radians(ry)))
-            y = (tag_transform[7] + 4.098925 ) + (x_dis * math.cos(math.radians(ry))) - (z_dis * math.sin(math.radians(ry)))
-            z = tag_transform[11]
-            print(x_dis ,math.cos(math.radians(ry)) )
-
-            return [x , y , ry]
-        else:
-            return None
-
-    def process_frame(self, img, timestamp):
+    def process_frame(self, img, timestamp: float):
         if len(img.shape) == 3:
             img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         else:
@@ -64,6 +37,10 @@ class ApriltagPipeline(Pipeline):
         img_gray = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2RGB)
 
         for detection in detections:
+            if detection.getId() != self.target_tag:
+                print(detection.getId())
+                continue
+
             center = detection.getCenter()
             estimation = self.pose_estimator.estimate(detection)
             
