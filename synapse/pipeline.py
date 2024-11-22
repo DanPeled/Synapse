@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Optional
+from ntcore import NetworkTable
+from typing_extensions import Any
 import cv2
 
 from synapse.pipeline_settings import PipelineSettings
@@ -10,7 +13,7 @@ class Pipeline(ABC):
 
     @abstractmethod
     def __init__(self, settings: PipelineSettings | None):
-        pass
+        self.nt_table = None
 
     @abstractmethod
     def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike | None:
@@ -21,6 +24,29 @@ class Pipeline(ABC):
         :param timestamp: The time the frame was captured
         """
         pass
+
+    def setValue(self, key: str, value: Any) -> None:
+        """
+        Sets a value in the network table.
+
+        :param key: The key for the value.
+        :param value: The value to store.
+        """
+        if self.nt_table is not None:
+            self.nt_table.putValue(key, value)
+
+    def getValue(self, key: str, default: Optional[Any] = None) -> Any:
+        """
+        Gets a value from the network table.
+
+        :param key: The key for the value.
+        :param default: The default value to return if the key does not exist.
+        :return: The value associated with the key, or the default if the key doesn't exist.
+        """
+        if self.nt_table is not None:
+            if self.nt_table.containsKey(key):
+                return self.nt_table.getValue(key, default)
+        return default
 
 
 def disabled(cls):

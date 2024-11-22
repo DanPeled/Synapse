@@ -1,16 +1,36 @@
 import time
+from typing_extensions import Optional
 from ntcore import NetworkTableInstance
+from synapse.log import log
 
 
 class NtClient:
-    def __init__(self, server_name: str, name: str, is_server: bool = False) -> None:
-        self.nt_inst = NetworkTableInstance.getDefault()
-        self.nt_inst.setServer(server_name)
-        if not is_server:
-            self.nt_inst.startClient4(name)
+    INSTANCE: Optional["NtClient"] = None
 
-            while not (self.nt_inst.isConnected()):
-                print(f"Trying to connect to {server_name}...")
-                time.sleep(1)
+    def setup(self, server_name: str, name: str, is_server: bool = False) -> bool:
+        NtClient.INSTANCE = self
+
+        self.nt_inst = NetworkTableInstance.getDefault()
+
+        if is_server:
+            self.server = NetworkTableInstance.create()
+            self.server.startServer(server_name)
+            log(f"Server started with name {name}.")
         else:
-            self.nt_inst.startServer(name)
+            self.server = None
+        # Client mode
+        self.nt_inst.setServer(server_name)
+        self.nt_inst.startClient4(name)
+        # Attempt to connect with timeout
+        timeout = 120  # seconds
+        start_time = time.time()
+        while not self.nt_inst.isConnected():
+            curr = time.time() - start_time
+            if curr > timeout:
+                log(
+                    f"Error: connection to server ({server_name}) from client ({name}) timed out after {curr} seconds"
+                )
+                return False
+            log(f"Trying to connect to {server_name}...")
+            time.sleep(1)
+        return True

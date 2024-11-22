@@ -2,12 +2,23 @@ import os
 import importlib.util
 import cv2
 from typing import Any, List, Type, Dict, Union
+
+from ntcore import Event, EventFlags
+import ntcore
+
+from ntcore._ntcore import (
+    IntegerSubscriber,
+    NetworkTable,
+)
+
+from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline
 from cscore import CameraServer, UsbCamera
 import numpy as np
-import time  # Import time for FPS calculation
+import time
 from synapse.log import log
 from synapse.pipeline_settings import PipelineSettings
+import threading
 
 
 class PipelineHandler:
@@ -17,17 +28,24 @@ class PipelineHandler:
         :param directory: Root directory to search for pipeline files
         """
         self.directory = directory
-        self.pipelines = self.load_pipelines()
+
+    def setup(self):
+        self.pipelines = self.loadPipelines()
         self.cameras: List[UsbCamera] = []
         self.pipeline_map: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipeline_instances: Dict[int, List[Pipeline]] = {}
         self.pipeline_settings: Dict[int, PipelineSettings] = {}
+        self.default_pipeline_indexes: Dict[int, int] = {}
+        self.pipeline_bindings: Dict[int, int] = {}
+        self.pipeline_types: Dict[int, str] = {}
+        self.pipeline_subscribers: Dict[int, IntegerSubscriber] = {}
 
-    def load_pipelines(self) -> Dict[str, Type[Pipeline]]:
+    def loadPipelines(self) -> Dict[str, Type[Pipeline]]:
         """
         Loads all classes that extend Pipeline from Python files in the directory.
         :return: A dictionary of Pipeline subclasses
         """
+        log("Loading pipelines...")
         pipelines = {}
         for root, _, files in os.walk(self.directory):
             for file in files:
@@ -55,19 +73,23 @@ class PipelineHandler:
                                 and cls is not Pipeline
                             ):
                                 if cls.__is_enabled__:
+                                    log(f"Loaded {cls.__name__} pipeline")
                                     pipelines[cls.__name__] = cls
                     except Exception as e:
                         log(
                             f"Error loading {file_path}: {e}"
                         )  # Consider using logging instead
+
+        log("Loaded pipelines successfully")
         return pipelines
 
-    def add_camera(self, camera_index: int) -> bool:
+    def addCamera(self, camera_index: int) -> bool:
         """
         Adds a camera to the handler by opening it through OpenCV.
         :param camera_index: Camera index to open
         """
         camera = CameraServer.startAutomaticCapture(camera_index)
+
         if camera.isConnected():
             self.cameras.append(camera)
             log(f"Camera {camera_index} added successfully.")
@@ -76,19 +98,11 @@ class PipelineHandler:
             log(f"Failed to open camera {camera_index}.")
             return False
 
-    def set_pipeline_for_camera_by_name(self, camera_index: int, pipline_name: str):
-        pipeline = self.pipelines.get(pipline_name, None)
-
-        if pipeline is None:
-            log(
-                f'Invalid pipeline name "{pipline_name}", avilable options are: {list(self.pipelines.keys())}'
-            )
-            return
-
-        self.set_pipeline_for_camera(camera_index, pipeline)
-
-    def set_pipeline_for_camera(
-        self, camera_index: int, pipeline: Union[Type[Pipeline], List[Type[Pipeline]]]
+    def __setPipelineForCamera(
+        self,
+        camera_index: int,
+        pipeline: Union[Type[Pipeline], List[Type[Pipeline]]],
+        pipeline_config: PipelineSettings,
     ):
         """
         Sets the pipeline(s) to be used for a specific camera.
@@ -99,48 +113,94 @@ class PipelineHandler:
         # Create instances for each pipeline only when setting them
         if isinstance(pipeline, Type):
             pipeline = [pipeline]
+
         self.pipeline_instances[camera_index] = [
-            pipeline_cls(self.pipeline_settings[camera_index])
+            pipeline_cls(
+                self.pipeline_settings[camera_index],
+            )
             for pipeline_cls in pipeline
         ]
-        log(f"Set pipeline(s) for camera {camera_index}: {pipeline}")
 
-    def switch_pipeline_at_runtime(
-        self, camera_index: int, pipeline: Union[Type[Pipeline], List[Type[Pipeline]]]
-    ):
-        """
-        Allows switching the pipeline for a specific camera at runtime.
-        :param camera_index: Index of the camera to update
-        :param pipeline: A new pipeline or list of pipelines to assign to the camera
-        """
-        self.set_pipeline_for_camera(camera_index, pipeline)
-        log(f"Switched pipeline(s) for camera {camera_index} at runtime.")
+        for pipelines in self.pipeline_instances[camera_index]:
+            if NtClient.INSTANCE is not None:
+                setattr(
+                    pipelines,
+                    "nt_table",
+                    NtClient.INSTANCE.nt_inst.getTable("Synapse"),
+                )
+            self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
+
+        log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
+
+    def setPipelineByIndex(self, camera_index: int, pipeline_index: int):
+        if camera_index not in range(len(self.cameras)):
+            log(
+                f"Error: Invalid camera_index {camera_index}. Must be in range(0, {len(self.cameras)-1})."
+            )
+            return
+
+        if pipeline_index not in self.pipeline_types.keys():
+            log(
+                f"Error: Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipeline_types.keys())}."
+            )
+            self.setNTPipelineIndex(camera_index, self.pipeline_bindings[camera_index])
+            return
+
+        # If both indices are valid, proceed with the pipeline setting
+        self.pipeline_bindings[camera_index] = pipeline_index
+
+        log(f"Set pipeline #{pipeline_index} for camera ({camera_index})")
+
+        self.setNTPipelineIndex(
+            camera_index=camera_index, pipeline_index=pipeline_index
+        )
+
+        self.__setPipelineForCamera(
+            camera_index=camera_index,
+            pipeline=self.pipelines[self.pipeline_types[pipeline_index]],
+            pipeline_config=self.pipeline_settings[pipeline_index],
+        )
+
+    def setNTPipelineIndex(self, camera_index: int, pipeline_index: int):
+        if NtClient.INSTANCE is not None:
+            NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
+                f"camera{camera_index}pipeline"
+            ).setInteger(pipeline_index)
 
     def run(self):
         """
-        Runs the assigned pipelines on each frame captured from the cameras.
+        Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
         try:
             sinks = [CameraServer.getVideo(camera) for camera in self.cameras]
+            log("Set up sinks array")
             frame_buffers = [
                 np.zeros((600, 600, 3), dtype=np.uint8) for _ in self.cameras
             ]
+
+            log("Set up frame buffers")
+
             outputs = [
                 CameraServer.putVideo(f"Camera {i} output", 600, 600)
                 for i in range(len(self.cameras))
             ]
 
-            while True:
-                for i, sink in enumerate(sinks):
-                    start_time = time.time()  # Start time for FPS calculation
+            log("Set up outputs array")
 
-                    ret, frame = sink.grabFrame(frame_buffers[i])
+            def process_camera(index):
+                sink = sinks[index]
+                frame_buffer = frame_buffers[index]
+                output = outputs[index]
+
+                while True:
+                    start_time = time.time()  # Start time for FPS calculation
+                    ret, frame = sink.grabFrame(frame_buffer)
 
                     if ret == 0 or frame is None:
                         continue
 
                     # Retrieve the pipeline instances for the current camera
-                    assigned_pipelines = self.pipeline_instances.get(i, [])
+                    assigned_pipelines = self.pipeline_instances.get(index, [])
                     processed_frame: Any = frame
 
                     # Process the frame through each assigned pipeline
@@ -162,29 +222,129 @@ class PipelineHandler:
                     )
 
                     if processed_frame is not None:
-                        outputs[i].putFrame(processed_frame)
+                        output.putFrame(processed_frame)
+
+                    for i in range(len(self.cameras)):
+                        if NtClient.INSTANCE is not None:
+                            entry = NtClient.INSTANCE.nt_inst.getTable(
+                                "Synapse"
+                            ).getEntry(f"camera{i}pipeline")
+
+                            pipeline = entry.getInteger(None)
+
+                            # print(f"pipeline: {pipeline}, entry : {entry.getName()}")
+
+                            if (
+                                pipeline != self.pipeline_bindings[i]
+                                and pipeline is not None
+                            ):
+                                self.setPipelineByIndex(i, pipeline)
+
+            # Create and start a thread for each camera
+            threads = []
+            for i in range(len(self.cameras)):
+                thread = threading.Thread(target=process_camera, args=(i,))
+                thread.daemon = True  # Daemon threads will automatically close on exit
+                threads.append(thread)
+                thread.start()
+
+            # Keep the main thread alive to allow all camera threads to run
+            while True:
+                time.sleep(1)
+
         finally:
             self.cleanup()
 
-    def load_settings(self):
+    def setupNetworkTables(self):
+        log("Setting up networktables...")
+
+        def addCurrentPipelineListener(table: NetworkTable, key: str, _: Event) -> None:
+            index = int(key.replace("camera", "").replace("pipeline", ""))
+            self.setPipelineByIndex(
+                camera_index=index,
+                pipeline_index=table.getEntry(key).getInteger(
+                    defaultValue=self.default_pipeline_indexes[index]
+                ),
+            )
+
+        if NtClient.INSTANCE is not None:
+            inst = NtClient.INSTANCE.server or NtClient.INSTANCE.nt_inst
+
+            table: NetworkTable = inst.getTable("Synapse")
+
+            for i, _ in enumerate(self.cameras):
+                topic = inst.getTable("Synapse").getIntegerTopic(f"camera{i}pipeline")
+
+                pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
+                pub.setDefault(self.pipeline_bindings[i])
+
+                sub = topic.subscribe(
+                    0, ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10)
+                )
+
+                NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
+                    f"camera{i}pipeline"
+                ).setInteger(sub.get())
+
+                self.pipeline_subscribers[i] = sub
+
+                log(f"Added listener for camera {i}, entry:{topic.getName()}")
+
+                table.addListener(
+                    key=f"camera{i}pipeline",
+                    eventMask=EventFlags.kImmediate,
+                    listener=addCurrentPipelineListener,
+                )
+            log("Set up settings successfully")
+        else:
+            log("Error: NtClient instance is None")
+
+    def loadSettings(self):
         import yaml
 
-        with open(r"./internal_files/settings.yml") as file:
+        log("Loading settings...")
+        with open(r"./config/settings.yml") as file:
             settings = yaml.full_load(file)
-            pipeline_settings = settings["pipeline_settings"]
 
-            for index, camera in enumerate(self.cameras):
-                self.set_pipeline_settings(index, pipeline_settings[index]["settings"])
-                self.set_pipeline_for_camera_by_name(
-                    index, pipline_name=pipeline_settings[index]["type"]
-                )
-                self.set_camera_configs(settings, camera)
+            camera_configs = settings["camera_configs"]
 
-    def set_camera_configs(self, settings: Dict[str, Any], camera: UsbCamera):
+            for config in camera_configs:
+                self.default_pipeline_indexes[config] = camera_configs[config][
+                    "default_pipeline"
+                ]
+
+            pipelines = settings["pipelines"]
+
+            for index, _ in enumerate(pipelines):
+                pipeline = pipelines[index]
+
+                log(f"Loaded pipeline #{index} with type {pipeline['type']}")
+
+                self.setPipelineSettings(index, pipeline["settings"])
+
+                self.pipeline_types[index] = pipeline["type"]
+
+        for camera_index in range(len(self.cameras)):
+            pipeline = self.default_pipeline_indexes[camera_index]
+            self.setPipelineByIndex(
+                camera_index=camera_index,
+                pipeline_index=pipeline,
+            )
+            log(f"Setup default pipeline (#{pipeline}) for camera ({camera_index})")
+
+        log("Loaded pipelines successfully")
+        self.setupNetworkTables()
+
+    def setCameraConfigs(self, settings: Dict[str, Any], camera: UsbCamera):
         camera.setBrightness(settings.get("brightness", 100))
-        # TODO: more configs
+        default_width = 1920
+        default_height = 1080
 
-    def set_pipeline_settings(self, camera_index: int, settings):
+        camera.setResolution(
+            settings.get("width", default_width), settings.get("height", default_height)
+        )
+
+    def setPipelineSettings(self, camera_index: int, settings):
         self.pipeline_settings[camera_index] = PipelineSettings(settings)
 
     def cleanup(self):
@@ -192,4 +352,10 @@ class PipelineHandler:
         Releases all cameras and closes OpenCV windows.
         """
         cv2.destroyAllWindows()
+
+        for sub in self.pipeline_subscribers.values():
+            name = sub.getTopic().getName()
+            sub.close()
+            log(f"Close sub : {name}")
+
         log("Cleaned up all resources.")

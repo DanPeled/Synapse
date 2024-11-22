@@ -27,3 +27,6 @@ class PipelineSettings:
 
     def __str__(self) -> str:
         return str(self.__settings)
+
+    def getMap(self) -> PipelineSettingsMap:
+        return self.__settings
