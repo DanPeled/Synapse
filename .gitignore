@@ -1,3 +1,4 @@
 *.log
 Vision-Py
-__pycache__/
+__pycache__/*
+synapse/__pycache__/*
