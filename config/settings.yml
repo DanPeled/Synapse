@@ -1,5 +1,5 @@
 network:
-  server: true
+  server: false
   name: Vision-Py
   server_ip: 127.0.0.1
 

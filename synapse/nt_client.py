@@ -6,10 +6,11 @@ from synapse.log import log
 
 class NtClient:
     INSTANCE: Optional["NtClient"] = None
+    TABLE: str = ""
 
     def setup(self, server_name: str, name: str, is_server: bool = False) -> bool:
         NtClient.INSTANCE = self
-
+        NtClient.TABLE = name
         self.nt_inst = NetworkTableInstance.getDefault()
 
         if is_server:

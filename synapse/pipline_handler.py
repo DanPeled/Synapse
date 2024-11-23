@@ -126,7 +126,7 @@ class PipelineHandler:
                 setattr(
                     pipelines,
                     "nt_table",
-                    NtClient.INSTANCE.nt_inst.getTable("Synapse"),
+                    NtClient.INSTANCE.nt_inst.getTable(NtClient.TABLE),
                 )
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
@@ -163,7 +163,7 @@ class PipelineHandler:
 
     def setNTPipelineIndex(self, camera_index: int, pipeline_index: int):
         if NtClient.INSTANCE is not None:
-            NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
+            NtClient.INSTANCE.nt_inst.getTable(NtClient.TABLE).getEntry(
                 f"camera{camera_index}pipeline"
             ).setInteger(pipeline_index)
 
@@ -227,7 +227,7 @@ class PipelineHandler:
                     for i in range(len(self.cameras)):
                         if NtClient.INSTANCE is not None:
                             entry = NtClient.INSTANCE.nt_inst.getTable(
-                                "Synapse"
+                                NtClient.TABLE
                             ).getEntry(f"camera{i}pipeline")
 
                             pipeline = entry.getInteger(None)
@@ -270,10 +270,12 @@ class PipelineHandler:
         if NtClient.INSTANCE is not None:
             inst = NtClient.INSTANCE.server or NtClient.INSTANCE.nt_inst
 
-            table: NetworkTable = inst.getTable("Synapse")
+            table: NetworkTable = inst.getTable(NtClient.TABLE)
 
             for i, _ in enumerate(self.cameras):
-                topic = inst.getTable("Synapse").getIntegerTopic(f"camera{i}pipeline")
+                topic = inst.getTable(NtClient.TABLE).getIntegerTopic(
+                    f"camera{i}pipeline"
+                )
 
                 pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
                 pub.setDefault(self.pipeline_bindings[i])
@@ -282,7 +284,7 @@ class PipelineHandler:
                     0, ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10)
                 )
 
-                NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
+                NtClient.INSTANCE.nt_inst.getTable(NtClient.TABLE).getEntry(
                     f"camera{i}pipeline"
                 ).setInteger(sub.get())
 
