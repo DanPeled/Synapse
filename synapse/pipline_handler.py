@@ -126,7 +126,9 @@ class PipelineHandler:
                 setattr(
                     pipelines,
                     "nt_table",
-                    NtClient.INSTANCE.nt_inst.getTable("Synapse"),
+                    NtClient.INSTANCE.nt_inst.getTable("Synapse").getSubTable(
+                        f"camera{camera_index}"
+                    ),
                 )
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
