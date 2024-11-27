@@ -43,7 +43,7 @@ class ApriltagPipeline(Pipeline):
                 + (x_dis * math.cos(math.radians(ry)))
                 - (z_dis * math.sin(math.radians(ry)))
             )
-            z = tag_transform[11]
+            # z = tag_transform[11]
             print(x_dis, math.cos(math.radians(ry)))
 
             return [x, y, ry]
@@ -92,11 +92,11 @@ class ApriltagPipeline(Pipeline):
             self.setValue("Tag ID", tag_id)
 
             # Convert tx, ty into a Pose2d object and set robot pose
-            robot_pose = ApriltagPipeline.calculatePoseOnFeild(
-                estimation, tag_id, self.apmap, estimation.z, estimation.x
-            )
-            speker_pose = ApriltagPipeline.calculatePoseOnFeild(
-                estimation, 7, self.apmap, 0, 0
-            )
+            # robot_pose = ApriltagPipeline.calculatePoseOnFeild(
+            #     estimation, tag_id, self.apmap, estimation.z, estimation.x
+            # )
+            # speker_pose = ApriltagPipeline.calculatePoseOnFeild(
+            #     estimation, 7, self.apmap, 0, 0
+            # )
 
         return img_gray
