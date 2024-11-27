@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from ntcore import NetworkTable
 from typing_extensions import Any
 import cv2
 

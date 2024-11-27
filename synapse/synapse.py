@@ -2,7 +2,6 @@ from typing import Any
 import yaml
 from synapse.nt_client import NtClient
 from synapse.pipline_handler import PipelineHandler
-from synapse.pipeline import Pipeline
 from synapse.log import log
 
 
