@@ -11,7 +11,7 @@ class Pipeline(ABC):
     __is_enabled__ = True
 
     @abstractmethod
-    def __init__(self, settings: PipelineSettings | None):
+    def __init__(self, settings: PipelineSettings | None, camera_index: int):
         self.nt_table = None
 
     @abstractmethod

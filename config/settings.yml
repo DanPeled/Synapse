@@ -3,7 +3,16 @@ network:
   name: Vision-Py
   server_ip: 127.0.0.1
 
-
+global:
+  camera_matrix:
+    0:
+      - [704.10929061, 0.0,          403.0831928 ]
+      - [0.0,          682.28472818, 221.93690416]
+      - [0.0,          0.0,          1.0         ]
+  camera_transform:
+    0:
+      - [0, 0, 0] # translation
+      - [0, 0, 0] # rotation
 camera_configs:
   0:
     default_pipeline: 0

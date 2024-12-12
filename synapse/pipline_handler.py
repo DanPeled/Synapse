@@ -116,7 +116,7 @@ class PipelineHandler:
 
         self.pipeline_instances[camera_index] = [
             pipeline_cls(
-                self.pipeline_settings[camera_index],
+                settings=self.pipeline_settings[camera_index], camera_index=camera_index
             )
             for pipeline_cls in pipeline
         ]
@@ -177,13 +177,13 @@ class PipelineHandler:
             sinks = [CameraServer.getVideo(camera) for camera in self.cameras]
             log("Set up sinks array")
             frame_buffers = [
-                np.zeros((600, 600, 3), dtype=np.uint8) for _ in self.cameras
+                np.zeros((1920, 1080, 3), dtype=np.uint8) for _ in self.cameras
             ]
 
             log("Set up frame buffers")
 
             outputs = [
-                CameraServer.putVideo(f"Camera {i} output", 600, 600)
+                CameraServer.putVideo(f"Camera {i} output", 1920, 1080)
                 for i in range(len(self.cameras))
             ]
 
