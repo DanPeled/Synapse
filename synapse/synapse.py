@@ -14,6 +14,7 @@ class Synapse:
         try:
             with open(r"./config/settings.yml") as file:
                 settings = yaml.full_load(file)
+                self.settings_dict = settings
                 network_settings = settings["network"]
                 nt_good = self.__init_networktables(network_settings)
                 if nt_good:
@@ -41,6 +42,5 @@ class Synapse:
         return setup_good
 
     def run(self):
-        self.pipeline_handler.addCamera(0)
         self.pipeline_handler.loadSettings()
         self.pipeline_handler.run()

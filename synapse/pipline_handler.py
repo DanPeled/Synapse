@@ -4,12 +4,8 @@ import cv2
 from typing import Any, List, Type, Dict, Union
 
 from ntcore import Event, EventFlags
-import ntcore
 
-from ntcore._ntcore import (
-    IntegerSubscriber,
-    NetworkTable,
-)
+import ntcore
 
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline
@@ -31,14 +27,14 @@ class PipelineHandler:
 
     def setup(self):
         self.pipelines = self.loadPipelines()
-        self.cameras: List[UsbCamera] = []
+        self.cameras: Dict[int, UsbCamera] = {}
         self.pipeline_map: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipeline_instances: Dict[int, List[Pipeline]] = {}
         self.pipeline_settings: Dict[int, PipelineSettings] = {}
         self.default_pipeline_indexes: Dict[int, int] = {}
         self.pipeline_bindings: Dict[int, int] = {}
         self.pipeline_types: Dict[int, str] = {}
-        self.pipeline_subscribers: Dict[int, IntegerSubscriber] = {}
+        self.pipeline_subscribers: Dict[int, ntcore.IntegerSubscriber] = {}
 
     def loadPipelines(self) -> Dict[str, Type[Pipeline]]:
         """
@@ -91,7 +87,7 @@ class PipelineHandler:
         camera = CameraServer.startAutomaticCapture(camera_index)
 
         if camera.isConnected():
-            self.cameras.append(camera)
+            self.cameras[camera_index] = camera
             log(f"Camera {camera_index} added successfully.")
             return True
         else:
@@ -121,23 +117,24 @@ class PipelineHandler:
             for pipeline_cls in pipeline
         ]
 
-        for pipelines in self.pipeline_instances[camera_index]:
+        for curr in self.pipeline_instances[camera_index]:
             if NtClient.INSTANCE is not None:
                 setattr(
-                    pipelines,
+                    curr,
                     "nt_table",
                     NtClient.INSTANCE.nt_inst.getTable("Synapse").getSubTable(
                         f"camera{camera_index}"
                     ),
                 )
+                curr.setup()
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
         log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
 
     def setPipelineByIndex(self, camera_index: int, pipeline_index: int):
-        if camera_index not in range(len(self.cameras)):
+        if camera_index not in self.cameras.keys():
             log(
-                f"Error: Invalid camera_index {camera_index}. Must be in range(0, {len(self.cameras)-1})."
+                f"Error: Invalid camera_index {camera_index}. Must be in range(0, {len(self.cameras.keys())-1})."
             )
             return
 
@@ -166,7 +163,7 @@ class PipelineHandler:
     def setNTPipelineIndex(self, camera_index: int, pipeline_index: int):
         if NtClient.INSTANCE is not None:
             NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
-                f"camera{camera_index}pipeline"
+                f"camera{camera_index}/pipeline"
             ).setInteger(pipeline_index)
 
     def run(self):
@@ -174,18 +171,21 @@ class PipelineHandler:
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
         try:
-            sinks = [CameraServer.getVideo(camera) for camera in self.cameras]
+            sinks = {
+                i: CameraServer.getVideo(self.cameras[i]) for i in self.cameras.keys()
+            }
+
             log("Set up sinks array")
-            frame_buffers = [
-                np.zeros((1920, 1080, 3), dtype=np.uint8) for _ in self.cameras
-            ]
+            frame_buffers = {
+                i: np.zeros((1920, 1080, 3), dtype=np.uint8) for i in self.cameras.keys()
+            }
 
             log("Set up frame buffers")
 
-            outputs = [
-                CameraServer.putVideo(f"Camera {i} output", 1920, 1080)
-                for i in range(len(self.cameras))
-            ]
+            outputs = {
+                i: CameraServer.putVideo(f"Camera {i} output", 1920, 1080)
+                for i in self.cameras.keys()
+            }
 
             log("Set up outputs array")
 
@@ -226,11 +226,11 @@ class PipelineHandler:
                     if processed_frame is not None:
                         output.putFrame(processed_frame)
 
-                    for i in range(len(self.cameras)):
+                    for i in self.cameras.keys():
                         if NtClient.INSTANCE is not None:
                             entry = NtClient.INSTANCE.nt_inst.getTable(
                                 "Synapse"
-                            ).getEntry(f"camera{i}pipeline")
+                            ).getEntry(f"camera{i}/pipeline")
 
                             pipeline = entry.getInteger(None)
 
@@ -244,7 +244,7 @@ class PipelineHandler:
 
             # Create and start a thread for each camera
             threads = []
-            for i in range(len(self.cameras)):
+            for i in self.cameras.keys():
                 thread = threading.Thread(target=process_camera, args=(i,))
                 thread.daemon = True  # Daemon threads will automatically close on exit
                 threads.append(thread)
@@ -260,7 +260,9 @@ class PipelineHandler:
     def setupNetworkTables(self):
         log("Setting up networktables...")
 
-        def addCurrentPipelineListener(table: NetworkTable, key: str, _: Event) -> None:
+        def addCurrentPipelineListener(
+            table: ntcore.NetworkTable, key: str, _: Event
+        ) -> None:
             index = int(key.replace("camera", "").replace("pipeline", ""))
             self.setPipelineByIndex(
                 camera_index=index,
@@ -272,20 +274,20 @@ class PipelineHandler:
         if NtClient.INSTANCE is not None:
             inst = NtClient.INSTANCE.server or NtClient.INSTANCE.nt_inst
 
-            table: NetworkTable = inst.getTable("Synapse")
+            table: ntcore.NetworkTable = inst.getTable("Synapse")
 
-            for i, _ in enumerate(self.cameras):
-                topic = inst.getTable("Synapse").getIntegerTopic(f"camera{i}pipeline")
+            for i in self.cameras.keys():
+                topic = inst.getTable("Synapse").getIntegerTopic(f"camera{i}/pipeline")
 
                 pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
-                pub.setDefault(self.pipeline_bindings[i])
+                pub.setDefault(0)
 
                 sub = topic.subscribe(
                     0, ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10)
                 )
 
                 NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
-                    f"camera{i}pipeline"
+                    f"camera{i}/pipeline"
                 ).setInteger(sub.get())
 
                 self.pipeline_subscribers[i] = sub
@@ -293,7 +295,7 @@ class PipelineHandler:
                 log(f"Added listener for camera {i}, entry:{topic.getName()}")
 
                 table.addListener(
-                    key=f"camera{i}pipeline",
+                    key=f"camera{i}/pipeline",
                     eventMask=EventFlags.kImmediate,
                     listener=addCurrentPipelineListener,
                 )
@@ -309,9 +311,10 @@ class PipelineHandler:
             settings = yaml.full_load(file)
 
             camera_configs = settings["camera_configs"]
-
-            for config in camera_configs:
-                self.default_pipeline_indexes[config] = camera_configs[config][
+            
+            for camera_index in camera_configs:
+                self.addCamera(camera_index)
+                self.default_pipeline_indexes[camera_index] = camera_configs[camera_index][
                     "default_pipeline"
                 ]
 
@@ -326,7 +329,7 @@ class PipelineHandler:
 
                 self.pipeline_types[index] = pipeline["type"]
 
-        for camera_index in range(len(self.cameras)):
+        for camera_index in self.cameras.keys():
             pipeline = self.default_pipeline_indexes[camera_index]
             self.setPipelineByIndex(
                 camera_index=camera_index,
