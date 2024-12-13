@@ -1,19 +1,26 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+import typing
 from ntcore import NetworkTable
-from typing_extensions import Any
+from ntcore import Event, EventFlags
+from typing_extensions import Any, Callable
 import cv2
 
+from synapse import log
 from synapse.pipeline_settings import PipelineSettings
 
 
 # Abstract Pipeline class
 class Pipeline(ABC):
     __is_enabled__ = True
+    VALID_ENTRY_TYPES = float | int | str | typing.Sequence | bytes | bool
 
     @abstractmethod
-    def __init__(self, settings: PipelineSettings | None):
-        self.nt_table = None
+    def __init__(self, settings: PipelineSettings | None, camera_index: int):
+        self.nt_table: Optional[NetworkTable] = None
+
+    def setup(self):
+        pass
 
     @abstractmethod
     def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike | None:
@@ -33,20 +40,36 @@ class Pipeline(ABC):
         :param value: The value to store.
         """
         if self.nt_table is not None:
-            self.nt_table.putValue(key, value)
+            self.nt_table.getSubTable("data").putValue(key, value)
 
-    def getValue(self, key: str, default: Optional[Any] = None) -> Any:
-        """
-        Gets a value from the network table.
-
-        :param key: The key for the value.
-        :param default: The default value to return if the key does not exist.
-        :return: The value associated with the key, or the default if the key doesn't exist.
-        """
+    def setDataListener(
+        self,
+        key: str,
+        setter: Callable[[VALID_ENTRY_TYPES], None],
+        getter: Callable[[], VALID_ENTRY_TYPES],
+    ):
         if self.nt_table is not None:
-            if self.nt_table.containsKey(key):
-                return self.nt_table.getValue(key, default)
-        return default
+            self.__setListener(
+                key=key,
+                setter=setter,
+                getter=getter,
+                table=self.nt_table.getSubTable("data"),
+            )
+        else:
+            log.log(f"Error: trying to set data listener (key = {key}), for None table")
+
+    def __setListener(
+        self,
+        key: str,
+        setter: Callable[[VALID_ENTRY_TYPES], None],
+        getter: Callable[[], VALID_ENTRY_TYPES],
+        table: NetworkTable,
+    ):
+        def listener(_: NetworkTable, key: str, event: Event):
+            setter(event.data.value.value())  # pyright: ignore
+
+        table.addListener(eventMask=EventFlags.kValueAll, listener=listener, key=key)
+        table.putValue(key, getter())
 
 
 def disabled(cls):
