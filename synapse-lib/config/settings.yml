@@ -28,11 +28,12 @@ pipelines:
       width: 600
       height: 600
       fieldpose: true
+      saturation: 10
   1:
     type: ApriltagPipeline
     settings:
       target_tag: 12
       brightness: 100
       exposure: 20
-      width: 600
-      height: 600
+      width: 1920
+      height: 1080
