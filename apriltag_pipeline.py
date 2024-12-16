@@ -5,7 +5,17 @@ from synapse.pipeline_settings import GlobalSettings, PipelineSettings
 from synapse.pipeline import Pipeline
 from pupil_apriltags import Detector
 import numpy as np
-from wpimath.geometry import Pose3d, Transform3d, Translation3d, Rotation3d
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Rotation2d,
+    Transform3d,
+    Translation2d,
+    Translation3d,
+    Rotation3d,
+)
+from robotpy_apriltag import AprilTagFieldLayout, AprilTagField
+from wpilib import Field2d
 
 
 class ApriltagPipeline(Pipeline):
@@ -21,6 +31,11 @@ class ApriltagPipeline(Pipeline):
         self.settings = settings
         self.camera_matrix = self.getCameraMatrix(camera_index)
         self.camera_transform = self.getCameraTransform(camera_index)
+        self.getFieldPose = settings["fieldpose"]
+        ApriltagPipeline.fmap = AprilTagFieldLayout.loadField(
+            AprilTagField.k2024Crescendo
+        )
+        self.field = Field2d()
 
     def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike | None:
         # Convert image to grayscale for detection
@@ -43,9 +58,6 @@ class ApriltagPipeline(Pipeline):
         if not tags:
             return gray
 
-        # Process detected tags
-        robot_transforms = []
-
         for tag in tags:  # pyright: ignore
             # Get AprilTag pose relative to the camera
             tag_translation_camera = np.array(tag.pose_t).flatten()
@@ -55,8 +67,6 @@ class ApriltagPipeline(Pipeline):
             robot_transform = np.eye(4)  # identity matrix, (0,0,0) essentialy
             robot_transform[:3, :3] = tag_rotation_camera
             robot_transform[:3, 3] = tag_translation_camera
-
-            robot_transforms.append(robot_transform)
 
             # Overlay tag detection details
             corners = tag.corners.astype(int)
@@ -80,17 +90,14 @@ class ApriltagPipeline(Pipeline):
                 1,
             )
 
-        # Average transforms if multiple tags are detected
-        if robot_transforms:
-            avg_transform = np.mean(robot_transforms, axis=0)
             # Extract translation vector
-            translation = avg_transform[:3, 3]
+            translation = robot_transform[:3, 3]
             translation3d = Translation3d(
-                translation[0], translation[1], translation[2]
+                translation[2], translation[0], translation[1]
             )
 
             # Extract rotation matrix and convert to Rotation3d
-            rotation_matrix = avg_transform[:3, :3]
+            rotation_matrix = robot_transform[:3, :3]
             rotation3d = Rotation3d(*cv2.Rodrigues(rotation_matrix)[0].flatten())
 
             # Create Transform3d
@@ -101,7 +108,55 @@ class ApriltagPipeline(Pipeline):
                 "tagRotation", [rotation3d.X(), rotation3d.Y(), rotation3d.Z()]
             )
 
+            if self.getFieldPose and self.camera_transform:
+                tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
+
+                if tagPose:
+                    robotPose = ApriltagPipeline.tagToRobotPose(
+                        tagFieldPose=tagPose,
+                        robotToCameraTransform=self.camera_transform,
+                        cameraToTagTransform=Transform3d(
+                            translation=translation3d,
+                            rotation=rotation3d,
+                        ).inverse(),
+                    )
+
+                    robotRotation = robotPose.rotation()
+                    self.setValue(
+                        "selfPose", [robotPose.X(), robotPose.Y(), robotPose.Z()]
+                    )
+                    self.setValue(
+                        "selfRotation",
+                        [robotRotation.X(), robotRotation.Y(), robotRotation.Z()],
+                    )
+
+                    tag_position = Translation2d(tagPose.X(), tagPose.Y())
+                    robot_position = Translation2d(robotPose.X(), robotPose.Y())
+
+                    # Step 2: Translate the robot's position to the tag's origin (centered at the tag)
+                    relative_position = robot_position - tag_position
+
+                    # Step 3: Apply the rotation around the tag (Rotation2d object applies the rotation)
+                    rotated_position = relative_position.rotateBy(
+                        Rotation2d(robotRotation.Y())
+                    )
+
+                    # Step 4: Translate the rotated position back to the field's coordinate system
+                    final_position = tag_position + rotated_position
+
+                    # Step 5: Set the robot pose on the field using the adjusted position
+                    self.field.setRobotPose(
+                        Pose2d(
+                            translation=final_position,
+                            rotation=Rotation2d(robotRotation.Y()),
+                        )
+                    )
+                    self.setValue("field", self.field)
         return gray
+
+    @staticmethod
+    def getTagPoseOnField(id: int) -> Optional[Pose3d]:
+        return ApriltagPipeline.fmap.getTagPose(id)
 
     @staticmethod
     def tagToRobotPose(
@@ -111,7 +166,8 @@ class ApriltagPipeline(Pipeline):
     ) -> Pose3d:
         """
         Computes the robot's pose in the field from the tag's pose in the field, using the camera's position and orientation
-        relative to both the robot and the tag.
+        relative to both the robot and the tag. The method now accounts for both the robot's rotation around itself
+        and its rotation around the tag.
 
         Args:
             tagFieldPose (Pose3d): The pose of the tag in the field coordinate system, including position and orientation.
@@ -125,7 +181,7 @@ class ApriltagPipeline(Pipeline):
             This method uses the following logic:
             1. The tag's pose in the field is transformed into the camera's coordinate system by applying the inverse of `cameraToTagTransform`.
             2. The resulting camera pose in the field is then transformed into the robot's coordinate system by applying the inverse of `robotToCameraTransform`.
-            3. The final result is the robot's pose in the field.
+            3. The robot's final pose is computed as a combination of its own rotation (relative to the tag) and the position relative to the tag.
         """
         cameraInField = tagFieldPose.transformBy(cameraToTagTransform.inverse())
         robotInField = cameraInField.transformBy(robotToCameraTransform.inverse())

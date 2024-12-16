@@ -6,7 +6,6 @@ from typing import Any, List, Type, Dict, Union
 from ntcore import Event, EventFlags
 
 import ntcore
-
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline
 from cscore import CameraServer, UsbCamera
@@ -117,16 +116,17 @@ class PipelineHandler:
             for pipeline_cls in pipeline
         ]
 
-        for curr in self.pipeline_instances[camera_index]:
+        for currPipeline in self.pipeline_instances[camera_index]:
             if NtClient.INSTANCE is not None:
                 setattr(
-                    curr,
+                    currPipeline,
                     "nt_table",
                     NtClient.INSTANCE.nt_inst.getTable("Synapse").getSubTable(
                         f"camera{camera_index}"
                     ),
                 )
-                curr.setup()
+                setattr(currPipeline, "builder_cache", {})
+                currPipeline.setup()
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
         log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
@@ -177,7 +177,8 @@ class PipelineHandler:
 
             log("Set up sinks array")
             frame_buffers = {
-                i: np.zeros((1920, 1080, 3), dtype=np.uint8) for i in self.cameras.keys()
+                i: np.zeros((1920, 1080, 3), dtype=np.uint8)
+                for i in self.cameras.keys()
             }
 
             log("Set up frame buffers")
@@ -311,12 +312,12 @@ class PipelineHandler:
             settings = yaml.full_load(file)
 
             camera_configs = settings["camera_configs"]
-            
+
             for camera_index in camera_configs:
                 self.addCamera(camera_index)
-                self.default_pipeline_indexes[camera_index] = camera_configs[camera_index][
-                    "default_pipeline"
-                ]
+                self.default_pipeline_indexes[camera_index] = camera_configs[
+                    camera_index
+                ]["default_pipeline"]
 
             pipelines = settings["pipelines"]
 

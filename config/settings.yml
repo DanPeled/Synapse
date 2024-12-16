@@ -6,9 +6,9 @@ network:
 global:
   camera_matrix:
     0:
-      - [704.10929061, 0.0,          403.0831928 ]
-      - [0.0,          682.28472818, 221.93690416]
-      - [0.0,          0.0,          1.0         ]
+      - [672.38531251,   0.      ,   348.05954802]
+      - [  0.   ,      649.66430117, 211.96006488]
+      - [  0. ,          0.      ,     1.        ]
   camera_transform:
     0:
       - [0, 0, 0] # translation
@@ -27,6 +27,7 @@ pipelines:
       exposure: 20
       width: 600
       height: 600
+      fieldpose: true
   1:
     type: ApriltagPipeline
     settings:
