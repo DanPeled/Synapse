@@ -1,16 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Callable, Any
 import typing
-from ntcore import NetworkTable
-from ntcore import Event, EventFlags
-from typing_extensions import Any, Callable
+from ntcore import NetworkTable, Event, EventFlags
+from wpilib import SendableBuilderImpl
+from wpiutil import Sendable, SendableBuilder
 import cv2
-
 from synapse import log
 from synapse.pipeline_settings import PipelineSettings
 
 
-# Abstract Pipeline class
 class Pipeline(ABC):
     __is_enabled__ = True
     VALID_ENTRY_TYPES = float | int | str | typing.Sequence | bytes | bool
@@ -18,6 +16,7 @@ class Pipeline(ABC):
     @abstractmethod
     def __init__(self, settings: PipelineSettings | None, camera_index: int):
         self.nt_table: Optional[NetworkTable] = None
+        self.builder_cache: dict[str, SendableBuilder] = {}
 
     def setup(self):
         pass
@@ -40,7 +39,12 @@ class Pipeline(ABC):
         :param value: The value to store.
         """
         if self.nt_table is not None:
-            self.nt_table.getSubTable("data").putValue(key, value)
+            if isinstance(value, Sendable):
+                builder = self.__getOrCreateBuilder(key)
+                value.initSendable(builder)
+                builder.update()
+            else:
+                self.nt_table.getSubTable("data").putValue(key, value)
 
     def setDataListener(
         self,
@@ -71,8 +75,22 @@ class Pipeline(ABC):
         table.addListener(eventMask=EventFlags.kValueAll, listener=listener, key=key)
         table.putValue(key, getter())
 
+    def __getOrCreateBuilder(self, key: str) -> SendableBuilder:
+        """
+        Retrieves a cached builder for the given key, or creates and caches a new one.
+
+        :param key: The key associated with the builder.
+        :return: A SendableBuilder instance.
+        """
+        if key not in self.builder_cache and self.nt_table is not None:
+            sub_table = self.nt_table.getSubTable(f"data/{key}")
+            builder = SendableBuilderImpl()
+            builder.setTable(sub_table)
+            builder.startListeners()
+            self.builder_cache[key] = builder
+        return self.builder_cache[key]
+
 
 def disabled(cls):
     cls.__is_enabled__ = False
-
     return cls

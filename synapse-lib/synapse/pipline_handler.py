@@ -6,10 +6,9 @@ from typing import Any, List, Type, Dict, Union
 from ntcore import Event, EventFlags
 
 import ntcore
-
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline
-from cscore import CameraServer, UsbCamera
+from cscore import CameraServer, CvSink, CvSource, UsbCamera
 import numpy as np
 import time
 from synapse.log import log
@@ -35,6 +34,8 @@ class PipelineHandler:
         self.pipeline_bindings: Dict[int, int] = {}
         self.pipeline_types: Dict[int, str] = {}
         self.pipeline_subscribers: Dict[int, ntcore.IntegerSubscriber] = {}
+        self.outputs: Dict[int, CvSource] = {}
+        self.sinks: Dict[int, CvSink] = {}
 
     def loadPipelines(self) -> Dict[str, Type[Pipeline]]:
         """
@@ -117,16 +118,17 @@ class PipelineHandler:
             for pipeline_cls in pipeline
         ]
 
-        for curr in self.pipeline_instances[camera_index]:
+        for currPipeline in self.pipeline_instances[camera_index]:
             if NtClient.INSTANCE is not None:
                 setattr(
-                    curr,
+                    currPipeline,
                     "nt_table",
                     NtClient.INSTANCE.nt_inst.getTable("Synapse").getSubTable(
                         f"camera{camera_index}"
                     ),
                 )
-                curr.setup()
+                setattr(currPipeline, "builder_cache", {})
+                currPipeline.setup()
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
         log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
@@ -148,17 +150,32 @@ class PipelineHandler:
         # If both indices are valid, proceed with the pipeline setting
         self.pipeline_bindings[camera_index] = pipeline_index
 
-        log(f"Set pipeline #{pipeline_index} for camera ({camera_index})")
-
         self.setNTPipelineIndex(
             camera_index=camera_index, pipeline_index=pipeline_index
         )
 
+        settings = self.pipeline_settings[pipeline_index]
+
+        if camera_index in self.outputs.keys():
+            self.cameras[camera_index].setResolution(
+                width=int(settings["width"]),  # pyright: ignore
+                height=int(settings["height"]),  # pyright: ignore
+            )
+            if self.outputs[camera_index].setResolution(
+                width=int(settings["width"]),  # pyright: ignore
+                height=int(settings["height"]),  # pyright: ignore
+            ):
+                print("yay")
+            else:
+                print("less yay")
+
         self.__setPipelineForCamera(
             camera_index=camera_index,
             pipeline=self.pipelines[self.pipeline_types[pipeline_index]],
-            pipeline_config=self.pipeline_settings[pipeline_index],
+            pipeline_config=settings,
         )
+
+        log(f"Set pipeline #{pipeline_index} for camera ({camera_index})")
 
     def setNTPipelineIndex(self, camera_index: int, pipeline_index: int):
         if NtClient.INSTANCE is not None:
@@ -171,28 +188,41 @@ class PipelineHandler:
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
         try:
-            sinks = {
+            self.sinks = {
                 i: CameraServer.getVideo(self.cameras[i]) for i in self.cameras.keys()
             }
 
             log("Set up sinks array")
             frame_buffers = {
-                i: np.zeros((1920, 1080, 3), dtype=np.uint8) for i in self.cameras.keys()
+                i: np.zeros((1920, 1080, 3), dtype=np.uint8)
+                for i in self.cameras.keys()
             }
 
             log("Set up frame buffers")
 
-            outputs = {
-                i: CameraServer.putVideo(f"Camera {i} output", 1920, 1080)
+            self.outputs = {
+                i: CameraServer.putVideo(
+                    f"Camera {i} output",
+                    width=int(
+                        self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
+                            "width"
+                        ]
+                    ),
+                    height=int(
+                        self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
+                            "height"
+                        ]
+                    ),
+                )
                 for i in self.cameras.keys()
             }
 
             log("Set up outputs array")
 
             def process_camera(index):
-                sink = sinks[index]
+                sink = self.sinks[index]
                 frame_buffer = frame_buffers[index]
-                output = outputs[index]
+                output = self.outputs[index]
 
                 while True:
                     start_time = time.time()  # Start time for FPS calculation
@@ -226,21 +256,20 @@ class PipelineHandler:
                     if processed_frame is not None:
                         output.putFrame(processed_frame)
 
-                    for i in self.cameras.keys():
-                        if NtClient.INSTANCE is not None:
-                            entry = NtClient.INSTANCE.nt_inst.getTable(
-                                "Synapse"
-                            ).getEntry(f"camera{i}/pipeline")
+                    if NtClient.INSTANCE is not None:
+                        entry = NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
+                            f"camera{index}/pipeline"
+                        )
 
-                            pipeline = entry.getInteger(None)
+                        pipeline = entry.getInteger(None)
 
-                            # print(f"pipeline: {pipeline}, entry : {entry.getName()}")
+                        # print(f"pipeline: {pipeline}, entry : {entry.getName()}")
 
-                            if (
-                                pipeline != self.pipeline_bindings[i]
-                                and pipeline is not None
-                            ):
-                                self.setPipelineByIndex(i, pipeline)
+                        if (
+                            pipeline != self.pipeline_bindings[index]
+                            and pipeline is not None
+                        ):
+                            self.setPipelineByIndex(i, pipeline)
 
             # Create and start a thread for each camera
             threads = []
@@ -311,12 +340,12 @@ class PipelineHandler:
             settings = yaml.full_load(file)
 
             camera_configs = settings["camera_configs"]
-            
+
             for camera_index in camera_configs:
                 self.addCamera(camera_index)
-                self.default_pipeline_indexes[camera_index] = camera_configs[camera_index][
-                    "default_pipeline"
-                ]
+                self.default_pipeline_indexes[camera_index] = camera_configs[
+                    camera_index
+                ]["default_pipeline"]
 
             pipelines = settings["pipelines"]
 
@@ -340,17 +369,82 @@ class PipelineHandler:
         log("Loaded pipelines successfully")
         self.setupNetworkTables()
 
-    def setCameraConfigs(self, settings: Dict[str, Any], camera: UsbCamera):
-        camera.setBrightness(settings.get("brightness", 100))
-        default_width = 1920
-        default_height = 1080
+    @staticmethod
+    def setCameraConfigs(
+        settings: Dict[str, Any],
+        camera: UsbCamera,
+        # Default values for each property
+        brightness: int = 0,
+        contrast: int = 12,
+        saturation: int = 25,
+        hue: int = 50,
+        exposure: int = 120,
+        gain: int = 31,
+        sharpness: int = 0,
+        white_balance_auto: bool = True,
+        gain_auto: bool = True,
+        horizontal_flip: bool = False,
+        vertical_flip: bool = False,
+        power_line_frequency: int = 0,  # Enum: 0 (Disabled), 1 (50Hz)
+    ):
+        # Set brightness
+        camera.setBrightness(settings.get("brightness", brightness))
 
-        camera.setResolution(
-            settings.get("width", default_width), settings.get("height", default_height)
+        # Set contrast
+        camera.getProperty("contrast").set(settings.get("contrast", contrast))
+
+        # Set saturation
+        camera.getProperty("saturation").set(settings.get("saturation", saturation))
+
+        # Set hue
+        camera.getProperty("hue").set(settings.get("hue", hue))
+
+        # Set exposure
+        camera.setExposureManual(settings.get("exposure", exposure))
+
+        # Set gain
+        camera.getProperty("gain").set(settings.get("gain", gain))
+
+        # Set sharpness
+        camera.getProperty("sharpness").set(settings.get("sharpness", sharpness))
+
+        # Set white balance (automatic or manual)
+        if settings.get("white_balance_automatic", white_balance_auto):
+            camera.setWhiteBalanceAuto()
+        else:
+            camera.setWhiteBalanceManual(
+                settings.get("white_balance", 0)
+            )  # Adjust based on manual value in settings
+
+        autoGain = settings.get("gain_automatic", gain_auto)
+        if "gain_automatic" in settings.keys():
+            camera.getProperty("gain_automatic").set(autoGain)
+        else:
+            camera.getProperty("raw_gain").set(
+                settings.get("raw_gain", 20)
+            )  # Use raw gain for manual gain adjustment
+
+        # Set horizontal flip
+        camera.getProperty("horizontal_flip").set(
+            settings.get("horizontal_flip", horizontal_flip)
         )
 
-    def setPipelineSettings(self, camera_index: int, settings):
-        self.pipeline_settings[camera_index] = PipelineSettings(settings)
+        # Set vertical flip
+        camera.getProperty("vertical_flip").set(
+            settings.get("vertical_flip", vertical_flip)
+        )
+
+        # Set power line frequency (0: Disabled, 1: 50Hz)
+        camera.getProperty("power_line_frequency").set(
+            settings.get("power_line_frequency", power_line_frequency)
+        )
+
+    def setPipelineSettings(
+        self,
+        pipeline_index: int,
+        settings: PipelineSettings.PipelineSettingsMap,
+    ):
+        self.pipeline_settings[pipeline_index] = PipelineSettings(settings)
 
     def cleanup(self):
         """

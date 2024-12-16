@@ -1,5 +1,7 @@
 from typing import Optional, Union, Dict, List
 
+from ntcore import NetworkTable, NetworkTableEntry
+
 
 class PipelineSettings:
     PipelineSettingsMapValue = Union[
@@ -16,8 +18,16 @@ class PipelineSettings:
     ]
     PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
 
-    def __init__(self, settings: Optional[PipelineSettingsMap] = None):
+    def __init__(
+        self,
+        settings: Optional[PipelineSettingsMap] = None,
+    ):
         self.__settings = settings if settings is not None else {}
+
+    def sendSettings(self, nt_table: NetworkTable):
+        for key in self.__settings.keys():
+            value = self.__settings[key]
+            PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
 
     def get(self, key: str) -> Optional[PipelineSettingsMapValue]:
         return self.__settings.get(key)
@@ -40,6 +50,30 @@ class PipelineSettings:
 
     def getMap(self) -> PipelineSettingsMap:
         return self.__settings
+
+    @staticmethod
+    def setEntryValue(entry: NetworkTableEntry, value):
+        if isinstance(value, int):
+            entry.setInteger(value)
+        elif isinstance(value, float):
+            entry.setFloat(value)
+        elif isinstance(value, bool):
+            entry.setBoolean(value)
+        elif isinstance(value, str):
+            entry.setString(value)
+        elif isinstance(value, list):
+            if all(isinstance(i, int) for i in value):
+                entry.setIntegerArray(value)
+            elif all(isinstance(i, float) for i in value):
+                entry.setFloatArray(value)
+            elif all(isinstance(i, bool) for i in value):
+                entry.setBooleanArray(value)
+            elif all(isinstance(i, str) for i in value):
+                entry.setStringArray(value)
+            else:
+                raise ValueError("Unsupported list type")
+        else:
+            raise ValueError("Unsupported type")
 
 
 class GlobalSettingsMeta(type):
