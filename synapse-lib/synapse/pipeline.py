@@ -60,7 +60,7 @@ class Pipeline(ABC):
                 table=self.nt_table.getSubTable("data"),
             )
         else:
-            log.log(f"Error: trying to set data listener (key = {key}), for None table")
+            log.err(f"trying to set data listener (key = {key}), for None table")
 
     def __setListener(
         self,

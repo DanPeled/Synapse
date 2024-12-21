@@ -17,6 +17,8 @@ global:
 camera_configs:
   0:
     default_pipeline: 0
+    name: Monochrome
+    path: /dev/video0
 
 pipelines:
   0: 

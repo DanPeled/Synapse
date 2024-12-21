@@ -2,30 +2,34 @@ import os
 import importlib.util
 import cv2
 from typing import Any, List, Type, Dict, Union
-
 from ntcore import Event, EventFlags
-
 import ntcore
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline
 from cscore import CameraServer, CvSink, CvSource, UsbCamera
 import numpy as np
 import time
-from synapse.log import log
+from synapse.log import log, err
 from synapse.pipeline_settings import PipelineSettings
 import threading
+from dataclasses import dataclass
+
+
+@dataclass
+class CameraBinding:
+    path: str
+    name: str
 
 
 class PipelineHandler:
+    NT_TABLE = "Synapse"
+
     def __init__(self, directory: str):
         """
         Initializes the handler, loads all pipeline classes in the specified directory.
         :param directory: Root directory to search for pipeline files
         """
         self.directory = directory
-
-    def setup(self):
-        self.pipelines = self.loadPipelines()
         self.cameras: Dict[int, UsbCamera] = {}
         self.pipeline_map: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipeline_instances: Dict[int, List[Pipeline]] = {}
@@ -36,6 +40,20 @@ class PipelineHandler:
         self.pipeline_subscribers: Dict[int, ntcore.IntegerSubscriber] = {}
         self.outputs: Dict[int, CvSource] = {}
         self.sinks: Dict[int, CvSink] = {}
+
+    def setup(self, settings: Dict[Any, Any]):
+        self.pipelines = self.loadPipelines()
+        self.camera_bindings = self.setupCameraBindings(settings["camera_configs"])
+
+    def setupCameraBindings(self, cameras_yml: dict):
+        bindings: Dict[int, CameraBinding] = {}
+
+        for index in cameras_yml.keys():
+            bindings[index] = CameraBinding(
+                cameras_yml[index]["path"], cameras_yml[index]["name"]
+            )
+
+        return bindings
 
     def loadPipelines(self) -> Dict[str, Type[Pipeline]]:
         """
@@ -73,8 +91,8 @@ class PipelineHandler:
                                     log(f"Loaded {cls.__name__} pipeline")
                                     pipelines[cls.__name__] = cls
                     except Exception as e:
-                        log(
-                            f"Error loading {file_path}: {e}"
+                        err(
+                            f"while loading {file_path}: {e}"
                         )  # Consider using logging instead
 
         log("Loaded pipelines successfully")
@@ -85,14 +103,23 @@ class PipelineHandler:
         Adds a camera to the handler by opening it through OpenCV.
         :param camera_index: Camera index to open
         """
-        camera = CameraServer.startAutomaticCapture(camera_index)
+        if camera_index not in self.camera_bindings.keys():
+            err(f"No camera defined for index {camera_index}")
+            return False
+
+        camera_config = self.camera_bindings[camera_index]
+
+        camera = CameraServer.startAutomaticCapture(
+            f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(camera_index)}/input",
+            camera_config.path,
+        )
 
         if camera.isConnected():
             self.cameras[camera_index] = camera
-            log(f"Camera {camera_index} added successfully.")
+            log(f"Camera ({camera_config}, id={camera_index}) added successfully.")
             return True
         else:
-            log(f"Failed to open camera {camera_index}.")
+            err(f"Failed to open camera {camera_index}.")
             return False
 
     def __setPipelineForCamera(
@@ -123,9 +150,9 @@ class PipelineHandler:
                 setattr(
                     currPipeline,
                     "nt_table",
-                    NtClient.INSTANCE.nt_inst.getTable("Synapse").getSubTable(
-                        f"camera{camera_index}"
-                    ),
+                    NtClient.INSTANCE.nt_inst.getTable(
+                        PipelineHandler.NT_TABLE
+                    ).getSubTable(self.getCameraTableName(camera_index)),
                 )
                 setattr(currPipeline, "builder_cache", {})
                 currPipeline.setup()
@@ -135,14 +162,14 @@ class PipelineHandler:
 
     def setPipelineByIndex(self, camera_index: int, pipeline_index: int):
         if camera_index not in self.cameras.keys():
-            log(
-                f"Error: Invalid camera_index {camera_index}. Must be in range(0, {len(self.cameras.keys())-1})."
+            err(
+                f"Invalid camera_index {camera_index}. Must be in range(0, {len(self.cameras.keys())-1})."
             )
             return
 
         if pipeline_index not in self.pipeline_types.keys():
-            log(
-                f"Error: Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipeline_types.keys())}."
+            err(
+                f"Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipeline_types.keys())}."
             )
             self.setNTPipelineIndex(camera_index, self.pipeline_bindings[camera_index])
             return
@@ -161,13 +188,10 @@ class PipelineHandler:
                 width=int(settings["width"]),  # pyright: ignore
                 height=int(settings["height"]),  # pyright: ignore
             )
-            if self.outputs[camera_index].setResolution(
+            self.outputs[camera_index].setResolution(
                 width=int(settings["width"]),  # pyright: ignore
                 height=int(settings["height"]),  # pyright: ignore
-            ):
-                print("yay")
-            else:
-                print("less yay")
+            )
 
         self.__setPipelineForCamera(
             camera_index=camera_index,
@@ -179,9 +203,27 @@ class PipelineHandler:
 
     def setNTPipelineIndex(self, camera_index: int, pipeline_index: int):
         if NtClient.INSTANCE is not None:
-            NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
-                f"camera{camera_index}/pipeline"
+            NtClient.INSTANCE.nt_inst.getTable(PipelineHandler.NT_TABLE).getEntry(
+                f"{self.getCameraTableName(camera_index)}/pipeline"
             ).setInteger(pipeline_index)
+
+    def getCameraOutputs(self):
+        return {
+            i: CameraServer.putVideo(
+                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
+                width=int(
+                    self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
+                        "width"
+                    ]
+                ),
+                height=int(
+                    self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
+                        "height"
+                    ]
+                ),
+            )
+            for i in self.cameras.keys()
+        }
 
     def run(self):
         """
@@ -200,23 +242,7 @@ class PipelineHandler:
 
             log("Set up frame buffers")
 
-            self.outputs = {
-                i: CameraServer.putVideo(
-                    f"Camera {i} output",
-                    width=int(
-                        self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
-                            "width"
-                        ]
-                    ),
-                    height=int(
-                        self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
-                            "height"
-                        ]
-                    ),
-                )
-                for i in self.cameras.keys()
-            }
-
+            self.outputs = self.getCameraOutputs()
             log("Set up outputs array")
 
             def process_camera(index):
@@ -257,9 +283,9 @@ class PipelineHandler:
                         output.putFrame(processed_frame)
 
                     if NtClient.INSTANCE is not None:
-                        entry = NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
-                            f"camera{index}/pipeline"
-                        )
+                        entry = NtClient.INSTANCE.nt_inst.getTable(
+                            PipelineHandler.NT_TABLE
+                        ).getEntry(f"{self.getCameraTableName(index)}/pipeline")
 
                         pipeline = entry.getInteger(None)
 
@@ -303,10 +329,14 @@ class PipelineHandler:
         if NtClient.INSTANCE is not None:
             inst = NtClient.INSTANCE.server or NtClient.INSTANCE.nt_inst
 
-            table: ntcore.NetworkTable = inst.getTable("Synapse")
+            table: ntcore.NetworkTable = inst.getTable(PipelineHandler.NT_TABLE)
 
             for i in self.cameras.keys():
-                topic = inst.getTable("Synapse").getIntegerTopic(f"camera{i}/pipeline")
+                topicName = f"{self.getCameraTableName(i)}/pipeline"
+
+                topic = inst.getTable(PipelineHandler.NT_TABLE).getIntegerTopic(
+                    topicName
+                )
 
                 pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
                 pub.setDefault(0)
@@ -315,8 +345,8 @@ class PipelineHandler:
                     0, ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10)
                 )
 
-                NtClient.INSTANCE.nt_inst.getTable("Synapse").getEntry(
-                    f"camera{i}/pipeline"
+                NtClient.INSTANCE.nt_inst.getTable(PipelineHandler.NT_TABLE).getEntry(
+                    topicName
                 ).setInteger(sub.get())
 
                 self.pipeline_subscribers[i] = sub
@@ -324,13 +354,16 @@ class PipelineHandler:
                 log(f"Added listener for camera {i}, entry:{topic.getName()}")
 
                 table.addListener(
-                    key=f"camera{i}/pipeline",
+                    key=topicName,
                     eventMask=EventFlags.kImmediate,
                     listener=addCurrentPipelineListener,
                 )
             log("Set up settings successfully")
         else:
-            log("Error: NtClient instance is None")
+            err("NtClient instance is None")
+
+    def getCameraTableName(self, index: int) -> str:
+        return f"camera{index}"
 
     def loadSettings(self):
         import yaml

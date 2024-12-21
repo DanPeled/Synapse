@@ -196,8 +196,8 @@ class ApriltagPipeline(Pipeline):
             camera_matrix = mat_lst[camera_index]
             return camera_matrix
         if camera_matrix is None:
-            log.log(
-                "ERROR: no camera matrix, will not return valid results for apriltag detections"
+            log.err(
+                "no camera matrix, will not return valid results for apriltag detections"
             )
 
     def getCameraTransform(self, camera_index: int) -> Optional[Transform3d]:
@@ -208,8 +208,8 @@ class ApriltagPipeline(Pipeline):
             trans_matrix = trans_matrix_lst.get(camera_index)
 
         if trans_matrix is None:
-            log.log(
-                "ERROR: no camera transform, will not return valid results for apriltag detections"
+            log.err(
+                "no camera transform, will not return valid results for apriltag detections"
             )
             return None
 
