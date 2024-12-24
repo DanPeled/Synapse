@@ -1,7 +1,7 @@
 network:
   server: true
   name: Vision-Py
-  server_ip: 127.0.0.1
+  team_number: 9738
 
 global:
   camera_matrix:

@@ -68,7 +68,7 @@ class Synapse:
         """
         self.nt_client = NtClient()
         setup_good = self.nt_client.setup(
-            settings["server_ip"], settings["name"], settings["server"]
+            settings["team_number"], settings["name"], settings["server"]
         )
         return setup_good
 

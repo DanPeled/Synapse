@@ -1,5 +1,5 @@
 import time
-from typing_extensions import Optional
+from typing import Optional
 from ntcore import NetworkTableInstance
 from synapse.log import err, log
 
@@ -7,7 +7,7 @@ from synapse.log import err, log
 class NtClient:
     """
     A class that handles the connection and communication with a NetworkTables server.
-    It can be configured as a client or a server.
+    It can be configured as either a client or a server.
 
     Attributes:
         INSTANCE (Optional[NtClient]): A singleton instance of the NtClient class.
@@ -17,7 +17,7 @@ class NtClient:
 
     INSTANCE: Optional["NtClient"] = None
 
-    def setup(self, server_name: str, name: str, is_server: bool = False) -> bool:
+    def setup(self, team_number: int, name: str, is_server: bool = False) -> bool:
         """
         Sets up the NetworkTables client or server, and attempts to connect to the specified server.
 
@@ -37,13 +37,14 @@ class NtClient:
         # If acting as a server, create and start the server instance
         if is_server:
             self.server = NetworkTableInstance.create()
-            self.server.startServer(server_name)
+            self.server.startServer("127.0.0.1")
+            self.nt_inst.setServer("127.0.0.1")
             log(f"Server started with name {name}.")
         else:
             self.server = None
+            self.nt_inst.setServerTeam(team_number)
 
         # Client mode: set the server and start the client
-        self.nt_inst.setServer(server_name)
         self.nt_inst.startClient4(name)
 
         # Attempt to connect to the server with a timeout of 120 seconds
@@ -54,10 +55,10 @@ class NtClient:
             curr = time.time() - start_time
             if curr > timeout:
                 err(
-                    f"connection to server ({server_name}) from client ({name}) timed out after {curr} seconds"
+                    f"connection to server ({'127.0.0.1' if is_server else team_number}) from client ({name}) timed out after {curr} seconds"
                 )
                 return False
-            log(f"Trying to connect to {server_name}...")
+            log(f"Trying to connect to {team_number}...")
             time.sleep(1)
 
         return True
