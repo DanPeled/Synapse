@@ -13,6 +13,7 @@ from synapse.log import log, err
 from synapse.pipeline_settings import PipelineSettings
 import threading
 from dataclasses import dataclass
+import traceback
 
 
 @dataclass
@@ -94,6 +95,7 @@ class PipelineHandler:
                         err(
                             f"while loading {file_path}: {e}"
                         )  # Consider using logging instead
+                        traceback.print_exc()
 
         log("Loaded pipelines successfully")
         return pipelines
@@ -406,7 +408,6 @@ class PipelineHandler:
     def setCameraConfigs(
         settings: Dict[str, Any],
         camera: UsbCamera,
-        # Default values for each property
         brightness: int = 0,
         contrast: int = 12,
         saturation: int = 25,
@@ -414,8 +415,8 @@ class PipelineHandler:
         exposure: int = 120,
         gain: int = 31,
         sharpness: int = 0,
-        white_balance_auto: bool = True,
-        gain_auto: bool = True,
+        white_balance_auto: bool = False,
+        gain_auto: bool = False,
         horizontal_flip: bool = False,
         vertical_flip: bool = False,
         power_line_frequency: int = 0,  # Enum: 0 (Disabled), 1 (50Hz)

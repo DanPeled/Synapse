@@ -56,7 +56,7 @@ class Synapse:
         log("Initialized Synapse successfully")
         return True
 
-    def __init_networktables(self, settings: dict[str, Any]) -> bool:
+    def __init_networktables(self, settings: dict) -> bool:
         """
         Initializes the NetworkTables client with the provided settings.
 

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Callable, Any
-import typing
 from ntcore import NetworkTable, Event, EventFlags
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
@@ -11,10 +10,10 @@ from synapse.pipeline_settings import PipelineSettings
 
 class Pipeline(ABC):
     __is_enabled__ = True
-    VALID_ENTRY_TYPES = float | int | str | typing.Sequence | bytes | bool
+    VALID_ENTRY_TYPES = Any
 
     @abstractmethod
-    def __init__(self, settings: PipelineSettings | None, camera_index: int):
+    def __init__(self, settings: PipelineSettings, camera_index: int):
         self.nt_table: Optional[NetworkTable] = None
         self.builder_cache: dict[str, SendableBuilder] = {}
 
@@ -22,7 +21,7 @@ class Pipeline(ABC):
         pass
 
     @abstractmethod
-    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike | None:
+    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
         """
         Abstract method that processes a single frame.
 

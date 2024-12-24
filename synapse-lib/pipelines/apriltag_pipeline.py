@@ -37,7 +37,7 @@ class ApriltagPipeline(Pipeline):
         )
         self.field = Field2d()
 
-    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike | None:
+    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -188,7 +188,7 @@ class ApriltagPipeline(Pipeline):
 
         return robotInField
 
-    def getCameraMatrix(self, camera_index: int) -> Optional[list[list[float]]]:
+    def getCameraMatrix(self, camera_index: int):
         mat_lst = GlobalSettings["camera_matrix"]
         camera_matrix = None
 
