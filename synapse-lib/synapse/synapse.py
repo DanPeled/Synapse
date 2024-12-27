@@ -1,4 +1,3 @@
-from typing import Any
 import yaml
 from synapse.nt_client import NtClient
 from synapse.pipeline_settings import GlobalSettings

@@ -6,7 +6,7 @@ from ntcore import Event, EventFlags
 import ntcore
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline
-from cscore import CameraServer, CvSink, CvSource, UsbCamera
+from cscore import CameraServer, CvSink, CvSource, UsbCamera, VideoMode
 import numpy as np
 import time
 from synapse.log import log, err
@@ -185,12 +185,10 @@ class PipelineHandler:
 
         settings = self.pipeline_settings[pipeline_index]
 
-        if camera_index in self.outputs.keys():
-            self.cameras[camera_index].setResolution(
-                width=int(settings["width"]),  # pyright: ignore
-                height=int(settings["height"]),  # pyright: ignore
-            )
-            self.outputs[camera_index].setResolution(
+        if camera_index in self.cameras.keys():
+            self.cameras[camera_index].setVideoMode(
+                fps=100,
+                pixelFormat=VideoMode.PixelFormat.kMJPEG,
                 width=int(settings["width"]),  # pyright: ignore
                 height=int(settings["height"]),  # pyright: ignore
             )
