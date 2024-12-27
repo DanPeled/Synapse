@@ -189,23 +189,27 @@ class ApriltagPipeline(Pipeline):
         return robotInField
 
     def getCameraMatrix(self, camera_index: int):
-        mat_lst = GlobalSettings["camera_matrix"]
+        camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
         camera_matrix = None
 
-        if isinstance(mat_lst, dict):
-            camera_matrix = mat_lst[camera_index]
+        if isinstance(camera_configs, dict):
+            camera_matrix = camera_configs[camera_index]["camera_matrix"]
             return camera_matrix
         if camera_matrix is None:
             log.err(
                 "no camera matrix, will not return valid results for apriltag detections"
             )
 
+    @staticmethod
+    def getCameraConfigsGlobalSettings():
+        return GlobalSettings["camera_configs"]
+
     def getCameraTransform(self, camera_index: int) -> Optional[Transform3d]:
-        trans_matrix_lst = GlobalSettings["camera_transform"]
+        camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
         trans_matrix = None
 
-        if isinstance(trans_matrix_lst, dict):
-            trans_matrix = trans_matrix_lst.get(camera_index)
+        if isinstance(camera_configs, dict):
+            trans_matrix = camera_configs[camera_index]["camera_transform"]
 
         if trans_matrix is None:
             log.err(

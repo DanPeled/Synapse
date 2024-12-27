@@ -1,4 +1,4 @@
-from typing import Optional, Union, Dict, List
+from typing import Any, Optional, Dict
 
 from ntcore import NetworkTable, NetworkTableEntry
 
@@ -19,18 +19,8 @@ class PipelineSettings:
         setEntryValue: A static method for setting a NetworkTable entry's value.
     """
 
-    PipelineSettingsMapValue = Union[
-        float,
-        int,
-        str,
-        List[float],
-        List[int],
-        List[str],
-        List[List[int]],
-        List[List[float]],
-        List[List[str]],
-        Dict,
-    ]
+    PipelineSettingsMapValue = Any
+
     PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
 
     def __init__(

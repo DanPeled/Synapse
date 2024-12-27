@@ -4,21 +4,18 @@ network:
   team_number: 9738
 
 global:
-  camera_matrix:
+  camera_configs:
     0:
-      - [672.38531251,   0.      ,   348.05954802]
-      - [  0.   ,      649.66430117, 211.96006488]
-      - [  0. ,          0.      ,     1.        ]
-  camera_transform:
-    0:
-      - [0, 0, 0] # translation
-      - [0, 0, 0] # rotation
-
-camera_configs:
-  0:
-    default_pipeline: 0
-    name: Monochrome
-    path: /dev/video0
+      default_pipeline: 0
+      name: Monochrome
+      path: /dev/video0
+      camera_matrix:
+        - [672.38531251,   0.      ,   348.05954802]
+        - [  0.   ,      649.66430117, 211.96006488]
+        - [  0. ,          0.      ,     1.        ]
+      camera_transform:
+        - [0, 0, 0] # translation
+        - [0, 0, 0] # rotation
 
 pipelines:
   0: 

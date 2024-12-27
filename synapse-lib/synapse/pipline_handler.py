@@ -44,7 +44,9 @@ class PipelineHandler:
 
     def setup(self, settings: Dict[Any, Any]):
         self.pipelines = self.loadPipelines()
-        self.camera_bindings = self.setupCameraBindings(settings["camera_configs"])
+        self.camera_bindings = self.setupCameraBindings(
+            settings["global"]["camera_configs"]
+        )
 
     def setupCameraBindings(self, cameras_yml: dict):
         bindings: Dict[int, CameraBinding] = {}
@@ -372,7 +374,7 @@ class PipelineHandler:
         with open(r"./config/settings.yml") as file:
             settings = yaml.full_load(file)
 
-            camera_configs = settings["camera_configs"]
+            camera_configs = settings["global"]["camera_configs"]
 
             for camera_index in camera_configs:
                 self.addCamera(camera_index)
