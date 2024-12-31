@@ -5,12 +5,11 @@ from typing import Any, List, Type, Dict, Union
 from ntcore import Event, EventFlags
 import ntcore
 from synapse.nt_client import NtClient
-from synapse.pipeline import Pipeline
+from synapse.pipeline import Pipeline, PipelineSettings
 from cscore import CameraServer, CvSink, CvSource, UsbCamera, VideoMode
 import numpy as np
 import time
 from synapse.log import log, err
-from synapse.pipeline_settings import PipelineSettings
 import threading
 from dataclasses import dataclass
 import traceback

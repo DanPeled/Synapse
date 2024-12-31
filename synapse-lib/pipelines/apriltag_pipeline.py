@@ -1,8 +1,7 @@
 from typing import Optional
 import cv2
 from synapse import log
-from synapse.pipeline_settings import GlobalSettings, PipelineSettings
-from synapse.pipeline import Pipeline
+from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from pupil_apriltags import Detector
 import numpy as np
 from wpimath.geometry import (
