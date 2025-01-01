@@ -143,7 +143,8 @@ class PipelineHandler:
 
         self.pipeline_instances[camera_index] = [
             pipeline_cls(
-                settings=self.pipeline_settings[camera_index], camera_index=camera_index
+                settings=self.pipeline_settings[self.pipeline_bindings[camera_index]],
+                camera_index=camera_index,
             )
             for pipeline_cls in pipeline
         ]
@@ -161,7 +162,7 @@ class PipelineHandler:
                 currPipeline.setup()
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
-        log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
+        # log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
 
     def setPipelineByIndex(self, camera_index: int, pipeline_index: int):
         if camera_index not in self.cameras.keys():
@@ -340,10 +341,11 @@ class PipelineHandler:
                 )
 
                 pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
-                pub.setDefault(0)
+                pub.setDefault(self.default_pipeline_indexes[i])
 
                 sub = topic.subscribe(
-                    0, ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10)
+                    self.default_pipeline_indexes[i],
+                    ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10),
                 )
 
                 NtClient.INSTANCE.nt_inst.getTable(PipelineHandler.NT_TABLE).getEntry(
