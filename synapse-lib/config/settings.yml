@@ -37,4 +37,7 @@ pipelines:
       exposure: 20
       width: 1920
       height: 1080
+      minSize: 0.001
       tag_size: 1
+      lower: [1, 2, 3]
+      upper: [4, 5, 6]
