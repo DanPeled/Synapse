@@ -5,3 +5,4 @@ if __name__ == "__main__":
     s = Synapse()
     if s.init(handler):
         s.run()
+    
