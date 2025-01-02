@@ -19,6 +19,7 @@ from wpilib import Field2d
 
 class ApriltagPipeline(Pipeline):
     def __init__(self, settings: PipelineSettings, camera_index: int):
+        super().__init__(settings=settings, camera_index=camera_index)
         self.detector = Detector(
             families="tag36h11",
             nthreads=4,
@@ -27,10 +28,8 @@ class ApriltagPipeline(Pipeline):
             refine_edges=1,
         )
 
-        self.settings = settings
         self.camera_matrix = self.getCameraMatrix(camera_index)
         self.camera_transform = self.getCameraTransform(camera_index)
-        self.getFieldPose = settings["fieldpose"]
         ApriltagPipeline.fmap = AprilTagFieldLayout.loadField(
             AprilTagField.k2024Crescendo
         )
@@ -50,7 +49,7 @@ class ApriltagPipeline(Pipeline):
                 self.camera_matrix[0][2],  # pyright: ignore  # cx
                 self.camera_matrix[1][2],  # pyright: ignore  # cy
             ),
-            tag_size=0.1651,  # pyright: ignore  # Tag size in meters
+            tag_size=self.getSetting("tag_size"),  # pyright: ignore  # Tag size in meters
         )
 
         # If no tags are detected, return None
@@ -79,15 +78,15 @@ class ApriltagPipeline(Pipeline):
                 )
             center = tuple(tag.center.astype(int))
             cv2.circle(gray, center, 5, (0, 0, 255), -1)
-            cv2.putText(
-                gray,
-                f"ID: {tag.tag_id}",
-                (center[0], center[1] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (255, 255, 255),
-                1,
-            )
+            # cv2.putText(
+            #     gray,
+            #     f"ID: {tag.tag_id}",
+            #     (center[0], center[1] - 10),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     0.5,
+            #     (255, 255, 255),
+            #     1,
+            # )
 
             # Extract translation vector
             translation = robot_transform[:3, 3]
@@ -100,14 +99,15 @@ class ApriltagPipeline(Pipeline):
             rotation3d = Rotation3d(*cv2.Rodrigues(rotation_matrix)[0].flatten())
 
             # Create Transform3d
-            self.setValue(
-                "tagPose", [translation3d.X(), translation3d.Y(), translation3d.Z()]
+            self.setDataValue(
+                "detectionPose",
+                [translation3d.X(), translation3d.Y(), translation3d.Z()],
             )
-            self.setValue(
-                "tagRotation", [rotation3d.X(), rotation3d.Y(), rotation3d.Z()]
+            self.setDataValue(
+                "detectionRotation", [rotation3d.X(), rotation3d.Y(), rotation3d.Z()]
             )
 
-            if self.getFieldPose and self.camera_transform:
+            if self.getSetting("fieldpose") and self.camera_transform:
                 tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
                 if tagPose:
@@ -121,10 +121,10 @@ class ApriltagPipeline(Pipeline):
                     )
 
                     robotRotation = robotPose.rotation()
-                    self.setValue(
+                    self.setDataValue(
                         "selfPose", [robotPose.X(), robotPose.Y(), robotPose.Z()]
                     )
-                    self.setValue(
+                    self.setDataValue(
                         "selfRotation",
                         [robotRotation.X(), robotRotation.Y(), robotRotation.Z()],
                     )
@@ -150,7 +150,7 @@ class ApriltagPipeline(Pipeline):
                             rotation=Rotation2d(robotRotation.Y()),
                         )
                     )
-                    self.setValue("field", self.field)
+                    self.setDataValue("field", self.field)
         return gray
 
     @staticmethod
