@@ -28,6 +28,7 @@ pipelines:
       height: 600
       fieldpose: true
       saturation: 10
+      tag_size: 0.1651
   1:
     type: ApriltagPipeline
     settings:
@@ -36,3 +37,4 @@ pipelines:
       exposure: 20
       width: 1920
       height: 1080
+      tag_size: 1

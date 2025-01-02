@@ -166,6 +166,8 @@ class Pipeline(ABC):
     def __init__(self, settings: PipelineSettings, camera_index: int):
         self.nt_table: Optional[NetworkTable] = None
         self.builder_cache: dict[str, SendableBuilder] = {}
+        self.settings = settings
+        self.camera_index = camera_index
 
     def setup(self):
         pass
@@ -180,7 +182,7 @@ class Pipeline(ABC):
         """
         pass
 
-    def setValue(self, key: str, value: Any) -> None:
+    def setDataValue(self, key: str, value: Any) -> None:
         """
         Sets a value in the network table.
 
@@ -194,6 +196,10 @@ class Pipeline(ABC):
                 builder.update()
             else:
                 self.nt_table.getSubTable("data").putValue(key, value)
+
+    def getSetting(self, key: str):
+        if self.nt_table is not None:
+            return self.nt_table.getSubTable("settings").getValue(key, None)
 
     def setDataListener(
         self,
