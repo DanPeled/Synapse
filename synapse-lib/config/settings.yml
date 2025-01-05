@@ -9,14 +9,15 @@ global:
       default_pipeline: 1
       name: Monochrome
       path: /dev/video0
-      camera_matrix:
+      matrix:
         - [672.38531251,   0.      ,   348.05954802]
         - [  0.   ,      649.66430117, 211.96006488]
         - [  0. ,          0.      ,     1.        ]
-      camera_transform:
+      transform:
         - [0, 0, 0] # translation
         - [0, 0, 0] # rotation
-
+      distCoeffs:  
+      - [ 0.53598955, -1.26862255,  0.04250221,  0.06833977,  2.21866123]
 pipelines:
   0: 
     type: ApriltagPipeline
