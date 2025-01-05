@@ -8,7 +8,7 @@ global:
     0:
       default_pipeline: 1
       name: Monochrome
-      path: /dev/video0
+      path: 0
       matrix:
         - [672.38531251,   0.      ,   348.05954802]
         - [  0.   ,      649.66430117, 211.96006488]
@@ -42,4 +42,4 @@ pipelines:
       tag_size: 1
       lower: [1, 2, 3]
       upper: [4, 5, 6]
-      colorSpace: rgb
+      color_space: RGB

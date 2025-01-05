@@ -11,10 +11,11 @@ class ColorPipeline(Pipeline):
         print(self.settings.getMap())
 
     def process_frame(self, img: MatLike, timestamp: float) -> MatLike:
+        hsv = None
         # Convert the image to the HSV color space
         if(self.getSetting("color_space") == "RGB"):
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        if(self.getSetting("type_settings") == "HSV"):
+        if(self.getSetting("color_space") == "HSV"):
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         # Define the range for the color red in HSV
