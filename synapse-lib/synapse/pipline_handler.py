@@ -113,9 +113,14 @@ class PipelineHandler:
 
         camera_config = self.camera_bindings[camera_index]
 
+        path = camera_config.path
+
+        if isinstance(path, int):
+            path = int(path)
+
         camera = CameraServer.startAutomaticCapture(
             f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(camera_index)}/input",
-            0,
+            path,
         )
 
         if camera.isConnected():
