@@ -12,7 +12,10 @@ class ColorPipeline(Pipeline):
 
     def process_frame(self, img: MatLike, timestamp: float) -> MatLike:
         # Convert the image to the HSV color space
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        if(self.getSetting("color_space") == "RGB"):
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if(self.getSetting("type_settings") == "HSV"):
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         # Define the range for the color red in HSV
         lower = self.getSetting("lower")
@@ -28,27 +31,11 @@ class ColorPipeline(Pipeline):
         height, width = img.shape[:2]
         min_contour_area = self.getSetting("minSize") * height * width  # 0.1% of the screen size
 
-        # Filter contours by area and find the largest contour
-        largest_contour = None
-        largest_area = 0
+        # Filter contours by area and draw them on the image
         for contour in contours:
             area = cv2.contourArea(contour)
-            if area > largest_area and area >= min_contour_area:
-                largest_contour = contour
-                largest_area = area
-
-        # If a valid largest contour is found, get the bounding box coordinates
-        if largest_contour is not None:
-            x, y, w, h = cv2.boundingRect(largest_contour)
-
-            # Set the x and y coordinates with setValue
-            self.setDataValue("x", x)
-            self.setDataValue("y", y)
-            self.setDataValue("width", w)
-            self.setDataValue("height", h)
-
-            # Optional: Draw the bounding box on the image for visualization
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            if area >= min_contour_area:
+                cv2.drawContours(img, [contour], -1, (0, 255, 0), 2)
 
         return img
 
