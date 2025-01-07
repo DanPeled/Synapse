@@ -1,11 +1,13 @@
 from typing import Optional
-from cv2.typing import MatLike
 import numpy as np
 from wpilib import Field2d
 from wpimath.geometry import (
+    Pose2d,
     Pose3d,
+    Rotation2d,
     Transform3d,
     Rotation3d,
+    Translation2d,
     Translation3d,
 )
 from dt_apriltags import Detector
@@ -33,67 +35,124 @@ class ApriltagPipeline(Pipeline):
         self.field = Field2d()
         self.detector = Detector(families="tag36h11")
 
-    def process_frame(self, img, timestamp: float) -> MatLike:
+    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
+        # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        detections = self.detector.detect(
+        # Detect AprilTags
+        tags = self.detector.detect(
             gray,
             estimate_tag_pose=True,
             camera_params=(
-                self.camera_matrix[0, 0],  # fx
-                self.camera_matrix[1, 1],  # fy
-                self.camera_matrix[0, 2],  # cx
-                self.camera_matrix[1, 2],  # cy
+                self.camera_matrix[0][0],  # pyright: ignore  # fx
+                self.camera_matrix[1][1],  # pyright: ignore  # fy
+                self.camera_matrix[0][2],  # pyright: ignore  # cx
+                self.camera_matrix[1][2],  # pyright: ignore  # cy
             ),
-            tag_size=0.1524,
+            tag_size=self.getSetting("tag_size"),  # pyright: ignore  # Tag size in meters
         )
-        gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
-        for detection in detections:  # pyright: ignore
-            tag_id = detection.tag_id
-            tag_pose_on_field = self.getTagPoseOnField(tag_id)
+        # If no tags are detected, return None
+        if not tags:
+            return gray
 
-            if tag_pose_on_field is None:
-                log.err(f"Tag ID {tag_id} not found in the field layout")
-                continue
+        for tag in tags:  # pyright: ignore
+            # Get AprilTag pose relative to the camera
+            tag_translation_camera = np.array(tag.pose_t).flatten()
+            tag_rotation_camera = np.array(tag.pose_R)
 
-            rvec, _ = cv2.Rodrigues(np.array(detection.pose_R))
-            rvec[1, :] *= -1  # Invert Y-axis
-            rvec[2, :] *= -1  # Invert Z-axis
-            tvec = np.array(detection.pose_t).reshape((3, 1))
-            # rotation_matrix = np.array(rvec, dtype=np.float64)
-            rotation = ApriltagPipeline.extractRotationFromMatrix(rvec)
+            # Compute the transform matrix for the robot relative to the camera
+            robot_transform = np.eye(4)  # identity matrix, (0,0,0) essentialy
+            robot_transform[:3, :3] = tag_rotation_camera
+            robot_transform[:3, 3] = tag_translation_camera
 
-            cv2.drawFrameAxes(
-                image=gray,
-                cameraMatrix=self.camera_matrix,
-                distCoeffs=self.distCoeffs,
-                rvec=rvec,
-                tvec=tvec,
-                length=0.1,
+            # Overlay tag detection details
+            corners = tag.corners.astype(int)
+            for i in range(4):
+                cv2.line(
+                    gray,
+                    tuple(corners[i]),
+                    tuple(corners[(i + 1) % 4]),
+                    (0, 255, 0),
+                    2,
+                )
+            center = tuple(tag.center.astype(int))
+            cv2.circle(gray, center, 5, (0, 0, 255), -1)
+
+            # Extract translation vector
+            translation = robot_transform[:3, 3]
+            translation3d = Translation3d(
+                translation[2], translation[0], translation[1]
             )
 
-            translation = Translation3d(*tvec)
+            # Extract rotation matrix and convert to Rotation3d
+            rotation_matrix = robot_transform[:3, :3]
+            rvec = cv2.Rodrigues(rotation_matrix)[0].flatten()
+            rotation3d = Rotation3d(*rvec)
 
-            camera_to_tag_transform = Transform3d(translation, rotation)
+            # cv2.drawFrameAxes(
+            #     gray,
+            #     self.camera_matrix,
+            #     self.distCoeffs,
+            #     translation,
+            #     np.array(rvec),
+            #     0.1,
+            # )
 
-            self.setDataValue("TX", tvec[0][0])
-            self.setDataValue("TY", tvec[1][0])
-            self.setDataValue("TZ", tvec[2][0])
+            # Create Transform3d
+            self.setDataValue(
+                "detectionPose",
+                [translation3d.X(), translation3d.Y(), translation3d.Z()],
+            )
+            self.setDataValue(
+                "detectionRotation", [rotation3d.X(), rotation3d.Y(), rotation3d.Z()]
+            )
 
-            self.setDataValue("RX", rotation.X())
-            self.setDataValue("RY", rotation.Y())
-            self.setDataValue("RZ", rotation.Z())
+            if self.getSetting("fieldpose") and self.camera_transform:
+                tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
-            if self.camera_transform is not None:
-                robot_pose = self.tagToRobotPose(
-                    tagFieldPose=tag_pose_on_field,
-                    robotToCameraTransform=self.camera_transform,
-                    cameraToTagTransform=camera_to_tag_transform,
-                )
-                self.field.setRobotPose(robot_pose.toPose2d())
-                self.setDataValue("field", self.field)
+                if tagPose:
+                    # robotPose = ApriltagPipeline.tagToRobotPose(
+                    #     tagFieldPose=tagPose,
+                    #     robotToCameraTransform=self.camera_transform,
+                    #     cameraToTagTransform=Transform3d(
+                    #         translation=translation3d,
+                    #         rotation=rotation3d,
+                    #     ).inverse(),
+                    # )
 
+                    # robotRotation = robotPose.rotation()
+
+                    # Step 2: Translate the robot's position to the tag's origin (centered at the tag)
+
+                    # Step 3: Apply the rotation around the tag (Rotation2d object applies the rotation)
+                    rotated_position = translation3d.rotateBy(rotation3d)
+                    # Step 4: Translate the rotated position back to the field's coordinate system
+                    final_position = tagPose + Transform3d(
+                        translation=rotated_position, rotation=Rotation3d()
+                    )
+
+                    self.setDataValue(
+                        "selfPose",
+                        [final_position.X(), final_position.Y(), final_position.Z()],
+                    )
+                    # self.setDataValue(
+                    #     "selfRotation",
+                    #     [final_position.X(), final_position.Y(), final_position.Z()],
+                    # )
+
+                    # Step 5: Set the robot pose on the field using the adjusted position
+                    self.field.setRobotPose(
+                        Pose2d(
+                            translation=Translation2d(
+                                final_position.translation().X(),
+                                final_position.translation().Y(),
+                            ),
+                            rotation=Rotation2d(),
+                        )
+                    )
+
+                    # self.setDataValue("field", self.field)
         return gray
 
     @staticmethod
