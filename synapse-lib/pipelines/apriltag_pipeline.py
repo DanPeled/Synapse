@@ -112,14 +112,14 @@ class ApriltagPipeline(Pipeline):
                 tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
                 if tagPose:
-                    robotPose = ApriltagPipeline.tagToRobotPose(
-                        tagFieldPose=tagPose,
-                        robotToCameraTransform=self.camera_transform,
-                        cameraToTagTransform=Transform3d(
-                            translation=translation3d,
-                            rotation=rotation3d,
-                        ).inverse(),
-                    )
+                    # robotPose = ApriltagPipeline.tagToRobotPose(
+                    #     tagFieldPose=tagPose,
+                    #     robotToCameraTransform=self.camera_transform,
+                    #     cameraToTagTransform=Transform3d(
+                    #         translation=translation3d,
+                    #         rotation=rotation3d,
+                    #     ).inverse(),
+                    # )
 
                     # robotRotation = robotPose.rotation()
 
