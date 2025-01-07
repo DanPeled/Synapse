@@ -121,7 +121,7 @@ class ApriltagPipeline(Pipeline):
                         ).inverse(),
                     )
 
-                    robotRotation = robotPose.rotation()
+                    # robotRotation = robotPose.rotation()
 
                     # Step 2: Translate the robot's position to the tag's origin (centered at the tag)
 
