@@ -10,7 +10,7 @@ from wpimath.geometry import (
     Translation2d,
     Translation3d,
 )
-from dt_apriltags import Detector
+from pupil_apriltags import Detector
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 import synapse.log as log
 import cv2
