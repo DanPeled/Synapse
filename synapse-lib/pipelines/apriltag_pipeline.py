@@ -122,28 +122,24 @@ class ApriltagPipeline(Pipeline):
                     )
 
                     robotRotation = robotPose.rotation()
-                    self.setDataValue(
-                        "selfPose", [robotPose.X(), robotPose.Y(), robotPose.Z()]
-                    )
-                    self.setDataValue(
-                        "selfRotation",
-                        [robotRotation.X(), robotRotation.Y(), robotRotation.Z()],
-                    )
 
                     # Step 2: Translate the robot's position to the tag's origin (centered at the tag)
-                    relative_position = robotPose - tagPose
 
                     # Step 3: Apply the rotation around the tag (Rotation2d object applies the rotation)
-                    rotated_position = Pose3d(
-                        translation=relative_position.translation(),
-                        rotation=relative_position.rotation(),
-                    ).rotateBy(Rotation3d(roll=0, pitch=0, yaw=rotation3d.y))
-
+                    rotated_position = translation3d.rotateBy(rotation3d)
                     # Step 4: Translate the rotated position back to the field's coordinate system
                     final_position = tagPose + Transform3d(
-                        translation=rotated_position.translation(),
-                        rotation=rotated_position.rotation(),
+                        translation=rotated_position, rotation=Rotation3d()
                     )
+
+                    self.setDataValue(
+                        "selfPose",
+                        [final_position.X(), final_position.Y(), final_position.Z()],
+                    )
+                    # self.setDataValue(
+                    #     "selfRotation",
+                    #     [final_position.X(), final_position.Y(), final_position.Z()],
+                    # )
 
                     # Step 5: Set the robot pose on the field using the adjusted position
                     self.field.setRobotPose(
@@ -152,11 +148,11 @@ class ApriltagPipeline(Pipeline):
                                 final_position.translation().X(),
                                 final_position.translation().Y(),
                             ),
-                            rotation=Rotation2d(robotRotation.Y()),
+                            rotation=Rotation2d(),
                         )
                     )
 
-                    self.setDataValue("field", self.field)
+                    # self.setDataValue("field", self.field)
         return gray
 
     @staticmethod
