@@ -64,8 +64,8 @@ class ApriltagPipeline(Pipeline):
             poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
             pose3d = self.getPose3DFromTagPoseMatrix(poseMatrix)
 
-            self.draw_pose_box(gray, self.camera_matrix, self.distCoeffs, poseMatrix)
-            self.draw_pose_axes(
+            self.drawPoseBox(gray, self.camera_matrix, self.distCoeffs, poseMatrix)
+            self.drawPoseAxes(
                 gray, self.camera_matrix, self.distCoeffs, poseMatrix, tag.center
             )
 
@@ -160,7 +160,7 @@ class ApriltagPipeline(Pipeline):
 
         return Transform3d(translation=translation3d, rotation=rotation3d)
 
-    def draw_pose_box(self, img: MatLike, camera_matrix, dcoeffs, pose, z_sign=1):
+    def drawPoseBox(self, img: MatLike, camera_matrix, dcoeffs, pose, z_sign=1):
         """
         Draws the 3d pose box around the AprilTag.
 
@@ -275,7 +275,7 @@ class ApriltagPipeline(Pipeline):
 
         return pose
 
-    def draw_pose_axes(self, img: MatLike, camera_matrix, dcoeffs, pose, center):
+    def drawPoseAxes(self, img: MatLike, camera_matrix, dcoeffs, pose, center):
         """
         Draws the colored pose axes around the AprilTag.
 
