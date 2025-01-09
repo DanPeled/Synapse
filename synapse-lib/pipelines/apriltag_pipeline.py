@@ -32,6 +32,7 @@ class ApriltagPipeline(Pipeline):
         ApriltagPipeline.fmap = ApriltagPipeline.fmap.loadField(
             AprilTagField.k2024Crescendo
         )
+
         self.field = Field2d()
         self.detector = Detector(families="tag36h11")
 
@@ -57,16 +58,6 @@ class ApriltagPipeline(Pipeline):
             return gray
 
         for tag in tags:  # pyright: ignore
-            # Get AprilTag pose relative to the camera
-            tag_translation_camera = np.array(tag.pose_t).flatten()
-            tag_rotation_camera = np.array(tag.pose_R)
-
-            # Compute the transform matrix for the robot relative to the camera
-            robot_transform = np.eye(4)  # identity matrix, (0,0,0) essentialy
-            robot_transform[:3, :3] = tag_rotation_camera
-            robot_transform[:3, 3] = tag_translation_camera
-
-            # Overlay tag detection details
             corners = tag.corners.astype(int)
             for i in range(4):
                 cv2.line(
@@ -79,80 +70,35 @@ class ApriltagPipeline(Pipeline):
             center = tuple(tag.center.astype(int))
             cv2.circle(gray, center, 5, (0, 0, 255), -1)
 
-            # Extract translation vector
-            translation = robot_transform[:3, 3]
-            translation3d = Translation3d(
-                translation[2], translation[0], translation[1]
-            )
-
-            # Extract rotation matrix and convert to Rotation3d
-            rotation_matrix = robot_transform[:3, :3]
-            rvec = cv2.Rodrigues(rotation_matrix)[0].flatten()
-            rotation3d = Rotation3d(*rvec)
-
-            # cv2.drawFrameAxes(
-            #     gray,
-            #     self.camera_matrix,
-            #     self.distCoeffs,
-            #     translation,
-            #     np.array(rvec),
-            #     0.1,
-            # )
-
-            # Create Transform3d
-            self.setDataValue(
-                "detectionPose",
-                [translation3d.X(), translation3d.Y(), translation3d.Z()],
-            )
-            self.setDataValue(
-                "detectionRotation", [rotation3d.X(), rotation3d.Y(), rotation3d.Z()]
-            )
+            poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
+            pose3d = self.getPose3D(poseMatrix)
 
             if self.getSetting("fieldpose") and self.camera_transform:
                 tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
                 if tagPose:
-                    # robotPose = ApriltagPipeline.tagToRobotPose(
-                    #     tagFieldPose=tagPose,
-                    #     robotToCameraTransform=self.camera_transform,
-                    #     cameraToTagTransform=Transform3d(
-                    #         translation=translation3d,
-                    #         rotation=rotation3d,
-                    #     ).inverse(),
-                    # )
-
-                    # robotRotation = robotPose.rotation()
-
-                    # Step 2: Translate the robot's position to the tag's origin (centered at the tag)
-
-                    # Step 3: Apply the rotation around the tag (Rotation2d object applies the rotation)
-                    rotated_position = translation3d.rotateBy(rotation3d)
-                    # Step 4: Translate the rotated position back to the field's coordinate system
-                    final_position = tagPose + Transform3d(
-                        translation=rotated_position, rotation=Rotation3d()
+                    robotPose = ApriltagPipeline.tagToRobotPose(
+                        tagFieldPose=tagPose,
+                        robotToCameraTransform=self.camera_transform,
+                        cameraToTagTransform=Transform3d(
+                            translation=pose3d.translation(),
+                            rotation=pose3d.rotation(),
+                        ).inverse(),
                     )
 
-                    self.setDataValue(
-                        "selfPose",
-                        [final_position.X(), final_position.Y(), final_position.Z()],
-                    )
-                    # self.setDataValue(
-                    #     "selfRotation",
-                    #     [final_position.X(), final_position.Y(), final_position.Z()],
-                    # )
-
-                    # Step 5: Set the robot pose on the field using the adjusted position
                     self.field.setRobotPose(
                         Pose2d(
                             translation=Translation2d(
-                                final_position.translation().X(),
-                                final_position.translation().Y(),
+                                robotPose.translation().X(),
+                                robotPose.translation().Y(),
                             ),
-                            rotation=Rotation2d(),
+                            rotation=Rotation2d(
+                                tagPose.rotation().Z() - pose3d.rotation().Z()
+                            ),
                         )
                     )
 
-                    # self.setDataValue("field", self.field)
+                    self.setDataValue("field", self.field)
         return gray
 
     @staticmethod
@@ -234,3 +180,62 @@ class ApriltagPipeline(Pipeline):
         rotation3d = Rotation3d.fromDegrees(*rot_lst)
 
         return Transform3d(translation=translation3d, rotation=rotation3d)
+
+    def getPose3D(self, poseMatrix=None):
+        """
+        Calculates a WPILib ``Pose3d`` from the PupilApriltags matrix.
+
+        :param poseMatrix: A 3x4 ``numpy.ndarray``.
+        :return: A ``Pose3d`` object.
+        """
+        # Variables
+        x, y, z = 0, 0, 0
+
+        # Extract the tag data from the detection results
+        if poseMatrix is not None:
+            # Flattens the pose matrix into a 1D array
+            flatPose = np.array(poseMatrix).flatten()
+
+            # Creates the Pose3d components for a tag in the AprilTags WCS
+            try:
+                tempRot = Rotation3d(
+                    np.array(
+                        [
+                            [flatPose[0], flatPose[1], flatPose[2]],
+                            [flatPose[4], flatPose[5], flatPose[6]],
+                            [flatPose[8], flatPose[9], flatPose[10]],
+                        ]
+                    )
+                )
+            except ValueError as e:
+                tempRot = Rotation3d()
+                log.err(str(e))
+            tempTrans = Translation3d(flatPose[3], flatPose[7], flatPose[11])
+
+            # Get the camera's measured X, Y, and Z
+            tempX = tempTrans.Z()
+            y = -tempTrans.X()
+            z = -tempTrans.Y()
+
+            # Create a Rotation3d object
+            rot = Rotation3d(tempRot.Z(), -tempRot.X(), -tempRot.Y())
+
+            # Calulates the field relative X and Y coordinate
+            yTrans = Translation2d(tempX, y).rotateBy(Rotation2d(-rot.Z()))
+            x = yTrans.X()
+            y = yTrans.Y()
+
+            # Calulates the field relative Z coordinate
+            zTrans = Translation2d(tempX, z).rotateBy(Rotation2d(np.pi + rot.Y()))
+            z = zTrans.Y()
+
+            # Create a Translation3d object
+            trans = Translation3d(x, y, z)
+
+            # Creates a Pose3d object in the field WCS
+            pose = Pose3d(trans, rot)
+
+            return pose
+        else:
+            # Returns a blank Pose3d
+            return Pose3d()
