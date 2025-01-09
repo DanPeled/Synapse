@@ -140,23 +140,6 @@ class ApriltagPipeline(Pipeline):
         return None
 
     @staticmethod
-    def extractRotationFromMatrix(rvec):
-        rotation_matrix, _ = cv2.Rodrigues(rvec)
-        sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
-        singular = sy < 1e-6
-
-        if not singular:
-            yaw = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
-            pitch = np.arctan2(-rotation_matrix[2, 0], sy)
-            roll = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-        else:
-            yaw = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
-            pitch = np.arctan2(-rotation_matrix[2, 0], sy)
-            roll = 0
-
-        return Rotation3d(roll=roll, pitch=pitch, yaw=yaw)
-
-    @staticmethod
     def getCameraConfigsGlobalSettings():
         return GlobalSettings["camera_configs"]
 
@@ -209,7 +192,7 @@ class ApriltagPipeline(Pipeline):
                 )
             except ValueError as e:
                 tempRot = Rotation3d()
-                log.err(str(e))
+                log.err(f"Error converting array to Rotation3d: {str(e)}")
             tempTrans = Translation3d(flatPose[3], flatPose[7], flatPose[11])
 
             # Get the camera's measured X, Y, and Z
