@@ -1,7 +1,7 @@
 from typing import Optional
 from cv2.typing import MatLike
 import numpy as np
-from wpilib import Field2d
+from wpilib import Field2d, Timer
 from wpimath.geometry import (
     Pose2d,
     Pose3d,
@@ -118,6 +118,7 @@ class ApriltagPipeline(Pipeline):
                         )
                     )
 
+                    self.setDataValue("timestamp", Timer.getFPGATimestamp())
                     self.setDataValue("field", self.field)
         return gray
 
