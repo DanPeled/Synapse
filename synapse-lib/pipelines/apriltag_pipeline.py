@@ -1,7 +1,7 @@
 from typing import Optional
 from cv2.typing import MatLike
 import numpy as np
-from wpilib import Field2d
+from wpilib import Field2d, Timer
 from wpimath.geometry import (
     Pose2d,
     Pose3d,
@@ -69,6 +69,18 @@ class ApriltagPipeline(Pipeline):
                 gray, self.camera_matrix, self.distCoeffs, poseMatrix, tag.center
             )
 
+            self.setDataValue(
+                "deltaTagPose",
+                [
+                    pose3d.translation().X(),
+                    pose3d.translation().Y(),
+                    pose3d.translation().Z(),
+                    pose3d.rotation().X(),
+                    pose3d.rotation().Y(),
+                    pose3d.rotation().Z(),
+                ],
+            )
+
             if self.getSetting("fieldpose") and self.camera_transform:
                 tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
@@ -80,6 +92,18 @@ class ApriltagPipeline(Pipeline):
                             translation=pose3d.translation(),
                             rotation=pose3d.rotation(),
                         ).inverse(),
+                    )
+
+                    self.setDataValue(
+                        "robotPose",
+                        [
+                            robotPose.translation().X(),
+                            robotPose.translation().Y(),
+                            robotPose.translation().Z(),
+                            robotPose.rotation().X(),
+                            robotPose.rotation().Y(),
+                            robotPose.rotation().Z(),
+                        ],
                     )
 
                     self.field.setRobotPose(
@@ -94,6 +118,7 @@ class ApriltagPipeline(Pipeline):
                         )
                     )
 
+                    self.setDataValue("timestamp", Timer.getFPGATimestamp())
                     self.setDataValue("field", self.field)
         return gray
 
