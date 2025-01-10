@@ -1,7 +1,7 @@
 import datetime
 import os
-from typing_extensions import Any
 
+# Flag to control printing to the console
 PRINTS = True
 
 # Create a logs directory if it doesn't exist
@@ -11,7 +11,17 @@ os.makedirs("logs", exist_ok=True)
 LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
 
 
-def log(text: Any):
+def log(text: str):
+    """
+    Logs a message with the current timestamp to both the console and a log file.
+
+    Args:
+        text (str): The message to log.
+
+    Writes:
+        - The log message to the console (if PRINTS is True).
+        - The log message to the log file `logs/logfile_<timestamp>.log`.
+    """
     # Get the current time
     current_time = datetime.datetime.now()
 
@@ -19,9 +29,22 @@ def log(text: Any):
     formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
     final_string = f"[{formatted_time}]: {text}"
 
+    # Print the log message to the console if PRINTS is True
     if PRINTS:
         print(str(final_string))
 
     # Write the log to the new file
     with open(LOG_FILE, "a") as f:
         f.write(str(final_string) + "\n")
+
+
+def err(text: str):
+    """
+    Logs an error message with the current timestamp by prepending '[ERROR]' to the message.
+
+    Args:
+        text (str): The error message to log.
+
+    This function calls the `log` function and formats the message to indicate an error.
+    """
+    log(f"[ERROR]: {text}")
