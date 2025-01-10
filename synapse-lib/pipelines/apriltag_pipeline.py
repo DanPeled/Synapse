@@ -82,6 +82,18 @@ class ApriltagPipeline(Pipeline):
                         ).inverse(),
                     )
 
+                    self.setDataValue(
+                        "robotPose",
+                        [
+                            robotPose.translation().X(),
+                            robotPose.translation().Y(),
+                            robotPose.translation().Z(),
+                            robotPose.rotation().X(),
+                            robotPose.rotation().Y(),
+                            robotPose.rotation().Z(),
+                        ],
+                    )
+
                     self.field.setRobotPose(
                         Pose2d(
                             translation=Translation2d(
