@@ -45,12 +45,3 @@ class ColorPipeline(Pipeline):
                         cv2.drawContours(img, [contour], -1, (0, 255, 0), 2)
 
         return img
-
-
-# Example usage:
-# settings = PipelineSettings(...)
-# pipeline = ColorPipeline(settings, camera_index=0)
-# frame = ... # Get the frame from the camera
-# timestamp = ... # Get the current timestamp
-# processed_frame = pipeline.process_frame(frame, timestamp)
-
