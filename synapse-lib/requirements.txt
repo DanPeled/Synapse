@@ -1,12 +1,14 @@
-dt_apriltags==3.1.7
 numpy==1.23.3
+opencv_contrib_python==4.10.0.84
 opencv_python==4.10.0.84
 paramiko==2.10.4
-pyntcore==2024.3.2.1
 pathspec==0.12.1
+pupil_apriltags==1.0.4.post10
+pyntcore==2024.3.2.1
 PyYAML==6.0.2
 robotpy_apriltag==2024.3.2.1
 robotpy_cscore==2024.3.2.1
 robotpy_wpimath==2024.3.2.1
 robotpy_wpiutil==2024.3.2.1
+typing_extensions==4.12.2
 wpilib==2024.3.2.1

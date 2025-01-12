@@ -1,14 +1,17 @@
 from typing import Optional
 from cv2.typing import MatLike
 import numpy as np
-from wpilib import Field2d
+from wpilib import Field2d, Timer
 from wpimath.geometry import (
+    Pose2d,
     Pose3d,
+    Rotation2d,
     Transform3d,
     Rotation3d,
+    Translation2d,
     Translation3d,
 )
-from dt_apriltags import Detector
+from pupil_apriltags import Detector
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 import synapse.log as log
 import cv2
@@ -30,70 +33,93 @@ class ApriltagPipeline(Pipeline):
         ApriltagPipeline.fmap = ApriltagPipeline.fmap.loadField(
             AprilTagField.k2024Crescendo
         )
+
         self.field = Field2d()
         self.detector = Detector(families="tag36h11")
 
-    def process_frame(self, img, timestamp: float) -> MatLike:
+    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
+        # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        detections = self.detector.detect(
+        # Detect AprilTags
+        tags = self.detector.detect(
             gray,
             estimate_tag_pose=True,
             camera_params=(
-                self.camera_matrix[0, 0],  # fx
-                self.camera_matrix[1, 1],  # fy
-                self.camera_matrix[0, 2],  # cx
-                self.camera_matrix[1, 2],  # cy
+                self.camera_matrix[0][0],  # pyright: ignore  # fx
+                self.camera_matrix[1][1],  # pyright: ignore  # fy
+                self.camera_matrix[0][2],  # pyright: ignore  # cx
+                self.camera_matrix[1][2],  # pyright: ignore  # cy
             ),
-            tag_size=0.1524,
+            tag_size=self.getSetting("tag_size"),  # pyright: ignore  # Tag size in meters
         )
+
         gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
-        for detection in detections:  # pyright: ignore
-            tag_id = detection.tag_id
-            tag_pose_on_field = self.getTagPoseOnField(tag_id)
+        # If no tags are detected, return None
+        if not tags:
+            return gray
 
-            if tag_pose_on_field is None:
-                log.err(f"Tag ID {tag_id} not found in the field layout")
-                continue
+        for tag in tags:  # pyright: ignore
+            poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
+            pose3d = self.getPose3DFromTagPoseMatrix(poseMatrix)
 
-            rvec, _ = cv2.Rodrigues(np.array(detection.pose_R))
-            rvec[1, :] *= -1  # Invert Y-axis
-            rvec[2, :] *= -1  # Invert Z-axis
-            tvec = np.array(detection.pose_t).reshape((3, 1))
-            # rotation_matrix = np.array(rvec, dtype=np.float64)
-            rotation = ApriltagPipeline.extractRotationFromMatrix(rvec)
-
-            cv2.drawFrameAxes(
-                image=gray,
-                cameraMatrix=self.camera_matrix,
-                distCoeffs=self.distCoeffs,
-                rvec=rvec,
-                tvec=tvec,
-                length=0.1,
+            self.drawPoseBox(gray, self.camera_matrix, self.distCoeffs, poseMatrix)
+            self.drawPoseAxes(
+                gray, self.camera_matrix, self.distCoeffs, poseMatrix, tag.center
             )
 
-            translation = Translation3d(*tvec)
+            self.setDataValue(
+                "deltaTagPose",
+                [
+                    pose3d.translation().X(),
+                    pose3d.translation().Y(),
+                    pose3d.translation().Z(),
+                    pose3d.rotation().X(),
+                    pose3d.rotation().Y(),
+                    pose3d.rotation().Z(),
+                ],
+            )
 
-            camera_to_tag_transform = Transform3d(translation, rotation)
+            if self.getSetting("fieldpose") and self.camera_transform:
+                tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
-            self.setDataValue("TX", tvec[0][0])
-            self.setDataValue("TY", tvec[1][0])
-            self.setDataValue("TZ", tvec[2][0])
+                if tagPose:
+                    robotPose = ApriltagPipeline.tagToRobotPose(
+                        tagFieldPose=tagPose,
+                        robotToCameraTransform=self.camera_transform,
+                        cameraToTagTransform=Transform3d(
+                            translation=pose3d.translation(),
+                            rotation=pose3d.rotation(),
+                        ).inverse(),
+                    )
 
-            self.setDataValue("RX", rotation.X())
-            self.setDataValue("RY", rotation.Y())
-            self.setDataValue("RZ", rotation.Z())
+                    self.setDataValue(
+                        "robotPose",
+                        [
+                            robotPose.translation().X(),
+                            robotPose.translation().Y(),
+                            robotPose.translation().Z(),
+                            robotPose.rotation().X(),
+                            robotPose.rotation().Y(),
+                            robotPose.rotation().Z(),
+                        ],
+                    )
 
-            if self.camera_transform is not None:
-                robot_pose = self.tagToRobotPose(
-                    tagFieldPose=tag_pose_on_field,
-                    robotToCameraTransform=self.camera_transform,
-                    cameraToTagTransform=camera_to_tag_transform,
-                )
-                self.field.setRobotPose(robot_pose.toPose2d())
-                self.setDataValue("field", self.field)
+                    self.field.setRobotPose(
+                        Pose2d(
+                            translation=Translation2d(
+                                robotPose.translation().X(),
+                                robotPose.translation().Y(),
+                            ),
+                            rotation=Rotation2d(
+                                tagPose.rotation().Z() - pose3d.rotation().Z()
+                            ),
+                        )
+                    )
 
+                    self.setDataValue("timestamp", Timer.getFPGATimestamp())
+                    self.setDataValue("field", self.field)
         return gray
 
     @staticmethod
@@ -135,23 +161,6 @@ class ApriltagPipeline(Pipeline):
         return None
 
     @staticmethod
-    def extractRotationFromMatrix(rvec):
-        rotation_matrix, _ = cv2.Rodrigues(rvec)
-        sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
-        singular = sy < 1e-6
-
-        if not singular:
-            yaw = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
-            pitch = np.arctan2(-rotation_matrix[2, 0], sy)
-            roll = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-        else:
-            yaw = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
-            pitch = np.arctan2(-rotation_matrix[2, 0], sy)
-            roll = 0
-
-        return Rotation3d(roll=roll, pitch=pitch, yaw=yaw)
-
-    @staticmethod
     def getCameraConfigsGlobalSettings():
         return GlobalSettings["camera_configs"]
 
@@ -175,3 +184,149 @@ class ApriltagPipeline(Pipeline):
         rotation3d = Rotation3d.fromDegrees(*rot_lst)
 
         return Transform3d(translation=translation3d, rotation=rotation3d)
+
+    def drawPoseBox(self, img: MatLike, camera_matrix, dcoeffs, pose, z_sign=1):
+        """
+        Draws the 3d pose box around the AprilTag.
+
+        :param img: The image to write on.
+        :param camera_matrix: The camera's intrinsic calibration matrix.
+        :param pose: The ``Pose3d`` of the tag.
+        :param z_sign: The direction of the z-axis.
+        """
+        # Creates object points
+        opoints = (
+            np.array(
+                [
+                    -1,
+                    -1,
+                    0,
+                    1,
+                    -1,
+                    0,
+                    1,
+                    1,
+                    0,
+                    -1,
+                    1,
+                    0,
+                    -1,
+                    -1,
+                    -2 * z_sign,
+                    1,
+                    -1,
+                    -2 * z_sign,
+                    1,
+                    1,
+                    -2 * z_sign,
+                    -1,
+                    1,
+                    -2 * z_sign,
+                ]
+            ).reshape(-1, 1, 3)
+            * 0.5
+            * (self.getSetting("tag_size"))  # pyright: ignore
+        )
+
+        # Creates edges
+        edges = np.array(
+            [0, 1, 1, 2, 2, 3, 3, 0, 0, 4, 1, 5, 2, 6, 3, 7, 4, 5, 5, 6, 6, 7, 7, 4]
+        ).reshape(-1, 2)
+
+        # Calulcates rotation and translation vectors for each AprilTag
+        rVecs, _ = cv2.Rodrigues(pose[:3, :3])
+        tVecs = pose[:3, 3:]
+
+        # Calulate image points of each AprilTag
+        ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
+        ipoints = np.round(ipoints).astype(int)
+        ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
+
+        # Draws lines between all the edges
+        for i, j in edges:
+            cv2.line(img, ipoints[i], ipoints[j], (0, 255, 0), 4, 16)
+
+    @staticmethod
+    def getPose3DFromTagPoseMatrix(poseMatrix: np.ndarray) -> Pose3d:
+        """
+        Calculates a WPILib ``Pose3d`` from the PupilApriltags matrix.
+
+        :param poseMatrix: A 3x4 ``numpy.ndarray``.
+        :return: A ``Pose3d`` object.
+        """
+        x, y, z = 0, 0, 0
+
+        # Flattens the pose matrix into a 1D array
+        flatPose = np.array(poseMatrix).flatten()
+
+        # Creates the Pose3d components for a tag in the AprilTags WCS
+        try:
+            tempRot = Rotation3d(
+                np.array(
+                    [
+                        [flatPose[0], flatPose[1], flatPose[2]],
+                        [flatPose[4], flatPose[5], flatPose[6]],
+                        [flatPose[8], flatPose[9], flatPose[10]],
+                    ]
+                )
+            )
+        except ValueError as e:
+            tempRot = Rotation3d()
+            log.err(f"Error converting array to Rotation3d: {str(e)}")
+        tempTrans = Translation3d(flatPose[3], flatPose[7], flatPose[11])
+
+        # Get the camera's measured X, Y, and Z
+        tempX = tempTrans.Z()
+        y = -tempTrans.X()
+        z = -tempTrans.Y()
+
+        # Create a Rotation3d object
+        rot = Rotation3d(tempRot.Z(), -tempRot.X(), -tempRot.Y())
+
+        # Calulates the field relative X and Y coordinate
+        yTrans = Translation2d(tempX, y).rotateBy(Rotation2d(-rot.Z()))
+        x = yTrans.X()
+        y = yTrans.Y()
+
+        # Calulates the field relative Z coordinate
+        zTrans = Translation2d(tempX, z).rotateBy(Rotation2d(np.pi + rot.Y()))
+        z = zTrans.Y()
+
+        # Create a Translation3d object
+        trans = Translation3d(x, y, z)
+
+        # Creates a Pose3d object in the field WCS
+        pose = Pose3d(trans, rot)
+
+        return pose
+
+    def drawPoseAxes(self, img: MatLike, camera_matrix, dcoeffs, pose, center):
+        """
+        Draws the colored pose axes around the AprilTag.
+
+        :param img: The image to write on.
+        :param camera_matrix: The camera's intrinsic calibration matrix.
+        :param pose: The ``Pose3d`` of the tag.
+        :param center: The center of the AprilTag.
+        """
+        # Calulcates rotation and translation vectors for each AprilTag
+        rVecs, _ = cv2.Rodrigues(pose[:3, :3])
+        tVecs = pose[:3, 3:]
+
+        # Calculate object points of each AprilTag
+        opoints = np.float32([[1, 0, 0], [0, -1, 0], [0, 0, -1]]).reshape(  # pyright: ignore
+            -1, 3
+        ) * self.getSetting("tag_size")  # pyright: ignore
+
+        # Calulate image points of each AprilTag
+        ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
+        ipoints = np.round(ipoints).astype(int)
+
+        # Calulates the center
+        center = np.round(center).astype(int)
+        center = tuple(center.ravel())
+
+        # Draws the 3d pose lines
+        cv2.line(img, center, tuple(ipoints[0].ravel()), (0, 0, 255), 3)
+        cv2.line(img, center, tuple(ipoints[1].ravel()), (0, 255, 0), 3)
+        cv2.line(img, center, tuple(ipoints[2].ravel()), (255, 0, 0), 3)
