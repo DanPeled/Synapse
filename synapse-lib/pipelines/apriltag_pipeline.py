@@ -31,7 +31,7 @@ class ApriltagPipeline(Pipeline):
 
         ApriltagPipeline.fmap = AprilTagFieldLayout()
         ApriltagPipeline.fmap = ApriltagPipeline.fmap.loadField(
-            AprilTagField.k2024Crescendo
+            AprilTagField.k2025Reefscape
         )
 
         self.field = Field2d()
