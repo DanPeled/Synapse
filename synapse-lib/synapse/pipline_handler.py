@@ -231,14 +231,6 @@ class PipelineHandler:
 
         settings = self.pipeline_settings[pipeline_index]
 
-        # if camera_index in self.cameras.keys():
-        #     self.cameras[camera_index].setVideoMode(
-        #         fps=100,
-        #         pixelFormat=VideoMode.PixelFormat.kMJPEG,
-        #         width=int(settings["width"]),  # pyright: ignore
-        #         height=int(settings["height"]),  # pyright: ignore
-        #     )
-
         self.__setPipelineForCamera(
             camera_index=camera_index,
             pipeline=self.pipelines[self.pipeline_types[pipeline_index]],
@@ -254,19 +246,14 @@ class PipelineHandler:
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
+        def getSettingsMap(camera_index: int) -> dict:
+            return self.pipeline_settings[self.pipeline_bindings[camera_index]].getMap()
+
         return {
             i: CameraServer.putVideo(
                 f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
-                width=int(
-                    self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
-                        "width"
-                    ]
-                ),
-                height=int(
-                    self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
-                        "height"
-                    ]
-                ),
+                width=int(getSettingsMap(i)["width"]),
+                height=int(getSettingsMap(i)["height"]),
             )
             for i in self.cameras.keys()
         }
@@ -458,8 +445,8 @@ class PipelineHandler:
         camera.setVideoMode(
             fps=settings.get("fps", 30),
             pixelFormat=VideoMode.PixelFormat.kMJPEG,
-            width=int(settings["width"]),  # pyright: ignore
-            height=int(settings["height"]),  # pyright: ignore
+            width=int(settings["width"]),
+            height=int(settings["height"]),
         )
         # Set brightness
         camera.setBrightness(settings.get("brightness", brightness))
