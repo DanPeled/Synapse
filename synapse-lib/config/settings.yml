@@ -6,7 +6,7 @@ network:
 global:
   camera_configs:
     0:
-      default_pipeline: 1
+      default_pipeline: 0
       name: Monochrome
       path: 0
       matrix:
@@ -33,13 +33,11 @@ pipelines:
   1:
     type: ColorPipeline
     settings:
-      target_tag: 12
       brightness: 100
       exposure: 20
       width: 1920
       height: 1080
       minSize: 0.001
-      tag_size: 1
       lower: [1, 2, 3]
       upper: [4, 5, 6]
       color_space: RGB
