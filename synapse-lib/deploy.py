@@ -122,10 +122,16 @@ def deploy():
     service_exists = "exists" in stdout.read().decode()
 
     if not service_exists:
-        with ssh.open_sftp().file(service_path, "w") as service_file:
+        temp_service_path = f"/tmp/{service_name}.service"
+
+        # Write service content to a temporary location
+        with ssh.open_sftp().file(temp_service_path, "w") as service_file:
             service_file.write(service_content)
-        ssh.exec_command("systemctl daemon-reload")
-        ssh.exec_command(f"systemctl enable {service_name}")
+
+        # Move the service file to /etc/systemd/system using sudo
+        ssh.exec_command(f"sudo mv {temp_service_path} {service_path}")
+        ssh.exec_command("sudo systemctl daemon-reload")
+        ssh.exec_command(f"sudo systemctl enable {service_name}")
 
     ssh.exec_command(f"systemctl restart {service_name}")
     print(f"Service {service_name} restarted.")

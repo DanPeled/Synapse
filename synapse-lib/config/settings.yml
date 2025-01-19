@@ -8,7 +8,7 @@ global:
     0:
       default_pipeline: 0
       name: Monochrome
-      path: 0
+      path: /dev/camera-monochrome
       matrix:
         - [672.38531251,   0.      ,   348.05954802]
         - [  0.   ,      649.66430117, 211.96006488]

@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import List, Optional, Union
 from cv2.typing import MatLike
 import numpy as np
 from wpilib import Field2d, Timer
@@ -164,14 +164,14 @@ class ApriltagPipeline(Pipeline):
 
         return robotInField
 
-    def getCameraMatrix(self, camera_index: int) -> Optional[list[list[float]]]:
+    def getCameraMatrix(self, camera_index: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
         if isinstance(camera_configs, dict):
             return camera_configs.get(camera_index, {})["matrix"]
         log.err("No camera matrix found, invalid results for AprilTag detection")
         return None
 
-    def getDistCoeffs(self, camera_index: int) -> Optional[list[list[float]]]:
+    def getDistCoeffs(self, camera_index: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
         if isinstance(camera_configs, dict):
             return camera_configs.get(camera_index, {})["distCoeffs"]
