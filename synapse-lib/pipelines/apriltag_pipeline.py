@@ -1,10 +1,12 @@
-from typing import List, Optional, Union
+import json
+from typing import Dict, List, Optional, Union
 from cv2.typing import MatLike
 import numpy as np
 from wpilib import Field2d, Timer
 from wpimath.geometry import (
     Pose2d,
     Pose3d,
+    Quaternion,
     Rotation2d,
     Transform3d,
     Rotation3d,
@@ -15,7 +17,6 @@ from pupil_apriltags import Detector
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 import synapse.log as log
 import cv2
-from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 
 
 class ApriltagPipeline(Pipeline):
@@ -33,10 +34,7 @@ class ApriltagPipeline(Pipeline):
 
         self.camera_transform = self.getCameraTransform(camera_index)
 
-        ApriltagPipeline.fmap = AprilTagFieldLayout()
-        ApriltagPipeline.fmap = ApriltagPipeline.fmap.loadField(
-            AprilTagField.k2025Reefscape
-        )
+        ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
         self.field = Field2d()
         self.detector = Detector(families=ApriltagPipeline.kTagFamily)
@@ -367,3 +365,41 @@ class ApriltagPipeline(Pipeline):
         cv2.line(img, center, tuple(ipoints[0].ravel()), (0, 0, 255), 3)
         cv2.line(img, center, tuple(ipoints[1].ravel()), (0, 255, 0), 3)
         cv2.line(img, center, tuple(ipoints[2].ravel()), (255, 0, 0), 3)
+
+
+class ApriltagFieldJson:
+    TagId = int
+
+    def __init__(self, jsonDict: Dict[TagId, Pose3d]):
+        self.fieldMap = jsonDict
+
+    @staticmethod
+    def loadField(filePath: str) -> "ApriltagFieldJson":
+        with open(filePath, "r") as file:
+            jsonDict: dict = json.load(file)
+            tagsDict: Dict[ApriltagFieldJson.TagId, Pose3d] = {}
+            for tag in jsonDict.get("tags", {}):
+                poseDict = tag["pose"]
+                rotation = poseDict["rotation"]["quaternion"]
+                translation = poseDict["translation"]
+                tagsDict[tag["ID"]] = Pose3d(
+                    translation=Translation3d(
+                        translation["x"], translation["y"], translation["z"]
+                    ),
+                    rotation=Rotation3d(
+                        Quaternion(
+                            w=rotation["W"],
+                            x=rotation["X"],
+                            y=rotation["Y"],
+                            z=rotation["Z"],
+                        )
+                    ),
+                )
+
+            return ApriltagFieldJson(tagsDict)
+
+    def getTagPose(self, id: TagId) -> Pose3d:
+        if id in self.fieldMap.keys():
+            return self.fieldMap[id]
+        else:
+            raise KeyError(f"Tag with ID: #{id} does not exist!")
