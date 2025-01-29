@@ -66,7 +66,7 @@ class ApriltagPipeline(Pipeline):
 
         for tag in tags:  # pyright: ignore
             poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
-            pose3d = self.getPose3DFromTagPoseMatrix(poseMatrix)
+            tagRelativePose = self.getPose3DFromTagPoseMatrix(poseMatrix)
 
             if tagSize is not None and tagSize > 0:
                 self.drawPoseBox(
@@ -88,25 +88,25 @@ class ApriltagPipeline(Pipeline):
             self.setDataValue(
                 "deltaTagPose",
                 [
-                    pose3d.translation().X(),
-                    pose3d.translation().Y(),
-                    pose3d.translation().Z(),
-                    pose3d.rotation().X(),
-                    pose3d.rotation().Y(),
-                    pose3d.rotation().Z(),
+                    tagRelativePose.translation().X(),
+                    tagRelativePose.translation().Y(),
+                    tagRelativePose.translation().Z(),
+                    tagRelativePose.rotation().X(),
+                    tagRelativePose.rotation().Y(),
+                    tagRelativePose.rotation().Z(),
                 ],
             )
 
             if self.getSetting(self.kGetFieldPoseKey) and self.camera_transform:
-                tagPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
+                tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
-                if tagPose:
+                if tagFieldPose:
                     robotPose = ApriltagPipeline.tagToRobotPose(
-                        tagFieldPose=tagPose,
+                        tagFieldPose=tagFieldPose,
                         robotToCameraTransform=self.camera_transform,
                         cameraToTagTransform=Transform3d(
-                            translation=pose3d.translation(),
-                            rotation=pose3d.rotation(),
+                            translation=tagRelativePose.translation(),
+                            rotation=tagRelativePose.rotation(),
                         ).inverse(),
                     )
 
@@ -129,13 +129,21 @@ class ApriltagPipeline(Pipeline):
                                 robotPose.translation().Y(),
                             ),
                             rotation=Rotation2d(
-                                tagPose.rotation().Z() - pose3d.rotation().Z()
+                                tagFieldPose.rotation().Z()
+                                - tagRelativePose.rotation().Z()
                             ),
                         )
                     )
 
-                    self.setDataValue("timestamp", Timer.getFPGATimestamp())
+                    setattr(tag, "timestamp", Timer.getFPGATimestamp())
+                    setattr(tag, "robotPose", robotPose)
+                    setattr(tag, "tagFieldPose", tagFieldPose)
+                    setattr(tag, "tagRelativePose", tagRelativePose)
+
                     self.setDataValue("field", self.field)
+
+        self.setDataValue("results", ApriltagsJson.toJsonString(tags))
+
         return gray
 
     @staticmethod
@@ -285,8 +293,8 @@ class ApriltagPipeline(Pipeline):
 
         # Creates the Pose3d components for a tag in the AprilTags WCS
         try:
-            tempRot = Rotation3d(
-                np.array(
+            tempRot = Rotation3d(  # pyright: ignore
+                np.array(  # pyright: ignore
                     [
                         [flatPose[0], flatPose[1], flatPose[2]],
                         [flatPose[4], flatPose[5], flatPose[6]],
@@ -403,3 +411,23 @@ class ApriltagFieldJson:
             return self.fieldMap[id]
         else:
             raise KeyError(f"Tag with ID: #{id} does not exist!")
+
+
+class ApriltagsJson:
+    @classmethod
+    def toJsonString(cls, tags) -> str:
+        return json.dumps(
+            list(map(lambda tag: tag.__dict__, tags)),
+            cls=ApriltagsJson.Encoder,
+            separators=(",", ":"),
+        )
+
+    class Encoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, np.ndarray):
+                return o.tolist()  # Convert numpy arrays to lists
+            if isinstance(o, bytes):
+                return o.decode()  # Convert bytes to strings
+            if isinstance(o, Pose3d):
+                return o.toMatrix().tolist()  # pyright: ignore
+            return super().default(o)
