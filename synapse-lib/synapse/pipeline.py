@@ -123,6 +123,9 @@ class PipelineSettings:
         """
         return self.__settings
 
+    def setMap(self, map: Dict[str, Any]) -> None:
+        self.__settings = map
+
     @staticmethod
     def setEntryValue(entry: NetworkTableEntry, value):
         """
