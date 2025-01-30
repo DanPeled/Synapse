@@ -16,6 +16,7 @@ class NtClient:
     """
 
     INSTANCE: Optional["NtClient"] = None
+    TABLE: str = ""
 
     def setup(self, team_number: int, name: str, is_server: bool = False) -> bool:
         """
