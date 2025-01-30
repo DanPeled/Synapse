@@ -417,7 +417,7 @@ class ApriltagsJson:
     @classmethod
     def toJsonString(cls, tags) -> str:
         return json.dumps(
-            list(map(lambda tag: tag.__dict__, tags)),
+            {"data": list(map(lambda tag: tag.__dict__, tags)), "type": "apriltag"},
             cls=ApriltagsJson.Encoder,
             separators=(",", ":"),
         )
@@ -429,5 +429,20 @@ class ApriltagsJson:
             if isinstance(o, bytes):
                 return o.decode()  # Convert bytes to strings
             if isinstance(o, Pose3d):
-                return o.toMatrix().tolist()  # pyright: ignore
+                return {
+                    "x": o.translation().X(),
+                    "y": o.translation().Y(),
+                    "z": o.translation().Z(),
+                    "yaw": o.rotation().z_degrees,
+                    "pitch": o.rotation().y_degrees,
+                    "roll": o.rotation().x_degrees,
+                    "rotation_unit": "degrees",
+                }
+            if isinstance(o, Pose2d):
+                return {
+                    "x": o.translation().X(),
+                    "y": o.translation().Y(),
+                    "rotation": o.rotation().degrees(),
+                    "rotation_unit": "degrees",
+                }
             return super().default(o)
