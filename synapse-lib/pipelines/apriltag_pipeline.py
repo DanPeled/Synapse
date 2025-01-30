@@ -437,12 +437,12 @@ class ApriltagsJson:
                     "pitch": o.rotation().y_degrees,
                     "roll": o.rotation().x_degrees,
                     "rotation_unit": "degrees",
-                }  # pyright: ignore
+                }
             if isinstance(o, Pose2d):
                 return {
                     "x": o.translation().X(),
                     "y": o.translation().Y(),
                     "rotation": o.rotation().degrees(),
                     "rotation_unit": "degrees",
-                }  # pyright: ignore
+                }
             return super().default(o)
