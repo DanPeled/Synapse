@@ -107,29 +107,44 @@ class PipelineHandler:
         Adds a camera to the handler by opening it through OpenCV.
         :param camera_index: Camera index to open
         """
-        if camera_index not in self.camera_bindings.keys():
+        if camera_index not in self.camera_bindings:
             err(f"No camera defined for index {camera_index}")
             return False
 
         camera_config = self.camera_bindings[camera_index]
-
-        path = camera_config.path
-
-        if isinstance(path, int):
-            path = int(path)
-
-        camera = CameraServer.startAutomaticCapture(
-            f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(camera_index)}/input",
-            path,
+        path = (
+            int(camera_config.path)
+            if isinstance(camera_config.path, int)
+            else camera_config.path
         )
+
+        try:
+            camera = CameraServer.startAutomaticCapture(
+                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(camera_index)}/input",
+                path,
+            )
+        except Exception as e:
+            err(f"Failed to start camera capture: {e}")
+            return False
+
+        count = 0
+        MAX_RETRIES = 30
+        DELAY = 1
+
+        while not camera.isConnected() and count < MAX_RETRIES:
+            err(f"Trying to open camera #{camera_index} ({path})")
+            count += 1
+            time.sleep(DELAY)
 
         if camera.isConnected():
             self.cameras[camera_index] = camera
             log(f"Camera ({camera_config}, id={camera_index}) added successfully.")
             return True
-        else:
-            err(f"Failed to open camera {camera_index}.")
-            return False
+
+        err(
+            f"Failed to open camera #{camera_index} ({path}) after {MAX_RETRIES} retries."
+        )
+        return False
 
     def __setPipelineForCamera(
         self,
@@ -159,12 +174,15 @@ class PipelineHandler:
             if NtClient.INSTANCE is not None:
                 camera_table = self.getCameraTable(camera_index)
 
+                self.setCameraConfigs(
+                    pipeline_config.getMap(), self.cameras[camera_index]
+                )
+
                 if camera_table is not None:
                     setattr(currPipeline, "nt_table", camera_table)
                     setattr(currPipeline, "builder_cache", {})
                     currPipeline.setup()
                     pipeline_config.sendSettings(camera_table.getSubTable("settings"))
-            self.setCameraConfigs(pipeline_config.getMap(), self.cameras[camera_index])
 
         # log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
 
@@ -186,6 +204,7 @@ class PipelineHandler:
 
     def syncPipelineSettings(self, camera_index: int):
         settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
+        somethingChanged = False
         for key, value in settings.getMap().items():
             nt_table = self.getCameraTable(camera_index)
             if nt_table is not None:
@@ -195,12 +214,15 @@ class PipelineHandler:
                         key
                     ] = nt_val
 
-                    self.setCameraConfigs(
-                        settings=self.pipeline_settings[
-                            self.pipeline_bindings[camera_index]
-                        ].getMap(),
-                        camera=self.cameras[camera_index],
-                    )
+                    somethingChanged = True
+
+        if somethingChanged:
+            self.setCameraConfigs(
+                settings=self.pipeline_settings[
+                    self.pipeline_bindings[camera_index]
+                ].getMap(),
+                camera=self.cameras[camera_index],
+            )
 
     def getCameraTable(self, camera_index: int) -> Optional[NetworkTable]:
         if NtClient.INSTANCE is not None:
@@ -231,14 +253,6 @@ class PipelineHandler:
 
         settings = self.pipeline_settings[pipeline_index]
 
-        # if camera_index in self.cameras.keys():
-        #     self.cameras[camera_index].setVideoMode(
-        #         fps=100,
-        #         pixelFormat=VideoMode.PixelFormat.kMJPEG,
-        #         width=int(settings["width"]),  # pyright: ignore
-        #         height=int(settings["height"]),  # pyright: ignore
-        #     )
-
         self.__setPipelineForCamera(
             camera_index=camera_index,
             pipeline=self.pipelines[self.pipeline_types[pipeline_index]],
@@ -254,19 +268,14 @@ class PipelineHandler:
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
+        def getSettingsMap(camera_index: int) -> dict:
+            return self.pipeline_settings[self.pipeline_bindings[camera_index]].getMap()
+
         return {
             i: CameraServer.putVideo(
                 f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
-                width=int(
-                    self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
-                        "width"
-                    ]
-                ),
-                height=int(
-                    self.pipeline_settings[self.pipeline_bindings[i]].getMap()[  # pyright: ignore
-                        "height"
-                    ]
-                ),
+                width=int(getSettingsMap(i)["width"]),
+                height=int(getSettingsMap(i)["height"]),
             )
             for i in self.cameras.keys()
         }
@@ -411,7 +420,8 @@ class PipelineHandler:
             camera_configs = settings["global"]["camera_configs"]
 
             for camera_index in camera_configs:
-                self.addCamera(camera_index)
+                if not (self.addCamera(camera_index)):
+                    return
                 self.default_pipeline_indexes[camera_index] = camera_configs[
                     camera_index
                 ]["default_pipeline"]
@@ -439,79 +449,50 @@ class PipelineHandler:
         self.setupNetworkTables()
 
     @staticmethod
-    def setCameraConfigs(
-        settings: Dict[str, Any],
-        camera: UsbCamera,
-        brightness: int = 0,
-        contrast: int = 12,
-        saturation: int = 25,
-        hue: int = 50,
-        exposure: int = 120,
-        gain: int = 31,
-        sharpness: int = 0,
-        white_balance_auto: bool = False,
-        gain_auto: bool = False,
-        horizontal_flip: bool = False,
-        vertical_flip: bool = False,
-        power_line_frequency: int = 0,  # Enum: 0 (Disabled), 1 (50Hz)
-    ):
+    def setCameraConfigs(settings: Dict[str, Any], camera: UsbCamera) -> Dict[str, Any]:
+        property_meta = {}
+        updated_settings = {}
+
+        # Read all camera properties and their min/max/default
+        for prop in camera.enumerateProperties():
+            property_meta[prop.getName()] = {
+                "min": prop.getMin(),
+                "max": prop.getMax(),
+                "default": prop.getDefault(),
+            }
+
+        def set_property(name: str, value: Any):
+            """Set property if it exists, clamping the value within bounds."""
+            if name in property_meta:
+                meta = property_meta[name]
+                clamped_value = max(meta["min"], min(value, meta["max"]))
+                camera.getProperty(name).set(clamped_value)
+                # Store the updated value in the return dictionary
+                updated_settings[name] = clamped_value
+
+        # Set properties based on settings or use defaults from property metadata
+        for name, meta in property_meta.items():
+            setting_value = settings.get(name, meta["default"])
+            set_property(name, setting_value)
+
+        # Set video mode separately
         camera.setVideoMode(
             fps=settings.get("fps", 30),
             pixelFormat=VideoMode.PixelFormat.kMJPEG,
-            width=int(settings["width"]),  # pyright: ignore
-            height=int(settings["height"]),  # pyright: ignore
-        )
-        # Set brightness
-        camera.setBrightness(settings.get("brightness", brightness))
-
-        # Set contrast
-        camera.getProperty("contrast").set(settings.get("contrast", contrast))
-
-        # Set saturation
-        camera.getProperty("saturation").set(settings.get("saturation", saturation))
-
-        # Set hue
-        camera.getProperty("hue").set(settings.get("hue", hue))
-
-        # Set exposure
-        camera.setExposureManual(settings.get("exposure", exposure))
-
-        # Set gain
-        camera.getProperty("gain").set(settings.get("gain", gain))
-
-        # Set sharpness
-        camera.getProperty("sharpness").set(settings.get("sharpness", sharpness))
-
-        # Set white balance (automatic or manual)
-        if settings.get("white_balance_automatic", white_balance_auto):
-            camera.setWhiteBalanceAuto()
-        else:
-            camera.setWhiteBalanceManual(
-                settings.get("white_balance", 0)
-            )  # Adjust based on manual value in settings
-
-        autoGain = settings.get("gain_automatic", gain_auto)
-        if "gain_automatic" in settings.keys():
-            camera.getProperty("gain_automatic").set(autoGain)
-        else:
-            camera.getProperty("raw_gain").set(
-                settings.get("raw_gain", 20)
-            )  # Use raw gain for manual gain adjustment
-
-        # Set horizontal flip
-        camera.getProperty("horizontal_flip").set(
-            settings.get("horizontal_flip", horizontal_flip)
+            width=int(settings["width"]),
+            height=int(settings["height"]),
         )
 
-        # Set vertical flip
-        camera.getProperty("vertical_flip").set(
-            settings.get("vertical_flip", vertical_flip)
+        # Add video mode properties to the updated settings
+        updated_settings.update(
+            {
+                "fps": settings.get("fps", 30),
+                "width": int(settings["width"]),
+                "height": int(settings["height"]),
+            }
         )
 
-        # Set power line frequency (0: Disabled, 1: 50Hz)
-        camera.getProperty("power_line_frequency").set(
-            settings.get("power_line_frequency", power_line_frequency)
-        )
+        return updated_settings
 
     def setPipelineSettings(
         self,
