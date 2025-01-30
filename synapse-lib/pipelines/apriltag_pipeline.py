@@ -417,7 +417,7 @@ class ApriltagsJson:
     @classmethod
     def toJsonString(cls, tags) -> str:
         return json.dumps(
-            list(map(lambda tag: tag.__dict__, tags)),
+            {"data": list(map(lambda tag: tag.__dict__, tags)), "type": "apriltag"},
             cls=ApriltagsJson.Encoder,
             separators=(",", ":"),
         )
