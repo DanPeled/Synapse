@@ -5,101 +5,101 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import edu.wpi.first.math.geometry.Pose3d;
 
 public class ApriltagResult {
-    @JsonProperty("timestamp")
-    private double timestamp;
+  @JsonProperty("timestamp")
+  private double timestamp;
 
-    @JsonProperty("tag_family")
-    private String tagFamily;
+  @JsonProperty("tag_family")
+  private String tagFamily;
 
-    @JsonProperty("tag_id")
-    private int tagID;
+  @JsonProperty("tag_id")
+  private int tagID;
 
-    @JsonProperty("hamming")
-    private double hamming;
+  @JsonProperty("hamming")
+  private double hamming;
 
-    @JsonProperty("decision_margin")
-    private double decisionMargin;
+  @JsonProperty("decision_margin")
+  private double decisionMargin;
 
-    @JsonProperty("homography")
-    private double[][] homography;
+  @JsonProperty("homography")
+  private double[][] homography;
 
-    @JsonProperty("center")
-    private double[] center;
+  @JsonProperty("center")
+  private double[] center;
 
-    @JsonProperty("pose_R")
-    private double[][] pose_R;
+  @JsonProperty("pose_R")
+  private double[][] pose_R;
 
-    @JsonProperty("pose_t")
-    private double[][] pose_t;
+  @JsonProperty("pose_t")
+  private double[][] pose_t;
 
-    @JsonProperty("corners")
-    private double[][] corners;
+  @JsonProperty("corners")
+  private double[][] corners;
 
-    @JsonProperty("pose_err")
-    private double poseError;
+  @JsonProperty("pose_err")
+  private double poseError;
 
-    @JsonDeserialize(using = Pose3dDeserializer.class)
-    private Pose3d robotPose;
+  @JsonDeserialize(using = Pose3dDeserializer.class)
+  private Pose3d robotPose;
 
-    @JsonDeserialize(using = Pose3dDeserializer.class)
-    private Pose3d tagRelativePose;
+  @JsonDeserialize(using = Pose3dDeserializer.class)
+  private Pose3d tagRelativePose;
 
-    @JsonDeserialize(using = Pose3dDeserializer.class)
-    private Pose3d tagFieldPose;
+  @JsonDeserialize(using = Pose3dDeserializer.class)
+  private Pose3d tagFieldPose;
 
-    public double getTimestamp() {
-        return timestamp;
-    }
+  public double getTimestamp() {
+    return timestamp;
+  }
 
-    public String getTagFamily() {
-        return tagFamily;
-    }
+  public String getTagFamily() {
+    return tagFamily;
+  }
 
-    public int getTagID() {
-        return tagID;
-    }
+  public int getTagID() {
+    return tagID;
+  }
 
-    public double getHamming() {
-        return hamming;
-    }
+  public double getHamming() {
+    return hamming;
+  }
 
-    public double getDecisionMargin() {
-        return decisionMargin;
-    }
+  public double getDecisionMargin() {
+    return decisionMargin;
+  }
 
-    public double[][] getHomongraphy() {
-        return homongraphy;
-    }
+  public double[][] getHomography() {
+    return homography;
+  }
 
-    public double[] getCenter() {
-        return center;
-    }
+  public double[] getCenter() {
+    return center;
+  }
 
-    public double[][] getPose_R() {
-        return pose_R;
-    }
+  public double[][] getPose_R() {
+    return pose_R;
+  }
 
-    public double[][] getPose_t() {
-        return pose_t;
-    }
+  public double[][] getPose_t() {
+    return pose_t;
+  }
 
-    public double[][] getCorners() {
-        return corners;
-    }
+  public double[][] getCorners() {
+    return corners;
+  }
 
-    public double getPoseError() {
-        return poseError;
-    }
+  public double getPoseError() {
+    return poseError;
+  }
 
-    public Pose3d getRobotPose() {
-        return robotPose;
-    }
+  public Pose3d getRobotPose() {
+    return robotPose;
+  }
 
-    public Pose3d getTagRelativePose() {
-        return tagRelativePose;
-    }
+  public Pose3d getTagRelativePose() {
+    return tagRelativePose;
+  }
 
-    public Pose3d getTagFieldPose() {
-        return tagFieldPose;
-    }
+  public Pose3d getTagFieldPose() {
+    return tagFieldPose;
+  }
 }
