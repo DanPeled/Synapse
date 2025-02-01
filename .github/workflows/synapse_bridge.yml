@@ -30,4 +30,4 @@ jobs:
     - name: Build Check
       run: |
         mkdir -p out
-        javac -d out -cp "libs/*" src/**/*.java
+        javac -d out -cp "libs/*" bridge/**/*.java
