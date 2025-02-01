@@ -21,7 +21,7 @@ public class ApriltagResult {
     private double decisionMargin;
 
     @JsonProperty("homography")
-    private double[][] homongraphy;
+    private double[][] homography;
 
     @JsonProperty("center")
     private double[] center;
