@@ -21,11 +21,11 @@ jobs:
     - name: Download Dependencies
       run: |
         mkdir -p libs
-        curl -L -o libs/ntcore-java-2025.2.1.jar https://frcmaven.wpi.edu/release/edu/wpi/first/ntcore/ntcore-java/2025.2.1/ntcore-java-2025.2.1.jar
-        curl -L -o libs/wpimath-java-2025.2.1.jar https://frcmaven.wpi.edu/release/edu/wpi/first/wpimath/wpimath-java/2025.2.1/wpimath-java-2025.2.1.jar
-        curl -L -o libs/jackson-core-2.13.0.jar https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.13.0/jackson-core-2.13.0.jar
-        curl -L -o libs/jackson-databind-2.13.0.jar https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.13.0/jackson-databind-2.13.0.jar
-        curl -L -o libs/jackson-annotations-2.13.0.jar https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.13.0/jackson-annotations-2.13.0.jar
+        curl -L -o bridge/libs/ntcore-java-2025.2.1.jar https://frcmaven.wpi.edu/release/edu/wpi/first/ntcore/ntcore-java/2025.2.1/ntcore-java-2025.2.1.jar
+        curl -L -o bridge/libs/wpimath-java-2025.2.1.jar https://frcmaven.wpi.edu/release/edu/wpi/first/wpimath/wpimath-java/2025.2.1/wpimath-java-2025.2.1.jar
+        curl -L -o bridge/libs/jackson-core-2.13.0.jar https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.13.0/jackson-core-2.13.0.jar
+        curl -L -o bridge/libs/jackson-databind-2.13.0.jar https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.13.0/jackson-databind-2.13.0.jar
+        curl -L -o bridge/libs/jackson-annotations-2.13.0.jar https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.13.0/jackson-annotations-2.13.0.jar
 
     - name: Build Check
       run: |
