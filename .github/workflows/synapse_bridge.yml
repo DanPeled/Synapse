@@ -2,6 +2,8 @@ name: Synapse Bridge
 
 on:
   push:
+    branches: 
+      - main
   pull_request:
 
 jobs:
