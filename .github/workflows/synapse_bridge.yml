@@ -29,5 +29,6 @@ jobs:
 
     - name: Build Check
       run: |
+        cd bridge
         mkdir -p out
-        javac -d out -cp "libs/*" bridge/**/*.java
+        javac -d out -cp "libs/*" *.java
