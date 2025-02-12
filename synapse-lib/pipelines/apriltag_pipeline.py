@@ -2,7 +2,7 @@ import json
 from typing import Dict, List, Optional, Union
 from cv2.typing import MatLike
 import numpy as np
-from wpilib import Field2d, Timer
+from wpilib import Timer
 from wpimath.geometry import (
     Pose2d,
     Pose3d,
@@ -31,13 +31,10 @@ class ApriltagPipeline(Pipeline):
         )
 
         self.distCoeffs = np.array(self.getDistCoeffs(camera_index), dtype=np.float32)
-
         self.camera_transform = self.getCameraTransform(camera_index)
+        self.detector = Detector(families=ApriltagPipeline.kTagFamily)
 
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
-
-        self.field = Field2d()
-        self.detector = Detector(families=ApriltagPipeline.kTagFamily)
 
     def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
         # Convert image to grayscale for detection
@@ -122,25 +119,10 @@ class ApriltagPipeline(Pipeline):
                         ],
                     )
 
-                    self.field.setRobotPose(
-                        Pose2d(
-                            translation=Translation2d(
-                                robotPose.translation().X(),
-                                robotPose.translation().Y(),
-                            ),
-                            rotation=Rotation2d(
-                                tagFieldPose.rotation().Z()
-                                - tagRelativePose.rotation().Z()
-                            ),
-                        )
-                    )
-
                     setattr(tag, "timestamp", Timer.getFPGATimestamp())
                     setattr(tag, "robotPose", robotPose)
                     setattr(tag, "tagFieldPose", tagFieldPose)
                     setattr(tag, "tagRelativePose", tagRelativePose)
-
-                    self.setDataValue("field", self.field)
 
         self.setDataValue("results", ApriltagsJson.toJsonString(tags))
 
