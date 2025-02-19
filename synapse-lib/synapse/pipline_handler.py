@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 import cv2
 import ntcore
 import numpy as np
-from cscore import CameraServer, CvSink, CvSource, UsbCamera, VideoMode
+from cscore import CameraServer, CvSink, CvSource, VideoCamera, VideoMode
 from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err, log
 from synapse.nt_client import NtClient
@@ -31,7 +31,7 @@ class PipelineHandler:
         :param directory: Root directory to search for pipeline files
         """
         self.directory = directory
-        self.cameras: Dict[int, UsbCamera] = {}
+        self.cameras: Dict[int, VideoCamera] = {}
         self.pipeline_map: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipeline_instances: Dict[int, List[Pipeline]] = {}
         self.pipeline_settings: Dict[int, PipelineSettings] = {}
@@ -449,9 +449,31 @@ class PipelineHandler:
         self.setupNetworkTables()
 
     @staticmethod
-    def setCameraConfigs(settings: Dict[str, Any], camera: UsbCamera) -> Dict[str, Any]:
+    def setCameraConfigs(
+        settings: Dict[str, Any], camera: VideoCamera
+    ) -> Dict[str, Any]:
         property_meta = {}
         updated_settings = {}
+        excluded = [
+            "",
+            "sharpness",
+            "raw_sharpness",
+            "raw_saturation",
+            "white_balance_automatic",
+            "raw_gain",
+            "raw_hue",
+            "raw_brightness",
+            "raw_contrast",
+            "raw_exposure_time_absolute",
+            "power_line_frequency",
+            "exposure_time_absolute",
+            "gamma",
+            "white_balance_temperature",
+            "connect_verbose",
+            "exposure_dynamic_framerate",
+            "backlight_compensation",
+            "auto_exposure",
+        ]
 
         # Read all camera properties and their min/max/default
         for prop in camera.enumerateProperties():
@@ -460,20 +482,24 @@ class PipelineHandler:
                 "max": prop.getMax(),
                 "default": prop.getDefault(),
             }
+            if prop.getName() not in settings.keys() and prop.getName() not in excluded:
+                settings[prop.getName()] = prop.getDefault()
 
-        def set_property(name: str, value: Any):
+        def set_property(name: str, value: int):
             """Set property if it exists, clamping the value within bounds."""
             if name in property_meta:
                 meta = property_meta[name]
                 clamped_value = max(meta["min"], min(value, meta["max"]))
-                camera.getProperty(name).set(clamped_value)
-                # Store the updated value in the return dictionary
-                updated_settings[name] = clamped_value
+                if value != camera.getProperty(name).get():
+                    camera.getProperty(name).set(clamped_value)
+                    # Store the updated value in the return dictionary
+                    updated_settings[name] = clamped_value
 
         # Set properties based on settings or use defaults from property metadata
         for name, meta in property_meta.items():
-            setting_value = settings.get(name, meta["default"])
-            set_property(name, setting_value)
+            if name not in excluded:
+                setting_value = settings.get(name, meta["default"])
+                set_property(name, setting_value)
 
         # Set video mode separately
         camera.setVideoMode(

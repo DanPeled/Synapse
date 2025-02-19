@@ -90,4 +90,3 @@ if __name__ == "__main__":
     # Release the camera and close the OpenCV windows
     cap.release()
     cv2.destroyAllWindows()
-
