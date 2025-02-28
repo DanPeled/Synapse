@@ -68,5 +68,8 @@ class NtClient:
         atexit.register(self.cleanup)
         return True
 
+    def getPID(self) -> int:
+        return self.nt_inst.getTable("Synapse").getEntry("PID").getInteger(-1)
+
     def cleanup(self) -> None:
         self.nt_inst.getTable("Synapse").getEntry("PID").setInteger(-1)

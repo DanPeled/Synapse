@@ -8,16 +8,16 @@ global:
     0:
       default_pipeline: 0
       name: Monochrome
-      path: /dev/monochrome
+      path: /dev/video0
       matrix:
-        - [672.38531251,   0.      ,   348.05954802]
-        - [  0.   ,      649.66430117, 211.96006488]
+        - [850.07889429,   0.      ,   661.79650612]
+        - [  0.   ,      896.26681121, 347.26132123]
         - [  0. ,          0.      ,     1.        ]
       transform:
-        - [0, 0, 0] # translation
-        - [0, 0, 0] # rotation
+        - [0.24596, 0.23285, 0.24523] # translation
+        - [0, 4, 25.05] # rotation
       distCoeffs:  
-      - [ 0.53598955, -1.26862255,  0.04250221,  0.06833977,  2.21866123]
+      - [ -0.06375875, 0.2054797,  -0.00232733,  -0.02853246,  -0.39985226]
 pipelines:
   0: 
     type: ApriltagPipeline
@@ -29,6 +29,7 @@ pipelines:
       height: 600
       fieldpose: true
       saturation: 10
+      orientation: 180
       tag_size: 0.1651
   1:
     type: ColorPipeline

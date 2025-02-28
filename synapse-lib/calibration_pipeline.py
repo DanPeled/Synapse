@@ -55,7 +55,7 @@ if __name__ == "__main__":
             print(f"Frame {frame_count} captured.")
 
         # Display the frame with the detected chessboard corners
-        cv2.imshow("Chessboard Detection", frame)
+        # cv2.imshow("Chessboard Detection", frame)
 
         # Exit the loop when 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -76,7 +76,7 @@ if __name__ == "__main__":
             )  # Optional flags
             end_time = time()
             undistorted_frame = cv2.undistort(frame, mtx, dist)
-            cv2.imshow("Undistorted Image", undistorted_frame)
+            # cv2.imshow("Undistorted Image", undistorted_frame)
             if ret:
                 print(
                     f"Camera calibration successful in {end_time - start_time} (seconds)!"
