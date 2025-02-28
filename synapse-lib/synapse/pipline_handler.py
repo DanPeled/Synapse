@@ -312,6 +312,8 @@ class PipelineHandler:
                     if ret == 0 or frame is None:
                         continue
 
+                    frame = self.rotateCameraBySettings(camera_index, frame)
+
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipeline_instances.get(camera_index, [])
                     processed_frame: Any = frame
@@ -519,6 +521,23 @@ class PipelineHandler:
         )
 
         return updated_settings
+
+    def rotateCameraBySettings(
+        self, camera_index: int, frame: Union[cv2.Mat, np.ndarray]
+    ) -> Union[cv2.Mat, np.ndarray]:
+        settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
+
+        if "orientation" in settings.getMap():
+            orientation = settings.get("orientation")
+
+            if orientation == 180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+            elif orientation == 90:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            elif orientation == 270:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+        return frame
 
     def setPipelineSettings(
         self,

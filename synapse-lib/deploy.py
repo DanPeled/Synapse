@@ -141,7 +141,7 @@ def deploy():
 
 
 if __name__ == "__main__":
-    hostname = "192.168.1.158"
+    hostname = "10.97.38.14"
     port = 22
     username = "orangepi"
     password = "orangepi"
