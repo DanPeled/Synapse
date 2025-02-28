@@ -43,10 +43,13 @@ class PipelineHandler:
         self.sinks: Dict[int, CvSink] = {}
 
     def setup(self, settings: Dict[Any, Any]):
+        import atexit
+
         self.pipelines = self.loadPipelines()
         self.camera_bindings = self.setupCameraBindings(
             settings["global"]["camera_configs"]
         )
+        atexit.register(self.cleanup)
 
     def setupCameraBindings(self, cameras_yml: dict):
         bindings: Dict[int, CameraBinding] = {}
