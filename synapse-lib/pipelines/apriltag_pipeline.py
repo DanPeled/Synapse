@@ -88,9 +88,9 @@ class ApriltagPipeline(Pipeline):
                     tagRelativePose.translation().X(),
                     tagRelativePose.translation().Y(),
                     tagRelativePose.translation().Z(),
-                    tagRelativePose.rotation().X(),
-                    tagRelativePose.rotation().Y(),
-                    tagRelativePose.rotation().Z(),
+                    tagRelativePose.rotation().x_degrees,
+                    tagRelativePose.rotation().y_degrees,
+                    tagRelativePose.rotation().z_degrees,
                 ],
             )
 
@@ -113,9 +113,9 @@ class ApriltagPipeline(Pipeline):
                             robotPose.translation().X(),
                             robotPose.translation().Y(),
                             robotPose.translation().Z(),
-                            robotPose.rotation().X(),
-                            robotPose.rotation().Y(),
-                            robotPose.rotation().Z(),
+                            robotPose.rotation().x_degrees,
+                            robotPose.rotation().y_degrees,
+                            robotPose.rotation().z_degrees,
                         ],
                     )
 
@@ -185,10 +185,10 @@ class ApriltagPipeline(Pipeline):
 
         trans_lst = trans_matrix[0]
         translation3d = Translation3d(*trans_lst)
-
+        print(translation3d)
         rot_lst = trans_matrix[1]
         rotation3d = Rotation3d.fromDegrees(*rot_lst)
-
+        print(rotation3d)
         return Transform3d(translation=translation3d, rotation=rotation3d)
 
     @staticmethod
