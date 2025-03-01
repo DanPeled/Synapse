@@ -22,6 +22,9 @@ class CameraBinding:
     name: str
 
 
+Frame = Union[cv2.Mat, np.ndarray]
+
+
 class PipelineHandler:
     NT_TABLE = "Synapse"
 
@@ -315,7 +318,7 @@ class PipelineHandler:
                     if ret == 0 or frame is None:
                         continue
 
-                    frame = self.rotateCameraBySettings(camera_index, frame)
+                    frame = self.fixtureFrame(camera_index, frame)
 
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipeline_instances.get(camera_index, [])
@@ -525,11 +528,7 @@ class PipelineHandler:
 
         return updated_settings
 
-    def rotateCameraBySettings(
-        self, camera_index: int, frame: Union[cv2.Mat, np.ndarray]
-    ) -> Union[cv2.Mat, np.ndarray]:
-        settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
-
+    def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
         if "orientation" in settings.getMap():
             orientation = settings.get("orientation")
 
@@ -539,6 +538,30 @@ class PipelineHandler:
                 frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             elif orientation == 270:
                 frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+        return frame
+
+    def fixBlackLevelOffset(self, settings: PipelineSettings, frame: Frame) -> Frame:
+        blackLevelOffset = settings.get("black_level_offset")
+
+        if blackLevelOffset == 0 or blackLevelOffset is None:
+            return frame  # No adjustment needed
+
+        blackLevelOffset = -blackLevelOffset / 100
+
+        # Convert to float32 for better precision
+        image = frame.astype(np.float32) / 255.0  # Normalize to range [0,1]
+
+        # Apply black level offset: lift only the darkest values
+        image = np.power(image + blackLevelOffset, 1.0)  # Apply a soft offset
+
+        # Clip to valid range and convert back to uint8
+        return np.clip(image * 255, 0, 255).astype(np.uint8)
+
+    def fixtureFrame(self, camera_index: int, frame: Frame) -> Frame:
+        settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
+        frame = self.rotateCameraBySettings(settings, frame)
+        frame = self.fixBlackLevelOffset(settings, frame)
 
         return frame
 

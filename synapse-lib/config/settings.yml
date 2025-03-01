@@ -30,6 +30,7 @@ pipelines:
       height: 720
       fieldpose: true
       saturation: 10
+      black_level_offset: 0.0
       orientation: 180
       tag_size: 0.1651
   1:

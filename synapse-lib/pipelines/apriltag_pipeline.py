@@ -107,6 +107,12 @@ class ApriltagPipeline(Pipeline):
                         ).inverse(),
                     )
 
+                    robotPose = robotPose.transformBy(
+                        Transform3d(
+                            Translation3d(0, self.fmap.width / 2, 0), Rotation3d()
+                        )
+                    )
+
                     self.setDataValue(
                         "robotPose",
                         [
@@ -360,8 +366,10 @@ class ApriltagPipeline(Pipeline):
 class ApriltagFieldJson:
     TagId = int
 
-    def __init__(self, jsonDict: Dict[TagId, Pose3d]):
+    def __init__(self, jsonDict: Dict[TagId, Pose3d], length: float, width: float):
         self.fieldMap = jsonDict
+        self.length = length
+        self.width = width
 
     @staticmethod
     def loadField(filePath: str) -> "ApriltagFieldJson":
@@ -385,8 +393,9 @@ class ApriltagFieldJson:
                         )
                     ),
                 )
-
-            return ApriltagFieldJson(tagsDict)
+            length = jsonDict["field"]["length"]
+            width = jsonDict["field"]["width"]
+            return ApriltagFieldJson(tagsDict, length, width)
 
     def getTagPose(self, id: TagId) -> Pose3d:
         if id in self.fieldMap.keys():
