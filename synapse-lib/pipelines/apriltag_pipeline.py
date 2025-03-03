@@ -107,12 +107,6 @@ class ApriltagPipeline(Pipeline):
                         ).inverse(),
                     )
 
-                    robotPose = robotPose.transformBy(
-                        Transform3d(
-                            Translation3d(0, self.fmap.width / 2, 0), Rotation3d()
-                        )
-                    )
-
                     self.setDataValue(
                         "robotPose",
                         [
