@@ -4,8 +4,8 @@ from typing_extensions import Dict
 from ntcore import NetworkTable, Event, EventFlags, NetworkTableEntry
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
-import cv2
 from synapse import log
+from synapse.stypes import Frame
 
 
 class PipelineSettings:
@@ -176,7 +176,7 @@ class Pipeline(ABC):
         pass
 
     @abstractmethod
-    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
+    def process_frame(self, img, timestamp: float) -> Frame:
         """
         Abstract method that processes a single frame.
 

@@ -14,15 +14,13 @@ from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err, log
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline, PipelineSettings
+from synapse.stypes import Frame
 
 
 @dataclass
 class CameraBinding:
     path: str
     name: str
-
-
-Frame = Union[cv2.Mat, np.ndarray]
 
 
 class PipelineHandler:
@@ -318,12 +316,12 @@ class PipelineHandler:
                     if ret == 0 or frame is None:
                         continue
 
+                    process_time = time.time()
                     frame = self.fixtureFrame(camera_index, frame)
 
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipeline_instances.get(camera_index, [])
                     processed_frame: Any = frame
-
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
                         processed_frame = pipeline.process_frame(frame, start_time)
@@ -334,7 +332,7 @@ class PipelineHandler:
                     # Overlay FPS on the frame
                     cv2.putText(
                         processed_frame,
-                        f"FPS: {fps:.2f}",
+                        f"FPS: {fps:.2f} \nPROCESS FPS: {1.0/(end_time - process_time)}",
                         (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1,
