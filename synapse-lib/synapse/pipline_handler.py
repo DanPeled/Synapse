@@ -316,7 +316,6 @@ class PipelineHandler:
                     if ret == 0 or frame is None:
                         continue
 
-                    process_time = time.time()
                     frame = self.fixtureFrame(camera_index, frame)
 
                     # Retrieve the pipeline instances for the current camera
@@ -332,7 +331,7 @@ class PipelineHandler:
                     # Overlay FPS on the frame
                     cv2.putText(
                         processed_frame,
-                        f"FPS: {fps:.2f} \nPROCESS FPS: {1.0/(end_time - process_time)}",
+                        f"FPS: {fps:.2f}",
                         (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1,
