@@ -14,15 +14,13 @@ from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err, log
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline, PipelineSettings
+from synapse.stypes import Frame
 
 
 @dataclass
 class CameraBinding:
     path: str
     name: str
-
-
-Frame = Union[cv2.Mat, np.ndarray]
 
 
 class PipelineHandler:
@@ -323,7 +321,6 @@ class PipelineHandler:
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipeline_instances.get(camera_index, [])
                     processed_frame: Any = frame
-
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
                         processed_frame = pipeline.process_frame(frame, start_time)

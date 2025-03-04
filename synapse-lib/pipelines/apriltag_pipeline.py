@@ -17,6 +17,7 @@ from pupil_apriltags import Detector
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 import synapse.log as log
 import cv2
+from synapse.stypes import Frame
 
 
 class ApriltagPipeline(Pipeline):
@@ -32,11 +33,11 @@ class ApriltagPipeline(Pipeline):
 
         self.distCoeffs = np.array(self.getDistCoeffs(camera_index), dtype=np.float32)
         self.camera_transform = self.getCameraTransform(camera_index)
-        self.detector = Detector(families=ApriltagPipeline.kTagFamily)
+        self.detector = Detector(families=ApriltagPipeline.kTagFamily, nthreads=4)
 
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
+    def process_frame(self, img, timestamp: float) -> Frame:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -57,8 +58,9 @@ class ApriltagPipeline(Pipeline):
 
         gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
-        # If no tags are detected, return None
         if not tags:
+            self.setDataValue("hasResults", False)
+            self.setDataValue("results", ApriltagsJson.toJsonString([]))
             return gray
 
         for tag in tags:  # pyright: ignore
@@ -124,6 +126,7 @@ class ApriltagPipeline(Pipeline):
                     setattr(tag, "tagFieldPose", tagFieldPose)
                     setattr(tag, "tagRelativePose", tagRelativePose)
 
+        self.setDataValue("hasResults", True)
         self.setDataValue("results", ApriltagsJson.toJsonString(tags))
 
         return gray
@@ -269,7 +272,6 @@ class ApriltagPipeline(Pipeline):
         :return: A ``Pose3d`` object.
         """
         x, y, z = 0, 0, 0
-
         # Flattens the pose matrix into a 1D array
         flatPose = np.array(poseMatrix).flatten()
 
