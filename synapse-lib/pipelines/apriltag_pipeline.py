@@ -24,6 +24,7 @@ class ApriltagPipeline(Pipeline):
     kTagSizeKey = "tag_size"
     kTagFamily = "tag36h11"
     kGetFieldPoseKey = "fieldpose"
+    kStickToGroundKey = "stick_to_ground"
 
     def __init__(self, settings: PipelineSettings, camera_index: int):
         self.settings = settings
@@ -66,6 +67,16 @@ class ApriltagPipeline(Pipeline):
         for tag in tags:  # pyright: ignore
             poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
             tagRelativePose = self.getPose3DFromTagPoseMatrix(poseMatrix)
+
+            if self.getSetting(ApriltagPipeline.kStickToGroundKey):
+                tagRelativePose = Pose3d(
+                    tagRelativePose.translation(),
+                    Rotation3d(
+                        0,
+                        0,
+                        tagRelativePose.rotation().Z(),
+                    ),
+                )
 
             if tagSize is not None and tagSize > 0:
                 self.drawPoseBox(
@@ -157,6 +168,7 @@ class ApriltagPipeline(Pipeline):
 
     def getCameraMatrix(self, camera_index: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
+
         if isinstance(camera_configs, dict):
             return camera_configs.get(camera_index, {})["matrix"]
         log.err("No camera matrix found, invalid results for AprilTag detection")
