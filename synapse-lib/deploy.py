@@ -101,7 +101,12 @@ def deploy():
     ssh.exec_command("rm /tmp/deploy.tar.gz")
 
     client = synapse.nt_client.NtClient()
-    client.setup(9738, "deploySynapse", False)
+    client.setup(
+        teamNumber=9738,
+        name="deploySynapse",
+        isServer=False,
+        isSim=False,
+    )
     if client.getPID() != -1:
         ssh.exec_command(f"kill {client.getPID()}")
         ssh.exec_command("cd ~/Synapse && python3 main.py")
