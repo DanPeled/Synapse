@@ -97,9 +97,7 @@ class PipelineHandler:
                                     log(f"Loaded {cls.__name__} pipeline")
                                     pipelines[cls.__name__] = cls
                     except Exception as e:
-                        err(
-                            f"while loading {file_path}: {e}"
-                        )  # Consider using logging instead
+                        err(f"while loading {file_path}: {e}")
                         traceback.print_exc()
 
         log("Loaded pipelines successfully")
@@ -512,22 +510,36 @@ class PipelineHandler:
                 setting_value = settings.get(name, meta["default"])
                 set_property(name, setting_value)
 
-        # Set video mode separately
-        camera.setVideoMode(
-            fps=settings.get("fps", 30),
-            pixelFormat=VideoMode.PixelFormat.kMJPEG,
-            width=int(settings["width"]),
-            height=int(settings["height"]),
+        modes = camera.enumerateVideoModes()
+        valid_modes = {
+            (mode.width, mode.height, mode.fps, mode.pixelFormat) for mode in modes
+        }
+
+        # Desired mode
+        desired_mode = (
+            int(settings["width"]),
+            int(settings["height"]),
+            settings.get("fps", 30),
+            VideoMode.PixelFormat.kMJPEG,
         )
 
-        # Add video mode properties to the updated settings
-        updated_settings.update(
-            {
-                "fps": settings.get("fps", 30),
-                "width": int(settings["width"]),
-                "height": int(settings["height"]),
-            }
-        )
+        # Check if the desired mode is valid
+        if desired_mode in valid_modes:
+            camera.setVideoMode(
+                width=desired_mode[0],
+                height=desired_mode[1],
+                fps=desired_mode[2],
+                pixelFormat=desired_mode[3],
+            )
+            updated_settings.update(
+                {
+                    "fps": settings.get("fps", 30),
+                    "width": int(settings["width"]),
+                    "height": int(settings["height"]),
+                }
+            )
+        else:
+            err(f"Warning: Invalid video mode {desired_mode}. Using default settings.")
 
         return updated_settings
 
