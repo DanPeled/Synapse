@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from cv2.typing import MatLike
 import numpy as np
 from wpilib import Timer
@@ -25,8 +25,11 @@ class ApriltagPipeline(Pipeline):
     kTagFamily = "tag36h11"
     kGetFieldPoseKey = "fieldpose"
     kStickToGroundKey = "stick_to_ground"
+    kMatrixKey = "matrix"
+    kMeasuredMatrixResolutionKey = "measured_res"
 
     def __init__(self, settings: PipelineSettings, camera_index: int):
+        super().__init__(settings, camera_index)
         self.settings = settings
         self.camera_matrix = np.array(
             self.getCameraMatrix(camera_index), dtype=np.float32
@@ -170,7 +173,34 @@ class ApriltagPipeline(Pipeline):
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
 
         if isinstance(camera_configs, dict):
-            return camera_configs.get(camera_index, {})["matrix"]
+            cam_config = camera_configs.get(camera_index, {})
+            measured_res = cam_config.get(ApriltagPipeline.kMeasuredMatrixResolutionKey)
+            current_res = (self.getSetting("width"), self.getSetting("height"))
+
+            if (
+                ApriltagPipeline.kMatrixKey in cam_config
+                and measured_res
+                and current_res
+            ):
+                if measured_res != current_res:
+                    scale_x = current_res[0] / measured_res[0]
+                    scale_y = current_res[1] / measured_res[1]
+
+                    matrix = cam_config[ApriltagPipeline.kMatrixKey]
+
+                    print(matrix)
+
+                    scaled_matrix = [
+                        [matrix[0][0] * scale_x, matrix[0][1], matrix[0][2] * scale_x],
+                        [matrix[1][0], matrix[1][1] * scale_y, matrix[1][2] * scale_y],
+                        [matrix[2][0], matrix[2][1], matrix[2][2]],
+                    ]
+
+                    print(scaled_matrix)
+                    return scaled_matrix
+
+                return cam_config[ApriltagPipeline.kMatrixKey]
+
         log.err("No camera matrix found, invalid results for AprilTag detection")
         return None
 
@@ -182,7 +212,7 @@ class ApriltagPipeline(Pipeline):
         return None
 
     @staticmethod
-    def getCameraConfigsGlobalSettings():
+    def getCameraConfigsGlobalSettings() -> Any:
         return GlobalSettings["camera_configs"]
 
     def getCameraTransform(self, camera_index: int) -> Optional[Transform3d]:
@@ -214,7 +244,7 @@ class ApriltagPipeline(Pipeline):
         pose: np.ndarray,
         tagSize: float,
         z_sign: int = 1,
-    ):
+    ) -> None:
         """
         Draws the 3d pose box around the AprilTag.
 
@@ -336,7 +366,7 @@ class ApriltagPipeline(Pipeline):
         pose: np.ndarray,
         center: Union[cv2.typing.Point, np.ndarray],
         tagSize: float,
-    ):
+    ) -> None:
         """
         Draws the colored pose axes around the AprilTag.
 

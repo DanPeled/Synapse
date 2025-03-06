@@ -200,9 +200,11 @@ class Pipeline(ABC):
             else:
                 self.nt_table.getSubTable("data").putValue(key, value)
 
-    def getSetting(self, key: str):
+    def getSetting(self, key: str) -> Optional[Any]:
         if self.nt_table is not None:
             return self.nt_table.getSubTable("settings").getValue(key, None)
+        else:
+            return self.settings.get(key)
 
     def setDataListener(
         self,
@@ -293,7 +295,7 @@ class GlobalSettingsMeta(type):
             return cls.__settings.get(key)
         return None
 
-    def set(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue):
+    def set(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue) -> None:
         """
         Sets a new value for a given setting key in the global settings.
 
@@ -304,7 +306,9 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             cls.__settings.set(key, value)
 
-    def __getitem__(cls, key: str):
+    def __getitem__(
+        cls, key: str
+    ) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
         """
         Retrieves a setting by its key using indexing syntax.
 
@@ -314,7 +318,7 @@ class GlobalSettingsMeta(type):
         Returns:
             Optional[PipelineSettings.PipelineSettingsMapValue]: The value of the setting.
         """
-        return cls.get(key)
+        return cls.get(key) or None
 
     def __setitem__(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue):
         """

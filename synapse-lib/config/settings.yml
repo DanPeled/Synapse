@@ -1,5 +1,4 @@
 network:
-  server: false
   name: Vision-Py
   team_number: 9738
 
@@ -18,6 +17,7 @@ global:
         - [1.86, 4, -24.95] # rotation
       distCoeffs:  
       - [ -0.02259194, 0.04796089,  0.01757909,  0.00100934,  -0.11873972]
+      measured_res: [1280, 720]
 
 pipelines:
   0: 
@@ -26,8 +26,8 @@ pipelines:
       target_tag: 7
       brightness: 100
       exposure: 20
-      width: 1280
-      height: 720
+      width: 640
+      height: 480
       fieldpose: true
       saturation: 10
       black_level_offset: 0.0
