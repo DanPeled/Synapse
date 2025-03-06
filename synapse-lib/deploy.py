@@ -5,6 +5,7 @@ import tarfile
 import subprocess
 import pathspec
 from datetime import datetime, timedelta
+import synapse.nt_client
 
 
 def check_python3_install() -> bool:
@@ -99,6 +100,11 @@ def deploy():
     ssh.exec_command(f"tar -xzf /tmp/deploy.tar.gz -C {remote_path}")
     ssh.exec_command("rm /tmp/deploy.tar.gz")
 
+    client = synapse.nt_client.NtClient()
+    client.setup(9738, "deploySynapse", False)
+    if client.getPID() != -1:
+        ssh.exec_command(f"kill {client.getPID()}")
+        ssh.exec_command("cd ~/Synapse && python3 main.py")
     service_name = "synapse_runtime"
     service_path = f"/etc/systemd/system/{service_name}.service"
 
@@ -141,7 +147,7 @@ def deploy():
 
 
 if __name__ == "__main__":
-    hostname = "192.168.1.158"
+    hostname = "10.97.38.14"
     port = 22
     username = "orangepi"
     password = "orangepi"

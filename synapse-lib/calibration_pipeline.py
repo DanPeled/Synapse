@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     # Criteria for corner subpixel accuracy
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    square_size = 20  # mm
+    square_size = 78.65  # mm
 
     # Prepare object points (0, 0, 0), (1, 0, 0), (2, 0, 0), ..., (8, 5, 0)
     objp = np.zeros((CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
@@ -20,11 +20,11 @@ if __name__ == "__main__":
     imgpoints = []  # 2D points in image plane
 
     # Start capturing from the webcam (0 is the default camera)
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(3)
 
     # Initialize a counter for the number of valid frames
     frame_count = 0
-    max_frames = 40  # Number of frames to capture (you can adjust this number)
+    max_frames = 120  # Number of frames to capture (you can adjust this number)
 
     while True:
         ret, frame = cap.read()
@@ -33,9 +33,10 @@ if __name__ == "__main__":
             print("Failed to grab frame")
             break
 
+        frame = cv2.rotate(frame, cv2.ROTATE_180)
         # Convert the frame to grayscale for better corner detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
+        print(gray.shape)
         # Find the chessboard corners
         ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, None)
 

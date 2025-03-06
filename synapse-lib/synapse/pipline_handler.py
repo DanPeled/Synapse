@@ -5,7 +5,6 @@ import time
 import traceback
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type, Union
-
 import cv2
 import ntcore
 import numpy as np
@@ -14,6 +13,7 @@ from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err, log
 from synapse.nt_client import NtClient
 from synapse.pipeline import Pipeline, PipelineSettings
+from synapse.stypes import Frame
 
 
 @dataclass
@@ -43,10 +43,13 @@ class PipelineHandler:
         self.sinks: Dict[int, CvSink] = {}
 
     def setup(self, settings: Dict[Any, Any]):
+        import atexit
+
         self.pipelines = self.loadPipelines()
         self.camera_bindings = self.setupCameraBindings(
             settings["global"]["camera_configs"]
         )
+        atexit.register(self.cleanup)
 
     def setupCameraBindings(self, cameras_yml: dict):
         bindings: Dict[int, CameraBinding] = {}
@@ -312,10 +315,11 @@ class PipelineHandler:
                     if ret == 0 or frame is None:
                         continue
 
+                    frame = self.fixtureFrame(camera_index, frame)
+
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipeline_instances.get(camera_index, [])
                     processed_frame: Any = frame
-
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
                         processed_frame = pipeline.process_frame(frame, start_time)
@@ -494,6 +498,13 @@ class PipelineHandler:
                     camera.getProperty(name).set(clamped_value)
                     # Store the updated value in the return dictionary
                     updated_settings[name] = clamped_value
+            elif name == "grayscale":
+                if value == 0:
+                    camera.setPixelFormat(VideoMode.PixelFormat.kMJPEG)
+                elif value == 1:
+                    camera.setPixelFormat(VideoMode.PixelFormat.kGray)
+            elif name == "fps":
+                camera.setFPS(value)
 
         # Set properties based on settings or use defaults from property metadata
         for name, meta in property_meta.items():
@@ -519,6 +530,43 @@ class PipelineHandler:
         )
 
         return updated_settings
+
+    def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
+        if "orientation" in settings.getMap():
+            orientation = settings.get("orientation")
+
+            if orientation == 180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+            elif orientation == 90:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            elif orientation == 270:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+        return frame
+
+    def fixBlackLevelOffset(self, settings: PipelineSettings, frame: Frame) -> Frame:
+        blackLevelOffset = settings.get("black_level_offset")
+
+        if blackLevelOffset == 0 or blackLevelOffset is None:
+            return frame  # No adjustment needed
+
+        blackLevelOffset = -blackLevelOffset / 100
+
+        # Convert to float32 for better precision
+        image = frame.astype(np.float32) / 255.0  # Normalize to range [0,1]
+
+        # Apply black level offset: lift only the darkest values
+        image = np.power(image + blackLevelOffset, 1.0)  # Apply a soft offset
+
+        # Clip to valid range and convert back to uint8
+        return np.clip(image * 255, 0, 255).astype(np.uint8)
+
+    def fixtureFrame(self, camera_index: int, frame: Frame) -> Frame:
+        settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
+        frame = self.rotateCameraBySettings(settings, frame)
+        # frame = self.fixBlackLevelOffset(settings, frame)
+
+        return frame
 
     def setPipelineSettings(
         self,

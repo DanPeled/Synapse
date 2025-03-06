@@ -17,12 +17,14 @@ from pupil_apriltags import Detector
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 import synapse.log as log
 import cv2
+from synapse.stypes import Frame
 
 
 class ApriltagPipeline(Pipeline):
     kTagSizeKey = "tag_size"
     kTagFamily = "tag36h11"
     kGetFieldPoseKey = "fieldpose"
+    kStickToGroundKey = "stick_to_ground"
 
     def __init__(self, settings: PipelineSettings, camera_index: int):
         self.settings = settings
@@ -32,11 +34,11 @@ class ApriltagPipeline(Pipeline):
 
         self.distCoeffs = np.array(self.getDistCoeffs(camera_index), dtype=np.float32)
         self.camera_transform = self.getCameraTransform(camera_index)
-        self.detector = Detector(families=ApriltagPipeline.kTagFamily)
+        self.detector = Detector(families=ApriltagPipeline.kTagFamily, nthreads=4)
 
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def process_frame(self, img, timestamp: float) -> cv2.typing.MatLike:
+    def process_frame(self, img, timestamp: float) -> Frame:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -57,13 +59,24 @@ class ApriltagPipeline(Pipeline):
 
         gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
-        # If no tags are detected, return None
         if not tags:
+            self.setDataValue("hasResults", False)
+            self.setDataValue("results", ApriltagsJson.toJsonString([]))
             return gray
 
         for tag in tags:  # pyright: ignore
             poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
             tagRelativePose = self.getPose3DFromTagPoseMatrix(poseMatrix)
+
+            if self.getSetting(ApriltagPipeline.kStickToGroundKey):
+                tagRelativePose = Pose3d(
+                    tagRelativePose.translation(),
+                    Rotation3d(
+                        0,
+                        0,
+                        tagRelativePose.rotation().Z(),
+                    ),
+                )
 
             if tagSize is not None and tagSize > 0:
                 self.drawPoseBox(
@@ -88,9 +101,9 @@ class ApriltagPipeline(Pipeline):
                     tagRelativePose.translation().X(),
                     tagRelativePose.translation().Y(),
                     tagRelativePose.translation().Z(),
-                    tagRelativePose.rotation().X(),
-                    tagRelativePose.rotation().Y(),
-                    tagRelativePose.rotation().Z(),
+                    tagRelativePose.rotation().x_degrees,
+                    tagRelativePose.rotation().y_degrees,
+                    tagRelativePose.rotation().z_degrees,
                 ],
             )
 
@@ -113,9 +126,9 @@ class ApriltagPipeline(Pipeline):
                             robotPose.translation().X(),
                             robotPose.translation().Y(),
                             robotPose.translation().Z(),
-                            robotPose.rotation().X(),
-                            robotPose.rotation().Y(),
-                            robotPose.rotation().Z(),
+                            robotPose.rotation().x_degrees,
+                            robotPose.rotation().y_degrees,
+                            robotPose.rotation().z_degrees,
                         ],
                     )
 
@@ -124,6 +137,7 @@ class ApriltagPipeline(Pipeline):
                     setattr(tag, "tagFieldPose", tagFieldPose)
                     setattr(tag, "tagRelativePose", tagRelativePose)
 
+        self.setDataValue("hasResults", True)
         self.setDataValue("results", ApriltagsJson.toJsonString(tags))
 
         return gray
@@ -154,6 +168,7 @@ class ApriltagPipeline(Pipeline):
 
     def getCameraMatrix(self, camera_index: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
+
         if isinstance(camera_configs, dict):
             return camera_configs.get(camera_index, {})["matrix"]
         log.err("No camera matrix found, invalid results for AprilTag detection")
@@ -185,10 +200,10 @@ class ApriltagPipeline(Pipeline):
 
         trans_lst = trans_matrix[0]
         translation3d = Translation3d(*trans_lst)
-
+        print(translation3d)
         rot_lst = trans_matrix[1]
         rotation3d = Rotation3d.fromDegrees(*rot_lst)
-
+        print(rotation3d)
         return Transform3d(translation=translation3d, rotation=rotation3d)
 
     @staticmethod
@@ -269,7 +284,6 @@ class ApriltagPipeline(Pipeline):
         :return: A ``Pose3d`` object.
         """
         x, y, z = 0, 0, 0
-
         # Flattens the pose matrix into a 1D array
         flatPose = np.array(poseMatrix).flatten()
 
@@ -360,8 +374,10 @@ class ApriltagPipeline(Pipeline):
 class ApriltagFieldJson:
     TagId = int
 
-    def __init__(self, jsonDict: Dict[TagId, Pose3d]):
+    def __init__(self, jsonDict: Dict[TagId, Pose3d], length: float, width: float):
         self.fieldMap = jsonDict
+        self.length = length
+        self.width = width
 
     @staticmethod
     def loadField(filePath: str) -> "ApriltagFieldJson":
@@ -385,8 +401,9 @@ class ApriltagFieldJson:
                         )
                     ),
                 )
-
-            return ApriltagFieldJson(tagsDict)
+            length = jsonDict["field"]["length"]
+            width = jsonDict["field"]["width"]
+            return ApriltagFieldJson(tagsDict, length, width)
 
     def getTagPose(self, id: TagId) -> Pose3d:
         if id in self.fieldMap.keys():
