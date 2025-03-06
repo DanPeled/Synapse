@@ -36,6 +36,7 @@ class Synapse:
                 network_settings = settings["network"]
 
                 # Initialize NetworkTables
+                self.__init_cmd_args()
                 nt_good = self.__init_networktables(network_settings)
                 if nt_good:
                     self.pipeline_handler.setup(settings)
@@ -67,11 +68,33 @@ class Synapse:
         """
         self.nt_client = NtClient()
         setup_good = self.nt_client.setup(
-            settings["team_number"], settings["name"], settings["server"]
+            teamNumber=settings["team_number"],
+            name=settings["name"],
+            isServer=self.__isServer,
+            isSim=self.__isSim,
         )
         return setup_good
 
-    def run(self):
+    def __init_cmd_args(self) -> None:
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--server", action="store_true", help="Run in server mode")
+        parser.add_argument("--sim", action="store_true", help="Run in sim mode")
+        args = parser.parse_args()
+
+        if args.server:
+            log("Running in server mode")
+            self.__isServer = True
+        else:
+            self.__isServer = False
+        if args.sim:
+            log("Running in simulation mode")
+            self.__isSim = True
+        else:
+            self.__isSim = False
+
+    def run(self) -> None:
         """
         Starts the pipeline by loading the settings and executing the pipeline handler.
 

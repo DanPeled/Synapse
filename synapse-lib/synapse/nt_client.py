@@ -20,7 +20,7 @@ class NtClient:
     INSTANCE: Optional["NtClient"] = None
     TABLE: str = ""
 
-    def setup(self, team_number: int, name: str, is_server: bool = False) -> bool:
+    def setup(self, teamNumber: int, name: str, isServer: bool, isSim: bool) -> bool:
         """
         Sets up the NetworkTables client or server, and attempts to connect to the specified server.
 
@@ -38,14 +38,17 @@ class NtClient:
         self.nt_inst = NetworkTableInstance.getDefault()
 
         # If acting as a server, create and start the server instance
-        if is_server:
+        if isServer:
             self.server = NetworkTableInstance.create()
             self.server.startServer("127.0.0.1")
             self.nt_inst.setServer("127.0.0.1")
             log(f"Server started with name {name}.")
         else:
             self.server = None
-            self.nt_inst.setServerTeam(team_number)
+            if isSim:
+                self.nt_inst.setServer("127.0.0.1")
+            else:
+                self.nt_inst.setServerTeam(teamNumber)
 
         # Client mode: set the server and start the client
         self.nt_inst.startClient4(name)
@@ -58,10 +61,10 @@ class NtClient:
             curr = time.time() - start_time
             if curr > timeout:
                 err(
-                    f"connection to server ({'127.0.0.1' if is_server else team_number}) from client ({name}) timed out after {curr} seconds"
+                    f"connection to server ({'127.0.0.1' if isServer else teamNumber}) from client ({name}) timed out after {curr} seconds"
                 )
                 return False
-            log(f"Trying to connect to {team_number}...")
+            log(f"Trying to connect to {teamNumber}...")
             time.sleep(1)
 
         self.nt_inst.getTable("Synapse").getEntry("PID").setInteger(os.getpid())
