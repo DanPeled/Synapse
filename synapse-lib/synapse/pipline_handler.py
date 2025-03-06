@@ -5,7 +5,6 @@ import time
 import traceback
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type, Union
-
 import cv2
 import ntcore
 import numpy as np
@@ -565,7 +564,7 @@ class PipelineHandler:
     def fixtureFrame(self, camera_index: int, frame: Frame) -> Frame:
         settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
         frame = self.rotateCameraBySettings(settings, frame)
-        frame = self.fixBlackLevelOffset(settings, frame)
+        # frame = self.fixBlackLevelOffset(settings, frame)
 
         return frame
 
