@@ -499,6 +499,13 @@ class PipelineHandler:
                     camera.getProperty(name).set(clamped_value)
                     # Store the updated value in the return dictionary
                     updated_settings[name] = clamped_value
+            elif name == "grayscale":
+                if value == 0:
+                    camera.setPixelFormat(VideoMode.PixelFormat.kMJPEG)
+                elif value == 1:
+                    camera.setPixelFormat(VideoMode.PixelFormat.kGray)
+            elif name == "fps":
+                camera.setFPS(value)
 
         # Set properties based on settings or use defaults from property metadata
         for name, meta in property_meta.items():
