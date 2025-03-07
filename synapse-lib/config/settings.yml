@@ -28,6 +28,7 @@ pipelines:
       exposure: 20
       width: 1280
       height: 720
+      stick_to_ground: true
       fieldpose: true
       saturation: 10
       black_level_offset: 0.0
