@@ -511,16 +511,12 @@ class PipelineHandler:
                 set_property(name, setting_value)
 
         modes = camera.enumerateVideoModes()
-        valid_modes = {
-            (mode.width, mode.height, mode.fps, mode.pixelFormat) for mode in modes
-        }
+        valid_modes = {(mode.width, mode.height) for mode in modes}
 
         # Desired mode
         desired_mode = (
             int(settings["width"]),
             int(settings["height"]),
-            settings.get("fps", 30),
-            VideoMode.PixelFormat.kMJPEG,
         )
 
         # Check if the desired mode is valid
@@ -528,8 +524,8 @@ class PipelineHandler:
             camera.setVideoMode(
                 width=desired_mode[0],
                 height=desired_mode[1],
-                fps=desired_mode[2],
-                pixelFormat=desired_mode[3],
+                fps=100,
+                pixelFormat=VideoMode.PixelFormat.kMJPEG,
             )
             updated_settings.update(
                 {
