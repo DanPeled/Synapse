@@ -5,7 +5,6 @@ import tarfile
 import subprocess
 import pathspec
 from datetime import datetime, timedelta
-import synapse.nt_client
 
 
 def check_python3_install() -> bool:
@@ -100,51 +99,9 @@ def deploy():
     ssh.exec_command(f"tar -xzf /tmp/deploy.tar.gz -C {remote_path}")
     ssh.exec_command("rm /tmp/deploy.tar.gz")
 
-    client = synapse.nt_client.NtClient()
-    client.setup(
-        teamNumber=9738,
-        name="deploySynapse",
-        isServer=False,
-        isSim=False,
-    )
-    if client.getPID() != -1:
-        ssh.exec_command(f"kill {client.getPID()}")
-        ssh.exec_command("cd ~/Synapse && python3 main.py")
-    service_name = "synapse_runtime"
-    service_path = f"/etc/systemd/system/{service_name}.service"
+    service_name = "synapse"
 
-    # Service definition
-    service_content = f"""
-    [Unit]
-    Description=Synapse Runtime
-    After=network.target
-
-    [Service]
-    ExecStart=/usr/bin/python3 {remote_path}main.py
-    Restart=always
-    User={username}
-    WorkingDirectory={remote_path}
-
-    [Install]
-    WantedBy=multi-user.target
-    """
-
-    stdin, stdout, stderr = ssh.exec_command(f"test -f {service_path} && echo exists")
-    service_exists = "exists" in stdout.read().decode()
-
-    if not service_exists:
-        temp_service_path = f"/tmp/{service_name}.service"
-
-        # Write service content to a temporary location
-        with ssh.open_sftp().file(temp_service_path, "w") as service_file:
-            service_file.write(service_content)
-
-        # Move the service file to /etc/systemd/system using sudo
-        ssh.exec_command(f"sudo mv {temp_service_path} {service_path}")
-        ssh.exec_command("sudo systemctl daemon-reload")
-        ssh.exec_command(f"sudo systemctl enable {service_name}")
-
-    ssh.exec_command(f"systemctl restart {service_name}")
+    ssh.exec_command(f"sudo systemctl restart {service_name}")
     print(f"Service {service_name} restarted.")
 
     sftp.close()
