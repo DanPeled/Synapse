@@ -5,6 +5,7 @@ import tarfile
 import subprocess
 import pathspec
 from datetime import datetime, timedelta
+import time as t
 
 
 def check_python3_install() -> bool:
@@ -101,7 +102,15 @@ def deploy():
 
     service_name = "synapse"
 
-    ssh.exec_command(f"sudo systemctl restart {service_name}")
+    # Run sudo command and provide the password
+    command = f"echo '{password}' | sudo -S systemctl restart {service_name}"
+    stdin, stdout, stderr = ssh.exec_command(command)
+
+    # Wait for the command to complete and print any output/errors
+    t.sleep(1)
+    print(stdout.read().decode())
+    print(stderr.read().decode())
+
     print(f"Service {service_name} restarted.")
 
     sftp.close()
