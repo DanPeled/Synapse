@@ -435,11 +435,11 @@ class ApriltagFieldJson:
             width = jsonDict["field"]["width"]
             return ApriltagFieldJson(tagsDict, length, width)
 
-    def getTagPose(self, id: TagId) -> Pose3d:
+    def getTagPose(self, id: TagId) -> Optional[Pose3d]:
         if id in self.fieldMap.keys():
             return self.fieldMap[id]
         else:
-            raise KeyError(f"Tag with ID: #{id} does not exist!")
+            return None
 
 
 class ApriltagsJson:

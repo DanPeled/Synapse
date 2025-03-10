@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, Final, List, Optional, Type, Union
 import cv2
 import ntcore
 import numpy as np
@@ -23,7 +23,8 @@ class CameraBinding:
 
 
 class PipelineHandler:
-    NT_TABLE = "Synapse"
+    NT_TABLE: Final[str] = "Synapse"
+    STREAM_SIZE: Final[tuple[int, int]] = (320, 180)
 
     def __init__(self, directory: str):
         """
@@ -269,15 +270,12 @@ class PipelineHandler:
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
-        def getSettingsMap(camera_index: int) -> dict:
-            return self.pipeline_settings[self.pipeline_bindings[camera_index]].getMap()
-
         return {
             i: CameraServer.putVideo(
                 f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
-                width=int(getSettingsMap(i)["width"]),
-                height=int(getSettingsMap(i)["height"]),
-            )
+                width=int(self.STREAM_SIZE[0]),
+                height=int(self.STREAM_SIZE[1]),
+            )  # Maybe in the future add this to be tunable
             for i in self.cameras.keys()
         }
 
@@ -337,7 +335,7 @@ class PipelineHandler:
                     )
 
                     if processed_frame is not None:
-                        output.putFrame(processed_frame)
+                        output.putFrame(cv2.resize(processed_frame, self.STREAM_SIZE))
 
                     if NtClient.INSTANCE is not None:
                         self.syncCurrentPipeline(camera_index)
