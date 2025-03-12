@@ -15,6 +15,7 @@ global:
       distCoeffs:  
       - [ -0.02259194, 0.04796089,  0.01757909,  0.00100934,  -0.11873972]
       measured_res: [1280, 720]
+      stream_res: [320, 180]
       transform:
         - [-0.24637, 0.23285, 0.28899] # translation
         - [1.86, 4, -24.95] # rotation
