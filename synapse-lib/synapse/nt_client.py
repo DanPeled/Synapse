@@ -2,7 +2,6 @@ import time
 from typing import Optional
 from ntcore import NetworkTableInstance
 from synapse.log import err, log
-import os
 import atexit
 
 
@@ -67,12 +66,8 @@ class NtClient:
             log(f"Trying to connect to {teamNumber}...")
             time.sleep(1)
 
-        self.nt_inst.getTable("Synapse").getEntry("PID").setInteger(os.getpid())
         atexit.register(self.cleanup)
         return True
 
-    def getPID(self) -> int:
-        return self.nt_inst.getTable("Synapse").getEntry("PID").getInteger(-1)
-
     def cleanup(self) -> None:
-        self.nt_inst.getTable("Synapse").getEntry("PID").setInteger(-1)
+        ...
