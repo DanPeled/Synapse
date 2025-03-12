@@ -12,7 +12,7 @@ from cscore import CameraServer, CvSink, CvSource, VideoCamera, VideoMode
 from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err, log
 from synapse.nt_client import NtClient
-from synapse.pipeline import Pipeline, PipelineSettings
+from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from synapse.stypes import Frame
 
 
@@ -24,7 +24,7 @@ class CameraBinding:
 
 class PipelineHandler:
     NT_TABLE: Final[str] = "Synapse"
-    STREAM_SIZE: Final[tuple[int, int]] = (320, 180)
+    DEFAULT_STREAM_SIZE: Final[tuple[int, int]] = (320, 180)
 
     def __init__(self, directory: str):
         """
@@ -33,13 +33,14 @@ class PipelineHandler:
         """
         self.directory = directory
         self.cameras: Dict[int, VideoCamera] = {}
-        self.pipeline_map: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
-        self.pipeline_instances: Dict[int, List[Pipeline]] = {}
-        self.pipeline_settings: Dict[int, PipelineSettings] = {}
-        self.default_pipeline_indexes: Dict[int, int] = {}
-        self.pipeline_bindings: Dict[int, int] = {}
-        self.pipeline_types: Dict[int, str] = {}
-        self.pipeline_subscribers: Dict[int, ntcore.IntegerSubscriber] = {}
+        self.pipelineMap: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
+        self.pipelineInstances: Dict[int, List[Pipeline]] = {}
+        self.pipelineSettings: Dict[int, PipelineSettings] = {}
+        self.defaultPipelineIndexes: Dict[int, int] = {}
+        self.pipelineBindings: Dict[int, int] = {}
+        self.streamSizes: Dict[int, tuple[int, int]] = {}
+        self.pipelineTypes: Dict[int, str] = {}
+        self.pipelineSubscribers: Dict[int, ntcore.IntegerSubscriber] = {}
         self.outputs: Dict[int, CvSource] = {}
         self.sinks: Dict[int, CvSink] = {}
 
@@ -47,7 +48,7 @@ class PipelineHandler:
         import atexit
 
         self.pipelines = self.loadPipelines()
-        self.camera_bindings = self.setupCameraBindings(
+        self.cameraBindings = self.setupCameraBindings(
             settings["global"]["camera_configs"]
         )
         atexit.register(self.cleanup)
@@ -109,11 +110,11 @@ class PipelineHandler:
         Adds a camera to the handler by opening it through OpenCV.
         :param camera_index: Camera index to open
         """
-        if camera_index not in self.camera_bindings:
+        if camera_index not in self.cameraBindings:
             err(f"No camera defined for index {camera_index}")
             return False
 
-        camera_config = self.camera_bindings[camera_index]
+        camera_config = self.cameraBindings[camera_index]
         path = (
             int(camera_config.path)
             if isinstance(camera_config.path, int)
@@ -159,20 +160,20 @@ class PipelineHandler:
         :param camera_index: Index of the camera
         :param pipeline: A pipeline class or list of pipeline classes to assign to the camera
         """
-        self.pipeline_map[camera_index] = pipeline
+        self.pipelineMap[camera_index] = pipeline
         # Create instances for each pipeline only when setting them
         if isinstance(pipeline, Type):
             pipeline = [pipeline]
 
-        self.pipeline_instances[camera_index] = [
+        self.pipelineInstances[camera_index] = [
             pipeline_cls(
-                settings=self.pipeline_settings[self.pipeline_bindings[camera_index]],
+                settings=self.pipelineSettings[self.pipelineBindings[camera_index]],
                 camera_index=camera_index,
             )
             for pipeline_cls in pipeline
         ]
 
-        for currPipeline in self.pipeline_instances[camera_index]:
+        for currPipeline in self.pipelineInstances[camera_index]:
             if NtClient.INSTANCE is not None:
                 camera_table = self.getCameraTable(camera_index)
 
@@ -199,29 +200,29 @@ class PipelineHandler:
             # print(f"pipeline: {pipeline}, entry : {entry.getName()}")
 
             if (
-                nt_pipeline != self.pipeline_bindings[camera_index]
+                nt_pipeline != self.pipelineBindings[camera_index]
                 and nt_pipeline is not None
             ):
                 self.setPipelineByIndex(camera_index, nt_pipeline)
 
     def syncPipelineSettings(self, camera_index: int):
-        settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
+        settings = self.pipelineSettings[self.pipelineBindings[camera_index]]
         somethingChanged = False
         for key, value in settings.getMap().items():
             nt_table = self.getCameraTable(camera_index)
             if nt_table is not None:
                 nt_val = nt_table.getSubTable("settings").getValue(key, None)
                 if nt_val != value:
-                    self.pipeline_settings[self.pipeline_bindings[camera_index]][
-                        key
-                    ] = nt_val
+                    self.pipelineSettings[self.pipelineBindings[camera_index]][key] = (
+                        nt_val
+                    )
 
                     somethingChanged = True
 
         if somethingChanged:
             self.setCameraConfigs(
-                settings=self.pipeline_settings[
-                    self.pipeline_bindings[camera_index]
+                settings=self.pipelineSettings[
+                    self.pipelineBindings[camera_index]
                 ].getMap(),
                 camera=self.cameras[camera_index],
             )
@@ -239,25 +240,25 @@ class PipelineHandler:
             )
             return
 
-        if pipeline_index not in self.pipeline_types.keys():
+        if pipeline_index not in self.pipelineTypes.keys():
             err(
-                f"Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipeline_types.keys())}."
+                f"Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipelineTypes.keys())}."
             )
-            self.setNTPipelineIndex(camera_index, self.pipeline_bindings[camera_index])
+            self.setNTPipelineIndex(camera_index, self.pipelineBindings[camera_index])
             return
 
         # If both indices are valid, proceed with the pipeline setting
-        self.pipeline_bindings[camera_index] = pipeline_index
+        self.pipelineBindings[camera_index] = pipeline_index
 
         self.setNTPipelineIndex(
             camera_index=camera_index, pipeline_index=pipeline_index
         )
 
-        settings = self.pipeline_settings[pipeline_index]
+        settings = self.pipelineSettings[pipeline_index]
 
         self.__setPipelineForCamera(
             camera_index=camera_index,
-            pipeline=self.pipelines[self.pipeline_types[pipeline_index]],
+            pipeline=self.pipelines[self.pipelineTypes[pipeline_index]],
             pipeline_config=settings,
         )
 
@@ -270,12 +271,22 @@ class PipelineHandler:
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
+        def getStreamRes(i: int) -> tuple[int, int]:
+            if "camera_configs" in GlobalSettings:
+                cameraConfigs = GlobalSettings.get("camera_configs")
+                if cameraConfigs is not None:
+                    streamRes = cameraConfigs[i]["stream_res"]
+                    self.streamSizes[i] = streamRes
+                    return (streamRes[0], streamRes[1])
+
+            return self.DEFAULT_STREAM_SIZE
+
         return {
             i: CameraServer.putVideo(
                 f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
-                width=int(self.STREAM_SIZE[0]),
-                height=int(self.STREAM_SIZE[1]),
-            )  # Maybe in the future add this to be tunable
+                width=getStreamRes(i)[0],
+                height=getStreamRes(i)[1],
+            )
             for i in self.cameras.keys()
         }
 
@@ -314,7 +325,7 @@ class PipelineHandler:
                     frame = self.fixtureFrame(camera_index, frame)
 
                     # Retrieve the pipeline instances for the current camera
-                    assigned_pipelines = self.pipeline_instances.get(camera_index, [])
+                    assigned_pipelines = self.pipelineInstances.get(camera_index, [])
                     processed_frame: Any = frame
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
@@ -335,7 +346,12 @@ class PipelineHandler:
                     )
 
                     if processed_frame is not None:
-                        output.putFrame(cv2.resize(processed_frame, self.STREAM_SIZE))
+                        output.putFrame(
+                            cv2.resize(
+                                processed_frame,
+                                self.streamSizes[camera_index],
+                            )
+                        )
 
                     if NtClient.INSTANCE is not None:
                         self.syncCurrentPipeline(camera_index)
@@ -366,7 +382,7 @@ class PipelineHandler:
             self.setPipelineByIndex(
                 camera_index=index,
                 pipeline_index=table.getEntry(key).getInteger(
-                    defaultValue=self.default_pipeline_indexes[index]
+                    defaultValue=self.defaultPipelineIndexes[index]
                 ),
             )
 
@@ -383,10 +399,10 @@ class PipelineHandler:
                 )
 
                 pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
-                pub.setDefault(self.default_pipeline_indexes[i])
+                pub.setDefault(self.defaultPipelineIndexes[i])
 
                 sub = topic.subscribe(
-                    self.default_pipeline_indexes[i],
+                    self.defaultPipelineIndexes[i],
                     ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10),
                 )
 
@@ -394,7 +410,7 @@ class PipelineHandler:
                     topicName
                 ).setInteger(sub.get())
 
-                self.pipeline_subscribers[i] = sub
+                self.pipelineSubscribers[i] = sub
 
                 log(f"Added listener for camera {i}, entry:{topic.getName()}")
 
@@ -422,7 +438,7 @@ class PipelineHandler:
             for camera_index in camera_configs:
                 if not (self.addCamera(camera_index)):
                     return
-                self.default_pipeline_indexes[camera_index] = camera_configs[
+                self.defaultPipelineIndexes[camera_index] = camera_configs[
                     camera_index
                 ]["default_pipeline"]
 
@@ -435,10 +451,10 @@ class PipelineHandler:
 
                 self.setPipelineSettings(index, pipeline["settings"])
 
-                self.pipeline_types[index] = pipeline["type"]
+                self.pipelineTypes[index] = pipeline["type"]
 
         for camera_index in self.cameras.keys():
-            pipeline = self.default_pipeline_indexes[camera_index]
+            pipeline = self.defaultPipelineIndexes[camera_index]
             self.setPipelineByIndex(
                 camera_index=camera_index,
                 pipeline_index=pipeline,
@@ -568,7 +584,7 @@ class PipelineHandler:
         return np.clip(image * 255, 0, 255).astype(np.uint8)
 
     def fixtureFrame(self, camera_index: int, frame: Frame) -> Frame:
-        settings = self.pipeline_settings[self.pipeline_bindings[camera_index]]
+        settings = self.pipelineSettings[self.pipelineBindings[camera_index]]
         frame = self.rotateCameraBySettings(settings, frame)
         # frame = self.fixBlackLevelOffset(settings, frame)
 
@@ -579,7 +595,7 @@ class PipelineHandler:
         pipeline_index: int,
         settings: PipelineSettings.PipelineSettingsMap,
     ):
-        self.pipeline_settings[pipeline_index] = PipelineSettings(settings)
+        self.pipelineSettings[pipeline_index] = PipelineSettings(settings)
 
     def cleanup(self):
         """
@@ -587,7 +603,7 @@ class PipelineHandler:
         """
         cv2.destroyAllWindows()
 
-        for sub in self.pipeline_subscribers.values():
+        for sub in self.pipelineSubscribers.values():
             name = sub.getTopic().getName()
             sub.close()
             log(f"Close sub : {name}")

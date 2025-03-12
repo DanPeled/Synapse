@@ -38,7 +38,9 @@ class PipelineSettings:
         Args:
             settings (Optional[PipelineSettingsMap]): A dictionary of settings to initialize with.
         """
-        self.__settings = settings if settings is not None else {}
+        self.__settings: PipelineSettings.PipelineSettingsMap = (
+            settings if settings is not None else {}
+        )
 
     def sendSettings(self, nt_table: NetworkTable):
         """
@@ -51,7 +53,7 @@ class PipelineSettings:
             value = self.__settings[key]
             PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
 
-    def get(self, key: str) -> Optional[PipelineSettingsMapValue]:
+    def get(self, key: str, defaultValue=None) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves the setting for a given key.
 
@@ -61,7 +63,7 @@ class PipelineSettings:
         Returns:
             Optional[PipelineSettingsMapValue]: The value of the setting, or None if not found.
         """
-        return self.__settings.get(key)
+        return self.__settings.get(key, defaultValue)
 
     def set(self, key: str, value: PipelineSettingsMapValue):
         """
@@ -113,6 +115,9 @@ class PipelineSettings:
             str: A string representation of the settings.
         """
         return str(self.__settings)
+
+    def __contains__(self, key: Any) -> bool:
+        return key in self.__settings.keys()
 
     def getMap(self) -> PipelineSettingsMap:
         """
@@ -281,7 +286,9 @@ class GlobalSettingsMeta(type):
         """
         cls.__settings = PipelineSettings(settings)
 
-    def get(cls, key: str) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
+    def get(
+        cls, key: str, defaultValue=None
+    ) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
         """
         Retrieves a setting by its key from the global settings.
 
@@ -292,7 +299,7 @@ class GlobalSettingsMeta(type):
             Optional[PipelineSettings.PipelineSettingsMapValue]: The value of the setting, or None if not found.
         """
         if cls.__settings is not None:
-            return cls.__settings.get(key)
+            return cls.__settings.get(key, defaultValue)
         return None
 
     def set(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue) -> None:
@@ -350,6 +357,11 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             return cls.__settings.getMap()
         return {}
+
+    def __contains__(cls, key: str) -> bool:
+        if cls.__settings is not None:
+            return key in cls.__settings
+        return False
 
 
 class GlobalSettings(metaclass=GlobalSettingsMeta):
