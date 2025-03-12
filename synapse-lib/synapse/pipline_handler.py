@@ -9,8 +9,8 @@ import cv2
 import ntcore
 import numpy as np
 from cscore import CameraServer, CvSink, CvSource
-from ntcore import Event, EventFlags, NetworkTable, NetworkTableInstance
-from synapse.camera_factory import OpenCvCamera, SynapseCamera
+from ntcore import Event, EventFlags, NetworkTable
+from synapse.camera_factory import CsCoreCamera, SynapseCamera
 from synapse.log import err, log
 from synapse.nt_client import NtClient
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
@@ -123,7 +123,7 @@ class PipelineHandler:
         )
 
         try:
-            camera = OpenCvCamera()
+            camera = CsCoreCamera()
             camera.create(devPath=camera_config.path)
         except Exception as e:
             err(f"Failed to start camera capture: {e}")
