@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass
-from typing import Any, Dict, Final, List, Optional, Type, Union
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 import cv2
 import ntcore
 import numpy as np
@@ -24,7 +24,7 @@ class CameraBinding:
 
 class PipelineHandler:
     NT_TABLE: Final[str] = "Synapse"
-    DEFAULT_STREAM_SIZE: Final[tuple[int, int]] = (320, 180)
+    DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
 
     def __init__(self, directory: str):
         """
@@ -38,7 +38,7 @@ class PipelineHandler:
         self.pipelineSettings: Dict[int, PipelineSettings] = {}
         self.defaultPipelineIndexes: Dict[int, int] = {}
         self.pipelineBindings: Dict[int, int] = {}
-        self.streamSizes: Dict[int, tuple[int, int]] = {}
+        self.streamSizes: Dict[int, Tuple[int, int]] = {}
         self.pipelineTypes: Dict[int, str] = {}
         self.pipelineSubscribers: Dict[int, ntcore.IntegerSubscriber] = {}
         self.outputs: Dict[int, CvSource] = {}
@@ -271,7 +271,7 @@ class PipelineHandler:
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
-        def getStreamRes(i: int) -> tuple[int, int]:
+        def getStreamRes(i: int) -> Tuple[int, int]:
             if "camera_configs" in GlobalSettings:
                 cameraConfigs = GlobalSettings.get("camera_configs")
                 if cameraConfigs is not None:
@@ -510,13 +510,6 @@ class PipelineHandler:
                     camera.getProperty(name).set(clamped_value)
                     # Store the updated value in the return dictionary
                     updated_settings[name] = clamped_value
-            elif name == "grayscale":
-                if value == 0:
-                    camera.setPixelFormat(VideoMode.PixelFormat.kMJPEG)
-                elif value == 1:
-                    camera.setPixelFormat(VideoMode.PixelFormat.kGray)
-            elif name == "fps":
-                camera.setFPS(value)
 
         # Set properties based on settings or use defaults from property metadata
         for name, meta in property_meta.items():
@@ -543,7 +536,7 @@ class PipelineHandler:
             )
             updated_settings.update(
                 {
-                    "fps": settings.get("fps", 30),
+                    "fps": settings.get("fps", 100),
                     "width": int(settings["width"]),
                     "height": int(settings["height"]),
                 }
