@@ -69,5 +69,4 @@ class NtClient:
         atexit.register(self.cleanup)
         return True
 
-    def cleanup(self) -> None:
-        ...
+    def cleanup(self) -> None: ...

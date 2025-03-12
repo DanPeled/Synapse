@@ -4,12 +4,13 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass
-from typing import Any, Dict, Final, List, Optional, Type, Union
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 import cv2
 import ntcore
 import numpy as np
-from cscore import CameraServer, CvSink, CvSource, VideoCamera, VideoMode
+from cscore import CameraServer, CvSink, CvSource
 from ntcore import Event, EventFlags, NetworkTable
+from synapse.camera_factory import CsCoreCamera, SynapseCamera
 from synapse.log import err, log
 from synapse.nt_client import NtClient
 from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
@@ -24,7 +25,7 @@ class CameraBinding:
 
 class PipelineHandler:
     NT_TABLE: Final[str] = "Synapse"
-    DEFAULT_STREAM_SIZE: Final[tuple[int, int]] = (320, 180)
+    DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
 
     def __init__(self, directory: str):
         """
@@ -32,13 +33,13 @@ class PipelineHandler:
         :param directory: Root directory to search for pipeline files
         """
         self.directory = directory
-        self.cameras: Dict[int, VideoCamera] = {}
+        self.cameras: Dict[int, SynapseCamera] = {}
         self.pipelineMap: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipelineInstances: Dict[int, List[Pipeline]] = {}
         self.pipelineSettings: Dict[int, PipelineSettings] = {}
         self.defaultPipelineIndexes: Dict[int, int] = {}
         self.pipelineBindings: Dict[int, int] = {}
-        self.streamSizes: Dict[int, tuple[int, int]] = {}
+        self.streamSizes: Dict[int, Tuple[int, int]] = {}
         self.pipelineTypes: Dict[int, str] = {}
         self.pipelineSubscribers: Dict[int, ntcore.IntegerSubscriber] = {}
         self.outputs: Dict[int, CvSource] = {}
@@ -122,10 +123,8 @@ class PipelineHandler:
         )
 
         try:
-            camera = CameraServer.startAutomaticCapture(
-                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(camera_index)}/input",
-                path,
-            )
+            camera = CsCoreCamera()
+            camera.create(devPath=camera_config.path)
         except Exception as e:
             err(f"Failed to start camera capture: {e}")
             return False
@@ -271,7 +270,7 @@ class PipelineHandler:
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
-        def getStreamRes(i: int) -> tuple[int, int]:
+        def getStreamRes(i: int) -> Tuple[int, int]:
             if "camera_configs" in GlobalSettings:
                 cameraConfigs = GlobalSettings.get("camera_configs")
                 if cameraConfigs is not None:
@@ -295,31 +294,17 @@ class PipelineHandler:
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
         try:
-            self.sinks = {
-                i: CameraServer.getVideo(self.cameras[i]) for i in self.cameras.keys()
-            }
-
-            log("Set up sinks array")
-            frame_buffers = {
-                i: np.zeros((1920, 1080, 3), dtype=np.uint8)
-                for i in self.cameras.keys()
-            }
-
-            log("Set up frame buffers")
-
             self.outputs = self.getCameraOutputs()
             log("Set up outputs array")
 
             def process_camera(camera_index: int):
-                sink = self.sinks[camera_index]
-                frame_buffer = frame_buffers[camera_index]
                 output = self.outputs[camera_index]
 
                 while True:
                     start_time = time.time()  # Start time for FPS calculation
-                    ret, frame = sink.grabFrame(frame_buffer)
+                    ret, frame = self.cameras[camera_index].grabFrame()
 
-                    if ret == 0 or frame is None:
+                    if not ret or frame is None:
                         continue
 
                     frame = self.fixtureFrame(camera_index, frame)
@@ -365,9 +350,8 @@ class PipelineHandler:
                 threads.append(thread)
                 thread.start()
 
-            # Keep the main thread alive to allow all camera threads to run
             while True:
-                time.sleep(1)
+                time.sleep(0.01)
 
         finally:
             self.cleanup()
@@ -466,7 +450,7 @@ class PipelineHandler:
 
     @staticmethod
     def setCameraConfigs(
-        settings: Dict[str, Any], camera: VideoCamera
+        settings: Dict[str, Any], camera: SynapseCamera
     ) -> Dict[str, Any]:
         property_meta = {}
         updated_settings = {}
@@ -492,31 +476,24 @@ class PipelineHandler:
         ]
 
         # Read all camera properties and their min/max/default
-        for prop in camera.enumerateProperties():
-            property_meta[prop.getName()] = {
-                "min": prop.getMin(),
-                "max": prop.getMax(),
-                "default": prop.getDefault(),
-            }
-            if prop.getName() not in settings.keys() and prop.getName() not in excluded:
-                settings[prop.getName()] = prop.getDefault()
+        # for prop in camera.enumerateProperties():
+        #     property_meta[prop.getName()] = {
+        #         "min": prop.getMin(),
+        #         "max": prop.getMax(),
+        #         "default": prop.getDefault(),
+        #     }
+        #     if prop.getName() not in settings.keys() and prop.getName() not in excluded:
+        #         settings[prop.getName()] = prop.getDefault()
 
         def set_property(name: str, value: int):
             """Set property if it exists, clamping the value within bounds."""
             if name in property_meta:
-                meta = property_meta[name]
-                clamped_value = max(meta["min"], min(value, meta["max"]))
-                if value != camera.getProperty(name).get():
-                    camera.getProperty(name).set(clamped_value)
-                    # Store the updated value in the return dictionary
-                    updated_settings[name] = clamped_value
-            elif name == "grayscale":
-                if value == 0:
-                    camera.setPixelFormat(VideoMode.PixelFormat.kMJPEG)
-                elif value == 1:
-                    camera.setPixelFormat(VideoMode.PixelFormat.kGray)
-            elif name == "fps":
-                camera.setFPS(value)
+                # meta = property_meta[name]
+                # clamped_value = max(meta["min"], min(value, meta["max"]))
+                # if value != camera.getProperty(name).get():
+                camera.setProperty(name, value)
+                # Store the updated value in the return dictionary
+                updated_settings[name] = value
 
         # Set properties based on settings or use defaults from property metadata
         for name, meta in property_meta.items():
@@ -524,8 +501,8 @@ class PipelineHandler:
                 setting_value = settings.get(name, meta["default"])
                 set_property(name, setting_value)
 
-        modes = camera.enumerateVideoModes()
-        valid_modes = {(mode.width, mode.height) for mode in modes}
+        # modes = camera.enumerateVideoModes()
+        # valid_modes = {(mode.width, mode.height) for mode in modes}
 
         # Desired mode
         desired_mode = (
@@ -534,16 +511,16 @@ class PipelineHandler:
         )
 
         # Check if the desired mode is valid
-        if desired_mode in valid_modes:
+        if True:
+            # if desired_mode in valid_modes:
             camera.setVideoMode(
                 width=desired_mode[0],
                 height=desired_mode[1],
                 fps=100,
-                pixelFormat=VideoMode.PixelFormat.kMJPEG,
             )
             updated_settings.update(
                 {
-                    "fps": settings.get("fps", 30),
+                    "fps": settings.get("fps", 100),
                     "width": int(settings["width"]),
                     "height": int(settings["height"]),
                 }
