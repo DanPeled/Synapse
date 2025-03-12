@@ -188,15 +188,12 @@ class ApriltagPipeline(Pipeline):
 
                     matrix = cam_config[ApriltagPipeline.kMatrixKey]
 
-                    print(matrix)
-
                     scaled_matrix = [
                         [matrix[0][0] * scale_x, matrix[0][1], matrix[0][2] * scale_x],
                         [matrix[1][0], matrix[1][1] * scale_y, matrix[1][2] * scale_y],
                         [matrix[2][0], matrix[2][1], matrix[2][2]],
                     ]
 
-                    print(scaled_matrix)
                     return scaled_matrix
 
                 return cam_config[ApriltagPipeline.kMatrixKey]
@@ -230,10 +227,8 @@ class ApriltagPipeline(Pipeline):
 
         trans_lst = trans_matrix[0]
         translation3d = Translation3d(*trans_lst)
-        print(translation3d)
         rot_lst = trans_matrix[1]
         rotation3d = Rotation3d.fromDegrees(*rot_lst)
-        print(rotation3d)
         return Transform3d(translation=translation3d, rotation=rotation3d)
 
     @staticmethod

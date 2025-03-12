@@ -9,7 +9,6 @@ class ColorPipeline(Pipeline):
         self.camera_index = camera_index
         self.settings = settings
         settings["minSize"] = 0.001
-        print(self.settings.getMap())
 
     def process_frame(self, img: MatLike, timestamp: float) -> MatLike:
         hsv = None

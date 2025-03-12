@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union, override
+from typing import Optional, Tuple, Union
 import cv2
 from synapse.log import err
 from synapse.stypes import Frame
@@ -55,12 +55,8 @@ class SynapseCamera(ABC):
     @abstractmethod
     def setVideoMode(self, fps: int, width: int, height: int) -> None: ...
 
-    @abstractmethod
-    def setFPS(self, fps: int) -> None: ...
-
 
 class OpenCvCamera(SynapseCamera):
-    @override
     def create(
         self, *_, devPath: Optional[str] = None, usbIndex: Optional[int] = None
     ) -> None:
@@ -71,26 +67,21 @@ class OpenCvCamera(SynapseCamera):
         else:
             err("No USB Index or Dev Path was provided for camera!")
 
-    @override
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         return self.cap.read()
 
-    @override
     def isConnected(self) -> bool:
         return self.cap.isOpened()
 
-    @override
     def close(self) -> None:
         self.cap.release()
 
-    @override
     def setProperty(self, prop: str, value: Union[int, float]) -> None:
         if isinstance(prop, int) and self.cap:
             propInt = cscore_to_cv(prop)
             if propInt is not None:
                 self.cap.set(propInt, value)
 
-    @override
     def getProperty(self, prop: str) -> Union[int, float, None]:
         if isinstance(prop, int) and self.cap:
             propInt = cscore_to_cv(prop)
@@ -100,7 +91,6 @@ class OpenCvCamera(SynapseCamera):
                 return None
         return None
 
-    @override
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
         if self.cap:
             self.cap.set(cv2.CAP_PROP_FPS, fps)
@@ -109,7 +99,6 @@ class OpenCvCamera(SynapseCamera):
 
 
 class CsCoreCamera(SynapseCamera):
-    @override
     def create(
         self, *_, devPath: Optional[str] = None, usbIndex: Optional[int] = None
     ) -> None:
@@ -128,26 +117,21 @@ class CsCoreCamera(SynapseCamera):
         if self.camera is not None:
             self.sink = CameraServer.getVideo(self.camera)
 
-    @override
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         if self.camera is not None:
             ret, frame = self.sink.grabFrame(self.frameBuffer)
             return ret != 0, frame
         return False, None
 
-    @override
     def isConnected(self) -> bool:
         return self.camera is not None
 
-    @override
     def close(self) -> None: ...
 
-    @override
     def setProperty(self, prop: str, value: Union[int, float]) -> None:
         if isinstance(prop, str) and self.camera and isinstance(value, int):
             self.camera.getProperty(prop).set(value)
 
-    @override
     def getProperty(self, prop: str) -> Union[int, float, None]:
         if isinstance(prop, str) and self.camera:
             prop_obj = self.camera.getProperty(prop)
@@ -155,7 +139,6 @@ class CsCoreCamera(SynapseCamera):
                 return prop_obj.get()
         return None
 
-    @override
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
         if self.camera:
             self.camera.setVideoMode(
