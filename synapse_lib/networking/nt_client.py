@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 from ntcore import NetworkTableInstance
-from synapse.log import err, log
+from core.log import err, log
 import atexit
 
 

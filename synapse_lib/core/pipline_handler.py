@@ -10,11 +10,12 @@ import ntcore
 import numpy as np
 from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
-from synapse.camera_factory import CsCoreCamera, SynapseCamera
-from synapse.log import err, log
-from synapse.nt_client import NtClient
-from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
-from synapse.stypes import Frame
+from core.camera_factory import CsCoreCamera, SynapseCamera
+from core.log import err, log
+from hardware.metrics import MetricsManager
+from networking import NtClient
+from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
+from core.stypes import Frame
 
 
 @dataclass
@@ -33,6 +34,8 @@ class PipelineHandler:
         :param directory: Root directory to search for pipeline files
         """
         self.directory = directory
+        self.metricsManager: Final[MetricsManager] = MetricsManager()
+        self.metricsManager.setConfig(None)
         self.cameras: Dict[int, SynapseCamera] = {}
         self.pipelineMap: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipelineInstances: Dict[int, List[Pipeline]] = {}
@@ -70,7 +73,7 @@ class PipelineHandler:
         """
         log("Loading pipelines...")
         pipelines = {}
-        for root, _, files in os.walk(self.directory):
+        for root, _, files in os.walk(self.directory + "/pipelines"):
             for file in files:
                 if file.endswith(".py"):
                     file_path = os.path.join(root, file)
@@ -353,7 +356,8 @@ class PipelineHandler:
                 thread.start()
 
             while True:
-                time.sleep(0.01)
+                time.sleep(1)
+                self.metricsManager.publishMetrics()
 
         finally:
             self.cleanup()

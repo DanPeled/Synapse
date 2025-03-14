@@ -1,8 +1,8 @@
 import yaml
-from synapse.nt_client import NtClient
-from synapse.pipeline import GlobalSettings
-from synapse.pipline_handler import PipelineHandler
-from synapse.log import log
+from networking import NtClient
+from .pipeline import GlobalSettings
+from .pipline_handler import PipelineHandler
+from .log import log
 
 
 class Synapse:
