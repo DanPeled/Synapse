@@ -8,7 +8,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 import cv2
 import ntcore
 import numpy as np
-from cscore import CameraServer, CvSink, CvSource
+from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
 from synapse.camera_factory import CsCoreCamera, SynapseCamera
 from synapse.log import err, log
@@ -43,7 +43,6 @@ class PipelineHandler:
         self.pipelineTypes: Dict[int, str] = {}
         self.pipelineSubscribers: Dict[int, ntcore.IntegerSubscriber] = {}
         self.outputs: Dict[int, CvSource] = {}
-        self.sinks: Dict[int, CvSink] = {}
 
     def setup(self, settings: Dict[Any, Any]):
         import atexit
@@ -124,7 +123,10 @@ class PipelineHandler:
 
         try:
             camera = CsCoreCamera()
-            camera.create(devPath=camera_config.path)
+            camera.create(
+                devPath=camera_config.path,
+                name=f"{self.NT_TABLE}/camera{camera_index}/input",
+            )
         except Exception as e:
             err(f"Failed to start camera capture: {e}")
             return False

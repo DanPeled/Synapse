@@ -34,7 +34,11 @@ class CameraFactory: ...  # TODO
 class SynapseCamera(ABC):
     @abstractmethod
     def create(
-        self, *_, devPath: Optional[str] = None, usbIndex: Optional[int] = None
+        self,
+        *_,
+        devPath: Optional[str] = None,
+        usbIndex: Optional[int] = None,
+        name: str = "",
     ) -> None: ...
 
     @abstractmethod
@@ -58,7 +62,11 @@ class SynapseCamera(ABC):
 
 class OpenCvCamera(SynapseCamera):
     def create(
-        self, *_, devPath: Optional[str] = None, usbIndex: Optional[int] = None
+        self,
+        *_,
+        devPath: Optional[str] = None,
+        usbIndex: Optional[int] = None,
+        name: str = "",
     ) -> None:
         if usbIndex is not None:
             self.cap = cv2.VideoCapture(usbIndex)
@@ -100,7 +108,11 @@ class OpenCvCamera(SynapseCamera):
 
 class CsCoreCamera(SynapseCamera):
     def create(
-        self, *_, devPath: Optional[str] = None, usbIndex: Optional[int] = None
+        self,
+        *_,
+        devPath: Optional[str] = None,
+        usbIndex: Optional[int] = None,
+        name: str = "",
     ) -> None:
         self.frameBuffer = np.zeros((1920, 1080, 3), dtype=np.uint8)
         if usbIndex is not None:
@@ -109,7 +121,7 @@ class CsCoreCamera(SynapseCamera):
             )
         elif devPath is not None:
             self.camera: VideoCamera = CameraServer.startAutomaticCapture(
-                devPath, devPath
+                f"{name}", devPath
             )
         else:
             err("No USB Index or Dev Path was provided for camera!")
