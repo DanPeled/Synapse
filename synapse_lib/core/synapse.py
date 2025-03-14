@@ -1,5 +1,5 @@
 import yaml
-from .nt_client import NtClient
+from networking import NtClient
 from .pipeline import GlobalSettings
 from .pipline_handler import PipelineHandler
 from .log import log

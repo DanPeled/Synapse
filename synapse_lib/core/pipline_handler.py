@@ -12,7 +12,7 @@ from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
 from .camera_factory import CsCoreCamera, SynapseCamera
 from .log import err, log
-from .nt_client import NtClient
+from networking import NtClient
 from .pipeline import GlobalSettings, Pipeline, PipelineSettings
 from .stypes import Frame
 

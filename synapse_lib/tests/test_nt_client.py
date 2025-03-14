@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from synapse.nt_client import NtClient
+from networking import NtClient
 
 
 class TestNtClient(unittest.TestCase):
