@@ -12,6 +12,7 @@ from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
 from core.camera_factory import CsCoreCamera, SynapseCamera
 from core.log import err, log
+from hardware.metrics import MetricsManager
 from networking import NtClient
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
@@ -33,6 +34,8 @@ class PipelineHandler:
         :param directory: Root directory to search for pipeline files
         """
         self.directory = directory
+        self.metricsManager: Final[MetricsManager] = MetricsManager()
+        self.metricsManager.setConfig(None)
         self.cameras: Dict[int, SynapseCamera] = {}
         self.pipelineMap: Dict[int, Union[Type[Pipeline], List[Type[Pipeline]]]] = {}
         self.pipelineInstances: Dict[int, List[Pipeline]] = {}
@@ -353,7 +356,8 @@ class PipelineHandler:
                 thread.start()
 
             while True:
-                time.sleep(0.01)
+                time.sleep(1)
+                self.metricsManager.publishMetrics()
 
         finally:
             self.cleanup()
