@@ -4,8 +4,8 @@ from typing_extensions import Dict
 from ntcore import NetworkTable, Event, EventFlags, NetworkTableEntry
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
+from core.log import err
 from .stypes import Frame
-import core.log
 
 
 class PipelineSettings:
@@ -225,7 +225,7 @@ class Pipeline(ABC):
                 table=self.nt_table.getSubTable("data"),
             )
         else:
-            log.err(f"trying to set data listener (key = {key}), for None table")
+            err(f"trying to set data listener (key = {key}), for None table")
 
     def __setListener(
         self,
