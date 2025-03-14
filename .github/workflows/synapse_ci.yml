@@ -3,7 +3,6 @@ name: Synapse CI
 on:
   push:
     branches:
-      - main
   pull_request:
     branches:
       - main
@@ -24,12 +23,12 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
       - name: Run build check
         run: |
           python -m compileall .
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
   lint:
     runs-on: ubuntu-latest
@@ -46,12 +45,12 @@ jobs:
       - name: Install Ruff
         run: |
           pip install ruff
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
       - name: Run Ruff linting
         run: |
           ruff check .
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
   type-check:
     runs-on: ubuntu-latest
@@ -68,17 +67,17 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
       - name: Install Pyright
         run: |
           pip install pyright
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
       - name: Run Pyright type checks
         run: |
           pyright
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
   test:
     runs-on: ubuntu-latest
@@ -95,9 +94,9 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        working-directory: synapse-lib
+        working-directory: synapse_lib
 
       - name: Run unittests
         run: |
           python -m unittest discover -s tests
-        working-directory: synapse-lib
+        working-directory: synapse_lib

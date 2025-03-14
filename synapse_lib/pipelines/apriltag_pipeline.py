@@ -14,10 +14,10 @@ from wpimath.geometry import (
     Translation3d,
 )
 from pupil_apriltags import Detector
-from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
-import synapse.log as log
+from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
+import core.log as log
 import cv2
-from synapse.stypes import Frame
+from core.stypes import Frame
 
 
 class ApriltagPipeline(Pipeline):

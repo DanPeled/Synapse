@@ -10,11 +10,11 @@ import ntcore
 import numpy as np
 from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
-from synapse.camera_factory import CsCoreCamera, SynapseCamera
-from synapse.log import err, log
-from synapse.nt_client import NtClient
-from synapse.pipeline import GlobalSettings, Pipeline, PipelineSettings
-from synapse.stypes import Frame
+from .camera_factory import CsCoreCamera, SynapseCamera
+from .log import err, log
+from .nt_client import NtClient
+from .pipeline import GlobalSettings, Pipeline, PipelineSettings
+from .stypes import Frame
 
 
 @dataclass

@@ -4,8 +4,8 @@ from typing_extensions import Dict
 from ntcore import NetworkTable, Event, EventFlags, NetworkTableEntry
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
-from synapse import log
-from synapse.stypes import Frame
+from .stypes import Frame
+import core.log
 
 
 class PipelineSettings:

@@ -1,4 +1,4 @@
-from synapse.synapse import PipelineHandler, Synapse
+from core import Synapse, PipelineHandler
 
 if __name__ == "__main__":
     handler = PipelineHandler("./")

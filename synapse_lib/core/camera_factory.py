@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 import cv2
-from synapse.log import err
-from synapse.stypes import Frame
+from .log import err
+from .stypes import Frame
 import numpy as np
 from cscore import CameraServer, VideoCamera, VideoMode
 
