@@ -10,11 +10,11 @@ import ntcore
 import numpy as np
 from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
-from .camera_factory import CsCoreCamera, SynapseCamera
-from .log import err, log
+from core.camera_factory import CsCoreCamera, SynapseCamera
+from core.log import err, log
 from networking import NtClient
-from .pipeline import GlobalSettings, Pipeline, PipelineSettings
-from .stypes import Frame
+from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
+from core.stypes import Frame
 
 
 @dataclass
@@ -70,7 +70,7 @@ class PipelineHandler:
         """
         log("Loading pipelines...")
         pipelines = {}
-        for root, _, files in os.walk(self.directory):
+        for root, _, files in os.walk(self.directory + "/pipelines"):
             for file in files:
                 if file.endswith(".py"):
                     file_path = os.path.join(root, file)
