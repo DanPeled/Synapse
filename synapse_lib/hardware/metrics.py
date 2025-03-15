@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Final, Optional
 import subprocess
-from core import err
+from core.log import err
 from networking import NtClient
 import json
 # Referenced from  https://github.com/PhotonVision/photonvision/
