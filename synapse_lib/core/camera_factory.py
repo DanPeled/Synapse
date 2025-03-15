@@ -136,7 +136,7 @@ class CsCoreCamera(SynapseCamera):
         return False, None
 
     def isConnected(self) -> bool:
-        return self.camera is not None
+        return self.camera.isConnected()
 
     def close(self) -> None: ...
 

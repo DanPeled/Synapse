@@ -27,8 +27,8 @@ pipelines:
       target_tag: 7
       brightness: 100
       exposure: 20
-      width: 320
-      height: 240
+      width: 1280
+      height: 720
       stick_to_ground: true
       fieldpose: true
       saturation: 10
