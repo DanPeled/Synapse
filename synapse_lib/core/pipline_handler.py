@@ -72,10 +72,12 @@ class PipelineHandler:
         :return: A dictionary of Pipeline subclasses
         """
         log("Loading pipelines...")
+
+        ignoredFiles = ["setup.py"]
         pipelines = {}
-        for root, _, files in os.walk(self.directory + "/pipelines"):
+        for root, _, files in os.walk(self.directory):
             for file in files:
-                if file.endswith(".py"):
+                if file.endswith(".py") and file not in ignoredFiles:
                     file_path = os.path.join(root, file)
                     module_name = file[:-3]  # Remove .py extension
 
