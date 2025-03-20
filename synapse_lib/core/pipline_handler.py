@@ -16,6 +16,7 @@ from hardware.metrics import MetricsManager
 from networking import NtClient
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
+from wpimath.units import seconds
 
 
 @dataclass
@@ -77,7 +78,7 @@ class PipelineHandler:
         pipelines = {}
         for root, _, files in os.walk(self.directory):
             for file in files:
-                if file.endswith(".py") and file not in ignoredFiles:
+                if file.endswith("_pipeline.py") and file not in ignoredFiles:
                     file_path = os.path.join(root, file)
                     module_name = file[:-3]  # Remove .py extension
 
@@ -311,11 +312,13 @@ class PipelineHandler:
                     start_time = time.time()  # Start time for FPS calculation
                     ret, frame = self.cameras[camera_index].grabFrame()
 
+                    captureLatency = time.time() - start_time
                     if not ret or frame is None:
                         continue
 
                     frame = self.fixtureFrame(camera_index, frame)
 
+                    process_start = time.time()
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipelineInstances.get(camera_index, [])
                     processed_frame: Any = frame
@@ -324,8 +327,10 @@ class PipelineHandler:
                         processed_frame = pipeline.process_frame(frame, start_time)
 
                     end_time = time.time()  # End time for FPS calculation
+                    processLatency = end_time - process_start
                     fps = 1.0 / (end_time - start_time)  # Calculate FPS
 
+                    self.sendLatency(camera_index, captureLatency, processLatency)
                     # Overlay FPS on the frame
                     cv2.putText(
                         processed_frame,
@@ -363,6 +368,13 @@ class PipelineHandler:
 
         finally:
             self.cleanup()
+
+    def sendLatency(self, camera_index: int, capture: seconds, process: seconds):
+        if NtClient.INSTANCE is not None:
+            cameraTable = self.getCameraTable(camera_index)
+            if cameraTable is not None:
+                cameraTable.getEntry("captureLatency").setDouble(capture)
+                cameraTable.getEntry("processLatency").setDouble(process)
 
     def setupNetworkTables(self):
         log("Setting up networktables...")
