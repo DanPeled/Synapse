@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 import cv2
+from cv2.typing import Size
 from .log import err
 from .stypes import Frame
 import numpy as np
@@ -58,6 +59,9 @@ class SynapseCamera(ABC):
 
     @abstractmethod
     def setVideoMode(self, fps: int, width: int, height: int) -> None: ...
+
+    @abstractmethod
+    def getResolution(self) -> Size: ...
 
 
 class OpenCvCamera(SynapseCamera):
@@ -129,6 +133,14 @@ class CsCoreCamera(SynapseCamera):
         if self.camera is not None:
             self.sink = CameraServer.getVideo(self.camera)
 
+        self.property_meta = {}
+        for prop in self.camera.enumerateProperties():
+            self.property_meta[prop.getName()] = {
+                "min": prop.getMin(),
+                "max": prop.getMax(),
+                "default": prop.getDefault(),
+            }
+
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         if self.camera is not None:
             ret, frame = self.sink.grabFrame(self.frameBuffer)
@@ -141,8 +153,18 @@ class CsCoreCamera(SynapseCamera):
     def close(self) -> None: ...
 
     def setProperty(self, prop: str, value: Union[int, float]) -> None:
-        if isinstance(prop, str) and self.camera and isinstance(value, int):
-            self.camera.getProperty(prop).set(value)
+        if (
+            isinstance(prop, str)
+            and self.camera
+            and isinstance(value, int)
+            and prop in self.property_meta.keys()
+        ):
+            self.camera.getProperty(prop).set(
+                max(
+                    min(value, self.property_meta[prop]["max"]),
+                    self.property_meta[prop]["min"],
+                )
+            )
 
     def getProperty(self, prop: str) -> Union[int, float, None]:
         if isinstance(prop, str) and self.camera:
@@ -159,3 +181,7 @@ class CsCoreCamera(SynapseCamera):
                 fps=fps,
                 pixelFormat=VideoMode.PixelFormat.kMJPEG,
             )
+
+    def getResolution(self) -> Size:
+        videoMode = self.camera.getVideoMode()
+        return (videoMode.width, videoMode.height)
