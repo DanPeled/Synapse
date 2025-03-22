@@ -5,7 +5,7 @@ paramiko==2.10.4
 pathspec==0.12.1
 pupil_apriltags==1.0.4.post10
 pyntcore==2025.2.1.2
-PyYAML==5.4.1
+PyYAML==6.0.2
 robotpy_cscore==2025.2.1
 robotpy_wpimath==2025.2.1.2
 robotpy_wpiutil==2025.2.1.2
