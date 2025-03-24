@@ -327,7 +327,7 @@ class PipelineHandler:
             def process_camera(camera_index: int):
                 output = self.outputs[camera_index]
                 recordingOutput = self.recordingOutputs[camera_index]
-                SHOULD_RECORD = True
+                SHOULD_RECORD = False
                 while True:
                     start_time = time.time()  # Start time for FPS calculation
                     ret, frame = self.cameras[camera_index].grabFrame()
@@ -387,9 +387,8 @@ class PipelineHandler:
             while True:
                 time.sleep(1)
                 self.metricsManager.publishMetrics()
-
-        finally:
-            self.cleanup()
+        except Exception as e:
+            log.err(f"{e}")
 
     def sendLatency(self, camera_index: int, capture: seconds, process: seconds):
         if NtClient.INSTANCE is not None:
