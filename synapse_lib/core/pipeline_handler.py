@@ -10,6 +10,7 @@ import ntcore
 import numpy as np
 from cscore import CameraServer, CvSource
 from ntcore import Event, EventFlags, NetworkTable
+from wpilib import Timer
 from core.camera_factory import CsCoreCamera, SynapseCamera
 import core.log as log
 from hardware.metrics import MetricsManager
@@ -329,16 +330,18 @@ class PipelineHandler:
                 recordingOutput = self.recordingOutputs[camera_index]
                 SHOULD_RECORD = False
                 while True:
-                    start_time = time.time()  # Start time for FPS calculation
+                    start_time = (
+                        Timer.getFPGATimestamp()
+                    )  # Start time for FPS calculation
                     ret, frame = self.cameras[camera_index].grabFrame()
 
-                    captureLatency = time.time() - start_time
+                    captureLatency = Timer.getFPGATimestamp() - start_time
                     if not ret or frame is None:
                         continue
 
                     frame = self.fixtureFrame(camera_index, frame)
 
-                    process_start = time.time()
+                    process_start = Timer.getFPGATimestamp()
                     # Retrieve the pipeline instances for the current camera
                     assigned_pipelines = self.pipelineInstances.get(camera_index, [])
                     processed_frame: Any = frame
@@ -346,7 +349,7 @@ class PipelineHandler:
                     for pipeline in assigned_pipelines:
                         processed_frame = pipeline.process_frame(frame, start_time)
 
-                    end_time = time.time()  # End time for FPS calculation
+                    end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
                     processLatency = end_time - process_start
                     fps = 1.0 / (end_time - start_time)  # Calculate FPS
 

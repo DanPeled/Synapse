@@ -2,7 +2,6 @@ import json
 from typing import Any, Dict, List, Optional, Union
 from cv2.typing import MatLike
 import numpy as np
-from wpilib import Timer
 from wpimath.geometry import (
     Pose2d,
     Pose3d,
@@ -116,11 +115,11 @@ class ApriltagPipeline(Pipeline):
                 if tagFieldPose:
                     robotPose = ApriltagPipeline.tagToRobotPose(
                         tagFieldPose=tagFieldPose,
-                        robotToCameraTransform=self.camera_transform,
+                        cameraToRobotTransform=self.camera_transform,
                         cameraToTagTransform=Transform3d(
                             translation=tagRelativePose.translation(),
                             rotation=tagRelativePose.rotation(),
-                        ).inverse(),
+                        ),
                     )
 
                     self.setDataValue(
@@ -135,7 +134,7 @@ class ApriltagPipeline(Pipeline):
                         ],
                     )
 
-                    setattr(tag, "timestamp", Timer.getFPGATimestamp())
+                    setattr(tag, "timestamp", timestamp)
                     setattr(tag, "robotPose", robotPose)
                     setattr(tag, "tagFieldPose", tagFieldPose)
                     setattr(tag, "tagRelativePose", tagRelativePose)
@@ -153,20 +152,16 @@ class ApriltagPipeline(Pipeline):
     @staticmethod
     def tagToRobotPose(
         tagFieldPose: Pose3d,
-        robotToCameraTransform: Transform3d,
+        cameraToRobotTransform: Transform3d,
         cameraToTagTransform: Transform3d,
     ) -> Pose3d:
         """
         Computes the robot's pose on the field based on the tag's pose in field coordinates.
         It transforms the pose through the camera and robot coordinate systems.
         """
-        cameraInField = tagFieldPose.transformBy(
+        robotInField: Pose3d = tagFieldPose.transformBy(
             cameraToTagTransform.inverse()
-        )  # Transform tag to camera space
-        robotInField = cameraInField.transformBy(
-            robotToCameraTransform.inverse()
-        )  # Transform camera to robot space
-
+        ).transformBy(cameraToRobotTransform)
         return robotInField
 
     def getCameraMatrix(self, camera_index: int) -> Optional[List[List[float]]]:
