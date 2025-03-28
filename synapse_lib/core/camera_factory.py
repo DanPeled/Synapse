@@ -4,7 +4,6 @@ from typing import Optional, Tuple, Union
 import cv2
 from cv2.typing import Size
 
-from core.pipeline import Pipeline
 from .log import err
 from .stypes import Frame
 import numpy as np
@@ -36,11 +35,6 @@ def opencvToCscoreProp(prop: int) -> Optional[str]:
 class CameraBinding:
     path: str
     name: str
-
-
-@dataclass
-class PipelineBinding:
-    instance: Pipeline
 
 
 class SynapseCamera(ABC):
