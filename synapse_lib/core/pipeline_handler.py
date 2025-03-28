@@ -1,17 +1,16 @@
 import importlib.util
-import os
+from pathlib import Path
 import threading
 import time
 import traceback
-from dataclasses import dataclass
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 import cv2
 import ntcore
 import numpy as np
 from cscore import CameraServer, CvSource
-from ntcore import Event, EventFlags, NetworkTable
+from ntcore import NetworkTable
 from wpilib import Timer
-from core.camera_factory import CsCoreCamera, SynapseCamera
+from core.camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
 import core.log as log
 from hardware.metrics import MetricsManager
 from networking import NtClient
@@ -20,22 +19,16 @@ from core.stypes import Frame
 from wpimath.units import seconds
 
 
-@dataclass
-class CameraBinding:
-    path: str
-    name: str
-
-
 class PipelineHandler:
     NT_TABLE: Final[str] = "Synapse"
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
 
-    def __init__(self, directory: str):
+    def __init__(self, directory: Path):
         """
         Initializes the handler, loads all pipeline classes in the specified directory.
         :param directory: Root directory to search for pipeline files
         """
-        self.directory = directory
+        self.directory: Path = directory
         self.metricsManager: Final[MetricsManager] = MetricsManager()
         self.metricsManager.setConfig(None)
         self.cameras: Dict[int, SynapseCamera] = {}
@@ -46,7 +39,6 @@ class PipelineHandler:
         self.pipelineBindings: Dict[int, int] = {}
         self.streamSizes: Dict[int, Tuple[int, int]] = {}
         self.pipelineTypes: Dict[int, str] = {}
-        self.pipelineSubscribers: Dict[int, ntcore.IntegerSubscriber] = {}
         self.outputs: Dict[int, CvSource] = {}
         self.recordingOutputs: Dict[int, cv2.VideoWriter] = {}
 
@@ -78,37 +70,35 @@ class PipelineHandler:
 
         ignoredFiles = ["setup.py"]
         pipelines = {}
-        for root, _, files in os.walk(self.directory):
-            for file in files:
-                if file.endswith("_pipeline.py") and file not in ignoredFiles:
-                    file_path = os.path.join(root, file)
-                    module_name = file[:-3]  # Remove .py extension
+        for file_path in self.directory.rglob("*_pipeline.py"):
+            if file_path.name not in ignoredFiles:
+                module_name = file_path.stem  # Get filename without extension
 
-                    try:
-                        # Load module directly from file path
-                        spec = importlib.util.spec_from_file_location(
-                            module_name, file_path
-                        )
-                        if spec is None or spec.loader is None:
-                            continue
+                try:
+                    # Load module directly from file path
+                    spec = importlib.util.spec_from_file_location(
+                        module_name, str(file_path)
+                    )
+                    if spec is None or spec.loader is None:
+                        continue
 
-                        module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(module)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
 
-                        # Look for Pipeline subclasses in the loaded module
-                        for attr in dir(module):
-                            cls = getattr(module, attr)
-                            if (
-                                isinstance(cls, type)
-                                and issubclass(cls, Pipeline)
-                                and cls is not Pipeline
-                            ):
-                                if cls.__is_enabled__:
-                                    log.log(f"Loaded {cls.__name__} pipeline")
-                                    pipelines[cls.__name__] = cls
-                    except Exception as e:
-                        log.err(f"while loading {file_path}: {e}")
-                        traceback.print_exc()
+                    # Look for Pipeline subclasses in the loaded module
+                    for attr in dir(module):
+                        cls = getattr(module, attr)
+                        if (
+                            isinstance(cls, type)
+                            and issubclass(cls, Pipeline)
+                            and cls is not Pipeline
+                        ):
+                            if cls.__is_enabled__:
+                                log.log(f"Loaded {cls.__name__} pipeline")
+                                pipelines[cls.__name__] = cls
+                except Exception as e:
+                    log.err(f"while loading {file_path}: {e}")
+                    traceback.print_exc()
 
         log.log("Loaded pipelines successfully")
         return pipelines
@@ -403,21 +393,8 @@ class PipelineHandler:
     def setupNetworkTables(self):
         log.log("Setting up networktables...")
 
-        def keepCurrentPipelineUpdatedListener(
-            table: ntcore.NetworkTable, key: str, _: Event
-        ) -> None:
-            index = int(key.replace("camera", "").replace("pipeline", ""))
-            self.setPipelineByIndex(
-                camera_index=index,
-                pipeline_index=table.getEntry(key).getInteger(
-                    defaultValue=self.defaultPipelineIndexes[index]
-                ),
-            )
-
         if NtClient.INSTANCE is not None:
             inst = NtClient.INSTANCE.server or NtClient.INSTANCE.nt_inst
-
-            table: ntcore.NetworkTable = inst.getTable(PipelineHandler.NT_TABLE)
 
             for i in self.cameras.keys():
                 topicName = f"{self.getCameraTableName(i)}/pipeline"
@@ -438,15 +415,7 @@ class PipelineHandler:
                     topicName
                 ).setInteger(sub.get())
 
-                self.pipelineSubscribers[i] = sub
-
                 log.log(f"Added listener for camera {i}, entry:{topic.getName()}")
-
-                table.addListener(
-                    key=topicName,
-                    eventMask=EventFlags.kImmediate,
-                    listener=keepCurrentPipelineUpdatedListener,
-                )
             log.log("Set up settings successfully")
         else:
             log.err("NtClient instance is None")
@@ -528,31 +497,11 @@ class PipelineHandler:
                 if setting_value is not None:
                     set_property(name, setting_value)
 
-        # Desired mode
-        desired_mode = (
-            int(settings["width"]),
-            int(settings["height"]),
+        camera.setVideoMode(
+            width=settings["width"],
+            height=settings["height"],
+            fps=100,
         )
-
-        # Check if the desired mode is valid
-        if True:
-            # if desired_mode in valid_modes:
-            camera.setVideoMode(
-                width=desired_mode[0],
-                height=desired_mode[1],
-                fps=100,
-            )
-            updated_settings.update(
-                {
-                    "fps": settings.get("fps", 100),
-                    "width": int(settings["width"]),
-                    "height": int(settings["height"]),
-                }
-            )
-        else:
-            log.err(
-                f"Warning: Invalid video mode {desired_mode}. Using default settings."
-            )
 
         return updated_settings
 
@@ -606,10 +555,6 @@ class PipelineHandler:
         """
         cv2.destroyAllWindows()
 
-        for sub in self.pipelineSubscribers.values():
-            name = sub.getTopic().getName()
-            sub.close()
-            log.log(f"Close sub : {name}")
         for record in self.recordingOutputs.values():
             record.release()
         log.log("Cleaned up all resources.")
