@@ -1,8 +1,10 @@
 import yaml
+
 from networking import NtClient
+
+from .log import log
 from .pipeline import GlobalSettings
 from .pipeline_handler import PipelineHandler
-from .log import log
 
 
 class Synapse:

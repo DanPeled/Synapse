@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Optional
+
+from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
 from typing_extensions import Dict
-from ntcore import NetworkTable, Event, EventFlags, NetworkTableEntry
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
+
 from core.log import err
+
 from .stypes import Frame
 
 

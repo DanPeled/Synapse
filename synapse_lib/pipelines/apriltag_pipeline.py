@@ -1,23 +1,18 @@
 import json
-from typing import Any, Dict, Final, List, Optional, Union
-from cv2.typing import MatLike
-import numpy as np
-from wpimath.geometry import (
-    Pose2d,
-    Pose3d,
-    Quaternion,
-    Rotation2d,
-    Transform3d,
-    Rotation3d,
-    Translation2d,
-    Translation3d,
-)
-from pupil_apriltags import Detector
-from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
-import core.log as log
-import cv2
-from core.stypes import Frame
 from dataclasses import dataclass
+from typing import Any, Dict, Final, List, Optional, Union
+
+import cv2
+import numpy as np
+from cv2.typing import MatLike
+from pupil_apriltags import Detector
+from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation2d,
+                              Rotation3d, Transform3d, Translation2d,
+                              Translation3d)
+
+import core.log as log
+from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
+from core.stypes import Frame
 
 
 @dataclass

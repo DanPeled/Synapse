@@ -1,5 +1,6 @@
-from core import Synapse, PipelineHandler
 from pathlib import Path
+
+from core import PipelineHandler, Synapse
 
 
 def getFilePath() -> Path:

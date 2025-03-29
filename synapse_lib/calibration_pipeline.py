@@ -1,6 +1,7 @@
 from time import time
-import numpy as np
+
 import cv2
+import numpy as np
 
 if __name__ == "__main__":
     # Chessboard dimensions (internal corners)
