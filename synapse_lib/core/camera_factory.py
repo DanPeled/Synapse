@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 import cv2
 from cv2.typing import Size
+
 from .log import err
 from .stypes import Frame
 import numpy as np
@@ -21,15 +23,18 @@ CSCORE_TO_CV_PROPS = {
 CV_TO_CSCORE_PROPS = {v: k for k, v in CSCORE_TO_CV_PROPS.items()}
 
 
-def cscore_to_cv(prop: str) -> Optional[int]:
+def cscoreToOpenCVProp(prop: str) -> Optional[int]:
     return CSCORE_TO_CV_PROPS.get(prop)
 
 
-def cv_to_cscore(prop: int) -> Optional[str]:
+def opencvToCscoreProp(prop: int) -> Optional[str]:
     return CV_TO_CSCORE_PROPS.get(prop)
 
 
-class CameraFactory: ...  # TODO
+@dataclass
+class CameraBinding:
+    path: str
+    name: str
 
 
 class SynapseCamera(ABC):
@@ -90,13 +95,13 @@ class OpenCvCamera(SynapseCamera):
 
     def setProperty(self, prop: str, value: Union[int, float]) -> None:
         if isinstance(prop, int) and self.cap:
-            propInt = cscore_to_cv(prop)
+            propInt = cscoreToOpenCVProp(prop)
             if propInt is not None:
                 self.cap.set(propInt, value)
 
     def getProperty(self, prop: str) -> Union[int, float, None]:
         if isinstance(prop, int) and self.cap:
-            propInt = cscore_to_cv(prop)
+            propInt = cscoreToOpenCVProp(prop)
             if propInt is not None:
                 return self.cap.get(propInt)
             else:
@@ -175,12 +180,27 @@ class CsCoreCamera(SynapseCamera):
 
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
         if self.camera:
-            self.camera.setVideoMode(
-                width=width,
-                height=height,
-                fps=fps,
-                pixelFormat=VideoMode.PixelFormat.kMJPEG,
-            )
+            valid_modes = []
+
+            for mode in self.camera.enumerateVideoModes():
+                valid_modes.append(
+                    (
+                        mode.width,
+                        mode.height,
+                    )
+                )
+
+            if (width, height) in valid_modes:
+                self.camera.setVideoMode(
+                    width=width,
+                    height=height,
+                    fps=fps,
+                    pixelFormat=VideoMode.PixelFormat.kMJPEG,
+                )
+            else:
+                err(
+                    f"Warning: Invalid video mode (width={width}, height={height}). Using default settings."
+                )
 
     def getResolution(self) -> Size:
         videoMode = self.camera.getVideoMode()

@@ -1,8 +1,7 @@
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Final, List, Optional, Union
 from cv2.typing import MatLike
 import numpy as np
-from wpilib import Timer
 from wpimath.geometry import (
     Pose2d,
     Pose3d,
@@ -18,15 +17,26 @@ from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 import core.log as log
 import cv2
 from core.stypes import Frame
+from dataclasses import dataclass
+
+
+@dataclass
+class RobotPoseEstimate:
+    robotPose_tagSpace: Transform3d
+    robotPose_fieldSpace: Pose3d
 
 
 class ApriltagPipeline(Pipeline):
-    kTagSizeKey = "tag_size"
-    kTagFamily = "tag36h11"
-    kGetFieldPoseKey = "fieldpose"
-    kStickToGroundKey = "stick_to_ground"
-    kMatrixKey = "matrix"
-    kMeasuredMatrixResolutionKey = "measured_res"
+    kTagSizeKey: Final[str] = "tag_size"
+    kTagFamily: Final[str] = "tag36h11"
+    kGetFieldPoseKey: Final[str] = "fieldpose"
+    kStickToGroundKey: Final[str] = "stick_to_ground"
+    kMatrixKey: Final[str] = "matrix"
+    kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
+    kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
+    kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
+    kCameraPoseTagSpace: Final[str] = "cameraPose_tagSpace"
+    kTagPoseFieldSpace: Final[str] = "tagPose_fieldSpace"
 
     def __init__(self, settings: PipelineSettings, camera_index: int):
         super().__init__(settings, camera_index)
@@ -64,7 +74,7 @@ class ApriltagPipeline(Pipeline):
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setDataValue("results", ApriltagsJson.toJsonString([]))
+            self.setDataValue("results", ApriltagsJson.empty())
             return gray
 
         for tag in tags:  # pyright: ignore
@@ -99,7 +109,7 @@ class ApriltagPipeline(Pipeline):
                 )
 
             self.setDataValue(
-                "deltaTagPose",
+                self.kCameraPoseTagSpace,
                 [
                     tagRelativePose.translation().X(),
                     tagRelativePose.translation().Y(),
@@ -114,31 +124,40 @@ class ApriltagPipeline(Pipeline):
                 tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
 
                 if tagFieldPose:
-                    robotPose = ApriltagPipeline.tagToRobotPose(
+                    robotPoseEstimate = ApriltagPipeline.tagToRobotPose(
                         tagFieldPose=tagFieldPose,
-                        robotToCameraTransform=self.camera_transform,
+                        cameraToRobotTransform=self.camera_transform,
                         cameraToTagTransform=Transform3d(
                             translation=tagRelativePose.translation(),
                             rotation=tagRelativePose.rotation(),
-                        ).inverse(),
+                        ),
                     )
 
                     self.setDataValue(
-                        "robotPose",
+                        self.kRobotPoseFieldSpaceKey,
                         [
-                            robotPose.translation().X(),
-                            robotPose.translation().Y(),
-                            robotPose.translation().Z(),
-                            robotPose.rotation().x_degrees,
-                            robotPose.rotation().y_degrees,
-                            robotPose.rotation().z_degrees,
+                            robotPoseEstimate.robotPose_fieldSpace.translation().X(),
+                            robotPoseEstimate.robotPose_fieldSpace.translation().Y(),
+                            robotPoseEstimate.robotPose_fieldSpace.translation().Z(),
+                            robotPoseEstimate.robotPose_fieldSpace.rotation().x_degrees,
+                            robotPoseEstimate.robotPose_fieldSpace.rotation().y_degrees,
+                            robotPoseEstimate.robotPose_fieldSpace.rotation().z_degrees,
                         ],
                     )
 
-                    setattr(tag, "timestamp", Timer.getFPGATimestamp())
-                    setattr(tag, "robotPose", robotPose)
-                    setattr(tag, "tagFieldPose", tagFieldPose)
-                    setattr(tag, "tagRelativePose", tagRelativePose)
+                    setattr(tag, "timestamp", timestamp)
+                    setattr(
+                        tag,
+                        self.kRobotPoseFieldSpaceKey,
+                        robotPoseEstimate.robotPose_fieldSpace,
+                    )
+                    setattr(
+                        tag,
+                        self.kRobotPoseTagSpaceKey,
+                        robotPoseEstimate.robotPose_tagSpace,
+                    )
+                    setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
+                    setattr(tag, self.kCameraPoseTagSpace, tagRelativePose)
 
         self.setDataValue("hasResults", True)
         self.setDataValue("results", ApriltagsJson.toJsonString(tags))
@@ -153,21 +172,18 @@ class ApriltagPipeline(Pipeline):
     @staticmethod
     def tagToRobotPose(
         tagFieldPose: Pose3d,
-        robotToCameraTransform: Transform3d,
+        cameraToRobotTransform: Transform3d,
         cameraToTagTransform: Transform3d,
-    ) -> Pose3d:
+    ) -> RobotPoseEstimate:
         """
         Computes the robot's pose on the field based on the tag's pose in field coordinates.
         It transforms the pose through the camera and robot coordinate systems.
         """
-        cameraInField = tagFieldPose.transformBy(
-            cameraToTagTransform.inverse()
-        )  # Transform tag to camera space
-        robotInField = cameraInField.transformBy(
-            robotToCameraTransform.inverse()
-        )  # Transform camera to robot space
-
-        return robotInField
+        robotInTagSpace: Transform3d = (
+            cameraToTagTransform.inverse() + cameraToRobotTransform
+        )
+        robotInField: Pose3d = tagFieldPose.transformBy(robotInTagSpace)
+        return RobotPoseEstimate(robotInTagSpace, robotInField)
 
     def getCameraMatrix(self, camera_index: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
@@ -438,6 +454,8 @@ class ApriltagFieldJson:
 
 
 class ApriltagsJson:
+    _emptyJson: Optional[str] = None
+
     @classmethod
     def toJsonString(cls, tags) -> str:
         return json.dumps(
@@ -446,13 +464,21 @@ class ApriltagsJson:
             separators=(",", ":"),
         )
 
+    @classmethod
+    def empty(cls) -> str:
+        if cls._emptyJson is not None:
+            return cls._emptyJson
+        else:
+            cls._emptyJson = cls.toJsonString([])
+            return cls._emptyJson
+
     class Encoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, np.ndarray):
                 return o.tolist()  # Convert numpy arrays to lists
-            if isinstance(o, bytes):
+            elif isinstance(o, bytes):
                 return o.decode()  # Convert bytes to strings
-            if isinstance(o, Pose3d):
+            elif isinstance(o, Pose3d) or isinstance(o, Transform3d):
                 return {
                     "x": o.translation().X(),
                     "y": o.translation().Y(),
@@ -462,7 +488,7 @@ class ApriltagsJson:
                     "roll": o.rotation().x_degrees,
                     "rotation_unit": "degrees",
                 }
-            if isinstance(o, Pose2d):
+            elif isinstance(o, Pose2d):
                 return {
                     "x": o.translation().X(),
                     "y": o.translation().Y(),
