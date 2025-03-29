@@ -1,11 +1,12 @@
 import os
-from typing import Tuple
-import paramiko
-import tarfile
 import subprocess
-import pathspec
-from datetime import datetime, timedelta
+import tarfile
 import time as t
+from datetime import datetime, timedelta
+from typing import Tuple
+
+import paramiko
+import pathspec
 
 
 def check_python3_install() -> bool:

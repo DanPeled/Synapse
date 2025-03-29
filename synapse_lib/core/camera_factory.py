@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
+
 import cv2
+import numpy as np
+from cscore import CameraServer, VideoCamera, VideoMode
 from cv2.typing import Size
 
 from .log import err
 from .stypes import Frame
-import numpy as np
-from cscore import CameraServer, VideoCamera, VideoMode
 
 CSCORE_TO_CV_PROPS = {
     "brightness": cv2.CAP_PROP_BRIGHTNESS,
