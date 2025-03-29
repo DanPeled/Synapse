@@ -74,7 +74,7 @@ class ApriltagPipeline(Pipeline):
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setDataValue("results", ApriltagsJson.toJsonString([]))
+            self.setDataValue("results", ApriltagsJson.empty())
             return gray
 
         for tag in tags:  # pyright: ignore
@@ -454,6 +454,8 @@ class ApriltagFieldJson:
 
 
 class ApriltagsJson:
+    _emptyJson: Optional[str] = None
+
     @classmethod
     def toJsonString(cls, tags) -> str:
         return json.dumps(
@@ -461,6 +463,14 @@ class ApriltagsJson:
             cls=ApriltagsJson.Encoder,
             separators=(",", ":"),
         )
+
+    @classmethod
+    def empty(cls) -> str:
+        if cls._emptyJson is not None:
+            return cls._emptyJson
+        else:
+            cls._emptyJson = cls.toJsonString([])
+            return cls._emptyJson
 
     class Encoder(json.JSONEncoder):
         def default(self, o):
