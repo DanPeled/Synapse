@@ -1,4 +1,4 @@
-package frc.robot.subsystems.vision;
+package synapse;
 
 import java.io.IOException;
 

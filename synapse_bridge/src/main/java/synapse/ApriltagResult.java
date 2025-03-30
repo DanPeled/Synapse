@@ -1,4 +1,4 @@
-package frc.robot.subsystems.vision;
+package synapse;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -39,13 +39,13 @@ public class ApriltagResult {
   private double poseError;
 
   @JsonDeserialize(using = Pose3dDeserializer.class)
-  private Pose3d robotPose;
+  private Pose3d robotPose_fieldSpace;
 
   @JsonDeserialize(using = Pose3dDeserializer.class)
-  private Pose3d tagRelativePose;
+  private Pose3d cameraPose_tagSpace;
 
   @JsonDeserialize(using = Pose3dDeserializer.class)
-  private Pose3d tagFieldPose;
+  private Pose3d robotPose_tagSpace;
 
   public double getTimestamp() {
     return timestamp;
@@ -91,15 +91,15 @@ public class ApriltagResult {
     return poseError;
   }
 
-  public Pose3d getRobotPose() {
-    return robotPose;
+  public Pose3d getRobotPose_fieldSpace() {
+    return robotPose_fieldSpace;
   }
 
-  public Pose3d getTagRelativePose() {
-    return tagRelativePose;
+  public Pose3d getRobotPose_tagSpace() {
+    return robotPose_tagSpace;
   }
 
-  public Pose3d getTagFieldPose() {
-    return tagFieldPose;
+  public Pose3d getCameraPose_tagSpace() {
+    return cameraPose_tagSpace;
   }
 }

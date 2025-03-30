@@ -9,9 +9,16 @@ from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cv2.typing import MatLike
 from pupil_apriltags import Detector
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation2d,
-                              Rotation3d, Transform3d, Translation2d,
-                              Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation2d,
+    Rotation3d,
+    Transform3d,
+    Translation2d,
+    Translation3d,
+)
 
 
 @dataclass
@@ -150,7 +157,7 @@ class ApriltagPipeline(Pipeline):
                         self.kRobotPoseTagSpaceKey,
                         robotPoseEstimate.robotPose_tagSpace,
                     )
-                    setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
+                    # setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
                     setattr(tag, self.kCameraPoseTagSpace, tagRelativePose)
 
         self.setDataValue("hasResults", True)
