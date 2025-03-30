@@ -55,7 +55,6 @@ jobs:
       - name: Run isort check
         run: |
           isort --check-only --diff .
-        working-directory: synapse_lib
 
   type-check:
     runs-on: ubuntu-latest

@@ -5,20 +5,19 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
+import core.log as log
 import cv2
 import ntcore
 import numpy as np
-from cscore import CameraServer, CvSource
-from ntcore import NetworkTable
-from wpilib import Timer
-from wpimath.units import seconds
-
-import core.log as log
 from core.camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
+from cscore import CameraServer, CvSource
 from hardware.metrics import MetricsManager
 from networking import NtClient
+from ntcore import NetworkTable
+from wpilib import Timer
+from wpimath.units import seconds
 
 
 class PipelineHandler:
@@ -136,8 +135,7 @@ class PipelineHandler:
         )
 
         try:
-            camera = CsCoreCamera()
-            camera.create(
+            camera = CsCoreCamera.create(
                 devPath=camera_config.path,
                 name=f"{self.NT_TABLE}/camera{camera_index}/input",
             )
@@ -257,7 +255,7 @@ class PipelineHandler:
 
         if pipeline_index not in self.pipelineTypes.keys():
             log.err(
-                f"Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipelineTypes.keys())}."
+                f"Invalid pipeline index {pipeline_index}. Must be one of {list(self.pipelineTypes.keys())}."
             )
             self.setNTPipelineIndex(camera_index, self.pipelineBindings[camera_index])
             return
@@ -298,7 +296,7 @@ class PipelineHandler:
 
         return {
             i: CameraServer.putVideo(
-                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
+                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}",
                 width=getStreamRes(i)[0],
                 height=getStreamRes(i)[1],
             )
