@@ -1,5 +1,4 @@
 import yaml
-
 from networking import NtClient
 
 from .log import log
