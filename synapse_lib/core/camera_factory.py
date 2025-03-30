@@ -4,7 +4,7 @@ from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
-from cscore import CameraServer, VideoCamera, VideoMode
+from cscore import CameraServer, UsbCamera, VideoCamera, VideoMode
 from cv2.typing import Size
 
 from .log import err
@@ -126,13 +126,11 @@ class CsCoreCamera(SynapseCamera):
     ) -> None:
         self.frameBuffer = np.zeros((1920, 1080, 3), dtype=np.uint8)
         if usbIndex is not None:
-            self.camera: VideoCamera = CameraServer.startAutomaticCapture(
+            self.camera: VideoCamera = UsbCamera(
                 devPath or f"USB Camera {usbIndex}", usbIndex
             )
         elif devPath is not None:
-            self.camera: VideoCamera = CameraServer.startAutomaticCapture(
-                f"{name}", devPath
-            )
+            self.camera: VideoCamera = UsbCamera(f"{name}", devPath)
         else:
             err("No USB Index or Dev Path was provided for camera!")
 

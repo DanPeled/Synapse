@@ -298,7 +298,7 @@ class PipelineHandler:
 
         return {
             i: CameraServer.putVideo(
-                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}/output",
+                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}",
                 width=getStreamRes(i)[0],
                 height=getStreamRes(i)[1],
             )
