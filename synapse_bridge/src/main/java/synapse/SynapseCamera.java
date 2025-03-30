@@ -16,7 +16,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 public class SynapseCamera {
   public static final String kSynapseTable = "Synapse";
   private final int m_id;
-  private final NetworkTable m_table;
+  private NetworkTable m_table, m_dataTable, m_settingsTable;
 
   public SynapseCamera(int id) {
     m_id = id;
@@ -63,6 +63,20 @@ public class SynapseCamera {
   }
 
   private NetworkTable getDataResultsTable() {
-    return m_table.getSubTable("data");
+    if (m_dataTable == null) {
+      m_dataTable = m_table.getSubTable("data");
+    }
+    return m_dataTable;
+  }
+
+  private NetworkTable getSettingsTable() {
+    if (m_settingsTable == null) {
+      m_settingsTable = m_table.getSubTable("settings");
+    }
+    return m_settingsTable;
+  }
+
+  public static class CameraSettings {
+    public static final String kBrightness = "brightness";
   }
 }
