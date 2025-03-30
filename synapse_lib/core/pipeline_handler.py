@@ -256,7 +256,7 @@ class PipelineHandler:
 
         if pipeline_index not in self.pipelineTypes.keys():
             log.err(
-                f"Invalid pipeline_index {pipeline_index}. Must be one of {list(self.pipelineTypes.keys())}."
+                f"Invalid pipeline index {pipeline_index}. Must be one of {list(self.pipelineTypes.keys())}."
             )
             self.setNTPipelineIndex(camera_index, self.pipelineBindings[camera_index])
             return
