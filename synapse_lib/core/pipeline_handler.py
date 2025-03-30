@@ -136,8 +136,7 @@ class PipelineHandler:
         )
 
         try:
-            camera = CsCoreCamera()
-            camera.create(
+            camera = CsCoreCamera.create(
                 devPath=camera_config.path,
                 name=f"{self.NT_TABLE}/camera{camera_index}/input",
             )

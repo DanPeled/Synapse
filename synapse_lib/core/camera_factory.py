@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import cv2
 import numpy as np
-from cscore import CameraServer, UsbCamera, VideoCamera, VideoMode
+from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode
 from cv2.typing import Size
 
 from .log import err
@@ -39,14 +39,15 @@ class CameraBinding:
 
 
 class SynapseCamera(ABC):
+    @classmethod
     @abstractmethod
     def create(
-        self,
+        cls,
         *_,
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",
-    ) -> None: ...
+    ) -> "SynapseCamera": ...
 
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
@@ -71,19 +72,26 @@ class SynapseCamera(ABC):
 
 
 class OpenCvCamera(SynapseCamera):
+    def __init__(self) -> None:
+        self.cap: cv2.VideoCapture
+
+    @classmethod
     def create(
-        self,
+        cls,
         *_,
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",
-    ) -> None:
+    ) -> "SynapseCamera":
+        inst = OpenCvCamera()
         if usbIndex is not None:
-            self.cap = cv2.VideoCapture(usbIndex)
+            inst.cap = cv2.VideoCapture(usbIndex)
         elif devPath is not None:
-            self.cap = cv2.VideoCapture(devPath, cv2.CAP_V4L2)
+            inst.cap = cv2.VideoCapture(devPath, cv2.CAP_V4L2)
         else:
             err("No USB Index or Dev Path was provided for camera!")
+
+        return inst
 
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         return self.cap.read()
@@ -115,35 +123,49 @@ class OpenCvCamera(SynapseCamera):
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
+    def getResolution(self) -> Size:
+        return (
+            int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        )
+
 
 class CsCoreCamera(SynapseCamera):
+    def __init__(self) -> None:
+        self.camera: VideoCamera
+        self.frameBuffer: np.ndarray
+        self.sink: CvSink
+        self.property_meta: Dict = {}
+
+    @classmethod
     def create(
-        self,
+        cls,
         *_,
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",
-    ) -> None:
-        self.frameBuffer = np.zeros((1920, 1080, 3), dtype=np.uint8)
+    ) -> "SynapseCamera":
+        inst = CsCoreCamera()
+        inst.frameBuffer = np.zeros((1920, 1080, 3), dtype=np.uint8)
         if usbIndex is not None:
-            self.camera: VideoCamera = UsbCamera(
-                devPath or f"USB Camera {usbIndex}", usbIndex
-            )
+            inst.camera = UsbCamera(devPath or f"USB Camera {usbIndex}", usbIndex)
         elif devPath is not None:
-            self.camera: VideoCamera = UsbCamera(f"{name}", devPath)
+            inst.camera = UsbCamera(f"{name}", devPath)
         else:
             err("No USB Index or Dev Path was provided for camera!")
 
-        if self.camera is not None:
-            self.sink = CameraServer.getVideo(self.camera)
+        if inst.camera is not None:
+            inst.sink = CameraServer.getVideo(inst.camera)
 
-        self.property_meta = {}
-        for prop in self.camera.enumerateProperties():
-            self.property_meta[prop.getName()] = {
+        inst.property_meta = {}
+        for prop in inst.camera.enumerateProperties():
+            inst.property_meta[prop.getName()] = {
                 "min": prop.getMin(),
                 "max": prop.getMax(),
                 "default": prop.getDefault(),
             }
+
+        return inst
 
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         if self.camera is not None:
