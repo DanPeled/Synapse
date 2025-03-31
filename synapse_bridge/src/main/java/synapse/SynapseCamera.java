@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.NetworkTableType;
 
 public class SynapseCamera {
   public static final String kSynapseTable = "Synapse";
@@ -95,24 +96,64 @@ public class SynapseCamera {
     return m_settingsTable;
   }
 
-  public void setSetting(String key, Object value) {
+  public void setSetting(String key, double value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (value instanceof Double) {
-      entry.setDouble((Double) value);
-    } else if (value instanceof Double[]) {
-      entry.setDoubleArray((Double[]) value);
-    } else if (value instanceof String) {
-      entry.setString((String) value);
-    } else if (value instanceof String[]) {
-      entry.setStringArray((String[]) value);
-    } else if (value instanceof Integer || value instanceof Long) {
-      entry.setInteger((Integer) value);
-    } else if (value instanceof Long[]) {
-      entry.setIntegerArray((Long[]) value);
+    if (entry.getType() == NetworkTableType.kDouble) {
+      entry.setDouble(value);
     } else {
-      throw new RuntimeException(
-          String.format("[Synapse]: Unknown setting (%s) value type: %s", key, value.getClass().getSimpleName()));
+      throwTypeMismatchException(key, entry.getType(), "double");
     }
+  }
+
+  public void setSetting(String key, double[] value) throws RuntimeException {
+    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    if (entry.getType() == NetworkTableType.kDoubleArray) {
+      entry.setDoubleArray(value);
+    } else {
+      throwTypeMismatchException(key, entry.getType(), "double[]");
+    }
+  }
+
+  public void setSetting(String key, String value) throws RuntimeException {
+    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    if (entry.getType() == NetworkTableType.kString) {
+      entry.setString(value);
+    } else {
+      throwTypeMismatchException(key, entry.getType(), "String");
+    }
+  }
+
+  public void setSetting(String key, String[] value) throws RuntimeException {
+    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    if (entry.getType() == NetworkTableType.kStringArray) {
+      entry.setStringArray(value);
+    } else {
+      throwTypeMismatchException(key, entry.getType(), "StringArray");
+    }
+  }
+
+  public void setSetting(String key, long value) throws RuntimeException {
+    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    if (entry.getType() == NetworkTableType.kInteger) {
+      entry.setInteger(value);
+    } else {
+      throwTypeMismatchException(key, entry.getType(), "Integer");
+    }
+  }
+
+  public void setSetting(String key, long[] value) throws RuntimeException {
+    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    if (entry.getType() == NetworkTableType.kIntegerArray) {
+      entry.setIntegerArray(value);
+    } else {
+      throwTypeMismatchException(key, entry.getType(), "Integer[]");
+    }
+  }
+
+  private void throwTypeMismatchException(String key, NetworkTableType actual, String expected) {
+    throw new RuntimeException(String.format(
+        "[Synapse]: Type mismatch for setting (%s). Expected: %s, but found: %s",
+        key, expected, actual.toString()));
   }
 
   public Optional<Object> getSetting(String key) {
