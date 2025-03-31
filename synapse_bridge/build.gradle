@@ -1,30 +1,31 @@
 import edu.wpi.first.toolchain.*
 
 plugins {
-  id 'cpp'
-  id 'java'
-  id 'google-test'
-  id 'edu.wpi.first.wpilib.repositories.WPILibRepositoriesPlugin' version '2025.0'
-  id 'edu.wpi.first.NativeUtils' version '2025.9.0'
-  id 'edu.wpi.first.GradleJni' version '1.1.0'
-  id 'edu.wpi.first.GradleVsCode' version '2.1.0'
+    id 'cpp'
+    id 'java'
+    id 'google-test'
+    id 'edu.wpi.first.wpilib.repositories.WPILibRepositoriesPlugin' version '2025.0'
+    id 'edu.wpi.first.NativeUtils' version '2025.9.0'
+    id 'edu.wpi.first.GradleJni' version '1.1.0'
+    id 'edu.wpi.first.GradleVsCode' version '2.1.0'
+    id 'com.diffplug.spotless' version '6.20.0'
 }
 
 // WPILib Version
 ext.wpilibVersion = "2025.+"
 
 repositories {
-  mavenCentral()
+    mavenCentral()
 }
 if (project.hasProperty('releaseMode')) {
-  wpilibRepositories.addAllReleaseRepositories(project)
+    wpilibRepositories.addAllReleaseRepositories(project)
 } else {
-  wpilibRepositories.addAllDevelopmentRepositories(project)
+    wpilibRepositories.addAllDevelopmentRepositories(project)
 }
 
 java {
-  sourceCompatibility = JavaVersion.VERSION_17
-  targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 var javaVersion = "17"
 
@@ -79,17 +80,17 @@ javadoc {
 
 // Set up exports properly
 nativeUtils {
-  exportsConfigs {
-    // Main library is just default empty. This will export everything
-    Vendor {
+    exportsConfigs {
+        // Main library is just default empty. This will export everything
+        Vendor {
+        }
     }
-  }
-  privateExportsConfigs {
-    // Only export explicit symbols from driver library
-    VendorDriver {
-      exportsFile = project.file("src/main/driver/symbols.txt")
+    privateExportsConfigs {
+        // Only export explicit symbols from driver library
+        VendorDriver {
+            exportsFile = project.file("src/main/driver/symbols.txt")
+        }
     }
-  }
 }
 
 ext.getCurrentArch = {
@@ -99,86 +100,129 @@ ext.getCurrentArch = {
 def systemArch = getCurrentArch()
 
 model {
-  components {
-    Vendor(NativeLibrarySpec) {
-      sources {
-        cpp {
-          source {
-            srcDirs 'src/main/native/cpp'
-            include '**/*.cpp'
-          }
-          exportedHeaders {
-            srcDirs 'src/main/native/include'
-          }
-        }
-      }
-      binaries.all {
-        lib library: 'VendorDriver', linkage: 'shared'
-      }
-      nativeUtils.useRequiredLibrary(it, 'wpilib_shared')
-    }
-
-    VendorDriver(JniNativeLibrarySpec) {
-      enableCheckTask true
-      javaCompileTasks << compileJava
-      jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.roborio)
-      // Leave these for future proofing
-      jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.linuxarm32)
-      jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.linuxarm64)
-      sources {
-        cpp {
-          source {
-            srcDirs 'src/main/driver/cpp'
-            include '**/*.cpp'
-          }
-          exportedHeaders {
-            srcDirs 'src/main/driver/include'
-          }
-        }
-      }
-
-      nativeUtils.useRequiredLibrary(it, "driver_shared")
-    }
-  }
-  testSuites {
-    VendorTest {
-        sources.cpp {
-            source {
-                srcDir 'src/test/native/cpp'
-                include '**/*.cpp'
+    components {
+        Vendor(NativeLibrarySpec) {
+            sources {
+                cpp {
+                    source {
+                        srcDirs 'src/main/native/cpp'
+                        include '**/*.cpp'
+                    }
+                    exportedHeaders {
+                        srcDirs 'src/main/native/include'
+                    }
+                }
             }
-        }
-
-        binaries.all {
-          lib library: 'VendorDriver', linkage: 'shared'
-
-          def arch = it.targetPlatform.name
-          if (systemArch == arch && it.buildType.name == 'debug') {
-            def filePath = it.tasks.install.installDirectory.get().toString() + File.separatorChar + 'lib'
-            test.dependsOn it.tasks.install
-            test.systemProperty 'java.library.path', filePath
-            test.environment 'LD_LIBRARY_PATH', filePath
-            test.workingDir filePath
-          }
-        }
-
-        nativeUtils.useRequiredLibrary(it, "wpilib_executable_shared", "googletest_static")
-    }
-
-    VendorDriverTest {
-        sources.cpp {
-            source {
-                srcDir 'src/test/driver/cpp'
-                include '**/*.cpp'
+            binaries.all {
+                lib library: 'VendorDriver', linkage: 'shared'
             }
+            nativeUtils.useRequiredLibrary(it, 'wpilib_shared')
         }
-        nativeUtils.useRequiredLibrary(it, "wpilib_executable_shared", "googletest_static")
+
+        VendorDriver(JniNativeLibrarySpec) {
+            enableCheckTask true
+            javaCompileTasks << compileJava
+            jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.roborio)
+            // Leave these for future proofing
+            jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.linuxarm32)
+            jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.linuxarm64)
+            sources {
+                cpp {
+                    source {
+                        srcDirs 'src/main/driver/cpp'
+                        include '**/*.cpp'
+                    }
+                    exportedHeaders {
+                        srcDirs 'src/main/driver/include'
+                    }
+                }
+            }
+
+            nativeUtils.useRequiredLibrary(it, "driver_shared")
+        }
     }
-  }
+    testSuites {
+        VendorTest {
+            sources.cpp {
+                source {
+                    srcDir 'src/test/native/cpp'
+                    include '**/*.cpp'
+                }
+            }
+
+            binaries.all {
+                lib library: 'VendorDriver', linkage: 'shared'
+
+                def arch = it.targetPlatform.name
+                if (systemArch == arch && it.buildType.name == 'debug') {
+                    def filePath = it.tasks.install.installDirectory.get().toString() + File.separatorChar + 'lib'
+                    test.dependsOn it.tasks.install
+                    test.systemProperty 'java.library.path', filePath
+                    test.environment 'LD_LIBRARY_PATH', filePath
+                    test.workingDir filePath
+                }
+            }
+
+            nativeUtils.useRequiredLibrary(it, "wpilib_executable_shared", "googletest_static")
+        }
+
+        VendorDriverTest {
+            sources.cpp {
+                source {
+                    srcDir 'src/test/driver/cpp'
+                    include '**/*.cpp'
+                }
+            }
+            nativeUtils.useRequiredLibrary(it, "wpilib_executable_shared", "googletest_static")
+        }
+    }
+}
+
+spotless {
+    java {
+        target fileTree('.') {
+            include '**/*.java'
+            exclude '**/build/**', '**/build-*/**', '**/bin/**'
+        }
+        toggleOffOn()
+        googleJavaFormat()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    groovyGradle {
+        target fileTree('.') {
+            include '**/*.gradle'
+            exclude '**/build/**', '**/build-*/**'
+        }
+        greclipse()
+        indentWithSpaces(4)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format 'xml', {
+        target fileTree('.') {
+            include '**/*.xml'
+            exclude '**/build/**', '**/build-*/**'
+        }
+        eclipseWtp('xml')
+        trimTrailingWhitespace()
+        indentWithSpaces(2)
+        endWithNewline()
+    }
+    format 'misc', {
+        target fileTree('.') {
+            include '**/*.md', '**/.gitignore'
+            exclude '**/build/**', '**/build-*/**'
+        }
+        trimTrailingWhitespace()
+        indentWithSpaces(2)
+        endWithNewline()
+    }
 }
 
 apply from: 'publish.gradle'
 
 wrapper {
-  gradleVersion '8.11'
+    gradleVersion '8.11'
 }

@@ -143,8 +143,8 @@ task vendordepJson() {
         from templateVendorFile
         into "$buildDir/repos/"
         expand(version: pubVersion,
-                groupId: artifactGroupId,
-                artifactId: baseArtifactId)
+        groupId: artifactGroupId,
+        artifactId: baseArtifactId)
     }
 }
 

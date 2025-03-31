@@ -1,19 +1,17 @@
 package synapse;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableType;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public class SynapseCamera {
   public static final String kSynapseTable = "Synapse";
@@ -26,9 +24,8 @@ public class SynapseCamera {
   public SynapseCamera(int id) {
     m_id = id;
 
-    m_table = NetworkTableInstance.getDefault()
-        .getTable(kSynapseTable)
-        .getSubTable("camera" + m_id);
+    m_table =
+        NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
   }
 
   public void setPipeline(long pipeline) {
@@ -54,13 +51,14 @@ public class SynapseCamera {
       ObjectMapper objectMapper = new ObjectMapper();
       List<ApriltagResult> resultList;
       try {
-        Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {
-        });
+        Map<String, Object> resultMap =
+            objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
 
         String type = (String) resultMap.get("type");
         if (type.equals("apriltag")) {
-          resultList = objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<ApriltagResult>>() {
-          });
+          resultList =
+              objectMapper.convertValue(
+                  resultMap.get("data"), new TypeReference<List<ApriltagResult>>() {});
           return resultList;
         } else {
           throw new IllegalArgumentException("[Synapse] : Error - Non-apriltag result: " + type);
@@ -151,9 +149,10 @@ public class SynapseCamera {
   }
 
   private void throwTypeMismatchException(String key, NetworkTableType actual, String expected) {
-    throw new RuntimeException(String.format(
-        "[Synapse]: Type mismatch for setting (%s). Expected: %s, but found: %s",
-        key, expected, actual.toString()));
+    throw new RuntimeException(
+        String.format(
+            "[Synapse]: Type mismatch for setting (%s). Expected: %s, but found: %s",
+            key, expected, actual.toString()));
   }
 
   public Optional<Object> getSetting(String key) {
