@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import edu.wpi.first.math.geometry.Pose3d;
 
+@RegisterSynapseResult(type = "apriltag")
 public class ApriltagResult {
   @JsonProperty("timestamp")
   private double timestamp;

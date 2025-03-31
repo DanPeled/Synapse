@@ -9,6 +9,7 @@ import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,7 @@ import java.util.Optional;
 public class SynapseCamera {
   public static final String kSynapseTable = "Synapse";
   public static final String kPipelineTopic = "pipeline";
+  private static Map<Class<?>, String> registeredResultTypes = new HashMap<>();
 
   private final int m_id;
   private NetworkTable m_table, m_dataTable, m_settingsTable;
@@ -43,25 +45,47 @@ public class SynapseCamera {
     return m_pipelineEntry.getInteger(-1);
   }
 
-  public List<ApriltagResult> getApriltagResults() throws IllegalArgumentException {
-    String jsonString = getDataEntry("results").getString("[{}]");
-    if (jsonString.equals("[{}]")) {
+  public <T> List<T> getResults(Class<T> clazz) throws IllegalArgumentException {
+    return getResults("results", clazz);
+  }
+
+  public <T> List<T> getResults(String resultsKey, Class<T> clazz) throws IllegalArgumentException {
+    String jsonString = getDataEntry(resultsKey).getString("[{}]");
+    if (jsonString.equals("[{}]") || jsonString.isEmpty()) {
       return new ArrayList<>();
     } else {
       ObjectMapper objectMapper = new ObjectMapper();
-      List<ApriltagResult> resultList;
+      List<T> resultList;
       try {
         Map<String, Object> resultMap =
             objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
+        String requestedTypeString = "";
 
-        String type = (String) resultMap.get("type");
-        if (type.equals("apriltag")) {
-          resultList =
-              objectMapper.convertValue(
-                  resultMap.get("data"), new TypeReference<List<ApriltagResult>>() {});
-          return resultList;
+        if (!registeredResultTypes.containsKey(clazz)) {
+          if (clazz.isAnnotationPresent(RegisterSynapseResult.class)) {
+            requestedTypeString = clazz.getAnnotation(RegisterSynapseResult.class).type();
+            registeredResultTypes.put(clazz, requestedTypeString);
+          } else {
+            throw new RuntimeException(
+                String.format(
+                    "[Synapse] Error: Class %s is missing the required @RegisterSynapseResult annotation.",
+                    clazz.getName()));
+          }
         } else {
-          throw new IllegalArgumentException("[Synapse] : Error - Non-apriltag result: " + type);
+          requestedTypeString = registeredResultTypes.get(clazz);
+        }
+
+        String actualTypeString = (String) resultMap.get("type");
+        if (actualTypeString.equals(requestedTypeString)) {
+          resultList =
+              objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<T>>() {});
+          return resultList;
+
+        } else {
+          throw new RuntimeException(
+              String.format(
+                  "[Synapse] Error: Type mismatch detected. Expected: %s, but found: %s (from JSON).",
+                  requestedTypeString, actualTypeString));
         }
       } catch (JsonMappingException e) {
         e.printStackTrace();
