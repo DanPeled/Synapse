@@ -7,6 +7,12 @@ import edu.wpi.first.math.geometry.Pose3d;
 /** Represents the result of an AprilTag detection, including pose estimation and metadata. */
 @RegisterSynapseResult(type = "apriltag")
 public class ApriltagResult {
+  /**
+   * Default constructor for the {@link ApriltagResult} class.
+   *
+   * <p>This constructor should not be used directly.
+   */
+  public ApriltagResult() {}
 
   /** Timestamp of the detection. */
   @JsonProperty("timestamp")
@@ -65,6 +71,8 @@ public class ApriltagResult {
   private Pose3d robotPose_tagSpace;
 
   /**
+   * Gets the timestamp of the detection.
+   *
    * @return the timestamp of the detection.
    */
   public double getTimestamp() {
@@ -72,6 +80,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the AprilTag family.
+   *
    * @return the AprilTag family.
    */
   public String getTagFamily() {
@@ -79,6 +89,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the ID of the detected tag.
+   *
    * @return the ID of the detected tag.
    */
   public int getTagID() {
@@ -86,6 +98,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the Hamming error correction value.
+   *
    * @return the Hamming error correction value.
    */
   public double getHamming() {
@@ -93,6 +107,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the confidence margin of the detection.
+   *
    * @return the confidence margin of the detection.
    */
   public double getDecisionMargin() {
@@ -100,6 +116,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the homography matrix.
+   *
    * @return the homography matrix.
    */
   public double[][] getHomography() {
@@ -107,6 +125,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the center of the detected tag in image space.
+   *
    * @return the center of the detected tag in image space.
    */
   public double[] getCenter() {
@@ -114,6 +134,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the rotation matrix of the tag.
+   *
    * @return the rotation matrix of the tag.
    */
   public double[][] getPose_R() {
@@ -121,6 +143,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the translation vector of the tag.
+   *
    * @return the translation vector of the tag.
    */
   public double[][] getPose_t() {
@@ -128,6 +152,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the coordinates of the tag corners.
+   *
    * @return the coordinates of the tag corners.
    */
   public double[][] getCorners() {
@@ -135,6 +161,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the pose estimation error.
+   *
    * @return the pose estimation error.
    */
   public double getPoseError() {
@@ -142,6 +170,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the estimated robot pose in field space.
+   *
    * @return the estimated robot pose in field space.
    */
   public Pose3d getRobotPose_fieldSpace() {
@@ -149,6 +179,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the estimated robot pose in tag space.
+   *
    * @return the estimated robot pose in tag space.
    */
   public Pose3d getRobotPose_tagSpace() {
@@ -156,6 +188,8 @@ public class ApriltagResult {
   }
 
   /**
+   * Gets the estimated camera pose in tag space.
+   *
    * @return the estimated camera pose in tag space.
    */
   public Pose3d getCameraPose_tagSpace() {
