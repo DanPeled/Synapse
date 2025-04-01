@@ -11,7 +11,21 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.util.Units;
 import java.io.IOException;
 
+/**
+ * A custom Jackson deserializer for {@link Pose3d} objects. This class deserializes a JSON object
+ * into a {@code Pose3d} instance, handling both degrees and radians for rotation.
+ */
 public class Pose3dDeserializer extends JsonDeserializer<Pose3d> {
+
+  /**
+   * Deserializes a JSON object into a {@link Pose3d} instance.
+   *
+   * @param p the JSON parser
+   * @param ctxt the deserialization context
+   * @return a new {@code Pose3d} instance based on the parsed JSON
+   * @throws IOException if an I/O error occurs
+   * @throws JacksonException if JSON parsing fails
+   */
   @Override
   public Pose3d deserialize(JsonParser p, DeserializationContext ctxt)
       throws IOException, JacksonException {
@@ -23,14 +37,15 @@ public class Pose3dDeserializer extends JsonDeserializer<Pose3d> {
     double pitch = node.get("pitch").asDouble();
     double roll = node.get("roll").asDouble();
 
-    if (node.get("rotation_unit").textValue() == "degrees") {
+    // Check if the rotation is specified in degrees and convert if necessary
+    if ("degrees".equals(node.get("rotation_unit").textValue())) {
       return new Pose3d(
           new Translation3d(x, y, z),
           new Rotation3d(
               Units.degreesToRadians(roll),
               Units.degreesToRadians(pitch),
               Units.degreesToRadians(yaw)));
-    } else { // radians
+    } else { // Default to radians
       return new Pose3d(new Translation3d(x, y, z), new Rotation3d(roll, pitch, yaw));
     }
   }

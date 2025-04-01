@@ -2,7 +2,6 @@ package synapse;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
@@ -14,6 +13,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
+ * results from NetworkTables.
+ */
 public class SynapseCamera {
   public static final String kSynapseTable = "Synapse";
   public static final String kPipelineTopic = "pipeline";
@@ -23,13 +26,22 @@ public class SynapseCamera {
   private NetworkTable m_table, m_dataTable, m_settingsTable;
   private NetworkTableEntry m_pipelineEntry;
 
+  /**
+   * Constructs a new SynapseCamera instance.
+   *
+   * @param id The camera ID.
+   */
   public SynapseCamera(int id) {
     m_id = id;
-
     m_table =
         NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
   }
 
+  /**
+   * Sets the camera pipeline.
+   *
+   * @param pipeline The pipeline ID to set.
+   */
   public void setPipeline(long pipeline) {
     if (m_pipelineEntry == null) {
       m_pipelineEntry = m_table.getEntry(kPipelineTopic);
@@ -37,65 +49,76 @@ public class SynapseCamera {
     m_pipelineEntry.setInteger(pipeline);
   }
 
+  /**
+   * Gets the current pipeline ID.
+   *
+   * @return The current pipeline ID, or -1 if not set.
+   */
   public long getPipeline() {
     if (m_pipelineEntry == null) {
       m_pipelineEntry = m_table.getEntry(kPipelineTopic);
     }
-
     return m_pipelineEntry.getInteger(-1);
   }
 
+  /**
+   * Retrieves detection results of a given type.
+   *
+   * @param clazz The class type of the results.
+   * @param <T> The type parameter.
+   * @return A list of detected results.
+   * @throws IllegalArgumentException If type mismatch occurs.
+   */
   public <T> List<T> getResults(Class<T> clazz) throws IllegalArgumentException {
     return getResults("results", clazz);
   }
 
+  /**
+   * Retrieves detection results with a specified key.
+   *
+   * @param resultsKey The key for retrieving results.
+   * @param clazz The class type of the results.
+   * @param <T> The type parameter.
+   * @return A list of detected results.
+   * @throws IllegalArgumentException If type mismatch occurs.
+   */
   public <T> List<T> getResults(String resultsKey, Class<T> clazz) throws IllegalArgumentException {
     String jsonString = getDataEntry(resultsKey).getString("[{}]");
     if (jsonString.equals("[{}]") || jsonString.isEmpty()) {
       return new ArrayList<>();
-    } else {
-      ObjectMapper objectMapper = new ObjectMapper();
-      List<T> resultList;
-      try {
-        Map<String, Object> resultMap =
-            objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
-        String requestedTypeString = "";
+    }
 
-        if (!registeredResultTypes.containsKey(clazz)) {
-          if (clazz.isAnnotationPresent(RegisterSynapseResult.class)) {
-            requestedTypeString = clazz.getAnnotation(RegisterSynapseResult.class).type();
-            registeredResultTypes.put(clazz, requestedTypeString);
-          } else {
-            throw new RuntimeException(
-                String.format(
-                    "[Synapse] Error: Class %s is missing the required @RegisterSynapseResult annotation.",
-                    clazz.getName()));
-          }
-        } else {
-          requestedTypeString = registeredResultTypes.get(clazz);
-        }
+    ObjectMapper objectMapper = new ObjectMapper();
+    try {
+      Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<>() {});
+      String requestedTypeString =
+          registeredResultTypes.computeIfAbsent(
+              clazz,
+              c -> {
+                if (c.isAnnotationPresent(RegisterSynapseResult.class)) {
+                  return c.getAnnotation(RegisterSynapseResult.class).type();
+                }
+                throw new RuntimeException(
+                    "Class " + c.getName() + " lacks @RegisterSynapseResult annotation.");
+              });
 
-        String actualTypeString = (String) resultMap.get("type");
-        if (actualTypeString.equals(requestedTypeString)) {
-          resultList =
-              objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<T>>() {});
-          return resultList;
-
-        } else {
-          throw new RuntimeException(
-              String.format(
-                  "[Synapse] Error: Type mismatch detected. Expected: %s, but found: %s (from JSON).",
-                  requestedTypeString, actualTypeString));
-        }
-      } catch (JsonMappingException e) {
-        e.printStackTrace();
-      } catch (JsonProcessingException e) {
-        e.printStackTrace();
+      String actualTypeString = (String) resultMap.get("type");
+      if (!actualTypeString.equals(requestedTypeString)) {
+        throw new RuntimeException(
+            "Type mismatch. Expected: " + requestedTypeString + ", but found: " + actualTypeString);
       }
+      return objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<T>>() {});
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
     }
     return new ArrayList<>();
   }
 
+  /**
+   * Retrieves the camera ID.
+   *
+   * @return The camera ID.
+   */
   public int getCameraID() {
     return m_id;
   }
@@ -118,6 +141,34 @@ public class SynapseCamera {
     return m_settingsTable;
   }
 
+  /**
+   * Retrieves a setting value from the camera.
+   *
+   * @param key The setting key.
+   * @return An Optional containing the setting value, if present.
+   */
+  public Optional<Object> getSetting(String key) {
+    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    if (!entry.exists()) return Optional.empty();
+
+    return switch (entry.getType()) {
+      case kDouble -> Optional.of(entry.getDouble(0.0));
+      case kDoubleArray -> Optional.of(entry.getDoubleArray(new double[0]));
+      case kString -> Optional.of(entry.getString(""));
+      case kStringArray -> Optional.of(entry.getStringArray(new String[0]));
+      case kInteger -> Optional.of(entry.getInteger(0));
+      case kIntegerArray -> Optional.of(entry.getIntegerArray(new long[0]));
+      default -> Optional.empty();
+    };
+  }
+
+  /**
+   * Sets a double setting value in the camera's settings table.
+   *
+   * @param key The setting key.
+   * @param value The double value to set.
+   * @throws RuntimeException If the setting type does not match.
+   */
   public void setSetting(String key, double value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
     if (entry.getType() == NetworkTableType.kDouble) {
@@ -127,6 +178,13 @@ public class SynapseCamera {
     }
   }
 
+  /**
+   * Sets a double array setting value in the camera's settings table.
+   *
+   * @param key The setting key.
+   * @param value The double array to set.
+   * @throws RuntimeException If the setting type does not match.
+   */
   public void setSetting(String key, double[] value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
     if (entry.getType() == NetworkTableType.kDoubleArray) {
@@ -136,6 +194,13 @@ public class SynapseCamera {
     }
   }
 
+  /**
+   * Sets a string setting value in the camera's settings table.
+   *
+   * @param key The setting key.
+   * @param value The string value to set.
+   * @throws RuntimeException If the setting type does not match.
+   */
   public void setSetting(String key, String value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
     if (entry.getType() == NetworkTableType.kString) {
@@ -145,6 +210,13 @@ public class SynapseCamera {
     }
   }
 
+  /**
+   * Sets a string array setting value in the camera's settings table.
+   *
+   * @param key The setting key.
+   * @param value The string array to set.
+   * @throws RuntimeException If the setting type does not match.
+   */
   public void setSetting(String key, String[] value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
     if (entry.getType() == NetworkTableType.kStringArray) {
@@ -154,6 +226,13 @@ public class SynapseCamera {
     }
   }
 
+  /**
+   * Sets an integer setting value in the camera's settings table.
+   *
+   * @param key The setting key.
+   * @param value The integer value to set.
+   * @throws RuntimeException If the setting type does not match.
+   */
   public void setSetting(String key, long value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
     if (entry.getType() == NetworkTableType.kInteger) {
@@ -163,6 +242,13 @@ public class SynapseCamera {
     }
   }
 
+  /**
+   * Sets an integer array setting value in the camera's settings table.
+   *
+   * @param key The setting key.
+   * @param value The integer array to set.
+   * @throws RuntimeException If the setting type does not match.
+   */
   public void setSetting(String key, long[] value) throws RuntimeException {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
     if (entry.getType() == NetworkTableType.kIntegerArray) {
@@ -179,31 +265,7 @@ public class SynapseCamera {
             key, expected, actual.toString()));
   }
 
-  public Optional<Object> getSetting(String key) {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-
-    if (!entry.exists()) {
-      return Optional.empty();
-    }
-
-    switch (entry.getType()) {
-      case kDouble:
-        return Optional.of(entry.getDouble(0.0));
-      case kDoubleArray:
-        return Optional.of(entry.getDoubleArray(new double[0]));
-      case kString:
-        return Optional.of(entry.getString(""));
-      case kStringArray:
-        return Optional.of(entry.getStringArray(new String[0]));
-      case kInteger:
-        return Optional.of(entry.getInteger(0));
-      case kIntegerArray:
-        return Optional.of(entry.getIntegerArray(new long[0]));
-      default:
-        return Optional.empty();
-    }
-  }
-
+  /** Defines camera setting keys. */
   public static class CameraSettings {
     public static final String kBrightness = "brightness";
     public static final String kGain = "gain";
