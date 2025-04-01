@@ -14,44 +14,32 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Represents a camera in the Synapse system, providing methods to manage
- * settings and retrieve
+ * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
  * results from NetworkTables.
  */
 public class SynapseCamera {
-  /** The name of the Synapse table in the NetworkTables **/
+  /** The name of the Synapse table in the NetworkTables * */
   public static final String kSynapseTable = "Synapse";
-  /** The topic for pipeline-related data **/
+
+  /** The topic for pipeline-related data * */
   public static final String kPipelineTopic = "pipeline";
 
-  /**
-   * A map for associating result classes with their corresponding data types as
-   * strings
-   **/
+  /** A map for associating result classes with their corresponding data types as strings */
   private static Map<Class<?>, String> registeredResultTypes = new HashMap<>();
 
-  /** Unique identifier for this Synapse instance **/
+  /** Unique identifier for this Synapse instance * */
   private final int m_id;
 
-  /**
-   * The main NetworkTable instance used for storing and retrieving
-   * Synapse-related data.
-   */
+  /** The main NetworkTable instance used for storing and retrieving Synapse-related data. */
   private NetworkTable m_table;
 
-  /**
-   * The NetworkTable used for storing detection and result data.
-   */
+  /** The NetworkTable used for storing detection and result data. */
   private NetworkTable m_dataTable;
 
-  /**
-   * The NetworkTable used for storing camera and pipeline settings.
-   */
+  /** The NetworkTable used for storing camera and pipeline settings. */
   private NetworkTable m_settingsTable;
 
-  /**
-   * The NetworkTableEntry representing the selected vision processing pipeline.
-   */
+  /** The NetworkTableEntry representing the selected vision processing pipeline. */
   private NetworkTableEntry m_pipelineEntry;
 
   /**
@@ -61,7 +49,8 @@ public class SynapseCamera {
    */
   public SynapseCamera(int id) {
     m_id = id;
-    m_table = NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
+    m_table =
+        NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
   }
 
   /**
@@ -92,7 +81,7 @@ public class SynapseCamera {
    * Retrieves detection results of a given type.
    *
    * @param clazz The class type of the results.
-   * @param <T>   The type parameter.
+   * @param <T> The type parameter.
    * @return A list of detected results.
    * @throws IllegalArgumentException If type mismatch occurs.
    */
@@ -104,8 +93,8 @@ public class SynapseCamera {
    * Retrieves detection results with a specified key.
    *
    * @param resultsKey The key for retrieving results.
-   * @param clazz      The class type of the results.
-   * @param <T>        The type parameter.
+   * @param clazz The class type of the results.
+   * @param <T> The type parameter.
    * @return A list of detected results.
    * @throws IllegalArgumentException If type mismatch occurs.
    */
@@ -117,25 +106,24 @@ public class SynapseCamera {
 
     ObjectMapper objectMapper = new ObjectMapper();
     try {
-      Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<>() {
-      });
-      String requestedTypeString = registeredResultTypes.computeIfAbsent(
-          clazz,
-          c -> {
-            if (c.isAnnotationPresent(RegisterSynapseResult.class)) {
-              return c.getAnnotation(RegisterSynapseResult.class).type();
-            }
-            throw new RuntimeException(
-                "Class " + c.getName() + " lacks @RegisterSynapseResult annotation.");
-          });
+      Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<>() {});
+      String requestedTypeString =
+          registeredResultTypes.computeIfAbsent(
+              clazz,
+              c -> {
+                if (c.isAnnotationPresent(RegisterSynapseResult.class)) {
+                  return c.getAnnotation(RegisterSynapseResult.class).type();
+                }
+                throw new RuntimeException(
+                    "Class " + c.getName() + " lacks @RegisterSynapseResult annotation.");
+              });
 
       String actualTypeString = (String) resultMap.get("type");
       if (!actualTypeString.equals(requestedTypeString)) {
         throw new RuntimeException(
             "Type mismatch. Expected: " + requestedTypeString + ", but found: " + actualTypeString);
       }
-      return objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<T>>() {
-      });
+      return objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<T>>() {});
     } catch (JsonProcessingException e) {
       e.printStackTrace();
     }
@@ -177,8 +165,7 @@ public class SynapseCamera {
    */
   public Optional<Object> getSetting(String key) {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (!entry.exists())
-      return Optional.empty();
+    if (!entry.exists()) return Optional.empty();
 
     return switch (entry.getType()) {
       case kDouble -> Optional.of(entry.getDouble(0.0));
@@ -194,7 +181,7 @@ public class SynapseCamera {
   /**
    * Sets a double setting value in the camera's settings table.
    *
-   * @param key   The setting key.
+   * @param key The setting key.
    * @param value The double value to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -210,7 +197,7 @@ public class SynapseCamera {
   /**
    * Sets a double array setting value in the camera's settings table.
    *
-   * @param key   The setting key.
+   * @param key The setting key.
    * @param value The double array to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -226,7 +213,7 @@ public class SynapseCamera {
   /**
    * Sets a string setting value in the camera's settings table.
    *
-   * @param key   The setting key.
+   * @param key The setting key.
    * @param value The string value to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -242,7 +229,7 @@ public class SynapseCamera {
   /**
    * Sets a string array setting value in the camera's settings table.
    *
-   * @param key   The setting key.
+   * @param key The setting key.
    * @param value The string array to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -258,7 +245,7 @@ public class SynapseCamera {
   /**
    * Sets an integer setting value in the camera's settings table.
    *
-   * @param key   The setting key.
+   * @param key The setting key.
    * @param value The integer value to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -274,7 +261,7 @@ public class SynapseCamera {
   /**
    * Sets an integer array setting value in the camera's settings table.
    *
-   * @param key   The setting key.
+   * @param key The setting key.
    * @param value The integer array to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -295,8 +282,7 @@ public class SynapseCamera {
   }
 
   /**
-   * Enum representing the camera setting keys. These keys are used to configure
-   * and retrieve
+   * Enum representing the camera setting keys. These keys are used to configure and retrieve
    * specific camera settings from a configuration system or camera interface.
    */
   public static enum CameraSettings {
