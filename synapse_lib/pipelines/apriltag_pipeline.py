@@ -150,7 +150,7 @@ class ApriltagPipeline(Pipeline):
                         self.kRobotPoseTagSpaceKey,
                         robotPoseEstimate.robotPose_tagSpace,
                     )
-                    setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
+                    # setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
                     setattr(tag, self.kCameraPoseTagSpace, tagRelativePose)
 
         self.setDataValue("hasResults", True)
