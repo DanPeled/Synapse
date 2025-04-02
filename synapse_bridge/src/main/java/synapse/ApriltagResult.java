@@ -3,6 +3,7 @@ package synapse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import edu.wpi.first.math.geometry.Pose3d;
+import java.util.Optional;
 
 /** Represents the result of an AprilTag detection, including pose estimation and metadata. */
 @RegisterSynapseResult(type = "apriltag")
@@ -20,43 +21,43 @@ public class ApriltagResult {
 
   /** The family of the detected AprilTag. */
   @JsonProperty("tag_family")
-  private String tagFamily;
+  private Optional<String> tagFamily;
 
   /** The unique ID of the detected AprilTag. */
   @JsonProperty("tag_id")
-  private int tagID;
+  private Optional<Integer> tagID;
 
   /** Hamming distance used for error correction. */
   @JsonProperty("hamming")
-  private double hamming;
+  private Optional<Double> hamming;
 
   /** Decision margin indicating the confidence of the tag detection. */
   @JsonProperty("decision_margin")
-  private double decisionMargin;
+  private Optional<Double> decisionMargin;
 
   /** Homography matrix describing the transformation. */
   @JsonProperty("homography")
-  private double[][] homography;
+  private Optional<double[][]> homography;
 
   /** Center coordinates of the detected tag in image space. */
   @JsonProperty("center")
-  private double[] center;
+  private Optional<double[]> center;
 
   /** Rotation matrix representing tag orientation. */
   @JsonProperty("pose_R")
-  private double[][] pose_R;
+  private Optional<double[][]> pose_R;
 
   /** Translation vector representing tag position. */
   @JsonProperty("pose_t")
-  private double[][] pose_t;
+  private Optional<double[][]> pose_t;
 
   /** Corner coordinates of the detected tag. */
   @JsonProperty("corners")
-  private double[][] corners;
+  private Optional<double[][]> corners;
 
   /** Pose estimation error value. */
   @JsonProperty("pose_err")
-  private double poseError;
+  private Optional<Double> poseError;
 
   /** Estimated robot pose in field space. */
   @JsonDeserialize(using = Pose3dDeserializer.class)
@@ -84,7 +85,7 @@ public class ApriltagResult {
    *
    * @return the AprilTag family.
    */
-  public String getTagFamily() {
+  public Optional<String> getTagFamily() {
     return tagFamily;
   }
 
@@ -93,7 +94,7 @@ public class ApriltagResult {
    *
    * @return the ID of the detected tag.
    */
-  public int getTagID() {
+  public Optional<Integer> getTagID() {
     return tagID;
   }
 
@@ -102,7 +103,7 @@ public class ApriltagResult {
    *
    * @return the Hamming error correction value.
    */
-  public double getHamming() {
+  public Optional<Double> getHamming() {
     return hamming;
   }
 
@@ -111,7 +112,7 @@ public class ApriltagResult {
    *
    * @return the confidence margin of the detection.
    */
-  public double getDecisionMargin() {
+  public Optional<Double> getDecisionMargin() {
     return decisionMargin;
   }
 
@@ -120,7 +121,7 @@ public class ApriltagResult {
    *
    * @return the homography matrix.
    */
-  public double[][] getHomography() {
+  public Optional<double[][]> getHomography() {
     return homography;
   }
 
@@ -129,7 +130,7 @@ public class ApriltagResult {
    *
    * @return the center of the detected tag in image space.
    */
-  public double[] getCenter() {
+  public Optional<double[]> getCenter() {
     return center;
   }
 
@@ -138,7 +139,7 @@ public class ApriltagResult {
    *
    * @return the rotation matrix of the tag.
    */
-  public double[][] getPose_R() {
+  public Optional<double[][]> getPose_R() {
     return pose_R;
   }
 
@@ -147,7 +148,7 @@ public class ApriltagResult {
    *
    * @return the translation vector of the tag.
    */
-  public double[][] getPose_t() {
+  public Optional<double[][]> getPose_t() {
     return pose_t;
   }
 
@@ -156,7 +157,7 @@ public class ApriltagResult {
    *
    * @return the coordinates of the tag corners.
    */
-  public double[][] getCorners() {
+  public Optional<double[][]> getCorners() {
     return corners;
   }
 
@@ -165,7 +166,7 @@ public class ApriltagResult {
    *
    * @return the pose estimation error.
    */
-  public double getPoseError() {
+  public Optional<Double> getPoseError() {
     return poseError;
   }
 
