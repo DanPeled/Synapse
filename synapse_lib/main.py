@@ -10,5 +10,5 @@ def getFilePath() -> Path:
 if __name__ == "__main__":
     handler = PipelineHandler(getFilePath() / "pipelines")
     s = Synapse()
-    if s.init(handler):
+    if s.init(handler, getFilePath() / "config" / "settings.yml"):
         s.run()

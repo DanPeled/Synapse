@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
-from core.pipeline import Pipeline, PipelineSettings
 from cv2.typing import MatLike
+
+from core.pipeline import Pipeline, PipelineSettings
 
 
 class ColorPipeline(Pipeline):

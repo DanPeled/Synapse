@@ -1,4 +1,6 @@
-import yaml
+from pathlib import Path
+
+from core.config import Config
 from networking import NtClient
 
 from .log import log
@@ -16,12 +18,17 @@ class Synapse:
             nt_client (NtClient): The instance of NtClient used to manage the NetworkTables connection.
     """
 
-    def init(self, pipeline_handler: PipelineHandler) -> bool:
+    def init(
+        self,
+        pipeline_handler: PipelineHandler,
+        config_path: Path,
+    ) -> bool:
         """
         Initializes the Synapse pipeline by loading configuration settings and setting up NetworkTables and global settings.
 
         Args:
             pipeline_handler (PipelineHandler): The handler responsible for managing the pipeline's lifecycle.
+            config_path (str, optional): The path to the configuration file. Defaults to "./config/settings.yml".
 
         Returns:
             bool: True if initialization was successful, False otherwise.
@@ -30,25 +37,27 @@ class Synapse:
         self.pipeline_handler = pipeline_handler
 
         try:
+            config = Config()
+            config.load(filePath=config_path)
+
             # Load the settings from the config file
-            with open(r"./config/settings.yml") as file:
-                settings = yaml.full_load(file)
-                self.settings_dict = settings
-                network_settings = settings["network"]
+            settings = config.getConfigMap()
+            self.settings_dict = settings
+            network_settings = settings["network"]
 
-                # Initialize NetworkTables
-                self.__init_cmd_args()
-                nt_good = self.__init_networktables(network_settings)
-                if nt_good:
-                    self.pipeline_handler.setup(settings)
-                else:
-                    log(
-                        f"Error something went wrong while setting up networktables with params: {network_settings}"
-                    )
+            # Initialize NetworkTables
+            self.__init_cmd_args()
+            nt_good = self.__init_networktables(network_settings)
+            if nt_good:
+                self.pipeline_handler.setup(settings)
+            else:
+                log(
+                    f"Error something went wrong while setting up networktables with params: {network_settings}"
+                )
 
-                # Setup global settings
-                global_settings = settings["global"]
-                GlobalSettings.setup(global_settings)
+            # Setup global settings
+            global_settings = settings["global"]
+            GlobalSettings.setup(global_settings)
 
         except Exception as e:
             log(f"Something went wrong while reading settings config file. {repr(e)}")
