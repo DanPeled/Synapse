@@ -5,21 +5,20 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
+import core.log as log
 import cv2
 import ntcore
 import numpy as np
-from cscore import CameraServer, CvSource
-from ntcore import NetworkTable
-from wpilib import Timer
-from wpimath.units import seconds
-
-import core.log as log
 from core.camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
 from core.config import Config
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
+from cscore import CameraServer, CvSource
 from hardware.metrics import MetricsManager
 from networking import NtClient
+from ntcore import NetworkTable
+from wpilib import Timer
+from wpimath.units import seconds
 
 
 class PipelineHandler:
