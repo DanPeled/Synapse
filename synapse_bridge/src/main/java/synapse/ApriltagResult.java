@@ -19,43 +19,83 @@ public class ApriltagResult {
   @JsonProperty("timestamp")
   private double timestamp;
 
-  /** The family of the detected AprilTag. */
+  /**
+   * The family of the detected AprilTag.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("tag_family")
   private Optional<String> tagFamily;
 
-  /** The unique ID of the detected AprilTag. */
+  /**
+   * The unique ID of the detected AprilTag.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("tag_id")
   private Optional<Integer> tagID;
 
-  /** Hamming distance used for error correction. */
+  /**
+   * Hamming distance used for error correction.
+   *
+   * <p>Present for verbosity levels: kTagDetails and above.
+   */
   @JsonProperty("hamming")
   private Optional<Double> hamming;
 
-  /** Decision margin indicating the confidence of the tag detection. */
+  /**
+   * Decision margin indicating the confidence of the tag detection.
+   *
+   * <p>Present for verbosity levels: kTagDetails and above.
+   */
   @JsonProperty("decision_margin")
   private Optional<Double> decisionMargin;
 
-  /** Homography matrix describing the transformation. */
+  /**
+   * Homography matrix describing the transformation.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("homography")
   private Optional<double[][]> homography;
 
-  /** Center coordinates of the detected tag in image space. */
+  /**
+   * Center coordinates of the detected tag in image space.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("center")
   private Optional<double[]> center;
 
-  /** Rotation matrix representing tag orientation. */
+  /**
+   * Rotation matrix representing tag orientation.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("pose_R")
   private Optional<double[][]> pose_R;
 
-  /** Translation vector representing tag position. */
+  /**
+   * Translation vector representing tag position.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("pose_t")
   private Optional<double[][]> pose_t;
 
-  /** Corner coordinates of the detected tag. */
+  /**
+   * Corner coordinates of the detected tag.
+   *
+   * <p>Present for verbosity levels: kTagDetectionData and above.
+   */
   @JsonProperty("corners")
   private Optional<double[][]> corners;
 
-  /** Pose estimation error value. */
+  /**
+   * Pose estimation error value.
+   *
+   * <p>Present for verbosity levels: kTagDetails and above.
+   */
   @JsonProperty("pose_err")
   private Optional<Double> poseError;
 
@@ -195,5 +235,18 @@ public class ApriltagResult {
    */
   public Pose3d getCameraPose_tagSpace() {
     return cameraPose_tagSpace;
+  }
+
+  public static enum ApriltagVerbosity {
+    kPoseOnly(0),
+    kTagDetails(1),
+    kTagDetectionData(2),
+    kAll(3);
+
+    public final int level;
+
+    ApriltagVerbosity(int level) {
+      this.level = level;
+    }
   }
 }
