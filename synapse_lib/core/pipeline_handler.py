@@ -10,6 +10,7 @@ import cv2
 import ntcore
 import numpy as np
 from core.camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
+from core.config import Config
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cscore import CameraServer, CvSource
@@ -24,12 +25,12 @@ class PipelineHandler:
     NT_TABLE: Final[str] = "Synapse"
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
 
-    def __init__(self, directory: Path):
+    def __init__(self, pipelineDirectory: Path):
         """
         Initializes the handler, loads all pipeline classes in the specified directory.
-        :param directory: Root directory to search for pipeline files
+        :param pipelineDirectory: Root directory to search for pipeline files
         """
-        self.directory: Path = directory
+        self.pipelineDirectory: Path = pipelineDirectory
         self.metricsManager: Final[MetricsManager] = MetricsManager()
         self.metricsManager.setConfig(None)
         self.cameras: Dict[int, SynapseCamera] = {}
@@ -71,7 +72,7 @@ class PipelineHandler:
 
         ignoredFiles = ["setup.py"]
         pipelines = {}
-        for file_path in self.directory.rglob("*_pipeline.py"):
+        for file_path in self.pipelineDirectory.rglob("*_pipeline.py"):
             if file_path.name not in ignoredFiles:
                 module_name = file_path.stem  # Get filename without extension
 
@@ -424,31 +425,28 @@ class PipelineHandler:
         return f"camera{index}"
 
     def loadSettings(self):
-        import yaml
-
         log.log("Loading settings...")
-        with open(r"./config/settings.yml") as file:
-            settings = yaml.full_load(file)
 
-            camera_configs = settings["global"]["camera_configs"]
+        settings: dict = Config.getConfigMap()
+        camera_configs = settings["global"]["camera_configs"]
 
-            for camera_index in camera_configs:
-                if not (self.addCamera(camera_index)):
-                    return
-                self.defaultPipelineIndexes[camera_index] = camera_configs[
-                    camera_index
-                ]["default_pipeline"]
+        for camera_index in camera_configs:
+            if not (self.addCamera(camera_index)):
+                return
+            self.defaultPipelineIndexes[camera_index] = camera_configs[camera_index][
+                "default_pipeline"
+            ]
 
-            pipelines = settings["pipelines"]
+        pipelines = settings["pipelines"]
 
-            for index, _ in enumerate(pipelines):
-                pipeline = pipelines[index]
+        for index, _ in enumerate(pipelines):
+            pipeline = pipelines[index]
 
-                log.log(f"Loaded pipeline #{index} with type {pipeline['type']}")
+            log.log(f"Loaded pipeline #{index} with type {pipeline['type']}")
 
-                self.setPipelineSettings(index, pipeline["settings"])
+            self.setPipelineSettings(index, pipeline["settings"])
 
-                self.pipelineTypes[index] = pipeline["type"]
+            self.pipelineTypes[index] = pipeline["type"]
 
         for camera_index in self.cameras.keys():
             pipeline = self.defaultPipelineIndexes[camera_index]
