@@ -41,25 +41,18 @@ class ApriltagVerbosity(Enum):
         return cls.kPoseOnly
 
 
-def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[set]:
+def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]]:
+    if verbosity == ApriltagVerbosity.kAll:
+        return None
+
     ignored: Set[str] = set()
 
-    match verbosity:
-        case ApriltagVerbosity.kAll:
-            return None
     if verbosity.value <= ApriltagVerbosity.kTagDetectionData.value:
-        ignored.add("corners")
-        ignored.add("pose_t")
-        ignored.add("pose_R")
-        ignored.add("homonography")
-        ignored.add("center")
+        ignored.update({"corners", "pose_t", "pose_R", "homonography", "center"})
     if verbosity.value <= ApriltagVerbosity.kTagDetails.value:
-        ignored.add("poseErr")
-        ignored.add("decision_margin")
-        ignored.add("hamming")
+        ignored.update({"poseErr", "decision_margin", "hamming"})
     if verbosity.value <= ApriltagVerbosity.kPoseOnly.value:
-        ignored.add("tag_family")
-        ignored.add("tag_id")
+        ignored.update({"tag_family", "tag_id"})
 
     return ignored
 
