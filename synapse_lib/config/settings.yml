@@ -34,6 +34,7 @@ pipelines:
       saturation: 10
       black_level_offset: 0.0
       orientation: 180
+      verbosity: 1
       tag_size: 0.1651
   1:
     type: ColorPipeline

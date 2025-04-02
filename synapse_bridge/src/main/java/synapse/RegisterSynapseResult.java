@@ -1,5 +1,10 @@
 package synapse;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 /**
  * This annotation is used to mark classes that represent a specific type of result to be registered
  * with Synapse.
@@ -11,6 +16,8 @@ package synapse;
  * representing the result type. This is necessary for ensuring that the correct result type is
  * registered and handled appropriately within the framework.
  */
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
 public @interface RegisterSynapseResult {
 
   /**

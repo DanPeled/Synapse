@@ -48,9 +48,9 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     ignored: Set[str] = set()
 
     if verbosity.value <= ApriltagVerbosity.kTagDetectionData.value:
-        ignored.update({"corners", "pose_t", "pose_R", "homonography", "center"})
+        ignored.update({"corners", "pose_t", "pose_R", "homography", "center"})
     if verbosity.value <= ApriltagVerbosity.kTagDetails.value:
-        ignored.update({"poseErr", "decision_margin", "hamming"})
+        ignored.update({"pose_err", "decision_margin", "hamming"})
     if verbosity.value <= ApriltagVerbosity.kPoseOnly.value:
         ignored.update({"tag_family", "tag_id"})
 

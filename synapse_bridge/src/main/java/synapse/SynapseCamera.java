@@ -3,6 +3,8 @@ package synapse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -12,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
@@ -99,14 +102,23 @@ public class SynapseCamera {
    * @throws IllegalArgumentException If type mismatch occurs.
    */
   public <T> List<T> getResults(String resultsKey, Class<T> clazz) throws IllegalArgumentException {
-    String jsonString = getDataEntry(resultsKey).getString("[{}]");
-    if (jsonString.equals("[{}]") || jsonString.isEmpty()) {
+    String jsonString = getDataEntry(resultsKey).getString("{\"data\":[],\"type\":\"\"}");
+
+    if (jsonString.isEmpty() || jsonString.equals("{\"data\":[],\"type\":\"\"}")) {
       return new ArrayList<>();
     }
 
-    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectMapper objectMapper =
+        new ObjectMapper()
+            .registerModule(new ParameterNamesModule())
+            .registerModule(new Jdk8Module());
     try {
+      // Parse JSON into a Map
       Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<>() {});
+
+      // Extract type information
+      String actualTypeString = (String) resultMap.get("type");
+
       String requestedTypeString =
           registeredResultTypes.computeIfAbsent(
               clazz,
@@ -118,12 +130,18 @@ public class SynapseCamera {
                     "Class " + c.getName() + " lacks @RegisterSynapseResult annotation.");
               });
 
-      String actualTypeString = (String) resultMap.get("type");
       if (!actualTypeString.equals(requestedTypeString)) {
         throw new RuntimeException(
             "Type mismatch. Expected: " + requestedTypeString + ", but found: " + actualTypeString);
       }
-      return objectMapper.convertValue(resultMap.get("data"), new TypeReference<List<T>>() {});
+
+      // Extract and convert the "data" field
+      List<?> dataList = (List<?>) resultMap.get("data");
+
+      return dataList.stream()
+          .map(item -> objectMapper.convertValue(item, clazz))
+          .collect(Collectors.toList());
+
     } catch (JsonProcessingException e) {
       e.printStackTrace();
     }
