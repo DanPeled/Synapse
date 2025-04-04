@@ -3,8 +3,12 @@ name: Synapse Bridge
 on:
   push:
     branches: [main]
-  pull_request: {}
-
+    paths:
+      - 'synapse_bridge/**'
+  pull_request:
+    paths:
+      - 'synapse_bridge/**'
+        
 permissions:
   contents: read
   pull-requests: write
@@ -26,7 +30,7 @@ jobs:
       - name: Build Project
         run: |
           cd synapse_bridge
-          # ./gradlew build # doesnt work due to jni being annoying
+          ./gradlew build 
 
   spotless-check:
     runs-on: ubuntu-latest

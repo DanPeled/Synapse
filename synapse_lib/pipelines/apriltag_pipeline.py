@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Final, List, Optional, Union
+from enum import Enum
+from typing import Any, Dict, Final, List, Optional, Set, Union
 
 import core.log as log
 import cv2
@@ -20,6 +21,42 @@ class RobotPoseEstimate:
     robotPose_fieldSpace: Pose3d
 
 
+class ApriltagVerbosity(Enum):
+    kPoseOnly = 0
+    kTagDetails = 1
+    kTagDetectionData = 2
+    kAll = 3
+
+    @classmethod
+    def fromValue(cls, value: int) -> "ApriltagVerbosity":
+        match value:
+            case 0:
+                return cls.kPoseOnly
+            case 1:
+                return cls.kTagDetails
+            case 2:
+                return cls.kTagDetectionData
+            case 3:
+                return cls.kAll
+        return cls.kPoseOnly
+
+
+def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]]:
+    if verbosity == ApriltagVerbosity.kAll:
+        return None
+
+    ignored: Set[str] = set()
+
+    if verbosity.value <= ApriltagVerbosity.kTagDetectionData.value:
+        ignored.update({"corners", "pose_t", "pose_R", "homography", "center"})
+    if verbosity.value <= ApriltagVerbosity.kTagDetails.value:
+        ignored.update({"pose_err", "decision_margin", "hamming"})
+    if verbosity.value <= ApriltagVerbosity.kPoseOnly.value:
+        ignored.update({"tag_family", "tag_id"})
+
+    return ignored
+
+
 class ApriltagPipeline(Pipeline):
     kTagSizeKey: Final[str] = "tag_size"
     kTagFamily: Final[str] = "tag36h11"
@@ -29,8 +66,9 @@ class ApriltagPipeline(Pipeline):
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
     kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
     kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
-    kCameraPoseTagSpace: Final[str] = "cameraPose_tagSpace"
-    kTagPoseFieldSpace: Final[str] = "tagPose_fieldSpace"
+    kCameraPoseTagSpaceKey: Final[str] = "cameraPose_tagSpace"
+    kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
+    kResultVerbosityKey: Final[str] = "verbosity"
 
     def __init__(self, settings: PipelineSettings, camera_index: int):
         super().__init__(settings, camera_index)
@@ -103,7 +141,7 @@ class ApriltagPipeline(Pipeline):
                 )
 
             self.setDataValue(
-                self.kCameraPoseTagSpace,
+                self.kCameraPoseTagSpaceKey,
                 [
                     tagRelativePose.translation().X(),
                     tagRelativePose.translation().Y(),
@@ -151,10 +189,21 @@ class ApriltagPipeline(Pipeline):
                         robotPoseEstimate.robotPose_tagSpace,
                     )
                     # setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
-                    setattr(tag, self.kCameraPoseTagSpace, tagRelativePose)
+                    setattr(tag, self.kCameraPoseTagSpaceKey, tagRelativePose)
 
         self.setDataValue("hasResults", True)
-        self.setDataValue("results", ApriltagsJson.toJsonString(tags))
+        self.setDataValue(
+            "results",
+            ApriltagsJson.toJsonString(
+                tags,
+                getIgnoredDataByVerbosity(
+                    ApriltagVerbosity.fromValue(
+                        self.getSetting(ApriltagPipeline.kResultVerbosityKey)
+                        or ApriltagVerbosity.kPoseOnly.value
+                    )
+                ),
+            ),
+        )
 
         return gray
 
@@ -451,10 +500,20 @@ class ApriltagsJson:
     _emptyJson: Optional[str] = None
 
     @classmethod
-    def toJsonString(cls, tags) -> str:
+    def toJsonString(cls, tags, ignore_keys: Optional[set] = None) -> str:
+        ignore_keys = set(
+            ignore_keys or []
+        )  # Convert ignore_keys to a set for fast lookup
+
         return json.dumps(
-            {"data": list(map(lambda tag: tag.__dict__, tags)), "type": "apriltag"},
-            cls=ApriltagsJson.Encoder,
+            {
+                "data": [
+                    {k: v for k, v in tag.__dict__.items() if k not in ignore_keys}
+                    for tag in tags
+                ],
+                "type": "apriltag",
+            },
+            cls=cls.Encoder,
             separators=(",", ":"),
         )
 
