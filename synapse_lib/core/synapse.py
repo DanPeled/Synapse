@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from core.config import Config
+from log import log
 from networking import NtClient
 
-from log import log
 from .pipeline import GlobalSettings
 from .pipeline_handler import PipelineHandler
 

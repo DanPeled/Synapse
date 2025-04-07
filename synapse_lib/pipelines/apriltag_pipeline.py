@@ -3,23 +3,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Final, List, Optional, Set, Union
 
-import log
 import cv2
+import log
 import numpy as np
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cv2.typing import MatLike
 from pupil_apriltags import Detector
-from wpimath.geometry import (
-    Pose2d,
-    Pose3d,
-    Quaternion,
-    Rotation2d,
-    Rotation3d,
-    Transform3d,
-    Translation2d,
-    Translation3d,
-)
+from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation2d,
+                              Rotation3d, Transform3d, Translation2d,
+                              Translation3d)
 
 
 @dataclass

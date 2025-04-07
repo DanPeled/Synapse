@@ -5,8 +5,8 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
-import log as log
 import cv2
+import log as log
 import ntcore
 import numpy as np
 from core.camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
