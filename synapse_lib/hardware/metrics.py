@@ -314,11 +314,14 @@ class MetricsManager:
         return self.safeExecute(self.cmds.gpuMemUsageCommand) if self.cmds else "0.0"
 
     def getUsedDiskPct(self) -> str:
-        return (
-            self.safeExecute(self.cmds.diskUsageCommand)[:-1] if self.safeExecute(self.cmds.diskUsageCommand).endswith("%") else self.safeExecute(self.cmds.diskUsageCommand)
-            if self.cmds
-            else "0.0"
-        )
+        if self.cmds:
+            return (
+                self.safeExecute(self.cmds.diskUsageCommand)[:-1]
+                if self.safeExecute(self.cmds.diskUsageCommand).endswith("%")
+                else self.safeExecute(self.cmds.diskUsageCommand)
+            )
+        else:
+            return "0.0"
 
     def getUsedRam(self) -> str:
         return self.safeExecute(self.cmds.ramUsageCommand) if self.cmds else "0.0"
