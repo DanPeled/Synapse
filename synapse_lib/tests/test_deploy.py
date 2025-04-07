@@ -1,11 +1,14 @@
+import os
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import paramiko
 import pytest
-
-from ..deploy import (add_files_to_tar, check_python3_install, deploy,
-                      get_gitignore_specs)
+from deploy import (add_files_to_tar, check_python3_install, deploy,
+                    get_gitignore_specs)
 
 
 # Mock SSH client and related methods
