@@ -1,5 +1,4 @@
 import os
-import subprocess
 import tarfile
 import time as t
 from datetime import datetime, timedelta
@@ -9,13 +8,16 @@ import paramiko
 import pathspec
 
 
-def check_python3_install() -> bool:
+def check_python3_install(ssh) -> bool:
+    """Check if Python 3 is installed on the remote system."""
     try:
-        result = subprocess.run(
-            ["python3", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        return result.returncode == 0
-    except FileNotFoundError:
+        stdin, stdout, stderr = ssh.exec_command("python3 --version")
+        if stdout.channel.recv_exit_status() == 0:
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Error checking Python3 installation: {e}")
         return False
 
 
@@ -24,7 +26,7 @@ def get_gitignore_specs(parentPath: Path) -> pathspec.PathSpec:
     gitignore_path = os.path.join(parentPath, ".gitignore")
     if os.path.exists(gitignore_path):
         with open(gitignore_path) as f:
-            spec = pathspec.PathSpec.from_lines("gitwildmatch", f.readlines())
+            spec = pathspec.PathSpec.from_lines("gitwildmatch", f)
             return spec
     return pathspec.PathSpec([])
 
@@ -43,33 +45,33 @@ def add_files_to_tar(tar, source_folder, gitignore_spec):
                 )
 
 
-def compile_file(file_path) -> bool:
-    """Compile a single Python file and return the result."""
+def compile_file_remotely(ssh, file_path) -> bool:
+    """Compile a single Python file on the remote system and return the result."""
     try:
-        python_cmd = "python3" if check_python3_install() else "python"
-        result = subprocess.run(
-            [python_cmd, "-m", "py_compile", file_path],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if result.returncode != 0:
-            print(f"Error compiling {file_path}:\n{result.stderr.decode()}")
+        python_cmd = "python3" if check_python3_install(ssh) else "python"
+        remote_compile_cmd = f"{python_cmd} -m py_compile {file_path}"
+        stdin, stdout, stderr = ssh.exec_command(remote_compile_cmd)
+
+        if stdout.channel.recv_exit_status() != 0:
+            print(f"Error compiling {file_path}:\n{stderr.read().decode()}")
             return False
         return True
     except Exception as e:
-        print(f"Error compiling {file_path}: {e}")
+        print(f"Error compiling {file_path} remotely: {e}")
         return False
 
 
-def build_project() -> Tuple[bool, timedelta]:
-    """Compile Python files in the project."""
-    print("Building...")
+def build_project_remotely(
+    ssh, origin_path: Path, remote_path
+) -> Tuple[bool, timedelta]:
+    """Compile Python files on the remote system."""
+    print("Building remotely...")
     build_start = datetime.now()
     total_files = 0
     compiled_files = 0
 
-    for root, _, files in os.walk("."):
+    # Transfer files and count the Python files
+    for root, _, files in os.walk(origin_path):
         total_files += sum(1 for file in files if file.endswith(".py"))
 
     if total_files == 0:
@@ -80,8 +82,15 @@ def build_project() -> Tuple[bool, timedelta]:
         for file in files:
             if file.endswith(".py"):
                 file_path = os.path.join(root, file)
-                if not compile_file(file_path):
-                    print(f"Build failed for {file_path}. Exiting.")
+                remote_file_path = os.path.join(remote_path, file_path)
+
+                # Copy file to remote server
+                sftp = ssh.open_sftp()
+                sftp.put(file_path, remote_file_path)
+                sftp.close()
+
+                if not compile_file_remotely(ssh, remote_file_path):
+                    print(f"Build failed for {file_path} remotely. Exiting.")
                     return False, timedelta()
                 compiled_files += 1
 
@@ -89,12 +98,7 @@ def build_project() -> Tuple[bool, timedelta]:
     return True, build_end - build_start
 
 
-def deploy(hostname, port, username, password, remote_path):
-    tarball_path = getTarballPath()
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    ssh.connect(hostname, port, username, password)
+def deploy(ssh, tarball_path, remote_path, password):
     ssh.exec_command(f"mkdir -p {remote_path}")
 
     sftp = ssh.open_sftp()
@@ -110,20 +114,12 @@ def deploy(hostname, port, username, password, remote_path):
 
     # Wait for the command to complete and print any output/errors
     t.sleep(1)
-    if stdout:
-        print(stdout.read().decode())
-    if stderr:
-        print(stderr.read().decode())
+    print(stdout.read().decode())
+    print(stderr.read().decode())
 
     print(f"Service {service_name} restarted.")
 
     sftp.close()
-    ssh.close()
-
-
-def getTarballPath():
-    tarball_path = "/tmp/deploy.tar.gz"
-    return tarball_path
 
 
 if __name__ == "__main__":
@@ -135,13 +131,22 @@ if __name__ == "__main__":
     current_folder = os.getcwd()
     remote_path = "~/Synapse/"
     gitignore_spec = get_gitignore_specs(Path(os.getcwd()))
+    tarball_path = "/tmp/deploy.tar.gz"
 
-    with tarfile.open(getTarballPath(), "w:gz") as tar:
+    with tarfile.open(tarball_path, "w:gz") as tar:
         add_files_to_tar(tar, current_folder, gitignore_spec)
 
-    build_OK, time = build_project()
+    # Establish SSH connection to the remote server
+    print(f"Connecting via SSH to {username}@{hostname}...")
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(hostname, port, username, password)
+
+    # Build project remotely
+    build_OK, time = build_project_remotely(ssh, Path("."), remote_path)
     if build_OK:
-        print(f"Built successfully in {time.total_seconds()} seconds")
-        print(f"Connecting via SSH to {username}@{hostname}...")
-        deploy(hostname, port, username, password, remote_path)
+        print(f"Built remotely in {time.total_seconds()} seconds")
+        deploy(ssh, tarball_path, remote_path, password)
         print(f"Deployment to {username}@{hostname}:{remote_path} complete.")
+
+    ssh.close()
