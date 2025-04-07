@@ -1,10 +1,9 @@
-import json
 import os
 import subprocess
 from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Final, Optional
+from typing import Any, Final, List, Optional
 
 from log import err
 from networking import NtClient
@@ -286,57 +285,61 @@ class MetricsManager:
 
     def getMemory(self) -> str:
         if not self.cmds or not self.cmds.cpuMemoryCommand:
-            return ""
+            return "0.0"
         if self.cpuMemSave is None:
             self.cpuMemSave = self.execute(self.cmds.cpuMemoryCommand)
         return self.cpuMemSave
 
     def getTemp(self) -> str:
-        return self.safeExecute(self.cmds.cpuTemperatureCommand) if self.cmds else ""
+        return self.safeExecute(self.cmds.cpuTemperatureCommand) if self.cmds else "0.0"
 
     def getUtilization(self) -> str:
-        return self.safeExecute(self.cmds.cpuUtilizationCommand) if self.cmds else ""
+        return self.safeExecute(self.cmds.cpuUtilizationCommand) if self.cmds else "0.0"
 
     def getUptime(self) -> str:
-        return self.safeExecute(self.cmds.cpuUptimeCommand) if self.cmds else ""
+        return self.safeExecute(self.cmds.cpuUptimeCommand) if self.cmds else "0.0"
 
     def getThrottleReason(self) -> str:
-        return self.safeExecute(self.cmds.cpuThrottleReasonCmd) if self.cmds else ""
+        return self.safeExecute(self.cmds.cpuThrottleReasonCmd) if self.cmds else "0.0"
 
     def getNpuUsage(self) -> str:
-        return self.safeExecute(self.cmds.npuUsageCommand) if self.cmds else ""
+        return self.safeExecute(self.cmds.npuUsageCommand) if self.cmds else "0.0"
 
     def getGPUMemorySplit(self) -> str:
         if self.gpuMemSave is None and self.cmds:
             self.gpuMemSave = self.safeExecute(self.cmds.gpuMemoryCommand)
-        return self.gpuMemSave or ""
+        return self.gpuMemSave or "0.0"
 
     def getMallocedMemory(self) -> str:
-        return self.safeExecute(self.cmds.gpuMemUsageCommand) if self.cmds else ""
+        return self.safeExecute(self.cmds.gpuMemUsageCommand) if self.cmds else "0.0"
 
     def getUsedDiskPct(self) -> str:
-        return self.safeExecute(self.cmds.diskUsageCommand) if self.cmds else ""
+        return (
+            self.safeExecute(self.cmds.diskUsageCommand).removesuffix("%")
+            if self.cmds
+            else "0.0"
+        )
 
     def getUsedRam(self) -> str:
-        return self.safeExecute(self.cmds.ramUsageCommand) if self.cmds else ""
+        return self.safeExecute(self.cmds.ramUsageCommand) if self.cmds else "0.0"
 
     def publishMetrics(self) -> None:
-        metrics: Dict[str, str] = {
-            "cpuTemp": self.getTemp(),
-            "cpuUtil": self.getUtilization(),
-            "cpuMem": self.getMemory(),
-            "cpuThr": self.getThrottleReason(),
-            "cpuUptime": self.getUptime(),
-            "gpuMem": self.getGPUMemorySplit(),
-            "ramUtil": self.getUsedRam(),
-            "gpuMemUtil": self.getMallocedMemory(),
-            "diskUtilPct": self.getUsedDiskPct(),
-            "npuUsage": self.getNpuUsage(),
-            # "ipAddress": self.getIpAddress(),
-        }
+        metrics: List[str] = [
+            self.getTemp(),
+            self.getUtilization(),
+            self.getMemory(),
+            self.getThrottleReason(),
+            self.getUptime(),
+            self.getGPUMemorySplit(),
+            self.getUsedRam(),
+            self.getMallocedMemory(),
+            self.getUsedDiskPct(),
+            self.getNpuUsage(),
+        ]
+
         if NtClient.INSTANCE is not None:
-            NtClient.INSTANCE.nt_inst.getEntry("Synapse/metrics").setString(
-                json.dumps(metrics)
+            NtClient.INSTANCE.nt_inst.getEntry("Synapse/metrics").setStringArray(
+                metrics
             )
 
     def execute(self, command: str) -> str:
