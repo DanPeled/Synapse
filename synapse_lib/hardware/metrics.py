@@ -315,7 +315,7 @@ class MetricsManager:
 
     def getUsedDiskPct(self) -> str:
         return (
-            self.safeExecute(self.cmds.diskUsageCommand).removesuffix("%")
+            self.safeExecute(self.cmds.diskUsageCommand)[:-1] if self.safeExecute(self.cmds.diskUsageCommand).endswith("%") else self.safeExecute(self.cmds.diskUsageCommand)
             if self.cmds
             else "0.0"
         )
