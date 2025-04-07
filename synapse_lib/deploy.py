@@ -2,6 +2,7 @@ import os
 import tarfile
 import time as t
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Tuple
 
 import paramiko
@@ -21,9 +22,9 @@ def check_python3_install(ssh) -> bool:
         return False
 
 
-def get_gitignore_specs() -> pathspec.PathSpec:
+def get_gitignore_specs(parentPath: Path) -> pathspec.PathSpec:
     """Load the .gitignore file to filter out ignored files."""
-    gitignore_path = os.path.join(os.getcwd(), ".gitignore")
+    gitignore_path = os.path.join(parentPath, ".gitignore")
     if os.path.exists(gitignore_path):
         with open(gitignore_path) as f:
             spec = pathspec.PathSpec.from_lines("gitwildmatch", f)
@@ -61,7 +62,9 @@ def compile_file_remotely(ssh, file_path) -> bool:
         return False
 
 
-def build_project_remotely(ssh) -> Tuple[bool, timedelta]:
+def build_project_remotely(
+    ssh, origin_path: Path, remote_path
+) -> Tuple[bool, timedelta]:
     """Compile Python files on the remote system."""
     print("Building remotely...")
     build_start = datetime.now()
@@ -69,7 +72,7 @@ def build_project_remotely(ssh) -> Tuple[bool, timedelta]:
     compiled_files = 0
 
     # Transfer files and count the Python files
-    for root, _, files in os.walk("."):
+    for root, _, files in os.walk(origin_path):
         total_files += sum(1 for file in files if file.endswith(".py"))
 
     if total_files == 0:
@@ -96,7 +99,7 @@ def build_project_remotely(ssh) -> Tuple[bool, timedelta]:
     return True, build_end - build_start
 
 
-def deploy(ssh, tarball_path):
+def deploy(ssh, tarball_path, remote_path, password):
     ssh.exec_command(f"mkdir -p {remote_path}")
 
     sftp = ssh.open_sftp()
@@ -128,7 +131,7 @@ if __name__ == "__main__":
 
     current_folder = os.getcwd()
     remote_path = "~/Synapse/"
-    gitignore_spec = get_gitignore_specs()
+    gitignore_spec = get_gitignore_specs(Path(os.getcwd()))
     tarball_path = "/tmp/deploy.tar.gz"
 
     with tarfile.open(tarball_path, "w:gz") as tar:
@@ -141,10 +144,10 @@ if __name__ == "__main__":
     ssh.connect(hostname, port, username, password)
 
     # Build project remotely
-    build_OK, time = build_project_remotely(ssh)
+    build_OK, time = build_project_remotely(ssh, Path("."), remote_path)
     if build_OK:
         print(f"Built remotely in {time.total_seconds()} seconds")
-        deploy(ssh, tarball_path)
+        deploy(ssh, tarball_path, remote_path, password)
         print(f"Deployment to {username}@{hostname}:{remote_path} complete.")
 
     ssh.close()
