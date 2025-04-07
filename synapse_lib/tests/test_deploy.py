@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 import paramiko
 import pytest
 
-from deploy import (add_files_to_tar, check_python3_install, deploy,
-                    get_gitignore_specs)
+from ..deploy import (add_files_to_tar, check_python3_install, deploy,
+                      get_gitignore_specs)
 
 
 # Mock SSH client and related methods
