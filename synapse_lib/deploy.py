@@ -4,7 +4,7 @@ import tarfile
 import time as t
 from datetime import datetime, timedelta
 from typing import Tuple
-
+from pathlib import Path
 import paramiko
 import pathspec
 
@@ -19,12 +19,12 @@ def check_python3_install() -> bool:
         return False
 
 
-def get_gitignore_specs() -> pathspec.PathSpec:
+def get_gitignore_specs(parentPath: Path) -> pathspec.PathSpec:
     """Load the .gitignore file to filter out ignored files."""
-    gitignore_path = os.path.join(os.getcwd(), ".gitignore")
+    gitignore_path = os.path.join(parentPath, ".gitignore")
     if os.path.exists(gitignore_path):
         with open(gitignore_path) as f:
-            spec = pathspec.PathSpec.from_lines("gitwildmatch", f)
+            spec = pathspec.PathSpec.from_lines("gitwildmatch", f.readlines())
             return spec
     return pathspec.PathSpec([])
 
@@ -89,7 +89,8 @@ def build_project() -> Tuple[bool, timedelta]:
     return True, build_end - build_start
 
 
-def deploy():
+def deploy(hostname, port, username, password, remote_path):
+    tarball_path = getTarballPath()
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -109,13 +110,20 @@ def deploy():
 
     # Wait for the command to complete and print any output/errors
     t.sleep(1)
-    print(stdout.read().decode())
-    print(stderr.read().decode())
+    if stdout:
+        print(stdout.read().decode())
+    if stderr:
+        print(stderr.read().decode())
 
     print(f"Service {service_name} restarted.")
 
     sftp.close()
     ssh.close()
+
+
+def getTarballPath():
+    tarball_path = "/tmp/deploy.tar.gz"
+    return tarball_path
 
 
 if __name__ == "__main__":
@@ -126,15 +134,14 @@ if __name__ == "__main__":
 
     current_folder = os.getcwd()
     remote_path = "~/Synapse/"
-    gitignore_spec = get_gitignore_specs()
-    tarball_path = "/tmp/deploy.tar.gz"
+    gitignore_spec = get_gitignore_specs(Path(os.getcwd()))
 
-    with tarfile.open(tarball_path, "w:gz") as tar:
+    with tarfile.open(getTarballPath(), "w:gz") as tar:
         add_files_to_tar(tar, current_folder, gitignore_spec)
 
     build_OK, time = build_project()
     if build_OK:
         print(f"Built successfully in {time.total_seconds()} seconds")
         print(f"Connecting via SSH to {username}@{hostname}...")
-        deploy()
+        deploy(hostname, port, username, password, remote_path)
         print(f"Deployment to {username}@{hostname}:{remote_path} complete.")
