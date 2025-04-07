@@ -1,13 +1,11 @@
-import pytest
-from unittest.mock import MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import paramiko
-from deploy import (
-    check_python3_install,
-    get_gitignore_specs,
-    add_files_to_tar,
-    deploy,
-)
+import pytest
+
+from deploy import (add_files_to_tar, check_python3_install, deploy,
+                    get_gitignore_specs)
 
 
 # Mock SSH client and related methods

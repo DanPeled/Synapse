@@ -86,4 +86,31 @@ jobs:
       - name: Run Pyright type checks
         run: |
           pyright
+        working-directory: synapse_lib 
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.7'
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        working-directory: synapse_lib
+
+      - name: Install PyTest
+        run: |
+          pip install pytest
+        working-directory: synapse_lib
+
+      - name: Run Tests
+        run: |
+          pytest tests/
         working-directory: synapse_lib

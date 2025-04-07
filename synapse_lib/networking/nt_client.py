@@ -2,8 +2,9 @@ import atexit
 import time
 from typing import Optional
 
-from core.log import err, log
 from ntcore import NetworkTableInstance
+
+from core.log import err, log
 
 
 class NtClient:
