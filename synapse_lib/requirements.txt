@@ -12,4 +12,5 @@ robotpy_wpimath==2025.2.1
 robotpy_wpiutil==2025.2.1
 typing_extensions==4.12.2
 wpilib==2025.2.1
-scp==0.15.0
+scp==0.15.0 
+pytest==8.3.4
