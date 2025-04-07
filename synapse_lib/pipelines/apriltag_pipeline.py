@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Final, List, Optional, Set, Union
 
-import core.log as log
 import cv2
+import log
 import numpy as np
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame

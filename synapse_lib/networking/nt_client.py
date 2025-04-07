@@ -2,7 +2,7 @@ import atexit
 import time
 from typing import Optional
 
-from core.log import err, log
+from log import err, log
 from ntcore import NetworkTableInstance
 
 
