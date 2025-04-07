@@ -7,6 +7,8 @@ def getFilePath() -> Path:
     return Path(__file__).resolve().parent
 
 
+from hardware import MetricsManager
+
 if __name__ == "__main__":
     handler = PipelineHandler(getFilePath() / "pipelines")
     s = Synapse()

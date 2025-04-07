@@ -3,7 +3,7 @@ from pathlib import Path
 from core.config import Config
 from networking import NtClient
 
-from .log import log
+from log import log
 from .pipeline import GlobalSettings
 from .pipeline_handler import PipelineHandler
 
