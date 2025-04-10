@@ -5,8 +5,8 @@ from cv2.typing import MatLike
 
 
 class ColorPipeline(Pipeline):
-    def __init__(self, settings: PipelineSettings, camera_index: int):
-        self.camera_index = camera_index
+    def __init__(self, settings: PipelineSettings, cameraIndex: int):
+        self.cameraIndex = cameraIndex
         self.settings = settings
         settings["minSize"] = 0.001
 
