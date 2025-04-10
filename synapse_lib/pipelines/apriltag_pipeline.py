@@ -70,15 +70,15 @@ class ApriltagPipeline(Pipeline):
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kResultVerbosityKey: Final[str] = "verbosity"
 
-    def __init__(self, settings: PipelineSettings, camera_index: int):
-        super().__init__(settings, camera_index)
+    def __init__(self, settings: PipelineSettings, cameraIndex: int):
+        super().__init__(settings, cameraIndex)
         self.settings = settings
         self.camera_matrix = np.array(
-            self.getCameraMatrix(camera_index), dtype=np.float32
+            self.getCameraMatrix(cameraIndex), dtype=np.float32
         )
 
-        self.distCoeffs = np.array(self.getDistCoeffs(camera_index), dtype=np.float32)
-        self.camera_transform = self.getCameraTransform(camera_index)
+        self.distCoeffs = np.array(self.getDistCoeffs(cameraIndex), dtype=np.float32)
+        self.camera_transform = self.getCameraTransform(cameraIndex)
         self.detector = Detector(families=ApriltagPipeline.kTagFamily, nthreads=4)
 
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
@@ -228,11 +228,11 @@ class ApriltagPipeline(Pipeline):
         robotInField: Pose3d = tagFieldPose.transformBy(robotInTagSpace)
         return RobotPoseEstimate(robotInTagSpace, robotInField)
 
-    def getCameraMatrix(self, camera_index: int) -> Optional[List[List[float]]]:
+    def getCameraMatrix(self, cameraIndex: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
 
         if isinstance(camera_configs, dict):
-            cam_config = camera_configs.get(camera_index, {})
+            cam_config = camera_configs.get(cameraIndex, {})
             measured_res = cam_config.get(ApriltagPipeline.kMeasuredMatrixResolutionKey)
             current_res = (self.getSetting("width"), self.getSetting("height"))
 
@@ -260,10 +260,10 @@ class ApriltagPipeline(Pipeline):
         log.err("No camera matrix found, invalid results for AprilTag detection")
         return None
 
-    def getDistCoeffs(self, camera_index: int) -> Optional[List[List[float]]]:
+    def getDistCoeffs(self, cameraIndex: int) -> Optional[List[List[float]]]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
         if isinstance(camera_configs, dict):
-            return camera_configs.get(camera_index, {})["distCoeffs"]
+            return camera_configs.get(cameraIndex, {})["distCoeffs"]
         log.err("No camera distCoeffs found, invalid results for AprilTag detection")
         return None
 
@@ -271,12 +271,12 @@ class ApriltagPipeline(Pipeline):
     def getCameraConfigsGlobalSettings() -> Any:
         return GlobalSettings["camera_configs"]
 
-    def getCameraTransform(self, camera_index: int) -> Optional[Transform3d]:
+    def getCameraTransform(self, cameraIndex: int) -> Optional[Transform3d]:
         camera_configs = ApriltagPipeline.getCameraConfigsGlobalSettings()
         trans_matrix = None
 
         if isinstance(camera_configs, dict):
-            trans_matrix = camera_configs[camera_index]["transform"]
+            trans_matrix = camera_configs[cameraIndex]["transform"]
 
         if trans_matrix is None:
             log.err(

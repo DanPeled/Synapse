@@ -16,7 +16,8 @@ from core.stypes import Frame
 from cscore import CameraServer, CvSource
 from hardware import MetricsManager
 from networking import NtClient
-from ntcore import NetworkTable
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from wpilib import Timer
 from wpimath.units import seconds
 
@@ -119,16 +120,16 @@ class PipelineHandler:
         }
         return finalDict
 
-    def addCamera(self, camera_index: int) -> bool:
+    def addCamera(self, cameraIndex: int) -> bool:
         """
         Adds a camera to the handler by opening it through OpenCV.
-        :param camera_index: Camera index to open
+        :param cameraIndex: Camera index to open
         """
-        if camera_index not in self.cameraBindings:
-            log.err(f"No camera defined for index {camera_index}")
+        if cameraIndex not in self.cameraBindings:
+            log.err(f"No camera defined for index {cameraIndex}")
             return False
 
-        camera_config = self.cameraBindings[camera_index]
+        camera_config = self.cameraBindings[cameraIndex]
         path = (
             int(camera_config.path)
             if isinstance(camera_config.path, int)
@@ -138,7 +139,7 @@ class PipelineHandler:
         try:
             camera = CsCoreCamera.create(
                 devPath=camera_config.path,
-                name=f"{self.NT_TABLE}/camera{camera_index}/input",
+                name=f"{self.NT_TABLE}/camera{cameraIndex}/input",
             )
         except Exception as e:
             log.err(f"Failed to start camera capture: {e}")
@@ -149,50 +150,50 @@ class PipelineHandler:
         DELAY = 1
 
         while not camera.isConnected() and count < MAX_RETRIES:
-            log.err(f"Trying to open camera #{camera_index} ({path})")
+            log.err(f"Trying to open camera #{cameraIndex} ({path})")
             count += 1
             time.sleep(DELAY)
 
         if camera.isConnected():
-            self.cameras[camera_index] = camera
-            log.log(f"Camera ({camera_config}, id={camera_index}) added successfully.")
+            self.cameras[cameraIndex] = camera
+            log.log(f"Camera ({camera_config}, id={cameraIndex}) added successfully.")
             return True
 
         log.err(
-            f"Failed to open camera #{camera_index} ({path}) after {MAX_RETRIES} retries."
+            f"Failed to open camera #{cameraIndex} ({path}) after {MAX_RETRIES} retries."
         )
         return False
 
-    def __setPipelineForCamera(
+    def __setupPipelineForCamera(
         self,
-        camera_index: int,
+        cameraIndex: int,
         pipeline: Union[Type[Pipeline], List[Type[Pipeline]]],
         pipeline_config: PipelineSettings,
     ):
         """
         Sets the pipeline(s) to be used for a specific camera.
-        :param camera_index: Index of the camera
+        :param cameraIndex: Index of the camera
         :param pipeline: A pipeline class or list of pipeline classes to assign to the camera
         """
-        self.pipelineMap[camera_index] = pipeline
+        self.pipelineMap[cameraIndex] = pipeline
         # Create instances for each pipeline only when setting them
         if isinstance(pipeline, Type):
             pipeline = [pipeline]
 
-        self.pipelineInstances[camera_index] = [
+        self.pipelineInstances[cameraIndex] = [
             pipeline_cls(
-                settings=self.pipelineSettings[self.pipelineBindings[camera_index]],
-                camera_index=camera_index,
+                settings=self.pipelineSettings[self.pipelineBindings[cameraIndex]],
+                cameraIndex=cameraIndex,
             )
             for pipeline_cls in pipeline
         ]
 
-        for currPipeline in self.pipelineInstances[camera_index]:
+        for currPipeline in self.pipelineInstances[cameraIndex]:
             if NtClient.INSTANCE is not None:
-                camera_table = self.getCameraTable(camera_index)
+                camera_table = self.getCameraTable(cameraIndex)
 
                 self.setCameraConfigs(
-                    pipeline_config.getMap(), self.cameras[camera_index]
+                    pipeline_config.getMap(), self.cameras[cameraIndex]
                 )
 
                 if camera_table is not None:
@@ -201,56 +202,61 @@ class PipelineHandler:
                     currPipeline.setup()
                     pipeline_config.sendSettings(camera_table.getSubTable("settings"))
 
-        # log.log(f"Set pipeline(s) for camera {camera_index}: {str(pipeline)}")
+                    def updateSettingListener(event: Event):
+                        prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
+                        value: Any = self.getEventDataValue(event)
+                        self.pipelineSettings[self.pipelineBindings[cameraIndex]][
+                            prop
+                        ] = value
+                        self.updateCameraProperty(
+                            camera=self.cameras[cameraIndex],
+                            prop=prop,
+                            value=value,
+                        )
 
-    def syncCurrentPipeline(self, camera_index: int):
-        if NtClient.INSTANCE is not None:
-            entry = NtClient.INSTANCE.nt_inst.getTable(
-                PipelineHandler.NT_TABLE
-            ).getEntry(f"{self.getCameraTableName(camera_index)}/pipeline")
+                    for key, value in pipeline_config.getMap().items():
+                        nt_table = self.getCameraTable(cameraIndex)
+                        if nt_table is not None:
+                            entry = nt_table.getSubTable("settings").getEntry(key)
 
-            nt_pipeline = entry.getInteger(None)
+                            NtClient.INSTANCE.nt_inst.addListener(
+                                entry, EventFlags.kValueRemote, updateSettingListener
+                            )
 
-            # print(f"pipeline: {pipeline}, entry : {entry.getName()}")
+    def getEventDataValue(self, event: Event) -> Any:
+        topic = event.data.topic  # pyright: ignore
+        topicType = topic.getType()
+        value = event.data.value  # pyright: ignore
 
-            if (
-                nt_pipeline != self.pipelineBindings[camera_index]
-                and nt_pipeline is not None
-            ):
-                self.setPipelineByIndex(camera_index, nt_pipeline)
+        if topicType == NetworkTableType.kBoolean:
+            return value.getBoolean()
+        elif topicType == NetworkTableType.kDouble:
+            return value.getDouble()
+        elif topicType == NetworkTableType.kInteger:
+            return value.getInteger()
+        elif topicType == NetworkTableType.kString:
+            return value.getString()
+        elif topicType == NetworkTableType.kBooleanArray:
+            return value.getBooleanArray()
+        elif topicType == NetworkTableType.kDoubleArray:
+            return value.getDoubleArray()
+        elif topicType == NetworkTableType.kIntegerArray:
+            return value.getIntegerArray()
+        elif topicType == NetworkTableType.kStringArray:
+            return value.getStringArray()
+        else:
+            raise ValueError(f"Unsupported topic type: {topicType}")
 
-    def syncPipelineSettings(self, camera_index: int):
-        settings = self.pipelineSettings[self.pipelineBindings[camera_index]]
-        somethingChanged = False
-        for key, value in settings.getMap().items():
-            nt_table = self.getCameraTable(camera_index)
-            if nt_table is not None:
-                nt_val = nt_table.getSubTable("settings").getValue(key, None)
-                if nt_val != value:
-                    self.pipelineSettings[self.pipelineBindings[camera_index]][key] = (
-                        nt_val
-                    )
-
-                    somethingChanged = True
-
-        if somethingChanged:
-            self.setCameraConfigs(
-                settings=self.pipelineSettings[
-                    self.pipelineBindings[camera_index]
-                ].getMap(),
-                camera=self.cameras[camera_index],
-            )
-
-    def getCameraTable(self, camera_index: int) -> Optional[NetworkTable]:
+    def getCameraTable(self, cameraIndex: int) -> Optional[NetworkTable]:
         if NtClient.INSTANCE is not None:
             return NtClient.INSTANCE.nt_inst.getTable(
                 PipelineHandler.NT_TABLE
-            ).getSubTable(self.getCameraTableName(camera_index))
+            ).getSubTable(self.getCameraTableName(cameraIndex))
 
-    def setPipelineByIndex(self, camera_index: int, pipeline_index: int):
-        if camera_index not in self.cameras.keys():
+    def setPipelineByIndex(self, cameraIndex: int, pipeline_index: int):
+        if cameraIndex not in self.cameras.keys():
             log.err(
-                f"Invalid camera_index {camera_index}. Must be in range(0, {len(self.cameras.keys())-1})."
+                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameras.keys())-1})."
             )
             return
 
@@ -258,30 +264,28 @@ class PipelineHandler:
             log.err(
                 f"Invalid pipeline index {pipeline_index}. Must be one of {list(self.pipelineTypes.keys())}."
             )
-            self.setNTPipelineIndex(camera_index, self.pipelineBindings[camera_index])
+            self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
             return
 
         # If both indices are valid, proceed with the pipeline setting
-        self.pipelineBindings[camera_index] = pipeline_index
+        self.pipelineBindings[cameraIndex] = pipeline_index
 
-        self.setNTPipelineIndex(
-            camera_index=camera_index, pipeline_index=pipeline_index
-        )
+        self.setNTPipelineIndex(cameraIndex=cameraIndex, pipeline_index=pipeline_index)
 
         settings = self.pipelineSettings[pipeline_index]
 
-        self.__setPipelineForCamera(
-            camera_index=camera_index,
+        self.__setupPipelineForCamera(
+            cameraIndex=cameraIndex,
             pipeline=self.pipelines[self.pipelineTypes[pipeline_index]],
             pipeline_config=settings,
         )
 
-        log.log(f"Set pipeline #{pipeline_index} for camera ({camera_index})")
+        log.log(f"Set pipeline #{pipeline_index} for camera ({cameraIndex})")
 
-    def setNTPipelineIndex(self, camera_index: int, pipeline_index: int):
+    def setNTPipelineIndex(self, cameraIndex: int, pipeline_index: int):
         if NtClient.INSTANCE is not None:
             NtClient.INSTANCE.nt_inst.getTable(PipelineHandler.NT_TABLE).getEntry(
-                f"{self.getCameraTableName(camera_index)}/pipeline"
+                f"{self.getCameraTableName(cameraIndex)}/pipeline"
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
@@ -316,25 +320,25 @@ class PipelineHandler:
             )
             log.log("Set up recording outputs array")
 
-            def process_camera(camera_index: int):
-                output = self.outputs[camera_index]
-                recordingOutput = self.recordingOutputs[camera_index]
+            def process_camera(cameraIndex: int):
+                output = self.outputs[cameraIndex]
+                recordingOutput = self.recordingOutputs[cameraIndex]
                 SHOULD_RECORD = False
                 while True:
                     start_time = (
                         Timer.getFPGATimestamp()
                     )  # Start time for FPS calculation
-                    ret, frame = self.cameras[camera_index].grabFrame()
+                    ret, frame = self.cameras[cameraIndex].grabFrame()
 
                     captureLatency = Timer.getFPGATimestamp() - start_time
                     if not ret or frame is None:
                         continue
 
-                    frame = self.fixtureFrame(camera_index, frame)
+                    frame = self.fixtureFrame(cameraIndex, frame)
 
                     process_start = Timer.getFPGATimestamp()
                     # Retrieve the pipeline instances for the current camera
-                    assigned_pipelines = self.pipelineInstances.get(camera_index, [])
+                    assigned_pipelines = self.pipelineInstances.get(cameraIndex, [])
                     processed_frame: Any = frame
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
@@ -344,7 +348,7 @@ class PipelineHandler:
                     processLatency = end_time - process_start
                     fps = 1.0 / (end_time - start_time)  # Calculate FPS
 
-                    self.sendLatency(camera_index, captureLatency, processLatency)
+                    self.sendLatency(cameraIndex, captureLatency, processLatency)
                     # Overlay FPS on the frame
                     cv2.putText(
                         processed_frame,
@@ -360,15 +364,11 @@ class PipelineHandler:
                         output.putFrame(
                             cv2.resize(
                                 processed_frame,
-                                self.streamSizes[camera_index],
+                                self.streamSizes[cameraIndex],
                             )
                         )
                         if SHOULD_RECORD:
                             recordingOutput.write(processed_frame)
-
-                    if NtClient.INSTANCE is not None:
-                        self.syncCurrentPipeline(camera_index)
-                        self.syncPipelineSettings(camera_index)
 
             # Create and start a thread for each camera
             threads = []
@@ -384,9 +384,9 @@ class PipelineHandler:
         except Exception as e:
             log.err(f"{e}")
 
-    def sendLatency(self, camera_index: int, capture: seconds, process: seconds):
+    def sendLatency(self, cameraIndex: int, capture: seconds, process: seconds):
         if NtClient.INSTANCE is not None:
-            cameraTable = self.getCameraTable(camera_index)
+            cameraTable = self.getCameraTable(cameraIndex)
             if cameraTable is not None:
                 cameraTable.getEntry("captureLatency").setDouble(capture)
                 cameraTable.getEntry("processLatency").setDouble(process)
@@ -394,29 +394,37 @@ class PipelineHandler:
     def setupNetworkTables(self):
         log.log("Setting up networktables...")
 
+        def connectionListener(event: ntcore.Event):
+            if event.is_(ntcore.EventFlags.kConnected):
+                log.log(f"Connected to NetworkTables server ({event.data.remote_ip})")  # pyright: ignore
+            if event.is_(ntcore.EventFlags.kDisconnected):
+                log.log(
+                    f"kDisconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
+                )
+
+        NetworkTableInstance.getDefault().addConnectionListener(
+            True, connectionListener
+        )
+
         if NtClient.INSTANCE is not None:
-            inst = NtClient.INSTANCE.server or NtClient.INSTANCE.nt_inst
+            for cameraIndex in self.cameras.keys():
+                topicName = f"{self.getCameraTableName(cameraIndex)}/pipeline"
 
-            for i in self.cameras.keys():
-                topicName = f"{self.getCameraTableName(i)}/pipeline"
+                entry = NtClient.INSTANCE.nt_inst.getTable(
+                    PipelineHandler.NT_TABLE
+                ).getEntry(topicName)
 
-                topic = inst.getTable(PipelineHandler.NT_TABLE).getIntegerTopic(
-                    topicName
+                NetworkTableInstance.getDefault().addListener(
+                    entry,
+                    EventFlags.kValueRemote,
+                    lambda event: self.setPipelineByIndex(
+                        cameraIndex,
+                        event.data.value.getInteger(),  # pyright: ignore
+                    ),
                 )
 
-                pub = topic.publish(ntcore.PubSubOptions(keepDuplicates=True))
-                pub.setDefault(self.defaultPipelineIndexes[i])
-
-                sub = topic.subscribe(
-                    self.defaultPipelineIndexes[i],
-                    ntcore.PubSubOptions(keepDuplicates=True, pollStorage=10),
-                )
-
-                NtClient.INSTANCE.nt_inst.getTable(PipelineHandler.NT_TABLE).getEntry(
-                    topicName
-                ).setInteger(sub.get())
-
-                log.log(f"Added listener for camera {i}, entry:{topic.getName()}")
+                entry.setInteger(self.defaultPipelineIndexes[cameraIndex])
+                log.log(f"Pipeline event listener added for camera #{cameraIndex}")
             log.log("Set up settings successfully")
         else:
             log.err("NtClient instance is None")
@@ -430,10 +438,10 @@ class PipelineHandler:
         settings: dict = Config.getConfigMap()
         camera_configs = settings["global"]["camera_configs"]
 
-        for camera_index in camera_configs:
-            if not (self.addCamera(camera_index)):
+        for cameraIndex in camera_configs:
+            if not (self.addCamera(cameraIndex)):
                 return
-            self.defaultPipelineIndexes[camera_index] = camera_configs[camera_index][
+            self.defaultPipelineIndexes[cameraIndex] = camera_configs[cameraIndex][
                 "default_pipeline"
             ]
 
@@ -448,20 +456,19 @@ class PipelineHandler:
 
             self.pipelineTypes[index] = pipeline["type"]
 
-        for camera_index in self.cameras.keys():
-            pipeline = self.defaultPipelineIndexes[camera_index]
+        for cameraIndex in self.cameras.keys():
+            pipeline = self.defaultPipelineIndexes[cameraIndex]
             self.setPipelineByIndex(
-                camera_index=camera_index,
+                cameraIndex=cameraIndex,
                 pipeline_index=pipeline,
             )
-            log.log(f"Setup default pipeline (#{pipeline}) for camera ({camera_index})")
+            log.log(f"Setup default pipeline (#{pipeline}) for camera ({cameraIndex})")
 
         log.log("Loaded pipelines successfully")
         self.setupNetworkTables()
 
-    @staticmethod
     def setCameraConfigs(
-        settings: Dict[str, Any], camera: SynapseCamera
+        self, settings: Dict[str, Any], camera: SynapseCamera
     ) -> Dict[str, Any]:
         updated_settings = {}
         excluded = [
@@ -485,15 +492,15 @@ class PipelineHandler:
             "auto_exposure",
         ]
 
-        def set_property(name: str, value: int):
-            """Set property if it exists, clamping the value within bounds."""
-            camera.setProperty(name, value)
-
         for name in settings.keys():
             if name not in excluded:
                 setting_value = settings.get(name)
                 if setting_value is not None:
-                    set_property(name, setting_value)
+                    self.updateCameraProperty(
+                        camera=camera,
+                        prop=name,
+                        value=setting_value,
+                    )
 
         camera.setVideoMode(
             width=settings["width"],
@@ -502,6 +509,9 @@ class PipelineHandler:
         )
 
         return updated_settings
+
+    def updateCameraProperty(self, camera: SynapseCamera, prop: str, value: Any):
+        camera.setProperty(prop, value)
 
     def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
         if "orientation" in settings.getMap():
@@ -533,8 +543,8 @@ class PipelineHandler:
         # Clip to valid range and convert back to uint8
         return np.clip(image * 255, 0, 255).astype(np.uint8)
 
-    def fixtureFrame(self, camera_index: int, frame: Frame) -> Frame:
-        settings = self.pipelineSettings[self.pipelineBindings[camera_index]]
+    def fixtureFrame(self, cameraIndex: int, frame: Frame) -> Frame:
+        settings = self.pipelineSettings[self.pipelineBindings[cameraIndex]]
         frame = self.rotateCameraBySettings(settings, frame)
         # frame = self.fixBlackLevelOffset(settings, frame)
 

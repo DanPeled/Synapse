@@ -173,11 +173,11 @@ class Pipeline(ABC):
     VALID_ENTRY_TYPES = Any
 
     @abstractmethod
-    def __init__(self, settings: PipelineSettings, camera_index: int):
+    def __init__(self, settings: PipelineSettings, cameraIndex: int):
         self.nt_table: Optional[NetworkTable] = None
         self.builder_cache: dict[str, SendableBuilder] = {}
         self.settings = settings
-        self.camera_index = camera_index
+        self.cameraIndex = cameraIndex
 
     def setup(self):
         pass
