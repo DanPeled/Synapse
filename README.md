@@ -13,11 +13,12 @@ A library for running custom vision code on an FRC coprocessor.
 
 ## Project Structure
 - `synapse-lib`: Contains the core Python library for Synapse.
+- `synapse-bridge` Contains the vendordep library for the robot to communicate with the Synapse runtime.
 
 ## Getting Started
 1. Clone the repository.
 2. Install required dependencies.
-3. Import `synapse-lib` into your project.
+3. Deploy code onto the coprocessor
 
 ## License
 This project is licensed under the [MIT License](LICENSE).
