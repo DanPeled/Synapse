@@ -57,7 +57,8 @@ class Synapse:
 
             # Setup global settings
             global_settings = settings["global"]
-            GlobalSettings.setup(global_settings)
+            if not GlobalSettings.setup(global_settings):
+                raise Exception("Global settings setup failed")
 
         except Exception as e:
             log(f"Something went wrong while reading settings config file. {repr(e)}")
