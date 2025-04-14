@@ -29,7 +29,7 @@ def get_gitignore_specs() -> pathspec.PathSpec:
     return pathspec.PathSpec([])
 
 
-def add_files_to_tar(tar, source_folder, gitignore_spec):
+def add_files_to_tar(tar, source_folder, gitignore_spec) -> None:
     """Add files to tarball, excluding gitignored files."""
     for root, dirs, files in os.walk(source_folder):
         dirs[:] = [
@@ -89,7 +89,7 @@ def build_project() -> Tuple[bool, timedelta]:
     return True, build_end - build_start
 
 
-def deploy():
+def deploy() -> None:
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -118,17 +118,18 @@ def deploy():
     ssh.close()
 
 
+hostname = "10.97.38.14"
+port = 22
+username = "orangepi"
+password = "orangepi"
+
+current_folder = os.getcwd()
+remote_path = "~/Synapse/"
+gitignore_spec = get_gitignore_specs()
+tarball_path = "/tmp/deploy.tar.gz"
+
+
 if __name__ == "__main__":
-    hostname = "10.97.38.14"
-    port = 22
-    username = "orangepi"
-    password = "orangepi"
-
-    current_folder = os.getcwd()
-    remote_path = "~/Synapse/"
-    gitignore_spec = get_gitignore_specs()
-    tarball_path = "/tmp/deploy.tar.gz"
-
     with tarfile.open(tarball_path, "w:gz") as tar:
         add_files_to_tar(tar, current_folder, gitignore_spec)
 

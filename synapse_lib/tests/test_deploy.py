@@ -1,75 +1,96 @@
 import os
 import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+import unittest
+from datetime import timedelta
+from unittest.mock import MagicMock, mock_open, patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import paramiko
-import pytest
-from deploy import (add_files_to_tar, check_python3_install, deploy,
-                    get_gitignore_specs)
+import deploy
 
 
-# Mock SSH client and related methods
-@pytest.fixture
-def mock_ssh():
-    ssh = MagicMock(spec=paramiko.SSHClient)
-    ssh.exec_command.return_value = (MagicMock(), MagicMock(), MagicMock())
-    return ssh
+class TestDeployScript(unittest.TestCase):
+    @patch("subprocess.run")
+    def test_check_python3_install_success(self, mock_run):
+        mock_run.return_value.returncode = 0
+        self.assertTrue(deploy.check_python3_install())
 
+    @patch("subprocess.run", side_effect=FileNotFoundError)
+    def test_check_python3_install_not_found(self, mock_run):
+        self.assertFalse(deploy.check_python3_install())
 
-# Test for check_python3_install function
-def test_check_python3_install(mock_ssh):
-    mock_ssh.exec_command.return_value[
-        1
-    ].channel.recv_exit_status.return_value = 0  # Success
-    assert check_python3_install(mock_ssh) is True
+    @patch("builtins.open", new_callable=mock_open, read_data="*.pyc\n")
+    @patch("os.path.exists", return_value=True)
+    def test_get_gitignore_specs_exists(self, mock_exists, mock_file):
+        spec = deploy.get_gitignore_specs()
+        self.assertTrue(spec.match_file("test.pyc"))
 
-    mock_ssh.exec_command.return_value[
-        1
-    ].channel.recv_exit_status.return_value = 1  # Failure
-    assert check_python3_install(mock_ssh) is False
+    @patch("os.path.exists", return_value=False)
+    def test_get_gitignore_specs_missing(self, mock_exists):
+        spec = deploy.get_gitignore_specs()
+        self.assertFalse(spec.match_file("test.py"))
 
+    @patch("subprocess.run")
+    def test_compile_file_success(self, mock_run):
+        mock_run.return_value.returncode = 0
+        self.assertTrue(deploy.compile_file("file.py"))
 
-def test_get_gitignore_specs():
-    gitignore_spec = get_gitignore_specs(Path("."))
-    assert gitignore_spec is not None
-    assert len(gitignore_spec.patterns) > 0
+    @patch("subprocess.run")
+    def test_compile_file_failure(self, mock_run):
+        mock_run.return_value.returncode = 1
+        mock_run.return_value.stderr = b"Syntax error"
+        self.assertFalse(deploy.compile_file("bad_file.py"))
 
-    gitignore_spec = get_gitignore_specs(Path(__file__).parent)
-    assert len(gitignore_spec.patterns) == 0
+    @patch("deploy.compile_file", return_value=True)
+    @patch("os.walk", return_value=[(".", [], ["file1.py", "file2.py"])])
+    def test_build_project_success(self, mock_walk, mock_compile):
+        result, duration = deploy.build_project()
+        self.assertTrue(result)
+        self.assertIsInstance(duration, timedelta)
 
+    @patch("deploy.compile_file", return_value=False)
+    @patch("os.walk", return_value=[(".", [], ["file1.py"])])
+    def test_build_project_failure(self, mock_walk, mock_compile):
+        result, _ = deploy.build_project()
+        self.assertFalse(result)
 
-# Test for add_files_to_tar function
-def test_add_files_to_tar(mock_ssh):
-    mock_tar = MagicMock()
-    mock_gitignore_spec = MagicMock()
-    mock_gitignore_spec.match_file.return_value = (
-        False  # Mock that no files are ignored
-    )
+    @patch("paramiko.SSHClient")
+    @patch("tarfile.open")
+    def test_deploy_success(self, mock_tar, mock_ssh_client):
+        ssh_instance = MagicMock()
+        mock_ssh_client.return_value = ssh_instance
+        sftp = ssh_instance.open_sftp.return_value
+        stdout = MagicMock()
+        stdout.read.return_value = b"Restarted"
+        stderr = MagicMock()
+        stderr.read.return_value = b""
 
-    # Mock os.walk to simulate walking through the file system
-    with patch("os.walk") as mock_walk:
-        mock_walk.return_value = [
-            ("root", ["dir"], ["file1.py", "file2.py"]),
+        ssh_instance.exec_command.side_effect = [
+            (None, stdout, stderr),
+            (None, stdout, stderr),
+            (None, stdout, stderr),
+            (None, stdout, stderr),
         ]
-        add_files_to_tar(mock_tar, "root", mock_gitignore_spec)
 
-    assert mock_tar.add.call_count == 2  # Two files should be added to the tar
+        with patch.dict(
+            "deploy.__dict__",
+            {
+                "hostname": "localhost",
+                "port": 22,
+                "username": "user",
+                "password": "pass",
+                "remote_path": "~/path/",
+                "tarball_path": "/tmp/deploy.tar.gz",
+            },
+        ):
+            deploy.deploy()
+
+        ssh_instance.connect.assert_called_once()
+        ssh_instance.exec_command.assert_any_call(
+            "echo 'pass' | sudo -S systemctl restart synapse"
+        )
+        sftp.put.assert_called_once()
 
 
-@patch("paramiko.SSHClient.exec_command")
-@patch("paramiko.SSHClient.open_sftp")
-def test_deploy(mock_sftp, mock_exec_command, mock_ssh):
-    mock_ssh.exec_command.return_value[1].channel.recv_exit_status.return_value = 0
-    mock_sftp.return_value.put.return_value = None
-
-    deploy(mock_ssh, "/tmp/deploy.tar.gz", "/remote/path", "")
-
-    mock_ssh.exec_command.assert_any_call("mkdir -p /remote/path")
-    mock_ssh.exec_command.assert_any_call("tar -xzf /tmp/deploy.tar.gz -C /remote/path")
-    mock_ssh.exec_command.assert_any_call("rm /tmp/deploy.tar.gz")
-    mock_ssh.exec_command.any_call(
-        "echo 'orangepi' | sudo -S systemctl restart synapse"
-    )
+if __name__ == "__main__":
+    unittest.main()
