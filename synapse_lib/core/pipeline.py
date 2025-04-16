@@ -225,7 +225,7 @@ class Pipeline(ABC):
         pass
 
     @abstractmethod
-    def process_frame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> Frame:
         """
         Abstract method that processes a single frame.
 

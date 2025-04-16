@@ -10,14 +10,9 @@ import robotpy_apriltag as apriltag
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cv2.typing import MatLike
-from wpimath.geometry import (
-    Pose2d,
-    Pose3d,
-    Quaternion,
-    Rotation3d,
-    Transform3d,
-    Translation3d,
-)
+from wpimath import geometry, units
+from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
+                              Transform3d, Translation3d)
 
 
 @dataclass
@@ -31,7 +26,7 @@ class ApriltagResult:
     detection: apriltag.AprilTagDetection
     timestamp: float
     robotPoseEstimate: RobotPoseEstimate
-    tagPoseEstimate: Transform3d
+    tagPoseEstimate: apriltag.AprilTagPoseEstimate
 
 
 class ApriltagVerbosity(Enum):
@@ -115,24 +110,12 @@ class ApriltagPipeline(Pipeline):
         )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def process_frame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> Frame:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         tagSize = self.getSetting(self.kTagSizeKey)
 
-        # Detect AprilTags
-        # tags = self.detector.detect(
-        #     gray,
-        #     estimate_tag_pose=True,
-        #     camera_params=(
-        #         self.camera_matrix[0][0],  # fx
-        #         self.camera_matrix[1][1],  # fy
-        #         self.camera_matrix[0][2],  # cx
-        #         self.camera_matrix[1][2],  # cy
-        #     ),
-        #     tag_size=tagSize,  # Tag size in meters
-        # )
         tags = self.apriltagDetector.detect(gray)
         results: List[ApriltagResult] = []
         gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
@@ -143,38 +126,39 @@ class ApriltagPipeline(Pipeline):
             return gray
 
         for tag in tags:
-            tagRelativePose: Transform3d = self.poseEstimator.estimate(tag)
-            if self.getSetting(ApriltagPipeline.kStickToGroundKey):
-                tagRelativePose = Transform3d(
-                    tagRelativePose.translation(),
-                    Rotation3d(
-                        0,
-                        0,
-                        tagRelativePose.rotation().Z(),
-                    ),
-                )
-            cv2.circle(
-                gray,
-                (int(tag.getCenter().x), int(tag.getCenter().y)),
-                100,
-                (255, 0, 0),
-                2,
+            tagPoseEstimate: apriltag.AprilTagPoseEstimate = (
+                self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
             )
-            # if tagSize is not None and tagSize > 0:
-            #     self.drawPoseBox(
-            #         gray,
-            #         self.camera_matrix,
-            #         self.distCoeffs,
-            #         tag.getHomographyMatrix(),
-            #         tagSize,
-            #     )
-            #     self.drawPoseAxes(
-            #         gray,
-            #         self.camera_matrix,
-            #         self.distCoeffs,
-            #         tag.getHomographyMatrix(),
-            #         np.array([tag.getCenter().x, tag.getCenter().y]),
-            #         tagSize,
+
+            tagRelativePose: Transform3d = (
+                tagPoseEstimate.pose1
+            )  # TODO: check if needs to switch with pose2 sometimes
+
+            if isinstance(tagSize, float):
+                self.drawTagDetectionMarker(
+                    tag=tag,
+                    tagTransform=tagRelativePose,
+                    tagSize=tagSize,
+                    img=gray,
+                )
+
+            tagRelativePose = Transform3d(  # NOTE: Should be correct
+                translation=tagRelativePose.translation(),
+                rotation=Rotation3d(
+                    roll=tagRelativePose.rotation().Z(),
+                    pitch=tagRelativePose.rotation().X(),
+                    yaw=tagRelativePose.rotation().Y(),
+                ),
+            )
+
+            # if self.getSetting(ApriltagPipeline.kStickToGroundKey):
+            #     tagRelativePose = Transform3d(
+            #         tagRelativePose.translation(),
+            #         Rotation3d(
+            #             0,
+            #             0,
+            #             tagRelativePose.rotation().Z(),
+            #         ),
             #     )
 
             self.setDataValue(
@@ -232,7 +216,7 @@ class ApriltagPipeline(Pipeline):
                             detection=tag,
                             timestamp=timestamp,
                             robotPoseEstimate=robotPoseEstimate,
-                            tagPoseEstimate=tagRelativePose,
+                            tagPoseEstimate=tagPoseEstimate,
                         )
                     )
 
@@ -251,6 +235,30 @@ class ApriltagPipeline(Pipeline):
         )
 
         return gray
+
+    def drawTagDetectionMarker(
+        self,
+        tag: apriltag.AprilTagDetection,
+        tagTransform: Transform3d,
+        tagSize: units.meters,
+        img: Frame,
+    ) -> None:
+        if tagSize is not None and tagSize > 0:
+            self.drawPoseBox(
+                img,
+                self.camera_matrix,
+                self.distCoeffs,
+                tagTransform,
+                tagSize,
+            )
+            self.drawPoseAxes(
+                img,
+                self.camera_matrix,
+                self.distCoeffs,
+                tagTransform,
+                np.array([tag.getCenter().x, tag.getCenter().y]),
+                tagSize,
+            )
 
     @staticmethod
     def getTagPoseOnField(id: int) -> Optional[Pose3d]:
@@ -316,7 +324,7 @@ class ApriltagPipeline(Pipeline):
         img: MatLike,
         camera_matrix: np.ndarray,
         dcoeffs: np.ndarray,
-        pose: np.ndarray,
+        pose: geometry.Transform3d,
         tagSize: float,
         z_sign: int = 1,
     ) -> None:
@@ -328,6 +336,7 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param z_sign: The direction of the z-axis.
         """
+
         # Creates object points
         opoints = (
             np.array(
@@ -368,8 +377,8 @@ class ApriltagPipeline(Pipeline):
         ).reshape(-1, 2)
 
         # Calulcates rotation and translation vectors for each AprilTag
-        rVecs, _ = cv2.Rodrigues(pose[:3, :3])
-        tVecs = pose[:3, 3:]
+        rVecs = pose.rotation().toVector()
+        tVecs = pose.translation().toVector()
 
         # Calulate image points of each AprilTag
         ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
@@ -385,7 +394,7 @@ class ApriltagPipeline(Pipeline):
         img: MatLike,
         camera_matrix: np.ndarray,
         dcoeffs: np.ndarray,
-        pose: np.ndarray,
+        pose: Transform3d,
         center: Union[cv2.typing.Point, np.ndarray],
         tagSize: float,
     ) -> None:
@@ -397,9 +406,8 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param center: The center of the AprilTag.
         """
-        # Calulcates rotation and translation vectors for each AprilTag
-        rVecs, _ = cv2.Rodrigues(pose[:3, :3])
-        tVecs = pose[:3, 3:]
+        rVecs = pose.rotation().toVector()
+        tVecs = pose.translation().toVector()
 
         # Calculate object points of each AprilTag
         opoints = (
@@ -526,5 +534,13 @@ class ApriltagsJson:
                     "y": o.translation().Y(),
                     "rotation": o.rotation().degrees(),
                     "rotation_unit": "degrees",
+                }
+            elif isinstance(o, apriltag.AprilTagPoseEstimate):
+                return {
+                    "pose1": o.pose1,
+                    "pose2": o.pose2,
+                    "error1": o.error1,
+                    "error2": o.error2,
+                    "ambiguity": o.getAmbiguity(),
                 }
             return super().default(o)
