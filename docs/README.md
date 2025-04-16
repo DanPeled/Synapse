@@ -10,8 +10,8 @@ icon: house
 
 ## Getting Started
 
-{% content-ref url="getting-started/hardware-configuration.md" %}
-[hardware-configuration.md](getting-started/hardware-configuration.md)
+{% content-ref url="getting-started/quick-start/" %}
+[quick-start](getting-started/quick-start/)
 {% endcontent-ref %}
 
 
