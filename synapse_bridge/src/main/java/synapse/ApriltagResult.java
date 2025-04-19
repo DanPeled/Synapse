@@ -2,7 +2,6 @@ package synapse;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import edu.wpi.first.math.geometry.Pose3d;
 import java.util.Optional;
 
 /** Represents the result of an AprilTag detection, including pose estimation and metadata. */
@@ -100,16 +99,13 @@ public class ApriltagResult {
   private Optional<Double> poseError;
 
   /** Estimated robot pose in field space. */
-  @JsonDeserialize(using = Pose3dDeserializer.class)
-  private Pose3d robotPose_fieldSpace;
+  private double[] robotPose_fieldSpace;
 
   /** Estimated camera pose in tag space. */
-  @JsonDeserialize(using = Pose3dDeserializer.class)
-  private Pose3d cameraPose_tagSpace;
+  private double[] cameraPose_tagSpace;
 
   /** Estimated robot pose in tag space. */
-  @JsonDeserialize(using = Pose3dDeserializer.class)
-  private Pose3d robotPose_tagSpace;
+  private double[] robotPose_tagSpace;
 
   /**
    * Gets the timestamp of the detection.
@@ -215,7 +211,7 @@ public class ApriltagResult {
    *
    * @return the estimated robot pose in field space.
    */
-  public Pose3d getRobotPose_fieldSpace() {
+  public double[] getRobotPose_fieldSpace() {
     return robotPose_fieldSpace;
   }
 
@@ -224,7 +220,7 @@ public class ApriltagResult {
    *
    * @return the estimated robot pose in tag space.
    */
-  public Pose3d getRobotPose_tagSpace() {
+  public double[] getRobotPose_tagSpace() {
     return robotPose_tagSpace;
   }
 
@@ -233,7 +229,7 @@ public class ApriltagResult {
    *
    * @return the estimated camera pose in tag space.
    */
-  public Pose3d getCameraPose_tagSpace() {
+  public double[] getCameraPose_tagSpace() {
     return cameraPose_tagSpace;
   }
 

@@ -519,22 +519,20 @@ class ApriltagsJson:
             elif isinstance(o, bytes):
                 return o.decode()  # Convert bytes to strings
             elif isinstance(o, Pose3d) or isinstance(o, Transform3d):
-                return {
-                    "x": o.translation().X(),
-                    "y": o.translation().Y(),
-                    "z": o.translation().Z(),
-                    "yaw": o.rotation().z_degrees,
-                    "pitch": o.rotation().y_degrees,
-                    "roll": o.rotation().x_degrees,
-                    "rotation_unit": "degrees",
-                }
+                return [
+                    o.translation().X(),
+                    o.translation().Y(),
+                    o.translation().Z(),
+                    o.rotation().z_degrees,
+                    o.rotation().y_degrees,
+                    o.rotation().x_degrees,
+                ]
             elif isinstance(o, Pose2d):
-                return {
-                    "x": o.translation().X(),
-                    "y": o.translation().Y(),
-                    "rotation": o.rotation().degrees(),
-                    "rotation_unit": "degrees",
-                }
+                return [
+                    o.translation().X(),
+                    o.translation().Y(),
+                    o.rotation().degrees(),
+                ]
             elif isinstance(o, apriltag.AprilTagPoseEstimate):
                 return {
                     "pose1": o.pose1,
