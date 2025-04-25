@@ -11,14 +11,8 @@ from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cv2.typing import MatLike
 from wpimath import geometry, units
-from wpimath.geometry import (
-    Pose2d,
-    Pose3d,
-    Quaternion,
-    Rotation3d,
-    Transform3d,
-    Translation3d,
-)
+from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
+                              Transform3d, Translation3d)
 
 
 @dataclass
