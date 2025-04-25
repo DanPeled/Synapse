@@ -11,8 +11,14 @@ from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cv2.typing import MatLike
 from wpimath import geometry, units
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
-                              Transform3d, Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation3d,
+    Transform3d,
+    Translation3d,
+)
 
 
 @dataclass
@@ -75,9 +81,10 @@ class ApriltagPipeline(Pipeline):
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
     kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
     kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
-    kCameraPoseTagSpaceKey: Final[str] = "cameraPose_tagSpace"
+    kTagPoseEstimateKey: Final[str] = "tag_estimate"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kResultVerbosityKey: Final[str] = "verbosity"
+    kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
     def __init__(self, settings: PipelineSettings, cameraIndex: int):
         super().__init__(settings, cameraIndex)
@@ -89,11 +96,19 @@ class ApriltagPipeline(Pipeline):
         self.distCoeffs = np.array(self.getDistCoeffs(cameraIndex), dtype=np.float32)
         self.camera_transform = self.getCameraTransform(cameraIndex)
         self.apriltagDetector: apriltag.AprilTagDetector = apriltag.AprilTagDetector()
+
+        detectorConfig: apriltag.AprilTagDetector.Config = (
+            apriltag.AprilTagDetector.Config()
+        )
+        detectorConfig.numThreads = int(settings.get("num_threads") or 1)
+        print(detectorConfig.numThreads)
+        self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily("tag36h11")
+
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
-                    tagSize=0.1651,
+                    tagSize=float(settings.get(ApriltagPipeline.kTagSizeKey) or 0.1651),
                     fx=self.camera_matrix[0][0],
                     fy=self.camera_matrix[1][1],
                     cx=self.camera_matrix[0][2],
@@ -142,14 +157,7 @@ class ApriltagPipeline(Pipeline):
                     img=gray,
                 )
 
-            tagRelativePose = Transform3d(  # NOTE: Should be correct
-                translation=tagRelativePose.translation(),
-                rotation=Rotation3d(
-                    roll=tagRelativePose.rotation().Z(),
-                    pitch=tagRelativePose.rotation().X(),
-                    yaw=tagRelativePose.rotation().Y(),
-                ),
-            )
+            tagRelativePose = self.opencvToWPI(tagRelativePose)
 
             # if self.getSetting(ApriltagPipeline.kStickToGroundKey):
             #     tagRelativePose = Transform3d(
@@ -162,7 +170,7 @@ class ApriltagPipeline(Pipeline):
             #     )
 
             self.setDataValue(
-                self.kCameraPoseTagSpaceKey,
+                self.kTagPoseEstimateKey,
                 [
                     tagRelativePose.translation().X(),
                     tagRelativePose.translation().Y(),
@@ -198,19 +206,6 @@ class ApriltagPipeline(Pipeline):
                         ],
                     )
 
-                    # setattr(tag, "timestamp", timestamp)
-                    # setattr(
-                    #     tag,
-                    #     self.kRobotPoseFieldSpaceKey,
-                    #     robotPoseEstimate.robotPose_fieldSpace,
-                    # )
-                    # setattr(
-                    #     tag,
-                    #     self.kRobotPoseTagSpaceKey,
-                    #     robotPoseEstimate.robotPose_tagSpace,
-                    # )
-                    # # setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
-                    # setattr(tag, self.kCameraPoseTagSpaceKey, tagRelativePose)
                     results.append(
                         ApriltagResult(
                             detection=tag,
@@ -236,6 +231,20 @@ class ApriltagPipeline(Pipeline):
 
         return gray
 
+    def opencvToWPI(self, opencv: Transform3d) -> Transform3d:
+        return Transform3d(  # NOTE: Should be correct
+            translation=Translation3d(
+                x=opencv.X(),
+                y=opencv.Z(),
+                z=opencv.Y(),
+            ),
+            rotation=Rotation3d(
+                roll=opencv.rotation().Z(),
+                pitch=opencv.rotation().X(),
+                yaw=opencv.rotation().Y(),
+            ),
+        )
+
     def drawTagDetectionMarker(
         self,
         tag: apriltag.AprilTagDetection,
@@ -244,21 +253,22 @@ class ApriltagPipeline(Pipeline):
         img: Frame,
     ) -> None:
         if tagSize is not None and tagSize > 0:
-            self.drawPoseBox(
-                img,
-                self.camera_matrix,
-                self.distCoeffs,
-                tagTransform,
-                tagSize,
-            )
-            self.drawPoseAxes(
-                img,
-                self.camera_matrix,
-                self.distCoeffs,
-                tagTransform,
-                np.array([tag.getCenter().x, tag.getCenter().y]),
-                tagSize,
-            )
+            # self.drawPoseBox(
+            #     img,
+            #     self.camera_matrix,
+            #     self.distCoeffs,
+            #     tagTransform,
+            #     tagSize,
+            # )
+            # self.drawPoseAxes(
+            #     img,
+            #     self.camera_matrix,
+            #     self.distCoeffs,
+            #     tagTransform,
+            #     np.array([tag.getCenter().x, tag.getCenter().y]),
+            #     tagSize,
+            # )
+            ...
 
     @staticmethod
     def getTagPoseOnField(id: int) -> Optional[Pose3d]:
@@ -491,7 +501,11 @@ class ApriltagsJson:
                     ApriltagPipeline.kHammingKey: tag.detection.getHamming(),
                     ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
                     ApriltagPipeline.kRobotPoseTagSpaceKey: tag.robotPoseEstimate.robotPose_tagSpace,
-                    ApriltagPipeline.kCameraPoseTagSpaceKey: tag.tagPoseEstimate,
+                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
+                    ApriltagPipeline.kTagCenterKey: [
+                        tag.detection.getCenter().x,
+                        tag.detection.getCenter().y,
+                    ],
                 }
             )
 
