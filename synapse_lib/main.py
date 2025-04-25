@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from core import PipelineHandler, Synapse
+from synapse.core import PipelineHandler, Synapse
 
 
 def getFilePath() -> Path:
@@ -8,7 +8,7 @@ def getFilePath() -> Path:
 
 
 if __name__ == "__main__":
-    handler = PipelineHandler(getFilePath() / "pipelines")
+    handler = PipelineHandler(getFilePath())
     s = Synapse()
     if s.init(handler, getFilePath() / "config" / "settings.yml"):
         s.run()

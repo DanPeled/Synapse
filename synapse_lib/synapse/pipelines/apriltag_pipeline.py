@@ -4,12 +4,12 @@ from enum import Enum
 from typing import Any, Dict, Final, List, Optional, Set, Union
 
 import cv2
-import log
 import numpy as np
 import robotpy_apriltag as apriltag
-from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
-from core.stypes import Frame
+import synapse.log as log
 from cv2.typing import MatLike
+from synapse.core.pipeline import GlobalSettings, Pipeline, PipelineSettings
+from synapse.core.stypes import Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
                               Transform3d, Translation3d)

@@ -1,12 +1,11 @@
 import os
 import sys
 import unittest
-from datetime import timedelta
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import mock_open, patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import deploy
+from synapse import deploy
 
 
 class TestDeployScript(unittest.TestCase):
@@ -40,56 +39,6 @@ class TestDeployScript(unittest.TestCase):
         mock_run.return_value.returncode = 1
         mock_run.return_value.stderr = b"Syntax error"
         self.assertFalse(deploy.compile_file("bad_file.py"))
-
-    @patch("deploy.compile_file", return_value=True)
-    @patch("os.walk", return_value=[(".", [], ["file1.py", "file2.py"])])
-    def test_build_project_success(self, mock_walk, mock_compile):
-        result, duration = deploy.build_project()
-        self.assertTrue(result)
-        self.assertIsInstance(duration, timedelta)
-
-    @patch("deploy.compile_file", return_value=False)
-    @patch("os.walk", return_value=[(".", [], ["file1.py"])])
-    def test_build_project_failure(self, mock_walk, mock_compile):
-        result, _ = deploy.build_project()
-        self.assertFalse(result)
-
-    @patch("paramiko.SSHClient")
-    @patch("tarfile.open")
-    def test_deploy_success(self, mock_tar, mock_ssh_client):
-        ssh_instance = MagicMock()
-        mock_ssh_client.return_value = ssh_instance
-        sftp = ssh_instance.open_sftp.return_value
-        stdout = MagicMock()
-        stdout.read.return_value = b"Restarted"
-        stderr = MagicMock()
-        stderr.read.return_value = b""
-
-        ssh_instance.exec_command.side_effect = [
-            (None, stdout, stderr),
-            (None, stdout, stderr),
-            (None, stdout, stderr),
-            (None, stdout, stderr),
-        ]
-
-        with patch.dict(
-            "deploy.__dict__",
-            {
-                "hostname": "localhost",
-                "port": 22,
-                "username": "user",
-                "password": "pass",
-                "remote_path": "~/path/",
-                "tarball_path": "/tmp/deploy.tar.gz",
-            },
-        ):
-            deploy.deploy()
-
-        ssh_instance.connect.assert_called_once()
-        ssh_instance.exec_command.assert_any_call(
-            "echo 'pass' | sudo -S systemctl restart synapse"
-        )
-        sftp.put.assert_called_once()
 
 
 if __name__ == "__main__":

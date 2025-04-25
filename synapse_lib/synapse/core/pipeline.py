@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, List, Optional, Tuple, Union
 
-from log import err
 from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
+from synapse.log import err
 from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
 from wpimath import geometry

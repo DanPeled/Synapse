@@ -5,8 +5,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final, List, Optional
 
-from log import err
-from networking import NtClient
+from synapse.log import err
+from synapse.networking import NtClient
 
 # Referenced from  https://github.com/PhotonVision/photonvision/
 
