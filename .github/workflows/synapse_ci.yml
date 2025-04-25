@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install . 
         working-directory: synapse_lib
 
       - name: Run build check
@@ -75,7 +75,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install .
         working-directory: synapse_lib
 
       - name: Install Pyright
@@ -102,7 +102,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install .  
         working-directory: synapse_lib
 
       - name: Install PyTest

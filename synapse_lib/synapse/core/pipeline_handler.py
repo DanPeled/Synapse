@@ -6,18 +6,23 @@ from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
-import log as log
+import synapse.log as log
 import ntcore
 import numpy as np
-from core.camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
-from core.config import Config
-from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
-from core.stypes import Frame
+from .camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
+from .config import Config
+from .pipeline import GlobalSettings, Pipeline, PipelineSettings
+from .stypes import Frame
 from cscore import CameraServer, CvSource
-from hardware import MetricsManager
-from networking import NtClient
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from synapse.hardware import MetricsManager
+from synapse.networking import NtClient
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from wpilib import Timer
 from wpimath.units import seconds
 

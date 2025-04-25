@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode
 from cv2.typing import Size
-from log import err
+from synapse.log import err
 
 from .stypes import Frame
 

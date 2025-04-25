@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from core.pipeline import Pipeline, PipelineSettings
+from synapse.core.pipeline import Pipeline, PipelineSettings
 from cv2.typing import MatLike
 
 

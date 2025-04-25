@@ -2,7 +2,7 @@ import atexit
 import time
 from typing import Optional
 
-from log import err, log
+from synapse.log import err, log
 from ntcore import NetworkTableInstance
 
 

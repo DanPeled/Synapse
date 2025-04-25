@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from core.config import Config
-from log import log
-from networking import NtClient
+from synapse.core.config import Config
+from synapse.log import log
+from synapse.networking import NtClient
 
 from .pipeline import GlobalSettings
 from .pipeline_handler import PipelineHandler
