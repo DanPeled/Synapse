@@ -1,5 +1,6 @@
 import datetime
 import os
+import sys
 
 # Flag to control printing to the console
 PRINTS = True
@@ -9,6 +10,14 @@ os.makedirs("logs", exist_ok=True)
 
 # Generate a new log file name based on the current date and time
 LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+
+
+class writer(object):
+    def write(self, data):
+        err(data)
+
+
+sys.stderr = writer()
 
 
 def log(text: str):

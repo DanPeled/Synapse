@@ -342,7 +342,7 @@ class PipelineHandler:
                     processed_frame: Any = frame
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
-                        processed_frame = pipeline.process_frame(frame, start_time)
+                        processed_frame = pipeline.processFrame(frame, start_time)
 
                     end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
                     processLatency = end_time - process_start

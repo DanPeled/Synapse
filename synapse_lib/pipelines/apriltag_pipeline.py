@@ -1,24 +1,32 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Final, List, Optional, Set, Union
+from typing import Any, Dict, Final, List, Optional, Set, Union
 
 import cv2
 import log
 import numpy as np
+import robotpy_apriltag as apriltag
 from core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from core.stypes import Frame
 from cv2.typing import MatLike
-from pupil_apriltags import Detector
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation2d,
-                              Rotation3d, Transform3d, Translation2d,
-                              Translation3d)
+from wpimath import geometry, units
+from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
+                              Transform3d, Translation3d)
 
 
 @dataclass
 class RobotPoseEstimate:
     robotPose_tagSpace: Transform3d
     robotPose_fieldSpace: Pose3d
+
+
+@dataclass
+class ApriltagResult:
+    detection: apriltag.AprilTagDetection
+    timestamp: float
+    robotPoseEstimate: RobotPoseEstimate
+    tagPoseEstimate: apriltag.AprilTagPoseEstimate
 
 
 class ApriltagVerbosity(Enum):
@@ -29,15 +37,14 @@ class ApriltagVerbosity(Enum):
 
     @classmethod
     def fromValue(cls, value: int) -> "ApriltagVerbosity":
-        match value:
-            case 0:
-                return cls.kPoseOnly
-            case 1:
-                return cls.kTagDetails
-            case 2:
-                return cls.kTagDetectionData
-            case 3:
-                return cls.kAll
+        if value == 0:
+            return cls.kPoseOnly
+        if value == 1:
+            return cls.kTagDetails
+        if value == 2:
+            return cls.kTagDetectionData
+        if value == 3:
+            return cls.kAll
         return cls.kPoseOnly
 
 
@@ -48,26 +55,30 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     ignored: Set[str] = set()
 
     if verbosity.value <= ApriltagVerbosity.kTagDetectionData.value:
-        ignored.update({"corners", "pose_t", "pose_R", "homography", "center"})
+        ignored.update({"corners", "homography", "center"})
     if verbosity.value <= ApriltagVerbosity.kTagDetails.value:
-        ignored.update({"pose_err", "decision_margin", "hamming"})
+        ignored.update({"pose_err", "decision_margin", ApriltagPipeline.kHammingKey})
     if verbosity.value <= ApriltagVerbosity.kPoseOnly.value:
-        ignored.update({"tag_family", "tag_id"})
+        ignored.update({ApriltagPipeline.kTagFamilyKey, ApriltagPipeline.kTagIDKey})
 
     return ignored
 
 
 class ApriltagPipeline(Pipeline):
     kTagSizeKey: Final[str] = "tag_size"
+    kHammingKey: Final[str] = "hamming"
+    kTagIDKey: Final[str] = "tag_id"
+    kTagFamilyKey: Final[str] = "tag_family"
     kTagFamily: Final[str] = "tag36h11"
     kGetFieldPoseKey: Final[str] = "fieldpose"
     kStickToGroundKey: Final[str] = "stick_to_ground"
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
     kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
     kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
-    kCameraPoseTagSpaceKey: Final[str] = "cameraPose_tagSpace"
+    kTagPoseEstimateKey: Final[str] = "tag_estimate"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kResultVerbosityKey: Final[str] = "verbosity"
+    kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
     def __init__(self, settings: PipelineSettings, cameraIndex: int):
         super().__init__(settings, cameraIndex)
@@ -76,36 +87,46 @@ class ApriltagPipeline(Pipeline):
             self.getCameraMatrix(cameraIndex), dtype=np.float32
         )
 
+        self.distCoeffs = np.array(self.getDistCoeffs(cameraIndex), dtype=np.float32)
+        self.camera_transform = self.getCameraTransform(cameraIndex)
+        self.apriltagDetector: apriltag.AprilTagDetector = apriltag.AprilTagDetector()
+
+        detectorConfig: apriltag.AprilTagDetector.Config = (
+            apriltag.AprilTagDetector.Config()
+        )
+        detectorConfig.numThreads = int(settings.get("num_threads") or 1)
+        print(detectorConfig.numThreads)
+        self.apriltagDetector.setConfig(detectorConfig)
+        self.apriltagDetector.addFamily("tag36h11")
+
+        self.poseEstimator: apriltag.AprilTagPoseEstimator = (
+            apriltag.AprilTagPoseEstimator(
+                config=apriltag.AprilTagPoseEstimator.Config(
+                    tagSize=float(settings.get(ApriltagPipeline.kTagSizeKey) or 0.1651),
+                    fx=self.camera_matrix[0][0],
+                    fy=self.camera_matrix[1][1],
+                    cx=self.camera_matrix[0][2],
+                    cy=self.camera_matrix[1][2],
+                )
+            )
+        )
+
         self.distCoeffs: np.ndarray = np.array(
             self.getDistCoeffs(cameraIndex), dtype=np.float32
         )
         self.camera_transform: Optional[Transform3d] = self.getCameraTransform(
             cameraIndex
         )
-        self.detector: Detector = Detector(
-            families=ApriltagPipeline.kTagFamily, nthreads=4
-        )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def process_frame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> Frame:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         tagSize = self.getSetting(self.kTagSizeKey)
 
-        # Detect AprilTags
-        tags = self.detector.detect(
-            gray,
-            estimate_tag_pose=True,
-            camera_params=(
-                self.camera_matrix[0][0],  # fx
-                self.camera_matrix[1][1],  # fy
-                self.camera_matrix[0][2],  # cx
-                self.camera_matrix[1][2],  # cy
-            ),
-            tag_size=tagSize,  # Tag size in meters
-        )
-
+        tags = self.apriltagDetector.detect(gray)
+        results: List[ApriltagResult] = []
         gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
         if not tags:
@@ -113,39 +134,37 @@ class ApriltagPipeline(Pipeline):
             self.setDataValue("results", ApriltagsJson.empty())
             return gray
 
-        for tag in tags:  # pyright: ignore
-            poseMatrix = np.concatenate([tag.pose_R, tag.pose_t], axis=1)
-            tagRelativePose = self.getPose3DFromTagPoseMatrix(poseMatrix)
+        for tag in tags:
+            tagPoseEstimate: apriltag.AprilTagPoseEstimate = (
+                self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
+            )
 
-            if self.getSetting(ApriltagPipeline.kStickToGroundKey):
-                tagRelativePose = Pose3d(
-                    tagRelativePose.translation(),
-                    Rotation3d(
-                        0,
-                        0,
-                        tagRelativePose.rotation().Z(),
-                    ),
+            tagRelativePose: Transform3d = (
+                tagPoseEstimate.pose1
+            )  # TODO: check if needs to switch with pose2 sometimes
+
+            if isinstance(tagSize, float):
+                self.drawTagDetectionMarker(
+                    tag=tag,
+                    tagTransform=tagRelativePose,
+                    tagSize=tagSize,
+                    img=gray,
                 )
 
-            if tagSize is not None and tagSize > 0:
-                self.drawPoseBox(
-                    gray,
-                    self.camera_matrix,
-                    self.distCoeffs,
-                    poseMatrix,
-                    tagSize,
-                )
-                self.drawPoseAxes(
-                    gray,
-                    self.camera_matrix,
-                    self.distCoeffs,
-                    poseMatrix,
-                    tag.center,
-                    tagSize,
-                )
+            tagRelativePose = self.opencvToWPI(tagRelativePose)
+
+            # if self.getSetting(ApriltagPipeline.kStickToGroundKey):
+            #     tagRelativePose = Transform3d(
+            #         tagRelativePose.translation(),
+            #         Rotation3d(
+            #             0,
+            #             0,
+            #             tagRelativePose.rotation().Z(),
+            #         ),
+            #     )
 
             self.setDataValue(
-                self.kCameraPoseTagSpaceKey,
+                self.kTagPoseEstimateKey,
                 [
                     tagRelativePose.translation().X(),
                     tagRelativePose.translation().Y(),
@@ -157,7 +176,7 @@ class ApriltagPipeline(Pipeline):
             )
 
             if self.getSetting(self.kGetFieldPoseKey) and self.camera_transform:
-                tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.tag_id)
+                tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.getId())
 
                 if tagFieldPose:
                     robotPoseEstimate = ApriltagPipeline.tagToRobotPose(
@@ -181,25 +200,20 @@ class ApriltagPipeline(Pipeline):
                         ],
                     )
 
-                    setattr(tag, "timestamp", timestamp)
-                    setattr(
-                        tag,
-                        self.kRobotPoseFieldSpaceKey,
-                        robotPoseEstimate.robotPose_fieldSpace,
+                    results.append(
+                        ApriltagResult(
+                            detection=tag,
+                            timestamp=timestamp,
+                            robotPoseEstimate=robotPoseEstimate,
+                            tagPoseEstimate=tagPoseEstimate,
+                        )
                     )
-                    setattr(
-                        tag,
-                        self.kRobotPoseTagSpaceKey,
-                        robotPoseEstimate.robotPose_tagSpace,
-                    )
-                    # setattr(tag, self.kTagPoseFieldSpace, tagFieldPose)
-                    setattr(tag, self.kCameraPoseTagSpaceKey, tagRelativePose)
 
         self.setDataValue("hasResults", True)
         self.setDataValue(
             "results",
             ApriltagsJson.toJsonString(
-                tags,
+                results,
                 getIgnoredDataByVerbosity(
                     ApriltagVerbosity.fromValue(
                         self.getSetting(ApriltagPipeline.kResultVerbosityKey)
@@ -210,6 +224,45 @@ class ApriltagPipeline(Pipeline):
         )
 
         return gray
+
+    def opencvToWPI(self, opencv: Transform3d) -> Transform3d:
+        return Transform3d(  # NOTE: Should be correct
+            translation=Translation3d(
+                x=opencv.X(),
+                y=opencv.Z(),
+                z=opencv.Y(),
+            ),
+            rotation=Rotation3d(
+                roll=opencv.rotation().Z(),
+                pitch=opencv.rotation().X(),
+                yaw=opencv.rotation().Y(),
+            ),
+        )
+
+    def drawTagDetectionMarker(
+        self,
+        tag: apriltag.AprilTagDetection,
+        tagTransform: Transform3d,
+        tagSize: units.meters,
+        img: Frame,
+    ) -> None:
+        if tagSize is not None and tagSize > 0:
+            # self.drawPoseBox(
+            #     img,
+            #     self.camera_matrix,
+            #     self.distCoeffs,
+            #     tagTransform,
+            #     tagSize,
+            # )
+            # self.drawPoseAxes(
+            #     img,
+            #     self.camera_matrix,
+            #     self.distCoeffs,
+            #     tagTransform,
+            #     np.array([tag.getCenter().x, tag.getCenter().y]),
+            #     tagSize,
+            # )
+            ...
 
     @staticmethod
     def getTagPoseOnField(id: int) -> Optional[Pose3d]:
@@ -236,7 +289,7 @@ class ApriltagPipeline(Pipeline):
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if camConfig:
             measured_res = camConfig.measuredRes
-            current_res = (self.getSetting("width"), self.getSetting("height"))
+            current_res = [self.getSetting("width"), self.getSetting("height")]
 
             if current_res[0] and current_res[1]:
                 if measured_res != current_res:
@@ -275,7 +328,7 @@ class ApriltagPipeline(Pipeline):
         img: MatLike,
         camera_matrix: np.ndarray,
         dcoeffs: np.ndarray,
-        pose: np.ndarray,
+        pose: geometry.Transform3d,
         tagSize: float,
         z_sign: int = 1,
     ) -> None:
@@ -287,6 +340,7 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param z_sign: The direction of the z-axis.
         """
+
         # Creates object points
         opoints = (
             np.array(
@@ -327,8 +381,8 @@ class ApriltagPipeline(Pipeline):
         ).reshape(-1, 2)
 
         # Calulcates rotation and translation vectors for each AprilTag
-        rVecs, _ = cv2.Rodrigues(pose[:3, :3])
-        tVecs = pose[:3, 3:]
+        rVecs = pose.rotation().toVector()
+        tVecs = pose.translation().toVector()
 
         # Calulate image points of each AprilTag
         ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
@@ -340,64 +394,11 @@ class ApriltagPipeline(Pipeline):
             cv2.line(img, ipoints[i], ipoints[j], (0, 255, 0), 4, 16)
 
     @staticmethod
-    def getPose3DFromTagPoseMatrix(poseMatrix: np.ndarray) -> Pose3d:
-        """
-        Calculates a WPILib ``Pose3d`` from the PupilApriltags matrix.
-
-        :param poseMatrix: A 3x4 ``numpy.ndarray``.
-        :return: A ``Pose3d`` object.
-        """
-        x, y, z = 0, 0, 0
-        # Flattens the pose matrix into a 1D array
-        flatPose = np.array(poseMatrix).flatten()
-
-        # Creates the Pose3d components for a tag in the AprilTags WCS
-        try:
-            tempRot = Rotation3d(  # pyright: ignore
-                np.array(  # pyright: ignore
-                    [
-                        [flatPose[0], flatPose[1], flatPose[2]],
-                        [flatPose[4], flatPose[5], flatPose[6]],
-                        [flatPose[8], flatPose[9], flatPose[10]],
-                    ]
-                )
-            )
-        except ValueError as e:
-            tempRot = Rotation3d()
-            log.err(f"Error converting array to Rotation3d: {str(e)}")
-        tempTrans = Translation3d(flatPose[3], flatPose[7], flatPose[11])
-
-        # Get the camera's measured X, Y, and Z
-        tempX = tempTrans.Z()
-        y = -tempTrans.X()
-        z = -tempTrans.Y()
-
-        # Create a Rotation3d object
-        rot = Rotation3d(tempRot.Z(), -tempRot.X(), -tempRot.Y())
-
-        # Calulates the field relative X and Y coordinate
-        yTrans = Translation2d(tempX, y).rotateBy(Rotation2d(-rot.Z()))
-        x = yTrans.X()
-        y = yTrans.Y()
-
-        # Calulates the field relative Z coordinate
-        zTrans = Translation2d(tempX, z).rotateBy(Rotation2d(np.pi + rot.Y()))
-        z = zTrans.Y()
-
-        # Create a Translation3d object
-        trans = Translation3d(x, y, z)
-
-        # Creates a Pose3d object in the field WCS
-        pose = Pose3d(trans, rot)
-
-        return pose
-
-    @staticmethod
     def drawPoseAxes(
         img: MatLike,
         camera_matrix: np.ndarray,
         dcoeffs: np.ndarray,
-        pose: np.ndarray,
+        pose: Transform3d,
         center: Union[cv2.typing.Point, np.ndarray],
         tagSize: float,
     ) -> None:
@@ -409,9 +410,8 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param center: The center of the AprilTag.
         """
-        # Calulcates rotation and translation vectors for each AprilTag
-        rVecs, _ = cv2.Rodrigues(pose[:3, :3])
-        tVecs = pose[:3, 3:]
+        rVecs = pose.rotation().toVector()
+        tVecs = pose.translation().toVector()
 
         # Calculate object points of each AprilTag
         opoints = (
@@ -480,17 +480,32 @@ class ApriltagsJson:
     _emptyJson: Optional[str] = None
 
     @classmethod
-    def toJsonString(cls, tags, ignore_keys: Optional[set] = None) -> str:
+    def toJsonString(
+        cls, tags: List[ApriltagResult], ignore_keys: Optional[set] = None
+    ) -> str:
         ignore_keys = set(
             ignore_keys or []
         )  # Convert ignore_keys to a set for fast lookup
+        data: List[dict[str, Any]] = []
+
+        for tag in tags:
+            data.append(
+                {
+                    ApriltagPipeline.kTagIDKey: tag.detection.getId(),
+                    ApriltagPipeline.kHammingKey: tag.detection.getHamming(),
+                    ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
+                    ApriltagPipeline.kRobotPoseTagSpaceKey: tag.robotPoseEstimate.robotPose_tagSpace,
+                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
+                    ApriltagPipeline.kTagCenterKey: [
+                        tag.detection.getCenter().x,
+                        tag.detection.getCenter().y,
+                    ],
+                }
+            )
 
         return json.dumps(
             {
-                "data": [
-                    {k: v for k, v in tag.__dict__.items() if k not in ignore_keys}
-                    for tag in tags
-                ],
+                "data": data,
                 "type": "apriltag",
             },
             cls=cls.Encoder,
@@ -512,20 +527,26 @@ class ApriltagsJson:
             elif isinstance(o, bytes):
                 return o.decode()  # Convert bytes to strings
             elif isinstance(o, Pose3d) or isinstance(o, Transform3d):
-                return {
-                    "x": o.translation().X(),
-                    "y": o.translation().Y(),
-                    "z": o.translation().Z(),
-                    "yaw": o.rotation().z_degrees,
-                    "pitch": o.rotation().y_degrees,
-                    "roll": o.rotation().x_degrees,
-                    "rotation_unit": "degrees",
-                }
+                return [
+                    o.translation().X(),
+                    o.translation().Y(),
+                    o.translation().Z(),
+                    o.rotation().z_degrees,
+                    o.rotation().y_degrees,
+                    o.rotation().x_degrees,
+                ]
             elif isinstance(o, Pose2d):
+                return [
+                    o.translation().X(),
+                    o.translation().Y(),
+                    o.rotation().degrees(),
+                ]
+            elif isinstance(o, apriltag.AprilTagPoseEstimate):
                 return {
-                    "x": o.translation().X(),
-                    "y": o.translation().Y(),
-                    "rotation": o.rotation().degrees(),
-                    "rotation_unit": "degrees",
+                    "pose1": o.pose1,
+                    "pose2": o.pose2,
+                    "error1": o.error1,
+                    "error2": o.error2,
+                    "ambiguity": o.getAmbiguity(),
                 }
             return super().default(o)

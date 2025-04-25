@@ -10,7 +10,7 @@ class ColorPipeline(Pipeline):
         self.settings = settings
         settings["minSize"] = 0.001
 
-    def process_frame(self, img: MatLike, timestamp: float) -> MatLike:
+    def processFrame(self, img: MatLike, timestamp: float) -> MatLike:
         hsv = None
         # Convert the image to the HSV color space
         if self.getSetting("color_space") == "RGB":
