@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from synapse.core import PipelineHandler, Synapse
 
 
