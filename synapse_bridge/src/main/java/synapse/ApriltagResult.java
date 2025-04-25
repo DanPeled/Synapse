@@ -1,7 +1,6 @@
 package synapse;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Optional;
 
 /** Represents the result of an AprilTag detection, including pose estimation and metadata. */
@@ -17,14 +16,6 @@ public class ApriltagResult {
   /** Timestamp of the detection. */
   @JsonProperty("timestamp")
   private double timestamp;
-
-  /**
-   * The family of the detected AprilTag.
-   *
-   * <p>Present for verbosity levels: kTagDetectionData and above.
-   */
-  @JsonProperty("tag_family")
-  private Optional<String> tagFamily;
 
   /**
    * The unique ID of the detected AprilTag.
@@ -43,22 +34,6 @@ public class ApriltagResult {
   private Optional<Double> hamming;
 
   /**
-   * Decision margin indicating the confidence of the tag detection.
-   *
-   * <p>Present for verbosity levels: kTagDetails and above.
-   */
-  @JsonProperty("decision_margin")
-  private Optional<Double> decisionMargin;
-
-  /**
-   * Homography matrix describing the transformation.
-   *
-   * <p>Present for verbosity levels: kTagDetectionData and above.
-   */
-  @JsonProperty("homography")
-  private Optional<double[][]> homography;
-
-  /**
    * Center coordinates of the detected tag in image space.
    *
    * <p>Present for verbosity levels: kTagDetectionData and above.
@@ -66,45 +41,16 @@ public class ApriltagResult {
   @JsonProperty("center")
   private Optional<double[]> center;
 
-  /**
-   * Rotation matrix representing tag orientation.
-   *
-   * <p>Present for verbosity levels: kTagDetectionData and above.
-   */
-  @JsonProperty("pose_R")
-  private Optional<double[][]> pose_R;
-
-  /**
-   * Translation vector representing tag position.
-   *
-   * <p>Present for verbosity levels: kTagDetectionData and above.
-   */
-  @JsonProperty("pose_t")
-  private Optional<double[][]> pose_t;
-
-  /**
-   * Corner coordinates of the detected tag.
-   *
-   * <p>Present for verbosity levels: kTagDetectionData and above.
-   */
-  @JsonProperty("corners")
-  private Optional<double[][]> corners;
-
-  /**
-   * Pose estimation error value.
-   *
-   * <p>Present for verbosity levels: kTagDetails and above.
-   */
-  @JsonProperty("pose_err")
-  private Optional<Double> poseError;
-
   /** Estimated robot pose in field space. */
+  @JsonProperty("robotPose_fieldSpace")
   private double[] robotPose_fieldSpace;
 
   /** Estimated camera pose in tag space. */
-  private double[] cameraPose_tagSpace;
+  @JsonProperty("tag_estimate")
+  private ApriltagPoseEstimate m_tagPoseEstimate;
 
   /** Estimated robot pose in tag space. */
+  @JsonProperty("robotPose_tagSpace")
   private double[] robotPose_tagSpace;
 
   /**
@@ -114,15 +60,6 @@ public class ApriltagResult {
    */
   public double getTimestamp() {
     return timestamp;
-  }
-
-  /**
-   * Gets the AprilTag family.
-   *
-   * @return the AprilTag family.
-   */
-  public Optional<String> getTagFamily() {
-    return tagFamily;
   }
 
   /**
@@ -144,66 +81,12 @@ public class ApriltagResult {
   }
 
   /**
-   * Gets the confidence margin of the detection.
-   *
-   * @return the confidence margin of the detection.
-   */
-  public Optional<Double> getDecisionMargin() {
-    return decisionMargin;
-  }
-
-  /**
-   * Gets the homography matrix.
-   *
-   * @return the homography matrix.
-   */
-  public Optional<double[][]> getHomography() {
-    return homography;
-  }
-
-  /**
    * Gets the center of the detected tag in image space.
    *
    * @return the center of the detected tag in image space.
    */
   public Optional<double[]> getCenter() {
     return center;
-  }
-
-  /**
-   * Gets the rotation matrix of the tag.
-   *
-   * @return the rotation matrix of the tag.
-   */
-  public Optional<double[][]> getPose_R() {
-    return pose_R;
-  }
-
-  /**
-   * Gets the translation vector of the tag.
-   *
-   * @return the translation vector of the tag.
-   */
-  public Optional<double[][]> getPose_t() {
-    return pose_t;
-  }
-
-  /**
-   * Gets the coordinates of the tag corners.
-   *
-   * @return the coordinates of the tag corners.
-   */
-  public Optional<double[][]> getCorners() {
-    return corners;
-  }
-
-  /**
-   * Gets the pose estimation error.
-   *
-   * @return the pose estimation error.
-   */
-  public Optional<Double> getPoseError() {
-    return poseError;
   }
 
   /**
@@ -229,8 +112,8 @@ public class ApriltagResult {
    *
    * @return the estimated camera pose in tag space.
    */
-  public double[] getCameraPose_tagSpace() {
-    return cameraPose_tagSpace;
+  public ApriltagPoseEstimate getTagPoseEstimate() {
+    return m_tagPoseEstimate;
   }
 
   public static enum ApriltagVerbosity {
