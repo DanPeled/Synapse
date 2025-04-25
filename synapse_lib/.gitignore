@@ -4,3 +4,4 @@
 **/logs/
 build/
 *.egg-info/
+dist/
