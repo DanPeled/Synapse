@@ -3,10 +3,12 @@ import subprocess
 import tarfile
 import time as t
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Tuple
 
 import paramiko
 import pathspec
+from synapse.core import config as synconfig
 
 
 def check_python3_install() -> bool:
@@ -98,6 +100,9 @@ def deploy() -> None:
 
     sftp = ssh.open_sftp()
     sftp.put(tarball_path, "/tmp/deploy.tar.gz")
+    ssh.exec_command(
+        f"find {remote_path} -mindepth 1 -not -name 'settings.yml' -exec rm -rf {{}} +"
+    )
     ssh.exec_command(f"tar -xzf /tmp/deploy.tar.gz -C {remote_path}")
     ssh.exec_command("rm /tmp/deploy.tar.gz")
 
@@ -118,15 +123,18 @@ def deploy() -> None:
     ssh.close()
 
 
-hostname = "10.97.38.14"
-port = 22
-username = "orangepi"
-password = "orangepi"
-
 current_folder = os.getcwd()
 remote_path = "~/Synapse/"
 gitignore_spec = get_gitignore_specs()
 tarball_path = "/tmp/deploy.tar.gz"
+
+config: synconfig.Config = synconfig.Config()
+config.load(Path(current_folder) / "config" / "settings.yml")
+networkConfig: dict = config.getConfigMap()["network"]
+hostname: str = networkConfig["hostname"]
+port: int = 22
+username: str = networkConfig["user"]
+password: str = networkConfig["password"]
 
 
 if __name__ == "__main__":

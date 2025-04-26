@@ -6,6 +6,12 @@ from ntcore import NetworkTableInstance
 from synapse.log import err, log
 
 
+def teamNumberToIP(teamNumber: int, lastOctet: int) -> str:
+    te = str(teamNumber // 100)
+    am = str(teamNumber % 100).zfill(2)
+    return f"10.{te}.{am}.{lastOctet}"
+
+
 class NtClient:
     """
     A class that handles the connection and communication with a NetworkTables server.

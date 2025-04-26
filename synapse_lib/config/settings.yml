@@ -1,6 +1,9 @@
 network:
   name: Vision-Py
-  team_number: 9738
+  team_number: 9738 
+  hostname: 10.97.38.14
+  user: orangepi
+  password: orangepi
 
 global:
   camera_configs:
