@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Final, List, Optional, Set, Union
+from typing import Any, Dict, Final, List, Optional, Set, Tuple, Union
 
 import cv2
 import numpy as np
@@ -64,7 +64,7 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
-class ApriltagPipeline(Pipeline):
+class ApriltagPipeline(Pipeline[List[ApriltagResult]]):
     kTagSizeKey: Final[str] = "tag_size"
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
@@ -119,7 +119,7 @@ class ApriltagPipeline(Pipeline):
         )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def processFrame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> Tuple[Frame, List[ApriltagResult]]:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -127,12 +127,11 @@ class ApriltagPipeline(Pipeline):
 
         tags = self.apriltagDetector.detect(gray)
         results: List[ApriltagResult] = []
-        gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
         if not tags:
             self.setDataValue("hasResults", False)
             self.setDataValue("results", ApriltagsJson.empty())
-            return gray
+            return (gray, [])
 
         for tag in tags:
             tagPoseEstimate: apriltag.AprilTagPoseEstimate = (
@@ -143,7 +142,7 @@ class ApriltagPipeline(Pipeline):
                 tagPoseEstimate.pose1
             )  # TODO: check if needs to switch with pose2 sometimes
 
-            if isinstance(tagSize, float):
+            if tagSize:
                 self.drawTagDetectionMarker(
                     tag=tag,
                     tagTransform=tagRelativePose,
@@ -223,7 +222,7 @@ class ApriltagPipeline(Pipeline):
             ),
         )
 
-        return gray
+        return (gray, results)
 
     def opencvToWPI(self, opencv: Transform3d) -> Transform3d:
         return Transform3d(  # NOTE: Should be correct

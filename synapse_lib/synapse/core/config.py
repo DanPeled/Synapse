@@ -11,5 +11,9 @@ class Config:
             self.__dictData: dict = yaml.full_load(file)
             Config.__inst = self
 
+    @classmethod
+    def getInstance(cls) -> "Config":
+        return cls.__inst
+
     def getConfigMap(self) -> dict:
         return self.__dictData

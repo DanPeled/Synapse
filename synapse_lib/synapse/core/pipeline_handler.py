@@ -343,13 +343,16 @@ class PipelineHandler:
                     processed_frame: Any = frame
                     # Process the frame through each assigned pipeline
                     for pipeline in assigned_pipelines:
-                        processed_frame = pipeline.processFrame(frame, start_time)
+                        processed_frame, results = pipeline.processFrame(
+                            frame, start_time
+                        )
 
                     end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
                     processLatency = end_time - process_start
                     fps = 1.0 / (end_time - start_time)  # Calculate FPS
 
                     self.sendLatency(cameraIndex, captureLatency, processLatency)
+
                     # Overlay FPS on the frame
                     cv2.putText(
                         processed_frame,
@@ -436,7 +439,7 @@ class PipelineHandler:
     def loadSettings(self):
         log.log("Loading settings...")
 
-        settings: dict = Config.getConfigMap()
+        settings: dict = Config.getInstance().getConfigMap()
         camera_configs = settings["global"]["camera_configs"]
 
         for cameraIndex in camera_configs:

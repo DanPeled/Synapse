@@ -1,16 +1,19 @@
+from typing import Tuple
+
 import cv2
 import numpy as np
 from cv2.typing import MatLike
 from synapse.core.pipeline import Pipeline, PipelineSettings
+from synapse.core.stypes import Frame
 
 
-class ColorPipeline(Pipeline):
+class ColorPipeline(Pipeline[None]):
     def __init__(self, settings: PipelineSettings, cameraIndex: int):
         self.cameraIndex = cameraIndex
         self.settings = settings
         settings["minSize"] = 0.001
 
-    def processFrame(self, img: MatLike, timestamp: float) -> MatLike:
+    def processFrame(self, img: MatLike, timestamp: float) -> Tuple[Frame, None]:
         hsv = None
         # Convert the image to the HSV color space
         if self.getSetting("color_space") == "RGB":
@@ -43,4 +46,4 @@ class ColorPipeline(Pipeline):
                     if area >= min_contour_area:
                         cv2.drawContours(img, [contour], -1, (0, 255, 0), 2)
 
-        return img
+        return img, None

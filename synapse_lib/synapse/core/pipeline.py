@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import (Any, Callable, Generic, List, Optional, Tuple, TypeVar,
+                    Union)
 
 from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
 from synapse.log import err
@@ -210,7 +211,10 @@ class PipelineSettings:
             raise ValueError("Unsupported type")
 
 
-class Pipeline(ABC):
+ResultType = TypeVar("ResultType")
+
+
+class Pipeline(ABC, Generic[ResultType]):
     __is_enabled__ = True
     VALID_ENTRY_TYPES = Any
 
@@ -225,7 +229,7 @@ class Pipeline(ABC):
         pass
 
     @abstractmethod
-    def processFrame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> Tuple[Frame, ResultType]:
         """
         Abstract method that processes a single frame.
 
