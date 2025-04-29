@@ -23,7 +23,7 @@ global:
         0.049742166267499596
           ]
       measured_res: [1280, 720]
-      stream_res: [320, 240]
+      stream_res: [320, 180]
       transform:
         - [0.24637, -0.23285, 0.28899] # translation
         - [-1.86, 4, 24.95] # rotation
@@ -40,6 +40,7 @@ pipelines:
       stick_to_ground: true
       fieldpose: true
       saturation: 10
+      num_threads: 4
       black_level_offset: 0.0
       orientation: 180
       verbosity: 1

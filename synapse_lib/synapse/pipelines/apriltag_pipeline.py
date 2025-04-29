@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
 from typing import Any, Dict, Final, List, Optional, Set, Tuple, Union
 
 import cv2
@@ -94,8 +95,8 @@ class ApriltagPipeline(Pipeline[List[ApriltagResult]]):
         detectorConfig: apriltag.AprilTagDetector.Config = (
             apriltag.AprilTagDetector.Config()
         )
+
         detectorConfig.numThreads = int(settings.get("num_threads") or 1)
-        print(detectorConfig.numThreads)
         self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily("tag36h11")
 
@@ -119,6 +120,12 @@ class ApriltagPipeline(Pipeline[List[ApriltagResult]]):
         )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
+    @lru_cache(maxsize=100)
+    def estimateTagPose(
+        self, tag: apriltag.AprilTagDetection
+    ) -> apriltag.AprilTagPoseEstimate:
+        return self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
+
     def processFrame(self, img, timestamp: float) -> Tuple[Frame, List[ApriltagResult]]:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -134,9 +141,7 @@ class ApriltagPipeline(Pipeline[List[ApriltagResult]]):
             return (gray, [])
 
         for tag in tags:
-            tagPoseEstimate: apriltag.AprilTagPoseEstimate = (
-                self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
-            )
+            tagPoseEstimate: apriltag.AprilTagPoseEstimate = self.estimateTagPose(tag)
 
             tagRelativePose: Transform3d = (
                 tagPoseEstimate.pose1

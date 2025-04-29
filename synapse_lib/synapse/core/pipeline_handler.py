@@ -1,7 +1,7 @@
 import importlib.util
-import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
@@ -324,7 +324,9 @@ class PipelineHandler:
             def process_camera(cameraIndex: int):
                 output = self.outputs[cameraIndex]
                 recordingOutput = self.recordingOutputs[cameraIndex]
+
                 SHOULD_RECORD = False
+
                 while True:
                     start_time = (
                         Timer.getFPGATimestamp()
@@ -375,15 +377,16 @@ class PipelineHandler:
                             recordingOutput.write(processed_frame)
 
             # Create and start a thread for each camera
-            threads = []
-            for pipeline_index in self.cameras.keys():
-                thread = threading.Thread(target=process_camera, args=(pipeline_index,))
-                thread.daemon = True  # Daemon threads will automatically close on exit
-                threads.append(thread)
-                thread.start()
+            MAX_THREADS: Final[int] = 8
+            with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+                executor.map(process_camera, self.cameras.keys())
 
             while True:
-                time.sleep(1)
+                if NtClient.INSTANCE:
+                    NtClient.INSTANCE.nt_inst.flush()
+                    if NtClient.INSTANCE.server:
+                        NtClient.INSTANCE.server.flush()
+                # time.sleep(1)
                 self.metricsManager.publishMetrics()
         except Exception as e:
             log.err(f"{e}")
