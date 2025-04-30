@@ -1,7 +1,8 @@
 from pathlib import Path
 
+from synapse.bcolors import bcolors
 from synapse.core.config import Config
-from synapse.log import log
+from synapse.log import err, log
 from synapse.networking import NtClient
 
 from .pipeline import GlobalSettings
@@ -33,7 +34,16 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
-        log("Initializing Synapse...")
+        log(
+            bcolors.OKGREEN
+            + bcolors.BOLD
+            + "\n"
+            + "=" * 30
+            + "\n  Synapse Runtime Starting...\n"
+            + "=" * 30
+            + bcolors.ENDC
+        )
+
         self.pipeline_handler = pipeline_handler
 
         try:
@@ -51,8 +61,8 @@ class Synapse:
             if nt_good:
                 self.pipeline_handler.setup(settings)
             else:
-                log(
-                    f"Error something went wrong while setting up networktables with params: {network_settings}"
+                err(
+                    f"Something went wrong while setting up networktables with params: {network_settings}"
                 )
 
             # Setup global settings

@@ -16,6 +16,20 @@ from .stypes import Frame
 
 @dataclass
 class CameraConfig:
+    """
+    Represents the configuration for a single camera.
+
+    Attributes:
+        name (str): The unique name or identifier for the camera.
+        path (Union[str, int]): The path or device index used to access the camera (e.g., '/dev/video0' or 0).
+        transform (geometry.Transform3d): The transformation from the camera to the robot coordinate frame.
+        defaultPipeline (int): The default processing pipeline index to use for the camera.
+        matrix (List[List[float]]): The intrinsic camera matrix (usually 3x3).
+        distCoeff (List[float]): The distortion coefficients for the camera lens.
+        measuredRes (Tuple[int, int]): The resolution (width, height) used for camera calibration.
+        streamRes (Tuple[int, int]): The resolution (width, height) used for video streaming.
+    """
+
     name: str
     path: Union[str, int]
     transform: geometry.Transform3d
@@ -312,15 +326,6 @@ def disabled(cls):
 class GlobalSettingsMeta(type):
     """
     A metaclass for managing global settings at the class level.
-
-    Attributes:
-        __settings (Optional[PipelineSettings]): The global pipeline settings instance.
-
-    Methods:
-        setup: Initializes the global settings.
-        get: Retrieves a setting by key from the global settings.
-        set: Sets a setting in the global settings.
-        getMap: Returns the global settings map.
     """
 
     kCameraConfigsKey: str = "camera_configs"
@@ -437,6 +442,15 @@ class GlobalSettingsMeta(type):
         return {}
 
     def __contains__(cls, key: str) -> bool:
+        """
+        Check if the specified key exists in the settings.
+
+        Args:
+            key (str): The key to check for in the settings.
+
+        Returns:
+            bool: True if the key exists in the settings, False otherwise.
+        """
         if cls.__settings is not None:
             return key in cls.__settings
         return False

@@ -327,6 +327,8 @@ class PipelineHandler:
 
                 SHOULD_RECORD = False
 
+                log.log(f"Started Camera #{cameraIndex} loop")
+
                 while True:
                     start_time = (
                         Timer.getFPGATimestamp()

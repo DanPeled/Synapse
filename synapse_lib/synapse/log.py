@@ -2,6 +2,8 @@ import datetime
 import os
 import sys
 
+from synapse.bcolors import bcolors
+
 # Flag to control printing to the console
 PRINTS = True
 
@@ -28,7 +30,7 @@ def log(text: str):
         text (str): The message to log.
 
     Writes:
-        - The log message to the console (if PRINTS is True).
+        - The log message to the console.
         - The log message to the log file `logs/logfile_<timestamp>.log`.
     """
     # Get the current time
@@ -40,7 +42,7 @@ def log(text: str):
 
     # Print the log message to the console if PRINTS is True
     if PRINTS:
-        print(str(final_string))
+        print(text)
 
     # Write the log to the new file
     with open(LOG_FILE, "a") as f:
@@ -56,4 +58,4 @@ def err(text: str):
 
     This function calls the `log` function and formats the message to indicate an error.
     """
-    log(f"[ERROR]: {text}")
+    log(bcolors.FAIL + f"[ERROR]: {text}" + bcolors.ENDC)
