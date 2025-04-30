@@ -2,7 +2,7 @@ import atexit
 import time
 from typing import Optional
 
-from ntcore import NetworkTableInstance
+from ntcore import Event, EventFlags, NetworkTableInstance
 from synapse.log import err, log
 
 
@@ -48,7 +48,6 @@ class NtClient:
             self.server = NetworkTableInstance.create()
             self.server.startServer("127.0.0.1")
             self.nt_inst.setServer("127.0.0.1")
-            log(f"Server started with name {name}.")
         else:
             self.server = None
             if isSim:
@@ -63,6 +62,18 @@ class NtClient:
         timeout = 120  # seconds
         start_time = time.time()
 
+        def connectionListener(event: Event):
+            if event.is_(EventFlags.kConnected):
+                log(f"Connected to NetworkTables server ({event.data.remote_ip})")  # pyright: ignore
+            if event.is_(EventFlags.kDisconnected):
+                log(
+                    f"kDisconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
+                )
+
+        NetworkTableInstance.getDefault().addConnectionListener(
+            True, connectionListener
+        )
+
         while not self.nt_inst.isConnected():
             curr = time.time() - start_time
             if curr > timeout:
@@ -70,7 +81,8 @@ class NtClient:
                     f"connection to server ({'127.0.0.1' if isServer else teamNumber}) from client ({name}) timed out after {curr} seconds"
                 )
                 return False
-            log(f"Trying to connect to {teamNumber}...")
+            if not isServer:
+                log(f"Trying to connect to {teamNumberToIP(teamNumber, 4)}...")
             time.sleep(1)
 
         atexit.register(self.cleanup)

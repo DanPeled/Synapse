@@ -1,17 +1,18 @@
 import importlib.util
+import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
+import cscore as cs
 import cv2
-import ntcore
 import numpy as np
 import synapse.log as log
-from cscore import CameraServer, CvSource
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType)
+from synapse.bcolors import bcolors
 from synapse.hardware import MetricsManager
 from synapse.networking import NtClient
 from wpilib import Timer
@@ -43,11 +44,22 @@ class PipelineHandler:
         self.pipelineBindings: Dict[int, int] = {}
         self.streamSizes: Dict[int, Tuple[int, int]] = {}
         self.pipelineTypes: Dict[int, str] = {}
-        self.outputs: Dict[int, CvSource] = {}
+        self.outputs: Dict[int, cs.CvSource] = {}
         self.recordingOutputs: Dict[int, cv2.VideoWriter] = {}
 
     def setup(self, settings: Dict[Any, Any]):
         import atexit
+
+        log.log(
+            bcolors.OKGREEN
+            + bcolors.BOLD
+            + "\n"
+            + "=" * 20
+            + " Loading Pipelines & Camera Configs... "
+            + "=" * 20
+            + bcolors.ENDC
+            + "\n"
+        )
 
         self.pipelines = self.loadPipelines()
         self.cameraBindings = self.setupCameraBindings(
@@ -301,7 +313,7 @@ class PipelineHandler:
             return self.DEFAULT_STREAM_SIZE
 
         return {
-            i: CameraServer.putVideo(
+            i: cs.CameraServer.putVideo(
                 f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}",
                 width=getStreamRes(i)[0],
                 height=getStreamRes(i)[1],
@@ -315,13 +327,11 @@ class PipelineHandler:
         """
         try:
             self.outputs = self.getCameraOutputs()
-            log.log("Set up outputs array")
             self.recordingOutputs = self.generateRecordingOutputs(
                 list(self.cameras.keys())
             )
-            log.log("Set up recording outputs array")
 
-            def process_camera(cameraIndex: int):
+            def processCamera(cameraIndex: int):
                 output = self.outputs[cameraIndex]
                 recordingOutput = self.recordingOutputs[cameraIndex]
 
@@ -378,10 +388,23 @@ class PipelineHandler:
                         if SHOULD_RECORD:
                             recordingOutput.write(processed_frame)
 
-            # Create and start a thread for each camera
-            MAX_THREADS: Final[int] = 8
-            with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-                executor.map(process_camera, self.cameras.keys())
+            def initThreads():
+                # Create and start a thread for each camera
+                MAX_THREADS: Final[int] = 8
+                with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+                    executor.map(processCamera, self.cameras.keys())
+
+            log.log(
+                bcolors.OKGREEN
+                + bcolors.BOLD
+                + "\n"
+                + "=" * 20
+                + " Synapse Runtime Starting... "
+                + "=" * 20
+                + bcolors.ENDC
+            )
+
+            threading.Thread(target=initThreads).start()
 
             while True:
                 if NtClient.INSTANCE:
@@ -401,20 +424,6 @@ class PipelineHandler:
                 cameraTable.getEntry("processLatency").setDouble(process)
 
     def setupNetworkTables(self):
-        log.log("Setting up networktables...")
-
-        def connectionListener(event: ntcore.Event):
-            if event.is_(ntcore.EventFlags.kConnected):
-                log.log(f"Connected to NetworkTables server ({event.data.remote_ip})")  # pyright: ignore
-            if event.is_(ntcore.EventFlags.kDisconnected):
-                log.log(
-                    f"kDisconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
-                )
-
-        NetworkTableInstance.getDefault().addConnectionListener(
-            True, connectionListener
-        )
-
         if NtClient.INSTANCE is not None:
             for cameraIndex in self.cameras.keys():
                 topicName = f"{self.getCameraTableName(cameraIndex)}/pipeline"
@@ -433,17 +442,13 @@ class PipelineHandler:
                 )
 
                 entry.setInteger(self.defaultPipelineIndexes[cameraIndex])
-                log.log(f"Pipeline event listener added for camera #{cameraIndex}")
-            log.log("Set up settings successfully")
         else:
             log.err("NtClient instance is None")
 
     def getCameraTableName(self, index: int) -> str:
         return f"camera{index}"
 
-    def loadSettings(self):
-        log.log("Loading settings...")
-
+    def loadPipelineSettings(self):
         settings: dict = Config.getInstance().getConfigMap()
         camera_configs = settings["global"]["camera_configs"]
 

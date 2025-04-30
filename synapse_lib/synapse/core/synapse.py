@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from synapse.bcolors import bcolors
-from synapse.core.config import Config
+from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
 from synapse.networking import NtClient
 
@@ -34,13 +34,14 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
+
         log(
             bcolors.OKGREEN
             + bcolors.BOLD
             + "\n"
-            + "=" * 30
-            + "\n  Synapse Runtime Starting...\n"
-            + "=" * 30
+            + "=" * 20
+            + " Synapse Initialize Starting... "
+            + "=" * 20
             + bcolors.ENDC
         )
 
@@ -53,31 +54,34 @@ class Synapse:
             # Load the settings from the config file
             settings = config.getConfigMap()
             self.settings_dict = settings
-            network_settings = settings["network"]
 
             # Initialize NetworkTables
             self.__init_cmd_args()
-            nt_good = self.__init_networktables(network_settings)
+
+            log(
+                f"Network Config:\n  Team Number: {config.network.teamNumber}\n  Name: {config.network.name}\n  Is Server: {self.__isServer}\n  Is Sim: {self.__isSim}"
+            )
+
+            nt_good = self.__init_networktables(config.network)
             if nt_good:
                 self.pipeline_handler.setup(settings)
             else:
                 err(
-                    f"Something went wrong while setting up networktables with params: {network_settings}"
+                    f"Something went wrong while setting up networktables with params: {config.network}"
                 )
+                return False
 
             # Setup global settings
             global_settings = settings["global"]
             if not GlobalSettings.setup(global_settings):
                 raise Exception("Global settings setup failed")
-
         except Exception as e:
             log(f"Something went wrong while reading settings config file. {repr(e)}")
             return False
 
-        log("Initialized Synapse successfully")
         return True
 
-    def __init_networktables(self, settings: dict) -> bool:
+    def __init_networktables(self, settings: NetworkConfig) -> bool:
         """
         Initializes the NetworkTables client with the provided settings.
 
@@ -89,8 +93,8 @@ class Synapse:
         """
         self.nt_client = NtClient()
         setup_good = self.nt_client.setup(
-            teamNumber=settings["team_number"],
-            name=settings["name"],
+            teamNumber=settings.teamNumber,
+            name=settings.name,
             isServer=self.__isServer,
             isSim=self.__isSim,
         )
@@ -105,12 +109,10 @@ class Synapse:
         args = parser.parse_args()
 
         if args.server:
-            log("Running in server mode")
             self.__isServer = True
         else:
             self.__isServer = False
         if args.sim:
-            log("Running in simulation mode")
             self.__isSim = True
         else:
             self.__isSim = False
@@ -121,5 +123,5 @@ class Synapse:
 
         This method is responsible for running the pipeline after it has been initialized.
         """
-        self.pipeline_handler.loadSettings()
+        self.pipeline_handler.loadPipelineSettings()
         self.pipeline_handler.run()

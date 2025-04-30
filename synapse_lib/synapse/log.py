@@ -16,7 +16,7 @@ LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 class writer(object):
     def write(self, data):
-        err(data)
+        print(f"{bcolors.FAIL}{data}{bcolors.ENDC}", end="")
 
 
 sys.stderr = writer()
