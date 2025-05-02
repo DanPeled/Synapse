@@ -320,96 +320,87 @@ class PipelineHandler:
         """
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
-        try:
-            self.outputs = self.getCameraOutputs()
-            self.recordingOutputs = self.generateRecordingOutputs(
-                list(self.cameras.keys())
-            )
+        self.outputs = self.getCameraOutputs()
+        self.recordingOutputs = self.generateRecordingOutputs(list(self.cameras.keys()))
 
-            def processCamera(cameraIndex: int):
-                output = self.outputs[cameraIndex]
-                recordingOutput = self.recordingOutputs[cameraIndex]
-                camera: SynapseCamera = self.cameras[cameraIndex]
+        def processCamera(cameraIndex: int):
+            output = self.outputs[cameraIndex]
+            recordingOutput = self.recordingOutputs[cameraIndex]
+            camera: SynapseCamera = self.cameras[cameraIndex]
 
-                SHOULD_RECORD = False
+            SHOULD_RECORD = False
 
-                log.log(f"Started Camera #{cameraIndex} loop")
-
-                while True:
-                    start_time = (
-                        Timer.getFPGATimestamp()
-                    )  # Start time for FPS calculation
-                    ret, frame = camera.grabFrame()
-
-                    captureLatency = Timer.getFPGATimestamp() - start_time
-                    if not ret or frame is None:
-                        continue
-
-                    frame = self.fixtureFrame(cameraIndex, frame)
-
-                    process_start = Timer.getFPGATimestamp()
-                    # Retrieve the pipeline instances for the current camera
-                    pipeline = self.pipelineInstanceBindings.get(cameraIndex, None)
-                    processed_frame: Frame = frame
-
-                    if pipeline is not None:
-                        # Process the frame through each assigned pipeline
-                        processed_frame, results = pipeline.processFrame(
-                            frame, start_time
-                        )
-
-                    end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
-                    processLatency = end_time - process_start
-                    fps = 1.0 / (end_time - start_time)  # Calculate FPS
-
-                    self.sendLatency(cameraIndex, captureLatency, processLatency)
-
-                    # Overlay FPS on the frame
-                    cv2.putText(
-                        processed_frame,
-                        f"FPS: {fps:.2f}",
-                        (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 255, 0),
-                        2,
-                    )
-
-                    if processed_frame is not None:
-                        output.putFrame(
-                            cv2.resize(
-                                processed_frame,
-                                self.streamSizes[cameraIndex],
-                            )
-                        )
-                        if SHOULD_RECORD:
-                            recordingOutput.write(processed_frame)
-
-            def initThreads():
-                for index in self.cameras.keys():
-                    thread = threading.Thread(target=lambda: processCamera(index))
-                    thread.start()
-
-            initThreads()
-
-            log.log(
-                bcolors.OKGREEN
-                + bcolors.BOLD
-                + "\n"
-                + "=" * 20
-                + " Synapse Runtime Starting... "
-                + "=" * 20
-                + bcolors.ENDC
-            )
+            log.log(f"Started Camera #{cameraIndex} loop")
 
             while True:
-                if NtClient.INSTANCE:
-                    NtClient.INSTANCE.nt_inst.flush()
-                    if NtClient.INSTANCE.server:
-                        NtClient.INSTANCE.server.flush()
+                start_time = Timer.getFPGATimestamp()  # Start time for FPS calculation
+                ret, frame = camera.grabFrame()
 
-        except Exception as e:
-            log.err(f"{e}")
+                captureLatency = Timer.getFPGATimestamp() - start_time
+                if not ret or frame is None:
+                    continue
+
+                frame = self.fixtureFrame(cameraIndex, frame)
+
+                process_start = Timer.getFPGATimestamp()
+                # Retrieve the pipeline instances for the current camera
+                pipeline = self.pipelineInstanceBindings.get(cameraIndex, None)
+                processed_frame: Frame = frame
+
+                if pipeline is not None:
+                    # Process the frame through each assigned pipeline
+                    processed_frame, results = pipeline.processFrame(frame, start_time)
+
+                end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
+                processLatency = end_time - process_start
+                fps = 1.0 / (end_time - start_time)  # Calculate FPS
+
+                self.sendLatency(cameraIndex, captureLatency, processLatency)
+
+                # Overlay FPS on the frame
+                cv2.putText(
+                    processed_frame,
+                    f"FPS: {fps:.2f}",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 255, 0),
+                    2,
+                )
+
+                if processed_frame is not None:
+                    resized_frame = cv2.resize(
+                        processed_frame,
+                        self.streamSizes[cameraIndex],
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    output.putFrame(resized_frame)
+                    if SHOULD_RECORD:
+                        recordingOutput.write(processed_frame)
+
+        def initThreads():
+            for index in self.cameras.keys():
+                thread = threading.Thread(target=processCamera, args=(index,))
+                thread.daemon = True
+                thread.start()
+
+        initThreads()
+
+        log.log(
+            bcolors.OKGREEN
+            + bcolors.BOLD
+            + "\n"
+            + "=" * 20
+            + " Synapse Runtime Starting... "
+            + "=" * 20
+            + bcolors.ENDC
+        )
+
+        while True:
+            if NtClient.INSTANCE:
+                NtClient.INSTANCE.nt_inst.flush()
+                if NtClient.INSTANCE.server:
+                    NtClient.INSTANCE.server.flush()
 
     def sendLatency(
         self, cameraIndex: int, captureLatency: seconds, processingLatency: seconds
