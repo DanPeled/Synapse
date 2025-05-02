@@ -2,6 +2,7 @@ import importlib.util
 import threading
 import time
 import traceback
+from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
 
@@ -9,13 +10,8 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse.bcolors import bcolors
 from synapse.hardware import MetricsManager
 from synapse.networking import NtClient
@@ -26,6 +22,34 @@ from .camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
 from .config import Config
 from .pipeline import GlobalSettings, Pipeline, PipelineSettings
 from .stypes import Frame
+
+
+def findAllVarsOfType(target, var_type, _cache=None) -> List[Tuple]:
+    if _cache is None:
+        _cache = {}
+
+    matches = []
+
+    obj_id = id(target)
+    if obj_id in _cache:
+        return _cache[obj_id]
+
+    # Don't go into non-container types
+    if isinstance(target, (str, int, float, bool, bytes, complex)):
+        _cache[obj_id] = matches
+        return matches
+    if isinstance(target, (list, tuple, set, np.ndarray, cv2.Mat)):
+        if isinstance(target, var_type):
+            matches.append((len(matches), target))
+        else:
+            for item in target:
+                matches.extend(findAllVarsOfType(item, var_type, _cache))
+    elif hasattr(target, "__dict__"):
+        for name, value in vars(target).items():
+            if isinstance(value, var_type):
+                matches.append((name, value))
+    _cache[obj_id] = matches
+    return matches
 
 
 class PipelineHandler:
@@ -231,7 +255,9 @@ class PipelineHandler:
                             entry, EventFlags.kValueRemote, updateSettingListener
                         )
 
-    def getEventDataValue(self, event: Event) -> Any:
+    @cache
+    @staticmethod
+    def getEventDataValue(event: Event) -> Any:
         topic = event.data.topic  # pyright: ignore
         topicType = topic.getType()
         value = event.data.value  # pyright: ignore
@@ -255,11 +281,14 @@ class PipelineHandler:
         else:
             raise ValueError(f"Unsupported topic type: {topicType}")
 
-    def getCameraTable(self, cameraIndex: int) -> Optional[NetworkTable]:
-        if NtClient.INSTANCE is not None:
-            return NtClient.INSTANCE.nt_inst.getTable(
-                PipelineHandler.NT_TABLE
-            ).getSubTable(self.getCameraTableName(cameraIndex))
+    @staticmethod
+    @cache
+    def getCameraTable(cameraIndex: int) -> NetworkTable:
+        return (
+            NetworkTableInstance.getDefault()
+            .getTable(PipelineHandler.NT_TABLE)
+            .getSubTable(PipelineHandler.getCameraTableName(cameraIndex))
+        )
 
     def setPipelineByIndex(self, cameraIndex: int, pipeline_index: int):
         if cameraIndex not in self.cameras.keys():
@@ -349,7 +378,11 @@ class PipelineHandler:
 
                 if pipeline is not None:
                     # Process the frame through each assigned pipeline
-                    processed_frame, results = pipeline.processFrame(frame, start_time)
+                    results = pipeline.processFrame(frame, start_time)
+                    frame = self.handleResults(results, cameraIndex)
+
+                    if frame is not None:
+                        processed_frame = frame
 
                 end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
                 processLatency = end_time - process_start
@@ -402,6 +435,20 @@ class PipelineHandler:
                 if NtClient.INSTANCE.server:
                     NtClient.INSTANCE.server.flush()
 
+    def handleResults(
+        self, results: Optional[object], cameraIndex: int
+    ) -> Optional[Frame]:
+        if results:
+            frameVars = findAllVarsOfType(results, Frame)
+            entry = self.getCameraTable(cameraIndex).getEntry("view_id")
+
+            DEFAULT_STEP: str = "step_0"
+            for var in list(frameVars):
+                if not entry.exists():
+                    entry.setString(DEFAULT_STEP)
+                if entry.getString(defaultValue=DEFAULT_STEP) == f"step_{var[0]}":
+                    return var[1]
+
     def sendLatency(
         self, cameraIndex: int, captureLatency: seconds, processingLatency: seconds
     ) -> None:
@@ -433,7 +480,8 @@ class PipelineHandler:
         else:
             log.err("NtClient instance is None")
 
-    def getCameraTableName(self, index: int) -> str:
+    @staticmethod
+    def getCameraTableName(index: int) -> str:
         return f"camera{index}"
 
     def loadPipelineSettings(self) -> None:

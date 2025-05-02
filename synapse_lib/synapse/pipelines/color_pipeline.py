@@ -7,7 +7,7 @@ from synapse.core.pipeline import Pipeline, PipelineSettings
 from synapse.core.stypes import Frame
 
 
-class ColorPipeline(Pipeline[None]):
+class ColorPipeline(Pipeline[Tuple[Frame, None]]):
     def __init__(self, settings: PipelineSettings, cameraIndex: int):
         self.cameraIndex = cameraIndex
         self.settings = settings

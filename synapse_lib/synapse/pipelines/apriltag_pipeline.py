@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
+from functools import cache, lru_cache
 from typing import Any, Dict, Final, List, Optional, Set, Tuple, Union
 
 import cv2
@@ -49,6 +49,7 @@ class ApriltagVerbosity(Enum):
         return cls.kPoseOnly
 
 
+@cache
 def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]]:
     if verbosity == ApriltagVerbosity.kAll:
         return None
@@ -65,7 +66,7 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
-class ApriltagPipeline(Pipeline[List[ApriltagResult]]):
+class ApriltagPipeline(Pipeline[Tuple[Frame, List[ApriltagResult]]]):
     kTagSizeKey: Final[str] = "tag_size"
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"

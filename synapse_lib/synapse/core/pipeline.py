@@ -11,8 +11,6 @@ from wpilib import SendableBuilderImpl
 from wpimath import geometry
 from wpiutil import Sendable, SendableBuilder
 
-from .stypes import Frame
-
 
 @dataclass
 class CameraConfig:
@@ -243,7 +241,7 @@ class Pipeline(ABC, Generic[ResultType]):
         pass
 
     @abstractmethod
-    def processFrame(self, img, timestamp: float) -> Tuple[Frame, ResultType]:
+    def processFrame(self, img, timestamp: float) -> ResultType:
         """
         Abstract method that processes a single frame.
 
