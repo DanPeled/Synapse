@@ -10,15 +10,26 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
 from synapse.hardware import MetricsManager
 from synapse.networking import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import CameraBinding, CsCoreCamera, SynapseCamera
+from .camera_factory import (
+    CameraBinding,
+    CameraSettingsKeys,
+    CsCoreCamera,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
 from .pipeline import GlobalSettings, Pipeline, PipelineSettings
 from .stypes import Frame
@@ -53,7 +64,6 @@ def findAllVarsOfType(target, var_type, _cache=None) -> List[Tuple]:
 
 
 class PipelineHandler:
-    NT_TABLE: Final[str] = "Synapse"
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
 
     def __init__(self, pipelineDirectory: Path):
@@ -179,8 +189,9 @@ class PipelineHandler:
         try:
             camera = CsCoreCamera.create(
                 devPath=camera_config.path,
-                name=f"{self.NT_TABLE}/camera{cameraIndex}/input",
+                name=f"{NtClient.NT_TABLE}/camera{cameraIndex}/input",
             )
+            camera.setIndex(cameraIndex)
         except Exception as e:
             log.err(f"Failed to start camera capture: {e}")
             return False
@@ -224,7 +235,7 @@ class PipelineHandler:
 
         currPipeline = self.pipelineInstanceBindings[cameraIndex]
         if NtClient.INSTANCE is not None:
-            camera_table = self.getCameraTable(cameraIndex)
+            camera_table = getCameraTable(cameraIndex)
 
             self.setCameraConfigs(pipeline_config.getMap(), self.cameras[cameraIndex])
 
@@ -247,7 +258,7 @@ class PipelineHandler:
                     )
 
                 for key in pipeline_config.getMap().keys():
-                    nt_table = self.getCameraTable(cameraIndex)
+                    nt_table = getCameraTable(cameraIndex)
                     if nt_table is not None:
                         entry = nt_table.getSubTable("settings").getEntry(key)
 
@@ -281,15 +292,6 @@ class PipelineHandler:
         else:
             raise ValueError(f"Unsupported topic type: {topicType}")
 
-    @staticmethod
-    @cache
-    def getCameraTable(cameraIndex: int) -> NetworkTable:
-        return (
-            NetworkTableInstance.getDefault()
-            .getTable(PipelineHandler.NT_TABLE)
-            .getSubTable(PipelineHandler.getCameraTableName(cameraIndex))
-        )
-
     def setPipelineByIndex(self, cameraIndex: int, pipeline_index: int):
         if cameraIndex not in self.cameras.keys():
             log.err(
@@ -321,8 +323,8 @@ class PipelineHandler:
 
     def setNTPipelineIndex(self, cameraIndex: int, pipeline_index: int):
         if NtClient.INSTANCE is not None:
-            NtClient.INSTANCE.nt_inst.getTable(PipelineHandler.NT_TABLE).getEntry(
-                f"{self.getCameraTableName(cameraIndex)}/pipeline"
+            NtClient.INSTANCE.nt_inst.getTable(NtClient.NT_TABLE).getEntry(
+                f"{getCameraTableName(cameraIndex)}/pipeline"
             ).setInteger(pipeline_index)
 
     def getCameraOutputs(self):
@@ -338,7 +340,7 @@ class PipelineHandler:
 
         return {
             i: cs.CameraServer.putVideo(
-                f"{PipelineHandler.NT_TABLE}/{self.getCameraTableName(i)}",
+                f"{NtClient.NT_TABLE}/{getCameraTableName(i)}",
                 width=getStreamRes(i)[0],
                 height=getStreamRes(i)[1],
             )
@@ -356,8 +358,6 @@ class PipelineHandler:
             output = self.outputs[cameraIndex]
             recordingOutput = self.recordingOutputs[cameraIndex]
             camera: SynapseCamera = self.cameras[cameraIndex]
-
-            SHOULD_RECORD = False
 
             log.log(f"Started Camera #{cameraIndex} loop")
 
@@ -408,7 +408,7 @@ class PipelineHandler:
                         interpolation=cv2.INTER_AREA,
                     )
                     output.putFrame(resized_frame)
-                    if SHOULD_RECORD:
+                    if camera.getSetting("record", False):
                         recordingOutput.write(processed_frame)
 
         def initThreads():
@@ -440,49 +440,47 @@ class PipelineHandler:
     ) -> Optional[Frame]:
         if results:
             frameVars = findAllVarsOfType(results, Frame)
-            entry = self.getCameraTable(cameraIndex).getEntry("view_id")
+            return self.handleFramePiblishing(frameVars, cameraIndex)
 
-            DEFAULT_STEP: str = "step_0"
-            for var in list(frameVars):
-                if not entry.exists():
-                    entry.setString(DEFAULT_STEP)
-                if entry.getString(defaultValue=DEFAULT_STEP) == f"step_{var[0]}":
-                    return var[1]
+    def handleFramePiblishing(
+        self, frames: List[Tuple[Any, Frame]], cameraIndex: int
+    ) -> Optional[Frame]:
+        entry = getCameraTable(cameraIndex).getEntry("view_id")
+        DEFAULT_STEP: str = "step_0"
+
+        for var in list(frames):
+            if not entry.exists():
+                entry.setString(DEFAULT_STEP)
+            if entry.getString(defaultValue=DEFAULT_STEP) == f"step_{var[0]}":
+                return var[1]
 
     def sendLatency(
         self, cameraIndex: int, captureLatency: seconds, processingLatency: seconds
     ) -> None:
         if NtClient.INSTANCE is not None:
-            cameraTable = self.getCameraTable(cameraIndex)
+            cameraTable = getCameraTable(cameraIndex)
             if cameraTable is not None:
                 cameraTable.getEntry("captureLatency").setDouble(captureLatency)
                 cameraTable.getEntry("processLatency").setDouble(processingLatency)
 
     def setupNetworkTables(self) -> None:
         if NtClient.INSTANCE is not None:
-            for cameraIndex in self.cameras.keys():
-                topicName = f"{self.getCameraTableName(cameraIndex)}/pipeline"
+            for cameraIndex, camera in self.cameras.items():
+                entry = camera.getSettingEntry(CameraSettingsKeys.pipeline.value)
 
-                entry = NtClient.INSTANCE.nt_inst.getTable(
-                    PipelineHandler.NT_TABLE
-                ).getEntry(topicName)
+                if entry is not None:
+                    NetworkTableInstance.getDefault().addListener(
+                        entry,
+                        EventFlags.kValueRemote,
+                        lambda event: self.setPipelineByIndex(
+                            cameraIndex,
+                            event.data.value.getInteger(),  # pyright: ignore
+                        ),
+                    )
 
-                NetworkTableInstance.getDefault().addListener(
-                    entry,
-                    EventFlags.kValueRemote,
-                    lambda event: self.setPipelineByIndex(
-                        cameraIndex,
-                        event.data.value.getInteger(),  # pyright: ignore
-                    ),
-                )
-
-                entry.setInteger(self.defaultPipelineIndexes[cameraIndex])
+                    entry.setInteger(self.defaultPipelineIndexes[cameraIndex])
         else:
             log.err("NtClient instance is None")
-
-    @staticmethod
-    def getCameraTableName(index: int) -> str:
-        return f"camera{index}"
 
     def loadPipelineSettings(self) -> None:
         settings: dict = Config.getInstance().getConfigMap()

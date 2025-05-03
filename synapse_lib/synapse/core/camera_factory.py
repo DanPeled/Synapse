@@ -1,12 +1,16 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, Union
+from enum import Enum
+from functools import cache
+from typing import Any, Dict, Optional, Tuple, Union
 
 import cv2
+from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 import numpy as np
 from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode
 from cv2.typing import Size
 from synapse.log import err
+from synapse.networking.nt_client import NtClient
 
 from .stypes import Frame
 
@@ -22,6 +26,25 @@ CSCORE_TO_CV_PROPS = {
 }
 
 CV_TO_CSCORE_PROPS = {v: k for k, v in CSCORE_TO_CV_PROPS.items()}
+
+
+class CameraSettingsKeys(Enum):
+    view_id = "view_id"
+    record = "record"
+    pipeline = "pipeline"
+
+
+def getCameraTableName(index: int) -> str:
+    return f"camera{index}"
+
+
+@cache
+def getCameraTable(cameraIndex: int) -> NetworkTable:
+    return (
+        NetworkTableInstance.getDefault()
+        .getTable(NtClient.NT_TABLE)
+        .getSubTable(getCameraTableName(cameraIndex))
+    )
 
 
 def cscoreToOpenCVProp(prop: str) -> Optional[int]:
@@ -49,6 +72,9 @@ class SynapseCamera(ABC):
         name: str = "",
     ) -> "SynapseCamera": ...
 
+    def setIndex(self, cameraIndex: int) -> None:
+        self.cameraIndex: int = cameraIndex
+
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
 
@@ -69,6 +95,61 @@ class SynapseCamera(ABC):
 
     @abstractmethod
     def getResolution(self) -> Size: ...
+
+    def getSettingEntry(self, key: str) -> Optional[NetworkTableEntry]:
+        if hasattr(self, "cameraIndex"):
+            table: NetworkTable = getCameraTable(self.cameraIndex)
+            entry: NetworkTableEntry = table.getEntry(key)
+            return entry
+        return None
+
+    def getSetting(self, key: str, defaultValue: Any) -> Any:
+        if hasattr(self, "cameraIndex"):
+            table: NetworkTable = getCameraTable(self.cameraIndex)
+            entry: NetworkTableEntry = table.getEntry(key)
+            if not entry.exists():
+                entry.setValue(defaultValue)
+            return entry.getValue()
+        return None
+
+    def setSetting(self, key: str, value: Any) -> None:
+        if hasattr(self, "cameraIndex"):
+            table: NetworkTable = getCameraTable(self.cameraIndex)
+            entry: NetworkTableEntry = table.getEntry(key)
+            entry.setValue(value)
+
+    @property
+    def viewID(self) -> str:
+        entry = self.getSettingEntry(CameraSettingsKeys.view_id.value)
+        if entry is not None:
+            return entry.getString("")
+        return ""
+
+    @viewID.setter
+    def viewID(self, value: str) -> None:
+        self.setSetting(CameraSettingsKeys.view_id.value, value)
+
+    @property
+    def record(self) -> bool:
+        entry = self.getSettingEntry(CameraSettingsKeys.record.value)
+        if entry is not None:
+            return entry.getBoolean(False)
+        return False
+
+    @record.setter
+    def record(self, value: bool) -> None:
+        self.setSetting(CameraSettingsKeys.view_id.value, value)
+
+    @property
+    def pipeline(self) -> int:
+        entry = self.getSettingEntry(CameraSettingsKeys.pipeline.value)
+        if entry is not None:
+            return entry.getInteger(0)
+        return 0
+
+    @pipeline.setter
+    def pipeline(self, value: int) -> None:
+        self.setSetting(CameraSettingsKeys.pipeline.value, value)
 
 
 class OpenCvCamera(SynapseCamera):

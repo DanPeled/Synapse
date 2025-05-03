@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import (Any, Callable, Generic, List, Optional, Tuple, TypeVar,
-                    Union)
+from typing import Any, Callable, Generic, List, Optional, Tuple, TypeVar, Union
 
 from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
 from synapse.log import err
@@ -265,7 +264,10 @@ class Pipeline(ABC, Generic[ResultType]):
             else:
                 self.nt_table.getSubTable("data").putValue(key, value)
 
-    def getSetting(self, key: str) -> Optional[Any]:
+    def getSetting(
+        self,
+        key: str,
+    ) -> Optional[Any]:
         if self.nt_table is not None:
             return self.nt_table.getSubTable("settings").getValue(key, None)
         else:
