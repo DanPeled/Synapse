@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache, lru_cache
-from typing import Any, Dict, Final, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Final, List, Optional, Set, Union
 
 import cv2
 import numpy as np
@@ -12,8 +12,14 @@ from cv2.typing import MatLike
 from synapse.core.pipeline import GlobalSettings, Pipeline, PipelineSettings
 from synapse.core.stypes import Frame
 from wpimath import geometry, units
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
-                              Transform3d, Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation3d,
+    Transform3d,
+    Translation3d,
+)
 
 
 @dataclass
@@ -66,7 +72,7 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
-class ApriltagPipeline(Pipeline[Tuple[Frame, List[ApriltagResult]]]):
+class ApriltagPipeline(Pipeline):
     kTagSizeKey: Final[str] = "tag_size"
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
@@ -127,7 +133,7 @@ class ApriltagPipeline(Pipeline[Tuple[Frame, List[ApriltagResult]]]):
     ) -> apriltag.AprilTagPoseEstimate:
         return self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
 
-    def processFrame(self, img, timestamp: float) -> Tuple[Frame, List[ApriltagResult]]:
+    def processFrame(self, img, timestamp: float) -> Optional[Frame]:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -139,7 +145,7 @@ class ApriltagPipeline(Pipeline[Tuple[Frame, List[ApriltagResult]]]):
         if not tags:
             self.setDataValue("hasResults", False)
             self.setDataValue("results", ApriltagsJson.empty())
-            return (gray, [])
+            return gray
 
         for tag in tags:
             tagPoseEstimate: apriltag.AprilTagPoseEstimate = self.estimateTagPose(tag)
@@ -228,7 +234,7 @@ class ApriltagPipeline(Pipeline[Tuple[Frame, List[ApriltagResult]]]):
             ),
         )
 
-        return (gray, results)
+        return gray
 
     def opencvToWPI(self, opencv: Transform3d) -> Transform3d:
         return Transform3d(  # NOTE: Should be correct
