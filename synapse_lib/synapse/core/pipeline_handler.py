@@ -53,14 +53,16 @@ class PipelineHandler:
         self.cameras: Dict[int, SynapseCamera] = {}
         self.pipelineInstanceBindings: Dict[int, Pipeline] = {}
         self.pipelineSettings: Dict[int, PipelineSettings] = {}
+        self.pipelines: Dict[str, type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[int, int] = {}
         self.pipelineBindings: Dict[int, int] = {}
         self.streamSizes: Dict[int, Tuple[int, int]] = {}
         self.pipelineTypes: Dict[int, str] = {}
         self.outputs: Dict[int, cs.CvSource] = {}
         self.recordingOutputs: Dict[int, cv2.VideoWriter] = {}
+        self.cameraBindings: Dict[int, CameraConfig] = {}
 
-    def setup(self, settings: Dict[Any, Any]):
+    def setup(self):
         import atexit
 
         log.log(
@@ -75,9 +77,8 @@ class PipelineHandler:
         )
 
         self.pipelines = self.loadPipelines()
-        self.cameraBindings: Dict[int, CameraConfig] = (
-            GlobalSettings.getCameraConfigMap()
-        )
+        self.cameraBindings = GlobalSettings.getCameraConfigMap()
+
         atexit.register(self.cleanup)
 
     def loadPipelines(self) -> Dict[str, Type[Pipeline]]:

@@ -68,7 +68,7 @@ class Synapse:
 
             nt_good = self.__init_networktables(config.network)
             if nt_good:
-                self.pipeline_handler.setup(settings)
+                self.pipeline_handler.setup()
             else:
                 err(
                     f"Something went wrong while setting up networktables with params: {config.network}"
@@ -126,3 +126,10 @@ class Synapse:
         """
         self.pipeline_handler.loadPipelineSettings()
         self.pipeline_handler.run()
+
+    @staticmethod
+    def createAndRunRuntime(root: Path) -> None:
+        handler = PipelineHandler(root)
+        s = Synapse()
+        if s.init(handler, root / "config" / "settings.yml"):
+            s.run()
