@@ -1,55 +1,15 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
+from synapse.core.stypes import Frame
 from synapse.log import err
 from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
-from wpimath import geometry
 from wpiutil import Sendable, SendableBuilder
 
-from .stypes import Frame
-
-
-@dataclass
-class CameraConfig:
-    name: str
-    path: Union[str, int]
-    transform: geometry.Transform3d
-    defaultPipeline: int
-    matrix: List[List[float]]
-    distCoeff: List[float]
-    measuredRes: Tuple[int, int]
-    streamRes: Tuple[int, int]
-
-
-class CameraConfigKey(Enum):
-    kName = "name"
-    kPath = "path"
-    kDefaultPipeline = "default_pipeline"
-    kMatrix = "matrix"
-    kDistCoeff = "distCoeffs"
-    kMeasuredRes = "measured_res"
-    kStreamRes = "stream_res"
-    kTransform = "transform"
-
-
-def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
-    if len(dataList) != 2:
-        err("Invalid transform length")
-        return geometry.Transform3d()
-    else:
-        poseList = dataList[0]
-        rotationList = dataList[1]
-
-        return geometry.Transform3d(
-            translation=geometry.Translation3d(poseList[0], poseList[1], poseList[2]),
-            rotation=geometry.Rotation3d.fromDegrees(
-                rotationList[0], rotationList[1], rotationList[2]
-            ),
-        )
+from ..util import listToTransform3d
+from .camera_factory import CameraConfig, CameraConfigKey
 
 
 class PipelineSettings:
@@ -210,6 +170,9 @@ class PipelineSettings:
             raise ValueError("Unsupported type")
 
 
+FrameResult = Optional[Union[Iterable[Frame], Frame]]
+
+
 class Pipeline(ABC):
     __is_enabled__ = True
     VALID_ENTRY_TYPES = Any
@@ -225,7 +188,7 @@ class Pipeline(ABC):
         pass
 
     @abstractmethod
-    def processFrame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> FrameResult:
         """
         Abstract method that processes a single frame.
 
@@ -249,7 +212,10 @@ class Pipeline(ABC):
             else:
                 self.nt_table.getSubTable("data").putValue(key, value)
 
-    def getSetting(self, key: str) -> Optional[Any]:
+    def getSetting(
+        self,
+        key: str,
+    ) -> Optional[Any]:
         if self.nt_table is not None:
             return self.nt_table.getSubTable("settings").getValue(key, None)
         else:
@@ -308,15 +274,6 @@ def disabled(cls):
 class GlobalSettingsMeta(type):
     """
     A metaclass for managing global settings at the class level.
-
-    Attributes:
-        __settings (Optional[PipelineSettings]): The global pipeline settings instance.
-
-    Methods:
-        setup: Initializes the global settings.
-        get: Retrieves a setting by key from the global settings.
-        set: Sets a setting in the global settings.
-        getMap: Returns the global settings map.
     """
 
     kCameraConfigsKey: str = "camera_configs"
@@ -359,6 +316,9 @@ class GlobalSettingsMeta(type):
         if cls.hasCameraData(cameraIndex):
             return cls.__cameraConfigs[cameraIndex]
         return None
+
+    def getCameraConfigMap(cls) -> Dict[int, CameraConfig]:
+        return cls.__cameraConfigs
 
     def get(
         cls, key: str, defaultValue=None
@@ -433,6 +393,15 @@ class GlobalSettingsMeta(type):
         return {}
 
     def __contains__(cls, key: str) -> bool:
+        """
+        Check if the specified key exists in the settings.
+
+        Args:
+            key (str): The key to check for in the settings.
+
+        Returns:
+            bool: True if the key exists in the settings, False otherwise.
+        """
         if cls.__settings is not None:
             return key in cls.__settings
         return False

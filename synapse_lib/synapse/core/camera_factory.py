@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, Union
+from enum import Enum
+from functools import cache
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
 from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode
 from cv2.typing import Size
+from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err
+from synapse.networking.nt_client import NtClient
+from wpimath import geometry
 
 from .stypes import Frame
 
@@ -24,18 +29,68 @@ CSCORE_TO_CV_PROPS = {
 CV_TO_CSCORE_PROPS = {v: k for k, v in CSCORE_TO_CV_PROPS.items()}
 
 
+class CameraSettingsKeys(Enum):
+    view_id = "view_id"
+    record = "record"
+    pipeline = "pipeline"
+
+
+def getCameraTableName(index: int) -> str:
+    return f"camera{index}"
+
+
+@dataclass
+class CameraConfig:
+    """
+    Represents the configuration for a single camera.
+
+    Attributes:
+        name (str): The unique name or identifier for the camera.
+        path (Union[str, int]): The path or device index used to access the camera (e.g., '/dev/video0' or 0).
+        transform (geometry.Transform3d): The transformation from the camera to the robot coordinate frame.
+        defaultPipeline (int): The default processing pipeline index to use for the camera.
+        matrix (List[List[float]]): The intrinsic camera matrix (usually 3x3).
+        distCoeff (List[float]): The distortion coefficients for the camera lens.
+        measuredRes (Tuple[int, int]): The resolution (width, height) used for camera calibration.
+        streamRes (Tuple[int, int]): The resolution (width, height) used for video streaming.
+    """
+
+    name: str
+    path: str
+    transform: geometry.Transform3d
+    defaultPipeline: int
+    matrix: List[List[float]]
+    distCoeff: List[float]
+    measuredRes: Tuple[int, int]
+    streamRes: Tuple[int, int]
+
+
+class CameraConfigKey(Enum):
+    kName = "name"
+    kPath = "path"
+    kDefaultPipeline = "default_pipeline"
+    kMatrix = "matrix"
+    kDistCoeff = "distCoeffs"
+    kMeasuredRes = "measured_res"
+    kStreamRes = "stream_res"
+    kTransform = "transform"
+
+
+@cache
+def getCameraTable(cameraIndex: int) -> NetworkTable:
+    return (
+        NetworkTableInstance.getDefault()
+        .getTable(NtClient.NT_TABLE)
+        .getSubTable(getCameraTableName(cameraIndex))
+    )
+
+
 def cscoreToOpenCVProp(prop: str) -> Optional[int]:
     return CSCORE_TO_CV_PROPS.get(prop)
 
 
 def opencvToCscoreProp(prop: int) -> Optional[str]:
     return CV_TO_CSCORE_PROPS.get(prop)
-
-
-@dataclass
-class CameraBinding:
-    path: str
-    name: str
 
 
 class SynapseCamera(ABC):
@@ -48,6 +103,9 @@ class SynapseCamera(ABC):
         usbIndex: Optional[int] = None,
         name: str = "",
     ) -> "SynapseCamera": ...
+
+    def setIndex(self, cameraIndex: int) -> None:
+        self.cameraIndex: int = cameraIndex
 
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
@@ -69,6 +127,61 @@ class SynapseCamera(ABC):
 
     @abstractmethod
     def getResolution(self) -> Size: ...
+
+    def getSettingEntry(self, key: str) -> Optional[NetworkTableEntry]:
+        if hasattr(self, "cameraIndex"):
+            table: NetworkTable = getCameraTable(self.cameraIndex)
+            entry: NetworkTableEntry = table.getEntry(key)
+            return entry
+        return None
+
+    def getSetting(self, key: str, defaultValue: Any) -> Any:
+        if hasattr(self, "cameraIndex"):
+            table: NetworkTable = getCameraTable(self.cameraIndex)
+            entry: NetworkTableEntry = table.getEntry(key)
+            if not entry.exists():
+                entry.setValue(defaultValue)
+            return entry.getValue()
+        return None
+
+    def setSetting(self, key: str, value: Any) -> None:
+        if hasattr(self, "cameraIndex"):
+            table: NetworkTable = getCameraTable(self.cameraIndex)
+            entry: NetworkTableEntry = table.getEntry(key)
+            entry.setValue(value)
+
+    @property
+    def viewID(self) -> str:
+        entry = self.getSettingEntry(CameraSettingsKeys.view_id.value)
+        if entry is not None:
+            return entry.getString("")
+        return ""
+
+    @viewID.setter
+    def viewID(self, value: str) -> None:
+        self.setSetting(CameraSettingsKeys.view_id.value, value)
+
+    @property
+    def record(self) -> bool:
+        entry = self.getSettingEntry(CameraSettingsKeys.record.value)
+        if entry is not None:
+            return entry.getBoolean(False)
+        return False
+
+    @record.setter
+    def record(self, value: bool) -> None:
+        self.setSetting(CameraSettingsKeys.view_id.value, value)
+
+    @property
+    def pipeline(self) -> int:
+        entry = self.getSettingEntry(CameraSettingsKeys.pipeline.value)
+        if entry is not None:
+            return entry.getInteger(0)
+        return 0
+
+    @pipeline.setter
+    def pipeline(self, value: int) -> None:
+        self.setSetting(CameraSettingsKeys.pipeline.value, value)
 
 
 class OpenCvCamera(SynapseCamera):
@@ -226,3 +339,27 @@ class CsCoreCamera(SynapseCamera):
     def getResolution(self) -> Size:
         videoMode = self.camera.getVideoMode()
         return (videoMode.width, videoMode.height)
+
+
+class CameraFactory:
+    kOpenCV: Type[SynapseCamera] = OpenCvCamera
+    kCameraServer: Type[SynapseCamera] = CsCoreCamera
+    kDefault: Type[SynapseCamera] = kCameraServer
+
+    @classmethod
+    def create(
+        cls,
+        *_,
+        cameraType: Type[SynapseCamera] = kDefault,
+        cameraIndex: int,
+        devPath: Optional[str] = None,
+        usbIndex: Optional[int] = None,
+        name: str = "",
+    ) -> "SynapseCamera":
+        cam: SynapseCamera = cameraType.create(
+            devPath=devPath,
+            usbIndex=usbIndex,
+            name=name,
+        )
+        cam.setIndex(cameraIndex)
+        return cam

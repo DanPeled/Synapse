@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
+from functools import cache, lru_cache
 from typing import Any, Dict, Final, List, Optional, Set, Union
 
 import cv2
@@ -48,6 +49,7 @@ class ApriltagVerbosity(Enum):
         return cls.kPoseOnly
 
 
+@cache
 def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]]:
     if verbosity == ApriltagVerbosity.kAll:
         return None
@@ -94,8 +96,8 @@ class ApriltagPipeline(Pipeline):
         detectorConfig: apriltag.AprilTagDetector.Config = (
             apriltag.AprilTagDetector.Config()
         )
+
         detectorConfig.numThreads = int(settings.get("num_threads") or 1)
-        print(detectorConfig.numThreads)
         self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily("tag36h11")
 
@@ -119,7 +121,13 @@ class ApriltagPipeline(Pipeline):
         )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def processFrame(self, img, timestamp: float) -> Frame:
+    @lru_cache(maxsize=100)
+    def estimateTagPose(
+        self, tag: apriltag.AprilTagDetection
+    ) -> apriltag.AprilTagPoseEstimate:
+        return self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
+
+    def processFrame(self, img, timestamp: float) -> Optional[Frame]:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -127,7 +135,6 @@ class ApriltagPipeline(Pipeline):
 
         tags = self.apriltagDetector.detect(gray)
         results: List[ApriltagResult] = []
-        gray = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
         if not tags:
             self.setDataValue("hasResults", False)
@@ -135,15 +142,13 @@ class ApriltagPipeline(Pipeline):
             return gray
 
         for tag in tags:
-            tagPoseEstimate: apriltag.AprilTagPoseEstimate = (
-                self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
-            )
+            tagPoseEstimate: apriltag.AprilTagPoseEstimate = self.estimateTagPose(tag)
 
             tagRelativePose: Transform3d = (
                 tagPoseEstimate.pose1
             )  # TODO: check if needs to switch with pose2 sometimes
 
-            if isinstance(tagSize, float):
+            if tagSize:
                 self.drawTagDetectionMarker(
                     tag=tag,
                     tagTransform=tagRelativePose,
