@@ -3,14 +3,15 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
-from wpimath import geometry
+
 import cv2
-from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 import numpy as np
 from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode
 from cv2.typing import Size
+from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err
 from synapse.networking.nt_client import NtClient
+from wpimath import geometry
 
 from .stypes import Frame
 

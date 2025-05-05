@@ -1,5 +1,7 @@
 from typing import List
+
 from wpimath import geometry
+
 from .log import err
 
 

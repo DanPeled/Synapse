@@ -5,37 +5,23 @@ import traceback
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
-from .pipeline import CameraConfig
+
 import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import Event, EventFlags, NetworkTableInstance, NetworkTableType
 from synapse.bcolors import bcolors
 from synapse.hardware import MetricsManager
 from synapse.networking import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from .camera_factory import (CameraFactory, CameraSettingsKeys, SynapseCamera,
+                             getCameraTable, getCameraTableName)
 from .config import Config
-from .pipeline import (
-    FrameResult,
-    GlobalSettings,
-    Pipeline,
-    PipelineSettings,
-)
+from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
+                       PipelineSettings)
 from .stypes import DataValue, Frame
 
 
