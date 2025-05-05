@@ -55,6 +55,10 @@ class Synapse:
             settings = config.getConfigMap()
             self.settings_dict = settings
 
+            global_settings = settings["global"]
+            if not GlobalSettings.setup(global_settings):
+                raise Exception("Global settings setup failed")
+
             # Initialize NetworkTables
             self.__init_cmd_args()
 
@@ -72,9 +76,6 @@ class Synapse:
                 return False
 
             # Setup global settings
-            global_settings = settings["global"]
-            if not GlobalSettings.setup(global_settings):
-                raise Exception("Global settings setup failed")
         except Exception as e:
             log(f"Something went wrong while reading settings config file. {repr(e)}")
             return False

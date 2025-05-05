@@ -5,6 +5,7 @@ import traceback
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
+from .pipeline import CameraConfig
 import cscore as cs
 import cv2
 import numpy as np
@@ -22,7 +23,6 @@ from wpilib import Timer
 from wpimath.units import seconds
 
 from .camera_factory import (
-    CameraBinding,
     CameraFactory,
     CameraSettingsKeys,
     SynapseCamera,
@@ -31,7 +31,6 @@ from .camera_factory import (
 )
 from .config import Config
 from .pipeline import (
-    CameraConfig,
     FrameResult,
     GlobalSettings,
     Pipeline,
@@ -76,32 +75,10 @@ class PipelineHandler:
         )
 
         self.pipelines = self.loadPipelines()
-        self.cameraBindings = self.setupCameraBindings(
-            settings["global"]["camera_configs"]
+        self.cameraBindings: Dict[int, CameraConfig] = (
+            GlobalSettings.getCameraConfigMap()
         )
         atexit.register(self.cleanup)
-
-    def setupCameraBindings(
-        self, camerasDataDict: Dict[int, Dict[str, Any]]
-    ) -> Dict[int, CameraBinding]:
-        """
-        Initializes camera bindings from a YAML configuration dictionary.
-
-        Args:
-            cameras_yml (Dict[int, Dict[str, Any]]): A dictionary where each key is a camera index,
-                and the value is a dictionary containing "path" and "name" keys for the camera.
-
-        Returns:
-            Dict[int, CameraBinding]: A dictionary mapping each index to its corresponding CameraBinding.
-        """
-        bindings: Dict[int, CameraBinding] = {}
-
-        for index, camera_config in camerasDataDict.items():
-            bindings[index] = CameraBinding(
-                camera_config["path"], camera_config["name"]
-            )
-
-        return bindings
 
     def loadPipelines(self) -> Dict[str, Type[Pipeline]]:
         """
@@ -175,7 +152,7 @@ class PipelineHandler:
                 cameraType=CameraFactory.kCameraServer,
                 cameraIndex=cameraIndex,
                 devPath=path,
-                name=f"camera{cameraIndex}",
+                name=f"{camera_config.name}(#{cameraIndex})",
             )
         except Exception as e:
             log.err(f"Failed to start camera capture: {e}")
@@ -192,7 +169,9 @@ class PipelineHandler:
 
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
-            log.log(f"Camera ({camera_config}, id={cameraIndex}) added successfully.")
+            log.log(
+                f"Camera (name={camera_config.name}, path={camera_config.path}, id={cameraIndex}) added successfully."
+            )
             return True
 
         log.err(

@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Optional, Tuple, Type, Union
-
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from wpimath import geometry
 import cv2
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 import numpy as np
@@ -38,6 +38,43 @@ def getCameraTableName(index: int) -> str:
     return f"camera{index}"
 
 
+@dataclass
+class CameraConfig:
+    """
+    Represents the configuration for a single camera.
+
+    Attributes:
+        name (str): The unique name or identifier for the camera.
+        path (Union[str, int]): The path or device index used to access the camera (e.g., '/dev/video0' or 0).
+        transform (geometry.Transform3d): The transformation from the camera to the robot coordinate frame.
+        defaultPipeline (int): The default processing pipeline index to use for the camera.
+        matrix (List[List[float]]): The intrinsic camera matrix (usually 3x3).
+        distCoeff (List[float]): The distortion coefficients for the camera lens.
+        measuredRes (Tuple[int, int]): The resolution (width, height) used for camera calibration.
+        streamRes (Tuple[int, int]): The resolution (width, height) used for video streaming.
+    """
+
+    name: str
+    path: str
+    transform: geometry.Transform3d
+    defaultPipeline: int
+    matrix: List[List[float]]
+    distCoeff: List[float]
+    measuredRes: Tuple[int, int]
+    streamRes: Tuple[int, int]
+
+
+class CameraConfigKey(Enum):
+    kName = "name"
+    kPath = "path"
+    kDefaultPipeline = "default_pipeline"
+    kMatrix = "matrix"
+    kDistCoeff = "distCoeffs"
+    kMeasuredRes = "measured_res"
+    kStreamRes = "stream_res"
+    kTransform = "transform"
+
+
 @cache
 def getCameraTable(cameraIndex: int) -> NetworkTable:
     return (
@@ -53,12 +90,6 @@ def cscoreToOpenCVProp(prop: str) -> Optional[int]:
 
 def opencvToCscoreProp(prop: int) -> Optional[str]:
     return CV_TO_CSCORE_PROPS.get(prop)
-
-
-@dataclass
-class CameraBinding:
-    path: str
-    name: str
 
 
 class SynapseCamera(ABC):

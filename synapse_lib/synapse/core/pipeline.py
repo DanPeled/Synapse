@@ -1,76 +1,19 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from enum import Enum
 from typing import (
     Any,
     Callable,
     Iterable,
-    List,
     Optional,
-    Tuple,
     Union,
 )
-
+from .camera_factory import CameraConfig, CameraConfigKey
+from ..util import listToTransform3d
 from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
 from synapse.core.stypes import Frame
 from synapse.log import err
 from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
-from wpimath import geometry
 from wpiutil import Sendable, SendableBuilder
-
-
-@dataclass
-class CameraConfig:
-    """
-    Represents the configuration for a single camera.
-
-    Attributes:
-        name (str): The unique name or identifier for the camera.
-        path (Union[str, int]): The path or device index used to access the camera (e.g., '/dev/video0' or 0).
-        transform (geometry.Transform3d): The transformation from the camera to the robot coordinate frame.
-        defaultPipeline (int): The default processing pipeline index to use for the camera.
-        matrix (List[List[float]]): The intrinsic camera matrix (usually 3x3).
-        distCoeff (List[float]): The distortion coefficients for the camera lens.
-        measuredRes (Tuple[int, int]): The resolution (width, height) used for camera calibration.
-        streamRes (Tuple[int, int]): The resolution (width, height) used for video streaming.
-    """
-
-    name: str
-    path: Union[str, int, None]
-    transform: geometry.Transform3d
-    defaultPipeline: int
-    matrix: List[List[float]]
-    distCoeff: List[float]
-    measuredRes: Tuple[int, int]
-    streamRes: Tuple[int, int]
-
-
-class CameraConfigKey(Enum):
-    kName = "name"
-    kPath = "path"
-    kDefaultPipeline = "default_pipeline"
-    kMatrix = "matrix"
-    kDistCoeff = "distCoeffs"
-    kMeasuredRes = "measured_res"
-    kStreamRes = "stream_res"
-    kTransform = "transform"
-
-
-def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
-    if len(dataList) != 2:
-        err("Invalid transform length")
-        return geometry.Transform3d()
-    else:
-        poseList = dataList[0]
-        rotationList = dataList[1]
-
-        return geometry.Transform3d(
-            translation=geometry.Translation3d(poseList[0], poseList[1], poseList[2]),
-            rotation=geometry.Rotation3d.fromDegrees(
-                rotationList[0], rotationList[1], rotationList[2]
-            ),
-        )
 
 
 class PipelineSettings:
