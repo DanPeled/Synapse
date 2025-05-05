@@ -195,7 +195,7 @@ class OpenCvCamera(SynapseCamera):
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",
-    ) -> "SynapseCamera":
+    ) -> "OpenCvCamera":
         inst = OpenCvCamera()
         if usbIndex is not None:
             inst.cap = cv2.VideoCapture(usbIndex)
@@ -257,7 +257,7 @@ class CsCoreCamera(SynapseCamera):
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",
-    ) -> "SynapseCamera":
+    ) -> "CsCoreCamera":
         inst = CsCoreCamera()
         inst.frameBuffer = np.zeros((1920, 1080, 3), dtype=np.uint8)
         if usbIndex is not None:
