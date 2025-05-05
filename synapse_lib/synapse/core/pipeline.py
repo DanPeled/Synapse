@@ -37,7 +37,7 @@ class CameraConfig:
     """
 
     name: str
-    path: Union[str, int]
+    path: Union[str, int, None]
     transform: geometry.Transform3d
     defaultPipeline: int
     matrix: List[List[float]]
@@ -377,6 +377,9 @@ class GlobalSettingsMeta(type):
         if cls.hasCameraData(cameraIndex):
             return cls.__cameraConfigs[cameraIndex]
         return None
+
+    def getCameraConfigMap(cls) -> Dict[int, CameraConfig]:
+        return cls.__cameraConfigs
 
     def get(
         cls, key: str, defaultValue=None

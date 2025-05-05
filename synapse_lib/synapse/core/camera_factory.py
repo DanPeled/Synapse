@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
 import cv2
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
@@ -307,3 +307,27 @@ class CsCoreCamera(SynapseCamera):
     def getResolution(self) -> Size:
         videoMode = self.camera.getVideoMode()
         return (videoMode.width, videoMode.height)
+
+
+class CameraFactory:
+    kOpenCV: Type[SynapseCamera] = OpenCvCamera
+    kCameraServer: Type[SynapseCamera] = CsCoreCamera
+    kDefault: Type[SynapseCamera] = kCameraServer
+
+    @classmethod
+    def create(
+        cls,
+        *_,
+        cameraType: Type[SynapseCamera] = kDefault,
+        cameraIndex: int,
+        devPath: Optional[str] = None,
+        usbIndex: Optional[int] = None,
+        name: str = "",
+    ) -> "SynapseCamera":
+        cam: SynapseCamera = cameraType.create(
+            devPath=devPath,
+            usbIndex=usbIndex,
+            name=name,
+        )
+        cam.setIndex(cameraIndex)
+        return cam
