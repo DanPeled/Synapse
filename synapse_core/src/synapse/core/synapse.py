@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from synapse.bcolors import bcolors
@@ -68,7 +69,7 @@ class Synapse:
 
             nt_good = self.__init_networktables(config.network)
             if nt_good:
-                self.pipeline_handler.setup()
+                self.pipeline_handler.setup(Path(os.getcwd()))
             else:
                 err(
                     f"Something went wrong while setting up networktables with params: {config.network}"

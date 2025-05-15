@@ -1,11 +1,14 @@
-from setuptools import find_packages, setup
+from setuptools import setup, find_packages
 
 setup(
-    name="synapse",
-    version="0.0.1",
-    author="Ionic Bond #9738",
-    description="",
-    packages=find_packages(),
+    name="Synapse",
+    version="0.1.0",
+    packages=[
+        *find_packages(where="synapse_core/src"),
+    ],
+    package_dir={
+        "": "synapse_core/src/",
+    },
     install_requires=[
         "robotpy_wpimath",
         "robotpy_apriltag",
@@ -23,5 +26,4 @@ setup(
         "pytest",
         "build",
     ],
-    python_requires=">=3.8",
 )
