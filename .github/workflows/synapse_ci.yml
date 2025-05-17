@@ -28,12 +28,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install . 
-        working-directory: synapse_core
 
       - name: Run build check
         run: |
-          python -m build .
-        working-directory: synapse_core
+          python -m build
 
   lint:
     runs-on: ubuntu-latest
