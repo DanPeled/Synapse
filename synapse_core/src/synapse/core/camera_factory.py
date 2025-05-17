@@ -11,9 +11,8 @@ from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err
 from synapse.networking.nt_client import NtClient
+from synapse.stypes import Frame
 from wpimath import geometry
-
-from .stypes import Frame
 
 CSCORE_TO_CV_PROPS = {
     "brightness": cv2.CAP_PROP_BRIGHTNESS,

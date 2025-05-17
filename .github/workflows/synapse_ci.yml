@@ -5,12 +5,12 @@ on:
     branches:
       - main
     paths:
-      - 'synapse_lib/**'
+      - 'synapse_core/**'
   pull_request:
     branches:
       - main
     paths:
-      - 'synapse_lib/**'
+      - 'synapse_core/**'
 
 jobs:
   build:
@@ -28,12 +28,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install . 
-        working-directory: synapse_lib
 
       - name: Run build check
         run: |
-          python -m build .
-        working-directory: synapse_lib
+          python -m build
 
   lint:
     runs-on: ubuntu-latest
@@ -50,12 +48,12 @@ jobs:
       - name: Install Ruff and isort
         run: |
           pip install ruff isort
-        working-directory: synapse_lib
+        working-directory: synapse_core
 
       - name: Run Ruff linting
         run: |
           ruff check .
-        working-directory: synapse_lib
+        working-directory: synapse_core
 
       - name: Run isort check
         run: |
@@ -76,17 +74,16 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .
-        working-directory: synapse_lib
 
       - name: Install Pyright
         run: |
           pip install pyright
-        working-directory: synapse_lib
+        working-directory: synapse_core
 
       - name: Run Pyright type checks
         run: |
           pyright
-        working-directory: synapse_lib 
+        working-directory: synapse_core 
 
   test:
     runs-on: ubuntu-latest
@@ -103,14 +100,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .  
-        working-directory: synapse_lib
 
       - name: Install PyTest
         run: |
           pip install pytest
-        working-directory: synapse_lib
+        working-directory: synapse_core
 
       - name: Run Tests
         run: |
-          pytest tests/
-        working-directory: synapse_lib
+          pytest .
+        working-directory: synapse_core/tests

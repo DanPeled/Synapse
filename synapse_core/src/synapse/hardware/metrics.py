@@ -5,8 +5,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final, List, Optional
 
+from ntcore import NetworkTableInstance
 from synapse.log import err
-from synapse.networking import NtClient
 
 # Referenced from  https://github.com/PhotonVision/photonvision/
 
@@ -340,10 +340,9 @@ class MetricsManager:
             self.getNpuUsage(),
         ]
 
-        if NtClient.INSTANCE is not None:
-            NtClient.INSTANCE.nt_inst.getEntry("Synapse/metrics").setStringArray(
-                metrics
-            )
+        NetworkTableInstance.getDefault().getEntry("Synapse/metrics").setStringArray(
+            metrics
+        )
 
     def execute(self, command: str) -> str:
         try:

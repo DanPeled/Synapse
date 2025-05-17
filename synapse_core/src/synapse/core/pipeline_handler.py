@@ -14,6 +14,7 @@ from ntcore import Event, EventFlags, NetworkTableInstance, NetworkTableType
 from synapse.bcolors import bcolors
 from synapse.hardware import MetricsManager
 from synapse.networking import NtClient
+from synapse.stypes import DataValue, Frame
 from wpilib import Timer
 from wpimath.units import seconds
 
@@ -22,7 +23,6 @@ from .camera_factory import (CameraFactory, CameraSettingsKeys, SynapseCamera,
 from .config import Config
 from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
                        PipelineSettings)
-from .stypes import DataValue, Frame
 
 
 class PipelineHandler:
@@ -48,7 +48,7 @@ class PipelineHandler:
         self.recordingOutputs: Dict[int, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[int, CameraConfig] = {}
 
-    def setup(self):
+    def setup(self, directory: Path):
         import atexit
 
         log.log(
@@ -62,48 +62,54 @@ class PipelineHandler:
             + "\n"
         )
 
-        self.pipelines = self.loadPipelines()
+        self.pipelines = self.loadPipelines(directory)
         self.cameraBindings = GlobalSettings.getCameraConfigMap()
 
         atexit.register(self.cleanup)
 
-    def loadPipelines(self) -> Dict[str, Type[Pipeline]]:
+    def loadPipelines(self, directory: Path) -> Dict[str, Type[Pipeline]]:
         """
         Loads all classes that extend Pipeline from Python files in the directory.
         :return: A dictionary of Pipeline subclasses
         """
 
+        def loadPipelineClasses(directory: Path):
+            pipelineClasses = {}
+            for file_path in directory.rglob("*_pipeline.py"):
+                if file_path.name not in ignoredFiles:
+                    module_name = file_path.stem  # Get filename without extension
+
+                    try:
+                        # Load module directly from file path
+                        spec = importlib.util.spec_from_file_location(
+                            module_name, str(file_path)
+                        )
+                        if spec is None or spec.loader is None:
+                            continue
+
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+
+                        # Look for Pipeline subclasses in the loaded module
+                        for attr in dir(module):
+                            cls = getattr(module, attr)
+                            if (
+                                isinstance(cls, type)
+                                and issubclass(cls, Pipeline)
+                                and cls is not Pipeline
+                            ):
+                                if cls.__is_enabled__:
+                                    log.log(f"Loaded {cls.__name__} pipeline")
+                                    pipelineClasses[cls.__name__] = cls
+                    except Exception as e:
+                        log.err(f"while loading {file_path}: {e}")
+                        traceback.print_exc()
+            return pipelineClasses
+
         ignoredFiles = ["setup.py"]
-        pipelines = {}
-        for file_path in self.pipelineDirectory.rglob("*_pipeline.py"):
-            if file_path.name not in ignoredFiles:
-                module_name = file_path.stem  # Get filename without extension
 
-                try:
-                    # Load module directly from file path
-                    spec = importlib.util.spec_from_file_location(
-                        module_name, str(file_path)
-                    )
-                    if spec is None or spec.loader is None:
-                        continue
-
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-
-                    # Look for Pipeline subclasses in the loaded module
-                    for attr in dir(module):
-                        cls = getattr(module, attr)
-                        if (
-                            isinstance(cls, type)
-                            and issubclass(cls, Pipeline)
-                            and cls is not Pipeline
-                        ):
-                            if cls.__is_enabled__:
-                                log.log(f"Loaded {cls.__name__} pipeline")
-                                pipelines[cls.__name__] = cls
-                except Exception as e:
-                    log.err(f"while loading {file_path}: {e}")
-                    traceback.print_exc()
+        pipelines = loadPipelineClasses(directory)
+        pipelines.update(loadPipelineClasses(Path(__file__).parent.parent))
 
         log.log("Loaded pipeline classes successfully")
         return pipelines
