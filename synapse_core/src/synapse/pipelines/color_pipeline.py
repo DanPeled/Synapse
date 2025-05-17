@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from cv2.typing import MatLike
 from synapse.core.pipeline import Pipeline, PipelineSettings
-from synapse.core.stypes import Frame
+from synapse.stypes import Frame
 
 
 class ColorPipeline(Pipeline):

@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Optional, Union
 
 from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
-from synapse.core.stypes import Frame
 from synapse.log import err
+from synapse.stypes import Frame
 from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
