@@ -1,5 +1,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock
+
 from synapse.core import Synapse
 from synapse.core.pipeline_handler import PipelineHandler
 
