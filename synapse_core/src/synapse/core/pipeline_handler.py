@@ -13,16 +13,26 @@ import synapse.log as log
 from ntcore import Event, EventFlags, NetworkTableInstance, NetworkTableType
 from synapse.bcolors import bcolors
 from synapse.hardware import MetricsManager
-from synapse.networking import NtClient
+from synapse_net import NtClient
 from synapse.stypes import DataValue, Frame
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CameraFactory, CameraSettingsKeys, SynapseCamera,
-                             getCameraTable, getCameraTableName)
+from .camera_factory import (
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
+from .pipeline import (
+    CameraConfig,
+    FrameResult,
+    GlobalSettings,
+    Pipeline,
+    PipelineSettings,
+)
 
 
 class PipelineHandler:

@@ -2,9 +2,9 @@ import builtins
 import os
 import re
 import sys
-
 import pytest
 import synapse.log as log
+from synapse.bcolors import bcolors
 
 
 @pytest.fixture
@@ -39,8 +39,8 @@ def test_err_logs_error_with_formatting(cleanupLogs) -> None:
         contents = f.read()
         assert "[ERROR]" in contents
         assert test_error in contents
-        assert log.bcolors.FAIL in contents
-        assert log.bcolors.ENDC in contents
+        assert bcolors.FAIL in contents
+        assert bcolors.ENDC in contents
 
 
 def test_console_output_mocked(monkeypatch) -> None:

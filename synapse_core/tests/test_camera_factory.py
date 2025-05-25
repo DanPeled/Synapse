@@ -3,8 +3,12 @@ from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
-from synapse.core.camera_factory import (CameraFactory, CsCoreCamera,
-                                         OpenCvCamera, opencvToCscoreProp)
+from synapse.core.camera_factory import (
+    CameraFactory,
+    CsCoreCamera,
+    OpenCvCamera,
+    opencvToCscoreProp,
+)
 
 
 class TestCsCoreCamera(unittest.TestCase):

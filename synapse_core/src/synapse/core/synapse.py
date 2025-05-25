@@ -4,7 +4,7 @@ from pathlib import Path
 from synapse.bcolors import bcolors
 from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
-from synapse.networking import NtClient
+from synapse_net import NtClient
 
 from .pipeline import GlobalSettings
 from .pipeline_handler import PipelineHandler

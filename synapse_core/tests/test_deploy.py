@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import mock_open, patch
 
 from synapse import deploy
@@ -17,14 +18,14 @@ def test_check_python3_install_not_found(mock_run):
 @patch("builtins.open", new_callable=mock_open, read_data="*.pyc\n")
 @patch("os.path.exists", return_value=True)
 def test_get_gitignore_specs_exists(mock_exists, mock_file):
-    spec = deploy.get_gitignore_specs()
+    spec = deploy.get_gitignore_specs(Path(__file__).parent)
 
     assert spec.match_file("test.pyc")
 
 
 @patch("os.path.exists", return_value=False)
 def test_get_gitignore_specs_missing(mock_exists):
-    spec = deploy.get_gitignore_specs()
+    spec = deploy.get_gitignore_specs(Path(__file__).parent)
     assert not (spec.match_file("test.py"))
 
 

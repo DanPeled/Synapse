@@ -5,9 +5,11 @@ setup(
     version="0.1.0",
     packages=[
         *find_packages(where="synapse_core/src"),
+        *find_packages(where="synapse_net/src"),
     ],
     package_dir={
         "": "synapse_core/src/",
+        "synapse_net": "synapse_net/src/",
     },
     install_requires=[
         "robotpy_wpimath",

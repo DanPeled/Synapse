@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from synapse.networking.nt_client import NtClient, teamNumberToIP
+from synapse_net.nt_client import NtClient, teamNumberToIP
 
 
 def test_teamNumberToIP() -> None:
@@ -9,9 +9,9 @@ def test_teamNumberToIP() -> None:
     assert teamNumberToIP(9999, 255) == "10.99.99.255"
 
 
-@patch("synapse.networking.nt_client.NetworkTableInstance")
-@patch("synapse.networking.nt_client.atexit.register")
-@patch("synapse.networking.nt_client.time.sleep", return_value=None)
+@patch("synapse_net.nt_client.NetworkTableInstance")
+@patch("synapse_net.nt_client.atexit.register")
+@patch("synapse_net.nt_client.time.sleep", return_value=None)
 def test_setup_client_success(mock_sleep, mock_atexit, mock_nt_instance) -> None:
     mock_instance = MagicMock()
     mock_instance.isConnected.side_effect = [
@@ -32,9 +32,9 @@ def test_setup_client_success(mock_sleep, mock_atexit, mock_nt_instance) -> None
     mock_atexit.assert_called_once()
 
 
-@patch("synapse.networking.nt_client.NetworkTableInstance")
-@patch("synapse.networking.nt_client.atexit.register")
-@patch("synapse.networking.nt_client.time.sleep", return_value=None)
+@patch("synapse_net.nt_client.NetworkTableInstance")
+@patch("synapse_net.nt_client.atexit.register")
+@patch("synapse_net.nt_client.time.sleep", return_value=None)
 def test_setup_client_timeout(mock_sleep, mock_atexit, mock_nt_instance) -> None:
     mock_instance = MagicMock()
     mock_instance.isConnected.return_value = False
@@ -44,7 +44,7 @@ def test_setup_client_timeout(mock_sleep, mock_atexit, mock_nt_instance) -> None
 
     # Patch time.time to simulate a timeout after 121 seconds
     with patch(
-        "synapse.networking.nt_client.time.time",
+        "synapse_net.nt_client.time.time",
         side_effect=[0] + [i for i in range(1, 122)],
     ):
         result = client.setup(
@@ -54,7 +54,7 @@ def test_setup_client_timeout(mock_sleep, mock_atexit, mock_nt_instance) -> None
     assert result is False
 
 
-@patch("synapse.networking.nt_client.NetworkTableInstance")
+@patch("synapse_net.nt_client.NetworkTableInstance")
 def test_setup_server(mock_nt_instance) -> None:
     mock_server_instance = MagicMock()
     mock_nt_instance.create.return_value = mock_server_instance
