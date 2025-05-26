@@ -2,6 +2,7 @@ import builtins
 import os
 import re
 import sys
+
 import pytest
 import synapse.log as log
 from synapse.bcolors import bcolors

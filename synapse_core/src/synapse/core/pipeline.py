@@ -7,10 +7,10 @@ from synapse.stypes import Frame
 from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
-from .settings_api import PipelineSettings
+
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
-
+from .settings_api import PipelineSettings
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
