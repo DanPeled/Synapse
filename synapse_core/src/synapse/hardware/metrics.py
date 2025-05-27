@@ -188,22 +188,22 @@ class LinuxCmds(CmdBase):
     def initCmds(self, config: Any) -> None:
         self.cpuMemoryCommand = "free -m | awk 'FNR == 2 {print $2}'"
         self.cpuUtilizationCommand = 'top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk \'{print 100 - $1}\''
-        self.cpuUptimeCommand = "uptime -p | cut -c 4-"
-        self.diskUsageCommand = "df ./ --output=pcent | tail -n +2"
+        self.cpuUptimeCommand = "cat /proc/uptime | awk '{print $1}'"
+        self.diskUsageCommand = "df ./ --output=pcent | tail -n +2 | tr -d '%'"
 
 
 class PiCmds(LinuxCmds):
     def initCmds(self, config: Any) -> None:
         super().initCmds(config)
         self.cpuTemperatureCommand = (
-            "sed 's/.\\{3\\}$/.&/' /sys/class/thermal/thermal_zone0/temp"
+            "cat /sys/class/thermal/thermal_zone0/temp | awk '{print $1/1000}'"
         )
         self.cpuThrottleReasonCmd = (
-            'if   ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x01 )) != 0x00 )); then echo "LOW VOLTAGE"; '
-            + ' elif ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x08 )) != 0x00 )); then echo "HIGH TEMP"; '
-            + ' elif ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x10000 )) != 0x00 )); then echo "Prev. Low Voltage"; '
-            + ' elif ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x80000 )) != 0x00 )); then echo "Prev. High Temp"; '
-            + ' else echo "None"; fi'
+            "if   ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x01 )) != 0x00 )); then echo 1; "
+            + " elif ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x08 )) != 0x00 )); then echo 1; "
+            + " elif ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x10000 )) != 0x00 )); then echo 1; "
+            + " elif ((  $(( $(vcgencmd get_throttled | grep -Eo 0x[0-9a-fA-F]*) & 0x80000 )) != 0x00 )); then echo 1; "
+            + " else echo 0; fi"
         )
         self.gpuMemoryCommand = "vcgencmd get_mem gpu | grep -Eo '[0-9]+'"
         self.gpuMemUsageCommand = "vcgencmd get_mem malloc | grep -Eo '[0-9]+'"
@@ -212,7 +212,6 @@ class PiCmds(LinuxCmds):
 class RK3588Cmds(LinuxCmds):
     def initCmds(self, config: Any) -> None:
         super().initCmds(config)
-
         self.cpuTemperatureCommand = "cat /sys/class/thermal/thermal_zone1/temp | awk '{printf \"%.1f\", $1/1000}'"
         self.npuUsageCommand = (
             "cat /sys/kernel/debug/rknpu/load | sed 's/NPU load://; s/^ *//; s/ *$//'"

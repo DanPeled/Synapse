@@ -12,12 +12,10 @@ import numpy as np
 import synapse.log as log
 from ntcore import Event, EventFlags, NetworkTableInstance, NetworkTableType
 from synapse.bcolors import bcolors
-from synapse.hardware import MetricsManager
 from synapse.stypes import DataValue, Frame
+from synapse_net import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
-
-from synapse_net import NtClient
 
 from .camera_factory import (CameraFactory, CameraSettingsKeys, SynapseCamera,
                              getCameraTable, getCameraTableName)
@@ -35,8 +33,6 @@ class PipelineHandler:
         :param pipelineDirectory: Root directory to search for pipeline files
         """
         self.pipelineDirectory: Path = pipelineDirectory
-        self.metricsManager: Final[MetricsManager] = MetricsManager()
-        self.metricsManager.setConfig(None)
         self.cameras: Dict[int, SynapseCamera] = {}
         self.pipelineInstanceBindings: Dict[int, Pipeline] = {}
         self.pipelineSettings: Dict[int, PipelineSettings] = {}
@@ -66,7 +62,68 @@ class PipelineHandler:
         self.pipelines = self.loadPipelines(directory)
         self.cameraBindings = GlobalSettings.getCameraConfigMap()
 
+        self.startMetricsThread()
+
         atexit.register(self.cleanup)
+
+    def startMetricsThread(self):
+        from multiprocessing import Process, Queue
+
+        """
+        Starts a separate process that collects system metrics,
+        then publishes them to NetworkTables from the main process as double array.
+        """
+
+        def metricsProcess(queue: Queue):
+            from synapse.hardware import MetricsManager
+
+            metricsManager = MetricsManager()
+            metricsManager.setConfig(None)  # Pass config if you have one
+
+            while True:
+                metrics_str = [
+                    metricsManager.getTemp(),
+                    metricsManager.getUtilization(),
+                    metricsManager.getMemory(),
+                    metricsManager.getThrottleReason(),
+                    metricsManager.getUptime(),
+                    metricsManager.getGPUMemorySplit(),
+                    metricsManager.getUsedRam(),
+                    metricsManager.getMallocedMemory(),
+                    metricsManager.getUsedDiskPct(),
+                    metricsManager.getNpuUsage(),
+                ]
+
+                # Convert strings to floats safely
+                metrics = []
+                for s in metrics_str:
+                    try:
+                        metrics.append(float(s))
+                    except (ValueError, TypeError):
+                        metrics.append(0.0)
+
+                queue.put(metrics)
+                time.sleep(1)
+
+        def publishLoop(queue: Queue):
+            entry = NetworkTableInstance.getDefault().getEntry("Synapse/metrics")
+            while True:
+                try:
+                    metrics = queue.get(timeout=2)
+                    entry.setDoubleArray(metrics)
+                except Exception:
+                    continue
+                time.sleep(1)
+
+        metrics_queue = Queue()
+
+        p = Process(target=metricsProcess, args=(metrics_queue,), daemon=True)
+        p.start()
+
+        publisher_thread = threading.Thread(
+            target=publishLoop, args=(metrics_queue,), daemon=True
+        )
+        publisher_thread.start()
 
     def loadPipelines(self, directory: Path) -> Dict[str, Type[Pipeline]]:
         """
