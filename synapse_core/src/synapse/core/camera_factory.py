@@ -14,6 +14,18 @@ from synapse.networking.nt_client import NtClient
 from synapse.stypes import Frame
 from wpimath import geometry
 
+
+class CameraPropKeys(Enum):
+    kBrightness = "brightness"
+    kContrast = "contrast"
+    kSaturation = "saturation"
+    kHue = "hue"
+    kGain = "gain"
+    kExposure = "exposure"
+    kWhiteBalanceTemperature = "white_balance_temperature"
+    kSharpness = "sharpness"
+
+
 CSCORE_TO_CV_PROPS = {
     "brightness": cv2.CAP_PROP_BRIGHTNESS,
     "contrast": cv2.CAP_PROP_CONTRAST,

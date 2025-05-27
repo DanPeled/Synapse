@@ -1,3 +1,4 @@
+from enum import Enum
 import importlib.util
 import threading
 import time
@@ -10,19 +11,38 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import Event, EventFlags, NetworkTableInstance, NetworkTableType
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from wpilib import Timer
 from wpimath.units import seconds
-
 from synapse_net import NtClient
-
-from .camera_factory import (CameraFactory, CameraSettingsKeys, SynapseCamera,
-                             getCameraTable, getCameraTableName)
+from .camera_factory import (
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+    CSCORE_TO_CV_PROPS,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
+from .pipeline import (
+    CameraConfig,
+    FrameResult,
+    GlobalSettings,
+    Pipeline,
+    PipelineSettings,
+)
+
+
+class NTKeys(Enum):
+    kSettings = "settings"
 
 
 class PipelineHandler:
@@ -250,30 +270,34 @@ class PipelineHandler:
         )
 
         currPipeline = self.pipelineInstanceBindings[cameraIndex]
-        camera_table = getCameraTable(cameraIndex)
+        cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
 
         self.setCameraConfigs(pipeline_config.getMap(), self.cameras[cameraIndex])
 
-        if camera_table is not None:
-            setattr(currPipeline, "nt_table", camera_table)
+        if cameraTable is not None:
+            setattr(currPipeline, "nt_table", cameraTable)
             setattr(currPipeline, "builder_cache", {})
             currPipeline.setup()
-            pipeline_config.sendSettings(camera_table.getSubTable("settings"))
+            pipeline_config.sendSettings(
+                cameraTable.getSubTable(NTKeys.kSettings.value)
+            )
 
             def updateSettingListener(event: Event):
                 prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
                 value: Any = self.getEventDataValue(event)
                 self.pipelineSettings[self.pipelineBindings[cameraIndex]][prop] = value
-                self.updateCameraProperty(
-                    camera=self.cameras[cameraIndex],
-                    prop=prop,
-                    value=value,
-                )
+
+                if prop in CSCORE_TO_CV_PROPS.keys():
+                    self.updateCameraProperty(
+                        camera=self.cameras[cameraIndex],
+                        prop=prop,
+                        value=value,
+                    )
 
             for key in pipeline_config.getMap().keys():
                 nt_table = getCameraTable(cameraIndex)
                 if nt_table is not None:
-                    entry = nt_table.getSubTable("settings").getEntry(key)
+                    entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
 
                     NetworkTableInstance.getDefault().addListener(
                         entry, EventFlags.kValueRemote, updateSettingListener
@@ -592,7 +616,7 @@ class PipelineHandler:
 
             log.log(f"Loaded pipeline #{index} with type {pipeline['type']}")
 
-            self.setPipelineSettings(index, pipeline["settings"])
+            self.setPipelineSettings(index, pipeline[NTKeys.kSettings])
 
             self.pipelineTypes[index] = pipeline["type"]
 
