@@ -470,25 +470,31 @@ class PipelineHandler:
 
     def handleResults(self, frames: FrameResult, cameraIndex: int) -> Optional[Frame]:
         if frames is not None:
-            return self.handleFramePiblishing(frames, cameraIndex)
+            return self.handleFramePublishing(frames, cameraIndex)
 
-    def handleFramePiblishing(
+    def handleFramePublishing(
         self, result: FrameResult, cameraIndex: int
     ) -> Optional[Frame]:
         entry = getCameraTable(cameraIndex).getEntry("view_id")
-        DEFAULT_STEP: str = "step_0"
+        DEFAULT_STEP = "step_0"
+
         if result is None:
             return
+
+        entry_exists = entry.exists()
+        entry_value = (
+            entry.getString(defaultValue=DEFAULT_STEP) if entry_exists else DEFAULT_STEP
+        )
+
+        if not entry_exists:
+            entry.setString(DEFAULT_STEP)
+
         if isinstance(result, Frame):
-            if not entry.exists():
-                entry.setString(DEFAULT_STEP)
-            if entry.getString(defaultValue=DEFAULT_STEP) == DEFAULT_STEP:
+            if entry_value == DEFAULT_STEP:
                 return result
         else:
             for i, var in enumerate(result):
-                if not entry.exists():
-                    entry.setString(DEFAULT_STEP)
-                if entry.getString(defaultValue=DEFAULT_STEP) == f"step_{i}":
+                if entry_value == f"step_{i}":
                     return var
 
     def sendLatency(
