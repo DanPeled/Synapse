@@ -138,31 +138,149 @@ class ListOptionsConstraint(Constraint):
 
 
 class ColorConstraint(Constraint):
-    """Constraint for color values (hex, rgb, etc.)"""
+    import re
+
+    """Constraint for color values (hex, rgb, hsv, etc.)"""
+
+    RGB_REGEX = re.compile(
+        r"^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
+    )
+    HSV_REGEX = re.compile(
+        r"^hsv\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
+    )
 
     def __init__(self, formatType: str = "hex"):
         super().__init__(ConstraintType.kColor)
-        self.formatType = formatType  # "hex", "rgb", "rgba", "hsl"
+        self.formatType = formatType  # "hex", "rgb", "rgba", "hsl", "hsv"
 
     def validate(self, value: Any) -> ValidationResult:
-        if not isinstance(value, str):
-            return ValidationResult(False, "Color value must be a string")
-
-        value = value.strip()
-
         if self.formatType == "hex":
-            if not value.startswith("#") or len(value) not in [4, 7, 9]:
-                return ValidationResult(False, "Invalid hex color format")
+            if isinstance(value, int):
+                hex_str = f"#{value:06X}"
+                return ValidationResult(True, None, hex_str)
+
+            if not isinstance(value, str):
+                return ValidationResult(
+                    False, "Color value must be a string or integer for hex format"
+                )
+
+            value = value.strip()
+            if value.startswith("#"):
+                hex_part = value[1:]
+            elif value.lower().startswith("0x"):
+                hex_part = value[2:]
+                value = f"#{hex_part}"
+            else:
+                return ValidationResult(False, "Hex color must start with '#' or '0x'")
+
+            if len(hex_part) not in [3, 6, 8]:
+                return ValidationResult(False, "Invalid hex color length")
+
             try:
-                int(value[1:], 16)
+                int(hex_part, 16)
                 return ValidationResult(True, None, value.upper())
             except ValueError:
                 return ValidationResult(False, "Invalid hex color value")
 
         elif self.formatType == "rgb":
-            if not (value.startswith("rgb(") and value.endswith(")")):
+            # Accept tuple of ints (r, g, b)
+            if isinstance(value, tuple):
+                if len(value) != 3:
+                    return ValidationResult(
+                        False, "RGB tuple must have exactly 3 elements"
+                    )
+                if not all(isinstance(v, int) for v in value):
+                    return ValidationResult(
+                        False, "RGB tuple elements must be integers"
+                    )
+
+                r, g, b = value
+                if not (0 <= r <= 255):
+                    return ValidationResult(False, "Red (r) must be between 0 and 255")
+                if not (0 <= g <= 255):
+                    return ValidationResult(
+                        False, "Green (g) must be between 0 and 255"
+                    )
+                if not (0 <= b <= 255):
+                    return ValidationResult(False, "Blue (b) must be between 0 and 255")
+
+                normalized = f"rgb({r}, {g}, {b})"
+                return ValidationResult(True, None, normalized)
+
+            # Or accept string "rgb(r, g, b)"
+            if not isinstance(value, str):
+                return ValidationResult(
+                    False, "RGB color value must be a string or tuple"
+                )
+
+            value = value.strip()
+            match = self.RGB_REGEX.match(value)
+            if not match:
                 return ValidationResult(False, "Invalid RGB format")
-            # Add more RGB validation logic as needed
+
+            r, g, b = map(int, match.groups())
+            if not (0 <= r <= 255):
+                return ValidationResult(False, "Red (r) must be between 0 and 255")
+            if not (0 <= g <= 255):
+                return ValidationResult(False, "Green (g) must be between 0 and 255")
+            if not (0 <= b <= 255):
+                return ValidationResult(False, "Blue (b) must be between 0 and 255")
+
+            normalized = f"rgb({r}, {g}, {b})"
+            return ValidationResult(True, None, normalized)
+
+        elif self.formatType == "hsv":
+            # Accept tuple of ints (h, s, v)
+            if isinstance(value, tuple):
+                if len(value) != 3:
+                    return ValidationResult(
+                        False, "HSV tuple must have exactly 3 elements"
+                    )
+                if not all(isinstance(v, int) for v in value):
+                    return ValidationResult(
+                        False, "HSV tuple elements must be integers"
+                    )
+
+                h, s, v = value
+                if not (0 <= h <= 360):
+                    return ValidationResult(False, "Hue (h) must be between 0 and 360")
+                if not (0 <= s <= 100):
+                    return ValidationResult(
+                        False, "Saturation (s) must be between 0 and 100"
+                    )
+                if not (0 <= v <= 100):
+                    return ValidationResult(
+                        False, "Value (v) must be between 0 and 100"
+                    )
+
+                normalized = f"hsv({h}, {s}, {v})"
+                return ValidationResult(True, None, normalized)
+
+            # Or accept string "hsv(h, s, v)" no %
+            if not isinstance(value, str):
+                return ValidationResult(
+                    False, "HSV color value must be a string or tuple"
+                )
+
+            value = value.strip()
+            match = self.HSV_REGEX.match(value)
+            if not match:
+                return ValidationResult(
+                    False, "Invalid HSV format (must not contain '%')"
+                )
+
+            h, s, v = map(int, match.groups())
+            if not (0 <= h <= 360):
+                return ValidationResult(False, "Hue (h) must be between 0 and 360")
+            if not (0 <= s <= 100):
+                return ValidationResult(
+                    False, "Saturation (s) must be between 0 and 100"
+                )
+            if not (0 <= v <= 100):
+                return ValidationResult(False, "Value (v) must be between 0 and 100")
+
+            normalized = f"hsv({h}, {s}, {v})"
+            return ValidationResult(True, None, normalized)
 
         return ValidationResult(True, None, value)
 
@@ -464,7 +582,7 @@ class PipelineSettings:
         self.__settings[key] = value
         # TODO: Send to NetworkTables, update, and save to file
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves the setting for a given key using the indexing syntax.
 

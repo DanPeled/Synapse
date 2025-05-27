@@ -23,9 +23,8 @@ class NtClient:
         nt_inst (NetworkTableInstance): The instance of NetworkTableInstance used for communication.
         server (Optional[NetworkTableInstance]): The server instance if the client is running as a server, otherwise None.
     """
-
-    INSTANCE: Optional["NtClient"] = None
     TABLE: str = ""
+    INSTANCE: Optional["NtClient"] = None
 
     def setup(self, teamNumber: int, name: str, isServer: bool, isSim: bool) -> bool:
         """

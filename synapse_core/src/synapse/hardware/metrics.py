@@ -3,9 +3,8 @@ import subprocess
 from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, List, Optional
+from typing import Any, Final, Optional
 
-from ntcore import NetworkTableInstance
 from synapse.log import err
 
 # Referenced from  https://github.com/PhotonVision/photonvision/
@@ -324,24 +323,6 @@ class MetricsManager:
 
     def getUsedRam(self) -> str:
         return self.safeExecute(self.cmds.ramUsageCommand) if self.cmds else "0.0"
-
-    def publishMetrics(self) -> None:
-        metrics: List[str] = [
-            self.getTemp(),
-            self.getUtilization(),
-            self.getMemory(),
-            self.getThrottleReason(),
-            self.getUptime(),
-            self.getGPUMemorySplit(),
-            self.getUsedRam(),
-            self.getMallocedMemory(),
-            self.getUsedDiskPct(),
-            self.getNpuUsage(),
-        ]
-
-        NetworkTableInstance.getDefault().getEntry("Synapse/metrics").setStringArray(
-            metrics
-        )
 
     def execute(self, command: str) -> str:
         try:
