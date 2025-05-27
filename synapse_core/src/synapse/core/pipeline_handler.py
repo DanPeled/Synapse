@@ -1,8 +1,8 @@
-from enum import Enum
 import importlib.util
 import threading
 import time
 import traceback
+from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
@@ -11,38 +11,28 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from wpilib import Timer
 from wpimath.units import seconds
+
 from synapse_net import NtClient
-from .camera_factory import (
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-    CSCORE_TO_CV_PROPS,
-)
+
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config
-from .pipeline import (
-    CameraConfig,
-    FrameResult,
-    GlobalSettings,
-    Pipeline,
-    PipelineSettings,
-)
+from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
+                       PipelineSettings)
 
 
 class NTKeys(Enum):
     kSettings = "settings"
+    kMetrics = "metrics"
+    kProcessLatency = "processLatency"
+    kCaptureLatency = "captureLatency"
 
 
 class PipelineHandler:
@@ -127,7 +117,9 @@ class PipelineHandler:
                 time.sleep(1)
 
         def publishLoop(queue: Queue):
-            entry = NetworkTableInstance.getDefault().getEntry("Synapse/metrics")
+            entry = NetworkTableInstance.getDefault().getEntry(
+                f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
+            )
             while True:
                 try:
                     metrics = queue.get(timeout=2)
@@ -406,7 +398,7 @@ class PipelineHandler:
 
         if cameraIndex not in self.__pipelineEntryCache:
             table = NetworkTableInstance.getDefault().getTable(NtClient.NT_TABLE)
-            entry_path = f"{getCameraTableName(cameraIndex)}/pipeline"
+            entry_path = f"{getCameraTableName(cameraIndex)}/{CameraSettingsKeys.kPipeline.value}"
             self.__pipelineEntryCache[cameraIndex] = table.getEntry(entry_path)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
@@ -579,12 +571,12 @@ class PipelineHandler:
         self, cameraIndex: int, captureLatency: seconds, processingLatency: seconds
     ) -> None:
         cameraTable = getCameraTable(cameraIndex)
-        cameraTable.getEntry("captureLatency").setDouble(captureLatency)
-        cameraTable.getEntry("processLatency").setDouble(processingLatency)
+        cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
+        cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
 
     def setupNetworkTables(self) -> None:
         for cameraIndex, camera in self.cameras.items():
-            entry = camera.getSettingEntry(CameraSettingsKeys.pipeline.value)
+            entry = camera.getSettingEntry(CameraSettingsKeys.kPipeline.value)
 
             if entry is not None:
                 NetworkTableInstance.getDefault().addListener(
@@ -600,14 +592,14 @@ class PipelineHandler:
 
     def loadPipelineSettings(self) -> None:
         settings: dict = Config.getInstance().getConfigMap()
-        camera_configs: dict = settings["global"]["camera_configs"]
+        camera_configs = GlobalSettings.getCameraConfigMap()
 
         for cameraIndex in camera_configs:
             if not (self.addCamera(cameraIndex)):
                 return
-            self.defaultPipelineIndexes[cameraIndex] = camera_configs[cameraIndex][
-                "default_pipeline"
-            ]
+            self.defaultPipelineIndexes[cameraIndex] = camera_configs[
+                cameraIndex
+            ].defaultPipeline
 
         pipelines: dict = settings["pipelines"]
 
@@ -616,7 +608,7 @@ class PipelineHandler:
 
             log.log(f"Loaded pipeline #{index} with type {pipeline['type']}")
 
-            self.setPipelineSettings(index, pipeline[NTKeys.kSettings])
+            self.setPipelineSettings(index, pipeline[NTKeys.kSettings.value])
 
             self.pipelineTypes[index] = pipeline["type"]
 
@@ -635,29 +627,8 @@ class PipelineHandler:
         self, settings: Dict[str, Any], camera: SynapseCamera
     ) -> Dict[str, Any]:
         updated_settings = {}
-        excluded = [
-            "",
-            "sharpness",
-            "raw_sharpness",
-            "raw_saturation",
-            "white_balance_automatic",
-            "raw_gain",
-            "raw_hue",
-            "raw_brightness",
-            "raw_contrast",
-            "raw_exposure_time_absolute",
-            "power_line_frequency",
-            "exposure_time_absolute",
-            "gamma",
-            "white_balance_temperature",
-            "connect_verbose",
-            "exposure_dynamic_framerate",
-            "backlight_compensation",
-            "auto_exposure",
-        ]
-
         for name in settings.keys():
-            if name not in excluded:
+            if name in CSCORE_TO_CV_PROPS.keys():
                 setting_value = settings.get(name)
                 if setting_value is not None:
                     self.updateCameraProperty(

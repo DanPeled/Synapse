@@ -41,9 +41,9 @@ CV_TO_CSCORE_PROPS = {v: k for k, v in CSCORE_TO_CV_PROPS.items()}
 
 
 class CameraSettingsKeys(Enum):
-    view_id = "view_id"
-    record = "record"
-    pipeline = "pipeline"
+    kViewID = "view_id"
+    kRecord = "record"
+    kPipeline = "pipeline"
 
 
 def getCameraTableName(index: int) -> str:
@@ -163,36 +163,36 @@ class SynapseCamera(ABC):
 
     @property
     def viewID(self) -> str:
-        entry = self.getSettingEntry(CameraSettingsKeys.view_id.value)
+        entry = self.getSettingEntry(CameraSettingsKeys.kViewID.value)
         if entry is not None:
             return entry.getString("")
         return ""
 
     @viewID.setter
     def viewID(self, value: str) -> None:
-        self.setSetting(CameraSettingsKeys.view_id.value, value)
+        self.setSetting(CameraSettingsKeys.kViewID.value, value)
 
     @property
     def record(self) -> bool:
-        entry = self.getSettingEntry(CameraSettingsKeys.record.value)
+        entry = self.getSettingEntry(CameraSettingsKeys.kRecord.value)
         if entry is not None:
             return entry.getBoolean(False)
         return False
 
     @record.setter
     def record(self, value: bool) -> None:
-        self.setSetting(CameraSettingsKeys.view_id.value, value)
+        self.setSetting(CameraSettingsKeys.kViewID.value, value)
 
     @property
     def pipeline(self) -> int:
-        entry = self.getSettingEntry(CameraSettingsKeys.pipeline.value)
+        entry = self.getSettingEntry(CameraSettingsKeys.kPipeline.value)
         if entry is not None:
             return entry.getInteger(0)
         return 0
 
     @pipeline.setter
     def pipeline(self, value: int) -> None:
-        self.setSetting(CameraSettingsKeys.pipeline.value, value)
+        self.setSetting(CameraSettingsKeys.kPipeline.value, value)
 
 
 class OpenCvCamera(SynapseCamera):
