@@ -11,20 +11,35 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
+from .pipeline import (
+    CameraConfig,
+    FrameResult,
+    GlobalSettings,
+    Pipeline,
+    PipelineSettings,
+)
 from .settings_api import PipelineSettingsMap
 
 
@@ -263,8 +278,13 @@ class PipelineHandler:
 
         currPipeline = self.pipelineInstanceBindings[cameraIndex]
         cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
-
-        self.setCameraConfigs(pipeline_config.getMap(), self.cameras[cameraIndex])
+        self.setCameraConfigs(
+            {
+                key: pipeline_config.getSetting(key)
+                for key in pipeline_config.getMap().keys()
+            },
+            self.cameras[cameraIndex],
+        )
 
         if cameraTable is not None:
             setattr(currPipeline, "nt_table", cameraTable)
@@ -277,7 +297,9 @@ class PipelineHandler:
             def updateSettingListener(event: Event):
                 prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
                 value: Any = self.getEventDataValue(event)
-                self.pipelineSettings[self.pipelineBindings[cameraIndex]][prop] = value
+                self.pipelineSettings[self.pipelineBindings[cameraIndex]].setSetting(
+                    prop, value
+                )
 
                 if prop in CSCORE_TO_CV_PROPS.keys():
                     self.updateCameraProperty(
@@ -292,7 +314,7 @@ class PipelineHandler:
                     entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
 
                     if NtClient.INSTANCE is not None:
-                        NtClient.INSTANCE.nt_inst.getDefault().addListener(
+                        NetworkTableInstance.getDefault().addListener(
                             entry, EventFlags.kValueRemote, updateSettingListener
                         )
 
@@ -321,6 +343,8 @@ class PipelineHandler:
             return value.getBoolean()
         elif topic_type == NetworkTableType.kDouble:
             return value.getDouble()
+        elif topic_type == NetworkTableType.kFloat:
+            return value.getFloat()
         elif topic_type == NetworkTableType.kInteger:
             return value.getInteger()
         elif topic_type == NetworkTableType.kString:
@@ -329,6 +353,8 @@ class PipelineHandler:
             return value.getBooleanArray()
         elif topic_type == NetworkTableType.kDoubleArray:
             return value.getDoubleArray()
+        elif topic_type == NetworkTableType.kFloatArray:
+            return value.getFloatArray()
         elif topic_type == NetworkTableType.kIntegerArray:
             return value.getIntegerArray()
         elif topic_type == NetworkTableType.kStringArray:
@@ -650,8 +676,7 @@ class PipelineHandler:
         camera.setProperty(prop, value)
 
     def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
-        settings_map = settings.getMap()
-        orientation = settings_map.get("orientation")
+        orientation = settings.getSetting("orientation")
 
         rotations = {
             90: cv2.ROTATE_90_CLOCKWISE,
@@ -665,7 +690,7 @@ class PipelineHandler:
         return frame
 
     def fixBlackLevelOffset(self, settings: PipelineSettings, frame: Frame) -> Frame:
-        blackLevelOffset = settings.get("black_level_offset")
+        blackLevelOffset = settings.getSetting("black_level_offset")
 
         if blackLevelOffset == 0 or blackLevelOffset is None:
             return frame  # No adjustment needed

@@ -13,8 +13,14 @@ from synapse.core.pipeline import GlobalSettings, Pipeline
 from synapse.core.settings_api import PipelineSettings
 from synapse.stypes import Frame
 from wpimath import geometry, units
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
-                              Transform3d, Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation3d,
+    Transform3d,
+    Translation3d,
+)
 
 
 @dataclass
@@ -98,14 +104,16 @@ class ApriltagPipeline(Pipeline):
             apriltag.AprilTagDetector.Config()
         )
 
-        detectorConfig.numThreads = int(settings.get("num_threads") or 1)
+        detectorConfig.numThreads = int(settings.getSetting("num_threads") or 1)
         self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily("tag36h11")
 
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
-                    tagSize=float(settings.get(ApriltagPipeline.kTagSizeKey) or 0.1651),
+                    tagSize=float(
+                        settings.getSetting(ApriltagPipeline.kTagSizeKey) or 0.1651
+                    ),
                     fx=self.camera_matrix[0][0],
                     fy=self.camera_matrix[1][1],
                     cx=self.camera_matrix[0][2],

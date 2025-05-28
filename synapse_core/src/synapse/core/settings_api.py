@@ -308,45 +308,59 @@ class ColorConstraint(Constraint):
 
 
 class ListConstraint(Constraint):
-    """Constraint for list values with optional item constraints"""
+    """Constraint for list values with optional item constraints and nested depth"""
 
     def __init__(
         self,
         itemConstraint: Optional[Constraint] = None,
         minLength: Optional[int] = None,
         maxLength: Optional[int] = None,
+        depth: int = 1,
     ):
         super().__init__(ConstraintType.kList)
         self.itemConstraint = itemConstraint
         self.minLength = minLength
         self.maxLength = maxLength
+        self.depth = depth
 
     def validate(self, value: Any) -> ValidationResult:
-        if not isinstance(value, list):
-            return ValidationResult(False, "Value must be a list")
+        def _validate_list(val, depth) -> ValidationResult:
+            if not isinstance(val, list):
+                return ValidationResult(False, f"Value must be a list at depth {depth}")
 
-        if self.minLength is not None and len(value) < self.minLength:
-            return ValidationResult(
-                False, f"List must have at least {self.minLength} items"
-            )
+            if self.minLength is not None and len(val) < self.minLength:
+                return ValidationResult(
+                    False,
+                    f"List at depth {depth} must have at least {self.minLength} items",
+                )
+            if self.maxLength is not None and len(val) > self.maxLength:
+                return ValidationResult(
+                    False,
+                    f"List at depth {depth} must have at most {self.maxLength} items",
+                )
 
-        if self.maxLength is not None and len(value) > self.maxLength:
-            return ValidationResult(
-                False, f"List must have at most {self.maxLength} items"
-            )
-
-        if self.itemConstraint:
             validated_items = []
-            for i, item in enumerate(value):
-                result = self.itemConstraint.validate(item)
+            for i, item in enumerate(val):
+                if depth > 1:
+                    result = _validate_list(item, depth - 1)
+                elif self.itemConstraint:
+                    result = self.itemConstraint.validate(item)
+                else:
+                    result = ValidationResult(True, None, item)
+
                 if not result.isValid:
                     return ValidationResult(
                         False, f"Item at index {i}: {result.errorMessage}"
                     )
-                validated_items.append(result.normalizedValue or item)
+                validated_items.append(
+                    result.normalizedValue
+                    if result.normalizedValue is not None
+                    else item
+                )
+
             return ValidationResult(True, None, validated_items)
 
-        return ValidationResult(True, None, value)
+        return _validate_list(value, self.depth)
 
     def toDict(self) -> Dict[str, Any]:
         return {
@@ -356,6 +370,7 @@ class ListConstraint(Constraint):
             else None,
             "minLength": self.minLength,
             "maxLength": self.maxLength,
+            "depth": self.depth,
         }
 
 
@@ -533,7 +548,7 @@ class PipelineSettings:
         self._fieldNames = []
         self._initializeSettings()
 
-        self.__settings: PipelineSettingsMap = settings if settings is not None else {}
+        # self.__settings: PipelineSettingsMap = settings if settings is not None else {}
 
         if settings:
             self.generateSettingsFromMap(settings)
@@ -556,7 +571,15 @@ class PipelineSettings:
                 elif isinstance(value, str):
                     constraint = StringConstraint()
                 elif isinstance(value, list):
-                    constraint = ListConstraint()
+
+                    def getListDepth(value) -> int:
+                        if not isinstance(value, list):
+                            return 0
+                        if not value:
+                            return 1  # An empty list still counts as one level
+                        return 1 + max(getListDepth(item) for item in value)
+
+                    constraint = ListConstraint(depth=getListDepth(value))
                 if constraint is not None:
                     self._settingsApi.addSetting(Setting(field, constraint, value))
             else:
@@ -581,29 +604,6 @@ class PipelineSettings:
         for key, value in self._settingsApi.values.items():
             PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
 
-    def get(self, key: str, defaultValue=None) -> Optional[PipelineSettingsMapValue]:
-        """
-        Retrieves the setting for a given key.
-
-        Args:
-            key (str): The key of the setting to retrieve.
-
-        Returns:
-            Optional[PipelineSettingsMapValue]: The value of the setting, or None if not found.
-        """
-        return self.__settings.get(key, defaultValue)
-
-    def set(self, key: str, value: PipelineSettingsMapValue):
-        """
-        Sets a new value for a given setting key.
-
-        Args:
-            key (str): The key of the setting to set.
-            value (PipelineSettingsMapValue): The value to set for the setting.
-        """
-        self.__settings[key] = value
-        # TODO: Send to NetworkTables, update, and save to file
-
     def __getitem__(self, key: str) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves the setting for a given key using the indexing syntax.
@@ -614,7 +614,7 @@ class PipelineSettings:
         Returns:
             Optional[PipelineSettingsMapValue]: The value of the setting.
         """
-        return self.get(key)
+        return self.getSetting(key)
 
     def __setitem__(self, key: str, value: PipelineSettingsMapValue):
         """
@@ -624,7 +624,7 @@ class PipelineSettings:
             key (str): The key of the setting to set.
             value (PipelineSettingsMapValue): The value to set for the setting.
         """
-        self.set(key, value)
+        self.setSetting(key, value)
 
     def __delitem__(self, key: str):
         """
@@ -647,14 +647,14 @@ class PipelineSettings:
     def __contains__(self, key: Any) -> bool:
         return key in self.__settings.keys()
 
-    def getMap(self) -> PipelineSettingsMap:
+    def getMap(self) -> Dict[str, Setting]:
         """
         Returns the entire settings map.
 
         Returns:
             PipelineSettingsMap: The dictionary of settings.
         """
-        return self.__settings
+        return self._settingsApi.settings
 
     def setMap(self, map: Dict[str, Any]) -> None:
         self.__settings = map
@@ -704,29 +704,26 @@ class PipelineSettings:
                     self._settingsApi.addSetting(attrValue)
                     self._fieldNames.append(attrName)
 
-    def getSetting(self, name: str) -> Any:
+    def getSetting(self, name: str) -> Optional[Any]:
         """Get setting value by name"""
-        if name in self._fieldNames:
+        if name in self._settingsApi.settings.keys():
             return self._settingsApi.getValue(name)
-        raise AttributeError(
-            f"'{self.__class__.__name__}' object has no setting '{name}'"
-        )
+        err(f"'{self.__class__.__name__}' object has no setting '{name}'")
+        return None
 
-    def setSetting(self, name: str, value: Any):
+    def setSetting(self, name: str, value: Any) -> None:
         """Set setting value by name with validation"""
-        if name in self._fieldNames:
+        if name in self._settingsApi.settings.keys():
             result = self._settingsApi.setValue(name, value)
             if not result.isValid:
-                raise ValueError(f"Invalid value for {name}: {result.errorMessage}")
+                err(f"Invalid value for {name}: {result.errorMessage}")
         else:
-            raise AttributeError(
-                f"'{self.__class__.__name__}' object has no setting '{name}'"
-            )
+            err(f"'{self.__class__.__name__}' object has no setting '{name}'")
 
     def validate(self, **kwargs) -> Dict[str, ValidationResult]:
         results = {}
         for key, value in kwargs.items():
-            if key in self._fieldNames:
+            if key in self._settingsApi.settings.keys():
                 results[key] = self._settingsApi.settings[key].validate(value)
             else:
                 results[key] = ValidationResult(False, f"Unknown setting: {key}")
@@ -735,7 +732,7 @@ class PipelineSettings:
     def update(self, **kwargs) -> Dict[str, ValidationResult]:
         results = {}
         for key, value in kwargs.items():
-            if key in self._fieldNames:
+            if key in self._settingsApi.settings.keys():
                 results[key] = self._settingsApi.setValue(key, value)
             else:
                 results[key] = ValidationResult(False, f"Unknown setting: {key}")
