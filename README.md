@@ -13,6 +13,7 @@ A library for running custom vision code on an FRC coprocessor.
 
 ## Project Structure
 - `synapse-core`: Contains the core Python library for Synapse.
+- `synapse-net` Contains networking library for the runtime (NetworkTables comm, Socket comm).
 - `synapse-lib` Contains the vendordep library for the robot to communicate with the Synapse runtime.
 
 ## Getting Started
