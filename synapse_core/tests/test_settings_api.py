@@ -1,7 +1,12 @@
-from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
-                                       ConstraintType, ListConstraint,
-                                       ListOptionsConstraint, RangeConstraint,
-                                       StringConstraint)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ColorConstraint,
+    ConstraintType,
+    ListConstraint,
+    ListOptionsConstraint,
+    RangeConstraint,
+    StringConstraint,
+)
 
 # ------------------ RangeConstraint ------------------
 
@@ -17,8 +22,8 @@ def test_range_constraint_out_of_bounds():
     c = RangeConstraint(0, 10)
     result = c.validate(15)
     assert not result.isValid
-    if result.errorMessage:
-        assert "outside range" in result.errorMessage
+    assert result.errorMessage is not None
+    assert "outside range" in result.errorMessage
 
 
 def test_range_constraint_with_step():
@@ -53,8 +58,8 @@ def test_list_options_constraint_multiple_invalid():
     c = ListOptionsConstraint(["a", "b", "c"], allowMultiple=True)
     result = c.validate(["a", "x"])
     assert not result.isValid
-    if result.errorMessage:
-        assert "Invalid options" in result.errorMessage
+    assert result.errorMessage is not None
+    assert "Invalid options" in result.errorMessage
 
 
 # ------------------ ColorConstraint ------------------
@@ -256,8 +261,49 @@ def test_list_constraint_with_invalid_item():
     c = ListConstraint(itemConstraint=item_c)
     result = c.validate([5, 20])
     assert not result.isValid
-    if result.errorMessage:
-        assert "Item at index" in result.errorMessage
+    assert result.errorMessage is not None
+    assert "Item at index" in result.errorMessage
+
+
+def test_list_constraint_valid_nested_depth_2():
+    item_c = RangeConstraint(0, 5)
+    c = ListConstraint(itemConstraint=item_c, depth=2)
+    result = c.validate([[1, 2], [3, 4]])
+    assert result.isValid
+
+
+def test_list_constraint_invalid_nested_depth_2_wrong_type():
+    item_c = RangeConstraint(0, 5)
+    c = ListConstraint(itemConstraint=item_c, depth=2)
+    result = c.validate([1, 2])  # Should be list of lists
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "depth" in result.errorMessage
+
+
+def test_list_constraint_invalid_nested_depth_2_invalid_item():
+    item_c = RangeConstraint(0, 5)
+    c = ListConstraint(itemConstraint=item_c, depth=2)
+    result = c.validate([[1, 2], [3, 10]])  # 10 is out of range
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "Item at index" in result.errorMessage
+
+
+def test_list_constraint_valid_nested_depth_3():
+    item_c = RangeConstraint(1, 3)
+    c = ListConstraint(itemConstraint=item_c, depth=3)
+    result = c.validate([[[1, 2], [2, 3]], [[1], [3]]])
+    assert result.isValid
+
+
+def test_list_constraint_invalid_nested_depth_3_structure():
+    item_c = RangeConstraint(1, 3)
+    c = ListConstraint(itemConstraint=item_c, depth=3)
+    result = c.validate([[1, 2], [2, 3]])  # Should be list of list of lists
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "depth" in result.errorMessage
 
 
 # ------------------ StringConstraint ------------------
