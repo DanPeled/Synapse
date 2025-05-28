@@ -67,7 +67,7 @@ class NtClient:
                 log(f"Connected to NetworkTables server ({event.data.remote_ip})")  # pyright: ignore
             if event.is_(EventFlags.kDisconnected):
                 log(
-                    f"kDisconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
+                    f"Disconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
                 )
 
         NetworkTableInstance.getDefault().addConnectionListener(
