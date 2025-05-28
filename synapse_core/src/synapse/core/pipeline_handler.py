@@ -11,35 +11,20 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (
-    CSCORE_TO_CV_PROPS,
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory, CameraPropKeys,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config
-from .pipeline import (
-    CameraConfig,
-    FrameResult,
-    GlobalSettings,
-    Pipeline,
-    PipelineSettings,
-)
+from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
+                       PipelineSettings)
 from .settings_api import PipelineSettingsMap
 
 
@@ -302,8 +287,7 @@ class PipelineHandler:
                 )
 
                 if prop in CSCORE_TO_CV_PROPS.keys():
-                    self.updateCameraProperty(
-                        camera=self.cameras[cameraIndex],
+                    self.cameras[cameraIndex].setProperty(
                         prop=prop,
                         value=value,
                     )
@@ -341,20 +325,20 @@ class PipelineHandler:
 
         if topic_type == NetworkTableType.kBoolean:
             return value.getBoolean()
-        elif topic_type == NetworkTableType.kDouble:
-            return value.getDouble()
         elif topic_type == NetworkTableType.kFloat:
             return value.getFloat()
+        elif topic_type == NetworkTableType.kDouble:
+            return value.getDouble()
         elif topic_type == NetworkTableType.kInteger:
             return value.getInteger()
         elif topic_type == NetworkTableType.kString:
             return value.getString()
         elif topic_type == NetworkTableType.kBooleanArray:
             return value.getBooleanArray()
-        elif topic_type == NetworkTableType.kDoubleArray:
-            return value.getDoubleArray()
         elif topic_type == NetworkTableType.kFloatArray:
             return value.getFloatArray()
+        elif topic_type == NetworkTableType.kDoubleArray:
+            return value.getDoubleArray()
         elif topic_type == NetworkTableType.kIntegerArray:
             return value.getIntegerArray()
         elif topic_type == NetworkTableType.kStringArray:
@@ -658,8 +642,7 @@ class PipelineHandler:
             if name in CSCORE_TO_CV_PROPS.keys():
                 setting_value = settings.get(name)
                 if setting_value is not None:
-                    self.updateCameraProperty(
-                        camera=camera,
+                    camera.setProperty(
                         prop=name,
                         value=setting_value,
                     )
@@ -672,11 +655,8 @@ class PipelineHandler:
 
         return updated_settings
 
-    def updateCameraProperty(self, camera: SynapseCamera, prop: str, value: Any):
-        camera.setProperty(prop, value)
-
     def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
-        orientation = settings.getSetting("orientation")
+        orientation = settings.getSetting(CameraPropKeys.kOrientation.value)
 
         rotations = {
             90: cv2.ROTATE_90_CLOCKWISE,

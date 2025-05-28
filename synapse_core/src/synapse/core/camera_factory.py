@@ -24,6 +24,7 @@ class CameraPropKeys(Enum):
     kExposure = "exposure"
     kWhiteBalanceTemperature = "white_balance_temperature"
     kSharpness = "sharpness"
+    kOrientation = "orientation"
 
 
 CSCORE_TO_CV_PROPS = {

@@ -10,11 +10,8 @@ from wpiutil import Sendable, SendableBuilder
 
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
-from .settings_api import (
-    PipelineSettings,
-    PipelineSettingsMap,
-    PipelineSettingsMapValue,
-)
+from .settings_api import (PipelineSettings, PipelineSettingsMap,
+                           PipelineSettingsMapValue)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 

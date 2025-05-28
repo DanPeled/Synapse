@@ -536,6 +536,7 @@ class PipelineSettings:
     brightness = settingField(RangeConstraint(0, 100), default=50)
     exposure = settingField(RangeConstraint(0, 100), default=50)
     saturation = settingField(RangeConstraint(0, 100), default=50)
+    orientation = settingField(RangeConstraint(0, 270, 90), default=0)
 
     def __init__(self, settings: Optional[PipelineSettingsMap] = None):
         """
@@ -581,7 +582,13 @@ class PipelineSettings:
 
                     constraint = ListConstraint(depth=getListDepth(value))
                 if constraint is not None:
-                    self._settingsApi.addSetting(Setting(field, constraint, value))
+                    self._settingsApi.addSetting(
+                        Setting(
+                            key=field,
+                            constraint=constraint,
+                            defaultValue=value,
+                        )
+                    )
             else:
                 setting = self._settingsApi.settings[field]
                 validation = setting.validate(value)
