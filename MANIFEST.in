@@ -1,0 +1,2 @@
+recursive-include synapse_net/src/synapse_net *
+recursive-include synapse_core/src/synapse *

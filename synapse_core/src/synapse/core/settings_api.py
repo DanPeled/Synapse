@@ -2,9 +2,15 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 from ntcore import NetworkTable, NetworkTableEntry
+from synapse.bcolors import bcolors
+from synapse.log import err
+
+PipelineSettingsMapValue = Any
+
+PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
 
 
 class ConstraintType(Enum):
@@ -18,6 +24,7 @@ class ConstraintType(Enum):
     kBoolean = "boolean"
     kInteger = "integer"
     kFloat = "float"
+    kClass = "class"
 
 
 @dataclass
@@ -43,12 +50,6 @@ class Constraint(ABC):
     @abstractmethod
     def toDict(self) -> Dict[str, Any]:
         """Serialize constraint to dictionary"""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def fromDict(cls, data: Dict[str, Any]) -> "Constraint":
-        """Deserialize constraint from dictionary"""
         pass
 
 
@@ -93,9 +94,27 @@ class RangeConstraint(Constraint):
             "step": self.step,
         }
 
-    @classmethod
-    def fromDict(cls, data: Dict[str, Any]) -> "RangeConstraint":
-        return cls(data["minValue"], data["maxValue"], data.get("step"))
+
+class ClassValueConstraint(Constraint):
+    """Constraint for values of a specific class"""
+
+    def __init__(self, expectedClass: Type):
+        super().__init__(ConstraintType.kClass)
+        self.expectedClass = expectedClass
+
+    def validate(self, value: Any) -> ValidationResult:
+        if isinstance(value, self.expectedClass):
+            return ValidationResult(True, None, value)
+        else:
+            return ValidationResult(
+                False, f"Value {value} is not of type {self.expectedClass.__name__}"
+            )
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            "type": self.constraintType.value,
+            "className": f"{self.expectedClass.__module__}.{self.expectedClass.__name__}",
+        }
 
 
 class ListOptionsConstraint(Constraint):
@@ -131,10 +150,6 @@ class ListOptionsConstraint(Constraint):
             "options": self.options,
             "allowMultiple": self.allowMultiple,
         }
-
-    @classmethod
-    def fromDict(cls, data: Dict[str, Any]) -> "ListOptionsConstraint":
-        return cls(data["options"], data.get("allowMultiple", False))
 
 
 class ColorConstraint(Constraint):
@@ -343,14 +358,6 @@ class ListConstraint(Constraint):
             "maxLength": self.maxLength,
         }
 
-    @classmethod
-    def fromDict(cls, data: Dict[str, Any]) -> "ListConstraint":
-        itemConstraint = None
-        if data.get("itemConstraint"):
-            itemConstraint = ConstraintFactory.fromDict(data["itemConstraint"])
-
-        return cls(itemConstraint, data.get("minLength"), data.get("maxLength"))
-
 
 class StringConstraint(Constraint):
     """Constraint for string values"""
@@ -432,25 +439,6 @@ class BooleanConstraint(Constraint):
         return cls()
 
 
-class ConstraintFactory:
-    """Factory for creating constraints from dictionaries"""
-
-    _constraintClasses = {
-        ConstraintType.kRange: RangeConstraint,
-        ConstraintType.kListOptions: ListOptionsConstraint,
-        ConstraintType.kColor: ColorConstraint,
-        ConstraintType.kList: ListConstraint,
-        ConstraintType.kString: StringConstraint,
-        ConstraintType.kBoolean: BooleanConstraint,
-    }
-
-    @classmethod
-    def fromDict(cls, data: Dict[str, Any]) -> Constraint:
-        constraintType = ConstraintType(data["type"])
-        constraintClass = cls._constraintClasses[constraintType]
-        return constraintClass.fromDict(data)
-
-
 @dataclass
 class Setting:
     """A single setting with its constraint and metadata"""
@@ -473,17 +461,6 @@ class Setting:
             "category": self.category,
         }
 
-    @classmethod
-    def fromDict(cls, data: Dict[str, Any]) -> "Setting":
-        constraint = ConstraintFactory.fromDict(data["constraint"])
-        return cls(
-            data["key"],
-            constraint,
-            data["defaultValue"],
-            data.get("description"),
-            data.get("category"),
-        )
-
 
 class SettingsAPI:
     """Main settings API for managing settings with constraints"""
@@ -492,7 +469,7 @@ class SettingsAPI:
         self.settings: Dict[str, Setting] = {}
         self.values: Dict[str, Any] = {}
 
-    def add_setting(self, setting: Setting):
+    def addSetting(self, setting: Setting):
         """Add a new setting"""
         self.settings[setting.key] = setting
         if setting.key not in self.values:
@@ -523,30 +500,76 @@ class SettingsAPI:
         }
         return json.dumps(settings_data, indent=2)
 
-    @classmethod
-    def deserialize(cls, json_str: str) -> "SettingsAPI":
-        """Create SettingsAPI instance from JSON string"""
-        data = json.loads(json_str)
-        api = cls()
-
-        for key, setting_data in data["settings"].items():
-            setting = Setting.fromDict(setting_data)
-            api.add_setting(setting)
-
-        api.values = data["values"]
-        return api
-
     def getSettingsSchema(self) -> Dict[str, Any]:
         """Get the schema of all settings (useful for UI generation)"""
         return {key: setting.toDict() for key, setting in self.settings.items()}
 
 
+def settingField(
+    constraint: Constraint,
+    default: Any,
+    description: Optional[str] = None,
+    category: Optional[str] = None,
+) -> Setting:
+    """Helper function to create Setting instances for use in SettingsCollection classes"""
+    return Setting("", constraint, default, description, category)
+
+
 class PipelineSettings:
     """Base class for creating pipeline settings collections"""
 
-    PipelineSettingsMapValue = Any
+    brightness = settingField(RangeConstraint(0, 100), default=50)
+    exposure = settingField(RangeConstraint(0, 100), default=50)
+    saturation = settingField(RangeConstraint(0, 100), default=50)
 
-    PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
+    def __init__(self, settings: Optional[PipelineSettingsMap] = None):
+        """
+        Initializes the PipelineSettings instance with optional settings.
+
+        Args:
+            settings (Optional[PipelineSettingsMap]): A dictionary of settings to initialize with.
+        """
+        self._settingsApi = SettingsAPI()
+        self._fieldNames = []
+        self._initializeSettings()
+
+        self.__settings: PipelineSettingsMap = settings if settings is not None else {}
+
+        if settings:
+            self.generateSettingsFromMap(settings)
+
+    def generateSettingsFromMap(self, settingsMap: PipelineSettingsMap) -> None:
+        prexistingKeys = self.getSchema().keys()
+        for field, value in settingsMap.items():
+            if field not in prexistingKeys:
+                constraint: Optional[Constraint] = None
+                if isinstance(value, bool):
+                    constraint = BooleanConstraint()
+                elif isinstance(value, float | int):
+                    import math
+
+                    constraint = RangeConstraint(
+                        minValue=-math.inf,
+                        maxValue=math.inf,
+                        step=None if isinstance(value, float) else 1,
+                    )
+                elif isinstance(value, str):
+                    constraint = StringConstraint()
+                elif isinstance(value, list):
+                    constraint = ListConstraint()
+                if constraint is not None:
+                    self._settingsApi.addSetting(Setting(field, constraint, value))
+            else:
+                setting = self._settingsApi.settings[field]
+                validation = setting.validate(value)
+                if validation.errorMessage is None:
+                    self._settingsApi.setValue(field, value)
+                else:
+                    err(
+                        f"Error validating {bcolors.BOLD}{field}{bcolors.ENDC}"
+                        + f"\n\t\t{bcolors.FAIL}{validation.errorMessage}"
+                        + f"\n\tSetting {field} as default: {setting.defaultValue}"
+                    )
 
     def sendSettings(self, nt_table: NetworkTable):
         """
@@ -555,8 +578,7 @@ class PipelineSettings:
         Args:
             nt_table (NetworkTable): The NetworkTable to send the settings to.
         """
-        for key in self.__settings.keys():
-            value = self.__settings[key]
+        for key, value in self._settingsApi.values.items():
             PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
 
     def get(self, key: str, defaultValue=None) -> Optional[PipelineSettingsMapValue]:
@@ -671,21 +693,6 @@ class PipelineSettings:
         else:
             raise ValueError("Unsupported type")
 
-    def __init__(self, settings: Optional[PipelineSettingsMap] = None):
-        """
-        Initializes the PipelineSettings instance with optional settings.
-
-        Args:
-            settings (Optional[PipelineSettingsMap]): A dictionary of settings to initialize with.
-        """
-        self._settingsApi = SettingsAPI()
-        self._fieldNames = []
-        self._initializeSettings()
-
-        self.__settings: PipelineSettings.PipelineSettingsMap = (
-            settings if settings is not None else {}
-        )
-
     def _initializeSettings(self):
         """Initialize settings based on class annotations and field definitions"""
         for attrName in dir(self.__class__):
@@ -694,7 +701,7 @@ class PipelineSettings:
                 if isinstance(attrValue, Setting):
                     if attrValue.key != attrName:
                         attrValue.key = attrName
-                    self._settingsApi.add_setting(attrValue)
+                    self._settingsApi.addSetting(attrValue)
                     self._fieldNames.append(attrName)
 
     def getSetting(self, name: str) -> Any:
@@ -743,13 +750,6 @@ class PipelineSettings:
     def serialize(self) -> str:
         return self._settingsApi.serialize()
 
-    @classmethod
-    def deserialize(cls, jsonStr: str) -> "PipelineSettings":
-        instance = cls()
-        api = SettingsAPI.deserialize(jsonStr)
-        instance._settingsApi = api
-        return instance
-
     def getSchema(self) -> Dict[str, Any]:
         return self._settingsApi.getSettingsSchema()
 
@@ -761,13 +761,3 @@ class PipelineSettings:
     def __repr__(self) -> str:
         values = {name: self.getSetting(name) for name in self._fieldNames}
         return f"{self.__class__.__name__}({', '.join(f'{k}={v!r}' for k, v in values.items())})"
-
-
-def settingField(
-    constraint: Constraint,
-    default: Any,
-    description: Optional[str] = None,
-    category: Optional[str] = None,
-) -> Setting:
-    """Helper function to create Setting instances for use in SettingsCollection classes"""
-    return Setting("", constraint, default, description, category)

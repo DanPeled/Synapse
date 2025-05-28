@@ -10,7 +10,8 @@ from wpiutil import Sendable, SendableBuilder
 
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
-from .settings_api import PipelineSettings
+from .settings_api import (PipelineSettings, PipelineSettingsMap,
+                           PipelineSettingsMapValue)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
@@ -121,7 +122,7 @@ class GlobalSettingsMeta(type):
     kCameraConfigsKey: str = "camera_configs"
     __settings: Optional[PipelineSettings] = None
 
-    def setup(cls, settings: PipelineSettings.PipelineSettingsMap) -> bool:
+    def setup(cls, settings: PipelineSettingsMap) -> bool:
         """
         Initializes the global settings with the provided settings map.
 
@@ -162,9 +163,7 @@ class GlobalSettingsMeta(type):
     def getCameraConfigMap(cls) -> Dict[int, CameraConfig]:
         return cls.__cameraConfigs
 
-    def get(
-        cls, key: str, defaultValue=None
-    ) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
+    def get(cls, key: str, defaultValue=None) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves a setting by its key from the global settings.
 
@@ -178,7 +177,7 @@ class GlobalSettingsMeta(type):
             return cls.__settings.get(key, defaultValue)
         return None
 
-    def set(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue) -> None:
+    def set(cls, key: str, value: PipelineSettingsMapValue) -> None:
         """
         Sets a new value for a given setting key in the global settings.
 
@@ -189,9 +188,7 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             cls.__settings.set(key, value)
 
-    def __getitem__(
-        cls, key: str
-    ) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
+    def __getitem__(cls, key: str) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves a setting by its key using indexing syntax.
 
@@ -203,7 +200,7 @@ class GlobalSettingsMeta(type):
         """
         return cls.get(key) or None
 
-    def __setitem__(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue):
+    def __setitem__(cls, key: str, value: PipelineSettingsMapValue):
         """
         Sets a value for a given setting key using indexing syntax.
 
@@ -223,7 +220,7 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             del cls.__settings.getMap()[key]
 
-    def getMap(cls) -> PipelineSettings.PipelineSettingsMap:
+    def getMap(cls) -> PipelineSettingsMap:
         """
         Returns the global settings map.
 

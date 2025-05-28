@@ -1,7 +1,12 @@
-from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
-                                       ConstraintFactory, ConstraintType,
-                                       ListConstraint, ListOptionsConstraint,
-                                       RangeConstraint, StringConstraint)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ColorConstraint,
+    ConstraintType,
+    ListConstraint,
+    ListOptionsConstraint,
+    RangeConstraint,
+    StringConstraint,
+)
 
 # ------------------ RangeConstraint ------------------
 
@@ -223,21 +228,6 @@ def test_color_constraint_to_dict():
     assert d_hsv["formatType"] == "hsv"
 
 
-def test_color_constraint_from_dict():
-    d_hex = {"type": ConstraintType.kColor.value, "formatType": "hex"}
-    c = ColorConstraint.fromDict(d_hex)
-    assert isinstance(c, ColorConstraint)
-    assert c.formatType == "hex"
-
-    d_rgb = {"type": ConstraintType.kColor.value, "formatType": "rgb"}
-    c_rgb = ColorConstraint.fromDict(d_rgb)
-    assert c_rgb.formatType == "rgb"
-
-    d_hsv = {"type": ConstraintType.kColor.value, "formatType": "hsv"}
-    c_hsv = ColorConstraint.fromDict(d_hsv)
-    assert c_hsv.formatType == "hsv"
-
-
 # ------------------ ListConstraint ------------------
 
 
@@ -325,24 +315,3 @@ def test_boolean_constraint_invalid():
     c = BooleanConstraint()
     result = c.validate("maybe")
     assert not result.isValid
-
-
-# ------------------ ConstraintFactory ------------------
-
-
-def test_factory_range_constraint():
-    data = {"type": "range", "minValue": 0, "maxValue": 10, "step": 1}
-    c = ConstraintFactory.fromDict(data)
-    assert isinstance(c, RangeConstraint)
-
-
-def test_factory_list_constraint():
-    data = {
-        "type": "list",
-        "minLength": 1,
-        "maxLength": 3,
-        "itemConstraint": {"type": "range", "minValue": 0, "maxValue": 10},
-    }
-    c = ConstraintFactory.fromDict(data)
-    assert isinstance(c, ListConstraint)
-    assert isinstance(c.itemConstraint, RangeConstraint)
