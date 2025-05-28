@@ -21,7 +21,7 @@ def check_python3_install() -> bool:
         return False
 
 
-def get_gitignore_specs(base_path: str) -> pathspec.PathSpec:
+def get_gitignore_specs(base_path: Path) -> pathspec.PathSpec:
     gitignore_path = os.path.join(base_path, ".gitignore")
     if os.path.exists(gitignore_path):
         with open(gitignore_path) as f:
@@ -30,7 +30,7 @@ def get_gitignore_specs(base_path: str) -> pathspec.PathSpec:
 
 
 def add_files_to_tar(
-    tar, source_folder: str, gitignore_spec: pathspec.PathSpec
+    tar, source_folder: Path, gitignore_spec: pathspec.PathSpec
 ) -> None:
     for root, dirs, files in os.walk(source_folder):
         dirs[:] = [
@@ -62,7 +62,7 @@ def compile_file(file_path: str) -> bool:
         return False
 
 
-def build_project(base_path: str) -> Tuple[bool, timedelta]:
+def build_project(base_path: Path) -> Tuple[bool, timedelta]:
     print("Building...")
     build_start = datetime.now()
     total_files = 0
@@ -125,14 +125,14 @@ def deploy(
     ssh.close()
 
 
-def load_config(base_path: str) -> dict:
+def load_config(base_path: Path) -> dict:
     config = synconfig.Config()
     config.load(Path(base_path) / "config" / "settings.yml")
     return config.getConfigMap()["network"]
 
 
 def main():
-    base_path = os.getcwd()
+    base_path = Path(os.getcwd())
     tarball_path = "/tmp/deploy.tar.gz"
     remote_path = "~/Synapse/"
 

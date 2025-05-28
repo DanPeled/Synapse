@@ -346,58 +346,58 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param z_sign: The direction of the z-axis.
         """
-
-        # Creates object points
-        opoints = (
-            np.array(
-                [
-                    -1,
-                    -1,
-                    0,
-                    1,
-                    -1,
-                    0,
-                    1,
-                    1,
-                    0,
-                    -1,
-                    1,
-                    0,
-                    -1,
-                    -1,
-                    -2 * z_sign,
-                    1,
-                    -1,
-                    -2 * z_sign,
-                    1,
-                    1,
-                    -2 * z_sign,
-                    -1,
-                    1,
-                    -2 * z_sign,
-                ]
-            ).reshape(-1, 1, 3)
-            * 0.5
-            * tagSize
-        )
-
-        # Creates edges
-        edges = np.array(
-            [0, 1, 1, 2, 2, 3, 3, 0, 0, 4, 1, 5, 2, 6, 3, 7, 4, 5, 5, 6, 6, 7, 7, 4]
-        ).reshape(-1, 2)
-
-        # Calulcates rotation and translation vectors for each AprilTag
-        rVecs = pose.rotation().toVector()
-        tVecs = pose.translation().toVector()
-
-        # Calulate image points of each AprilTag
-        ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
-        ipoints = np.round(ipoints).astype(int)
-        ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
-
-        # Draws lines between all the edges
-        for i, j in edges:
-            cv2.line(img, ipoints[i], ipoints[j], (0, 255, 0), 4, 16)
+        # # Creates object points
+        # opoints = (
+        #     np.array(
+        #         [
+        #             -1,
+        #             -1,
+        #             0,
+        #             1,
+        #             -1,
+        #             0,
+        #             1,
+        #             1,
+        #             0,
+        #             -1,
+        #             1,
+        #             0,
+        #             -1,
+        #             -1,
+        #             -2 * z_sign,
+        #             1,
+        #             -1,
+        #             -2 * z_sign,
+        #             1,
+        #             1,
+        #             -2 * z_sign,
+        #             -1,
+        #             1,
+        #             -2 * z_sign,
+        #         ]
+        #     ).reshape(-1, 1, 3)
+        #     * 0.5
+        #     * tagSize
+        # )
+        #
+        # # Creates edges
+        # edges = np.array(
+        #     [0, 1, 1, 2, 2, 3, 3, 0, 0, 4, 1, 5, 2, 6, 3, 7, 4, 5, 5, 6, 6, 7, 7, 4]
+        # ).reshape(-1, 2)
+        #
+        # TODO: fix to not use toVector
+        # # Calulcates rotation and translation vectors for each AprilTag
+        # rVecs = pose.rotation().toVector()
+        # tVecs = pose.translation().toVector()
+        #
+        # # Calulate image points of each AprilTag
+        # ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
+        # ipoints = np.round(ipoints).astype(int)
+        # ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
+        #
+        # # Draws lines between all the edges
+        # for i, j in edges:
+        #     cv2.line(img, ipoints[i], ipoints[j], (0, 255, 0), 4, 16)
 
     @staticmethod
     def drawPoseAxes(
@@ -416,29 +416,30 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param center: The center of the AprilTag.
         """
-        rVecs = pose.rotation().toVector()
-        tVecs = pose.translation().toVector()
-
-        # Calculate object points of each AprilTag
-        opoints = (
-            np.float32([[1, 0, 0], [0, -1, 0], [0, 0, -1]]).reshape(  # pyright: ignore
-                -1, 3
-            )
-            * tagSize
-        )
-
-        # Calulate image points of each AprilTag
-        ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
-        ipoints = np.round(ipoints).astype(int)
-
-        # Calulates the center
-        center = np.round(center).astype(int)
-        center = tuple(center.ravel())
-
-        # Draws the 3d pose lines
-        cv2.line(img, center, tuple(ipoints[0].ravel()), (0, 0, 255), 3)
-        cv2.line(img, center, tuple(ipoints[1].ravel()), (0, 255, 0), 3)
-        cv2.line(img, center, tuple(ipoints[2].ravel()), (255, 0, 0), 3)
+        # TODO: fix to not use toVector
+        # rVecs = pose.rotation().toVector()
+        # tVecs = pose.translation().toVector()
+        #
+        # # Calculate object points of each AprilTag
+        # opoints = (
+        #     np.float32([[1, 0, 0], [0, -1, 0], [0, 0, -1]]).reshape(  # pyright: ignore
+        #         -1, 3
+        #     )
+        #     * tagSize
+        # )
+        #
+        # # Calulate image points of each AprilTag
+        # ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
+        # ipoints = np.round(ipoints).astype(int)
+        #
+        # # Calulates the center
+        # center = np.round(center).astype(int)
+        # center = tuple(center.ravel())
+        #
+        # # Draws the 3d pose lines
+        # cv2.line(img, center, tuple(ipoints[0].ravel()), (0, 0, 255), 3)
+        # cv2.line(img, center, tuple(ipoints[1].ravel()), (0, 255, 0), 3)
+        # cv2.line(img, center, tuple(ipoints[2].ravel()), (255, 0, 0), 3)
 
 
 class ApriltagFieldJson:

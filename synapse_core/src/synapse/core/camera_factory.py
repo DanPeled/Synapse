@@ -11,9 +11,8 @@ from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err
 from synapse.stypes import Frame
-from wpimath import geometry
-
 from synapse_net.nt_client import NtClient
+from wpimath import geometry
 
 
 class CameraPropKeys(Enum):
