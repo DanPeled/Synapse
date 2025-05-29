@@ -342,16 +342,17 @@ class CsCoreCamera(SynapseCamera):
             ret, frame = self.sink.grabFrame(self.frameBuffer)
             hasFrame = ret != 0
             if hasFrame:
+                frame_copy = frame.copy()  # Make a deep copy
                 try:
-                    self._frameQueue.put_nowait((hasFrame, frame))
+                    self._frameQueue.put_nowait((hasFrame, frame_copy))
                 except queue.Full:
                     try:
                         self._frameQueue.get_nowait()  # drop oldest frame
                     except queue.Empty:
                         pass
-                    self._frameQueue.put_nowait((hasFrame, frame))
+                    self._frameQueue.put_nowait((hasFrame, frame_copy))
             else:
-                time.sleep(0.005)  # small sleep if no frame grabbed
+                time.sleep(1 / self.getMaxFPS() / 2)  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
         try:
