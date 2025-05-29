@@ -1,12 +1,7 @@
-from synapse.core.settings_api import (
-    BooleanConstraint,
-    ColorConstraint,
-    ConstraintType,
-    ListConstraint,
-    ListOptionsConstraint,
-    RangeConstraint,
-    StringConstraint,
-)
+from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
+                                       ConstraintType, ListConstraint,
+                                       ListOptionsConstraint, RangeConstraint,
+                                       StringConstraint)
 
 # ------------------ RangeConstraint ------------------
 
@@ -23,7 +18,7 @@ def test_range_constraint_out_of_bounds():
     result = c.validate(15)
     assert not result.isValid
     assert result.errorMessage is not None
-    assert "outside range" in result.errorMessage
+    assert "is greater than max" in result.errorMessage
 
 
 def test_range_constraint_with_step():

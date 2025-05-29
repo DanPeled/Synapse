@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 import importlib.util
 import threading
 import time
 import traceback
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
@@ -11,36 +11,20 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (
-    CSCORE_TO_CV_PROPS,
-    CameraFactory,
-    CameraPropKeys,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory, CameraPropKeys,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config
-from .pipeline import (
-    CameraConfig,
-    FrameResult,
-    GlobalSettings,
-    Pipeline,
-    PipelineSettings,
-)
+from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
+                       PipelineSettings)
 from .settings_api import PipelineSettingsMap
 
 
@@ -529,16 +513,16 @@ class PipelineHandler:
                 self.sendLatency(cameraIndex, captureLatency, processLatency)
 
                 # Overlay FPS on the frame
-                # cv2.putText(
-                #     processed_frame,
-                #     f"FPS: {fps:.2f}",
-                #     FPSView.position,
-                #     FPSView.font,
-                #     FPSView.fontScale,
-                #     FPSView.color,
-                #     FPSView.thickness,
-                #     lineType=cv2.LINE_8,
-                # )
+                cv2.putText(
+                    processed_frame,
+                    f"FPS: {fps:.2f}",
+                    FPSView.position,
+                    FPSView.font,
+                    FPSView.fontScale,
+                    FPSView.color,
+                    FPSView.thickness,
+                    lineType=cv2.LINE_8,
+                )
 
                 if processed_frame is not None:
                     resized_frame = cv2.resize(

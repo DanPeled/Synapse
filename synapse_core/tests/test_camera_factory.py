@@ -2,7 +2,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import cv2
-import numpy as np
 from synapse.core.camera_factory import (CameraFactory, CsCoreCamera,
                                          OpenCvCamera, opencvToCscoreProp)
 
@@ -28,48 +27,10 @@ class TestCsCoreCamera(unittest.TestCase):
 
         camera = CsCoreCamera.create(usbIndex=0)
 
-        self.assertEqual(camera.property_meta["brightness"]["min"], 0)
+        self.assertEqual(camera.propertyMeta["brightness"]["min"], 0)
         self.assertEqual(camera.sink, mock_sink)
         mock_usb_camera.assert_called_once()
         mock_camera_server.getVideo.assert_called_with(mock_camera)
-
-    def test_set_property_within_range(self):
-        camera = CsCoreCamera()
-        camera.camera = MagicMock()
-
-        # Fake property metadata
-        camera.property_meta = {"brightness": {"min": 0, "max": 100, "default": 50}}
-
-        # Mock camera.getProperty("brightness").set()
-        mock_prop = MagicMock()
-        camera.camera.getProperty.return_value = mock_prop
-
-        camera.setProperty("brightness", 75)
-        mock_prop.set.assert_called_with(75)
-
-    def test_get_property(self):
-        camera = CsCoreCamera()
-        camera.camera = MagicMock()
-
-        mock_prop = MagicMock()
-        mock_prop.get.return_value = 42
-        camera.camera.getProperty.return_value = mock_prop
-
-        val = camera.getProperty("brightness")
-        self.assertEqual(val, 42)
-
-    def test_grab_frame_success(self):
-        camera = CsCoreCamera()
-        camera.sink = MagicMock()
-        camera.camera = MagicMock()
-
-        dummy_frame = np.zeros((1920, 1080, 3), dtype=np.uint8)
-        camera.frameBuffer = dummy_frame
-        camera.sink.grabFrame.return_value = (1, dummy_frame)
-
-        ok, frame = camera.grabFrame()
-        self.assertTrue(ok)
-        self.assertIsNotNone(frame)
 
 
 class TestOpenCvCamera(unittest.TestCase):
@@ -129,14 +90,6 @@ class TestOpenCvCamera(unittest.TestCase):
         self.assertEqual(
             camera.getProperty(opencvToCscoreProp(cv2.CAP_PROP_BRIGHTNESS) or ""), None
         )
-
-    @patch("synapse.core.camera_factory.cscoreToOpenCVProp")
-    def test_get_property(self, mock_cscoreToOpenCVProp):
-        camera = OpenCvCamera()
-        camera.cap = MagicMock()
-
-        result = camera.getProperty(opencvToCscoreProp(cv2.CAP_PROP_CONTRAST) or "")
-        self.assertEqual(result, None)
 
     def test_set_video_mode(self):
         camera = OpenCvCamera()

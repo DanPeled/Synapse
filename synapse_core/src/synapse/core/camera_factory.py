@@ -1,17 +1,19 @@
+import queue
+import threading
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, Set
-import threading
-import queue
-import time
-import numpy as np
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
+
 import cv2
-from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
+import numpy as np
+from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
+                    VideoSource)
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
-from synapse.log import err
+from synapse.log import err, warn
 from synapse.stypes import Frame
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
@@ -383,8 +385,8 @@ class CsCoreCamera(SynapseCamera):
             )
             self.frameBuffer = np.zeros((height, width, 3), dtype=np.uint8)
         else:
-            print(
-                f"Warning: Invalid video mode (width={width}, height={height}). Using default settings."
+            warn(
+                f"Invalid video mode (width={width}, height={height}). Using default settings."
             )
 
     def getResolution(self) -> Tuple[int, int]:
