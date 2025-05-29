@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
@@ -144,6 +144,9 @@ class SynapseCamera(ABC):
     @abstractmethod
     def getResolution(self) -> Size: ...
 
+    @abstractmethod
+    def getMaxFPS(self) -> float: ...
+
     def getSettingEntry(self, key: str) -> Optional[NetworkTableEntry]:
         if hasattr(self, "cameraIndex"):
             table: NetworkTable = getCameraTable(self.cameraIndex)
@@ -258,6 +261,12 @@ class OpenCvCamera(SynapseCamera):
             int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
         )
 
+    def getMaxFPS(self) -> float:
+        desired_fps = 120
+        self.cap.set(cv2.CAP_PROP_FPS, desired_fps)
+        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        return actual_fps
+
 
 class CsCoreCamera(SynapseCamera):
     def __init__(self) -> None:
@@ -267,7 +276,7 @@ class CsCoreCamera(SynapseCamera):
         self.propertyMeta: Dict[str, Dict[str, Union[int, float]]] = {}
         self._properties: Dict[str, Any] = {}
         self._videoModes: List[Any] = []
-        self._validResolutions: Set[Tuple[int, int]] = set()
+        self._validVideoModes: List[VideoMode] = []
 
         self._frameQueue: queue.Queue[Tuple[bool, Optional[np.ndarray]]] = queue.Queue(
             maxsize=5
@@ -310,9 +319,7 @@ class CsCoreCamera(SynapseCamera):
 
         # Cache video modes and valid resolutions
         inst._videoModes = inst.camera.enumerateVideoModes()
-        inst._validResolutions = {
-            (mode.width, mode.height) for mode in inst._videoModes
-        }
+        inst._validVideoModes = [mode for mode in inst._videoModes]
 
         # Initialize frame buffer to current resolution
         mode = inst.camera.getVideoMode()
@@ -376,14 +383,22 @@ class CsCoreCamera(SynapseCamera):
         return None
 
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
-        if (width, height) in self._validResolutions:
-            self.camera.setVideoMode(
-                width=width,
-                height=height,
-                fps=fps,
-                pixelFormat=VideoMode.PixelFormat.kMJPEG,
-            )
-            self.frameBuffer = np.zeros((height, width, 3), dtype=np.uint8)
+        pixelFormat = VideoMode.PixelFormat.kMJPEG
+
+        for mode in self._validVideoModes:
+            if (
+                width == mode.width
+                and height == mode.height
+                and mode.pixelFormat == pixelFormat
+            ):
+                self.camera.setVideoMode(
+                    width=width,
+                    height=height,
+                    fps=mode.fps,
+                    pixelFormat=pixelFormat,
+                )
+                self.frameBuffer = np.zeros((height, width, 3), dtype=np.uint8)
+                return
         else:
             warn(
                 f"Invalid video mode (width={width}, height={height}). Using default settings."
@@ -392,6 +407,9 @@ class CsCoreCamera(SynapseCamera):
     def getResolution(self) -> Tuple[int, int]:
         videoMode = self.camera.getVideoMode()
         return (videoMode.width, videoMode.height)
+
+    def getMaxFPS(self) -> float:
+        return self.camera.getVideoMode().fps
 
 
 class CameraFactory:

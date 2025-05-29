@@ -484,33 +484,40 @@ class PipelineHandler:
             log.log(f"Started Camera #{cameraIndex} loop")
 
             while True:
-                start_time = Timer.getFPGATimestamp()  # Start time for FPS calculation
-                ret, frame = camera.grabFrame()
+                maxFps = camera.getMaxFPS()
+                frame_time = 1.0 / float(maxFps)
+                loop_start = Timer.getFPGATimestamp()
 
-                captureLatency = Timer.getFPGATimestamp() - start_time
+                ret, frame = camera.grabFrame()
+                captureLatency = Timer.getFPGATimestamp() - loop_start
                 if not ret or frame is None:
                     continue
 
                 frame = self.fixtureFrame(cameraIndex, frame)
 
                 process_start = Timer.getFPGATimestamp()
-                # Retrieve the pipeline instances for the current camera
                 pipeline = self.pipelineInstanceBindings.get(cameraIndex, None)
                 processed_frame: Frame = frame
 
                 if pipeline is not None:
-                    # Process the frame through each assigned pipeline
-                    result = pipeline.processFrame(frame, start_time)
+                    result = pipeline.processFrame(frame, loop_start)
                     frame = self.handleResults(result, cameraIndex)
-
                     if frame is not None:
                         processed_frame = frame
 
-                end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
-                processLatency = end_time - process_start
-                fps = 1.0 / (end_time - start_time)  # Calculate FPS
-                camera.setSetting("fps", fps)
+                processLatency = Timer.getFPGATimestamp() - process_start
+                total_time = Timer.getFPGATimestamp() - loop_start
+                fps = 1.0 / total_time if total_time > 0 else 0
                 self.sendLatency(cameraIndex, captureLatency, processLatency)
+
+                # Sleep to enforce max FPS
+                elapsed = Timer.getFPGATimestamp() - loop_start
+                remaining = frame_time - elapsed
+                if remaining > 0:
+                    time.sleep(remaining)
+                loop_end = Timer.getFPGATimestamp()
+                total_loop_time = loop_end - loop_start
+                fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
 
                 # Overlay FPS on the frame
                 cv2.putText(
@@ -657,9 +664,7 @@ class PipelineHandler:
                     )
 
         camera.setVideoMode(
-            width=int(settings["width"]),
-            height=int(settings["height"]),
-            fps=100,
+            width=int(settings["width"]), height=int(settings["height"]), fps=100
         )
 
         return updated_settings
