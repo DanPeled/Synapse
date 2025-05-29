@@ -2,11 +2,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
-
-import cv2
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, Set
+import threading
+import queue
+import time
 import numpy as np
-from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode
+import cv2
+from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err
@@ -260,7 +262,16 @@ class CsCoreCamera(SynapseCamera):
         self.camera: VideoCamera
         self.frameBuffer: np.ndarray
         self.sink: CvSink
-        self.property_meta: Dict = {}
+        self.propertyMeta: Dict[str, Dict[str, Union[int, float]]] = {}
+        self._properties: Dict[str, Any] = {}
+        self._videoModes: List[Any] = []
+        self._validResolutions: Set[Tuple[int, int]] = set()
+
+        self._frameQueue: queue.Queue[Tuple[bool, Optional[np.ndarray]]] = queue.Queue(
+            maxsize=5
+        )
+        self._running: bool = False
+        self._thread: Optional[threading.Thread] = None
 
     @classmethod
     def create(
@@ -271,84 +282,112 @@ class CsCoreCamera(SynapseCamera):
         name: str = "",
     ) -> "CsCoreCamera":
         inst = CsCoreCamera()
-        inst.frameBuffer = np.zeros((1920, 1080, 3), dtype=np.uint8)
+
         if usbIndex is not None:
             inst.camera = UsbCamera(devPath or f"USB Camera {usbIndex}", usbIndex)
         elif devPath is not None:
-            inst.camera = UsbCamera(f"{name}", devPath)
+            inst.camera = UsbCamera(name, devPath)
         else:
-            err("No USB Index or Dev Path was provided for camera!")
+            raise ValueError(
+                "Camera initialization failed: no USB Index or Dev Path provided."
+            )
 
-        if inst.camera is not None:
-            inst.sink = CameraServer.getVideo(inst.camera)
+        inst.sink = CameraServer.getVideo(inst.camera)
 
-        inst.property_meta = {}
-        for prop in inst.camera.enumerateProperties():
-            inst.property_meta[prop.getName()] = {
+        # Cache properties and metadata
+        props = inst.camera.enumerateProperties()
+        inst._properties = {prop.getName(): prop for prop in props}
+        inst.propertyMeta = {
+            name: {
                 "min": prop.getMin(),
                 "max": prop.getMax(),
                 "default": prop.getDefault(),
             }
+            for name, prop in inst._properties.items()
+        }
+
+        # Cache video modes and valid resolutions
+        inst._videoModes = inst.camera.enumerateVideoModes()
+        inst._validResolutions = {
+            (mode.width, mode.height) for mode in inst._videoModes
+        }
+
+        # Initialize frame buffer to current resolution
+        mode = inst.camera.getVideoMode()
+        inst.frameBuffer = np.zeros((mode.height, mode.width, 3), dtype=np.uint8)
+
+        # Start background frame grabbing thread
+        inst._startFrameThread()
 
         return inst
 
-    def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
-        if self.camera is not None:
+    def _startFrameThread(self) -> None:
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._frameGrabberLoop, daemon=True)
+        self._thread.start()
+
+    def _frameGrabberLoop(self) -> None:
+        while self._running:
             ret, frame = self.sink.grabFrame(self.frameBuffer)
-            return ret != 0, frame
-        return False, None
+            hasFrame = ret != 0
+            if hasFrame:
+                try:
+                    self._frameQueue.put_nowait((hasFrame, frame))
+                except queue.Full:
+                    try:
+                        self._frameQueue.get_nowait()  # drop oldest frame
+                    except queue.Empty:
+                        pass
+                    self._frameQueue.put_nowait((hasFrame, frame))
+            else:
+                time.sleep(0.005)  # small sleep if no frame grabbed
+
+    def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
+        try:
+            return self._frameQueue.get_nowait()
+        except queue.Empty:
+            return False, None
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        self._running = False
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+        # Properly close camera connection
+        self.camera.setConnectionStrategy(
+            VideoSource.ConnectionStrategy.kConnectionForceClose
+        )
 
     def setProperty(self, prop: str, value: Union[int, float]) -> None:
-        if (
-            isinstance(prop, str)
-            and self.camera
-            and isinstance(value, int)
-            and prop in self.property_meta.keys()
-        ):
-            self.camera.getProperty(prop).set(
-                max(
-                    min(value, self.property_meta[prop]["max"]),
-                    self.property_meta[prop]["min"],
-                )
-            )
+        if prop in self._properties:
+            meta = self.propertyMeta[prop]
+            value = int(np.clip(value, meta["min"], meta["max"]))
+            self._properties[prop].set(value)
 
     def getProperty(self, prop: str) -> Union[int, float, None]:
-        if isinstance(prop, str) and self.camera:
-            prop_obj = self.camera.getProperty(prop)
-            if prop_obj:
-                return prop_obj.get()
+        if prop in self._properties:
+            return self._properties[prop].get()
         return None
 
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
-        if self.camera:
-            valid_modes = []
+        if (width, height) in self._validResolutions:
+            self.camera.setVideoMode(
+                width=width,
+                height=height,
+                fps=fps,
+                pixelFormat=VideoMode.PixelFormat.kMJPEG,
+            )
+            self.frameBuffer = np.zeros((height, width, 3), dtype=np.uint8)
+        else:
+            print(
+                f"Warning: Invalid video mode (width={width}, height={height}). Using default settings."
+            )
 
-            for mode in self.camera.enumerateVideoModes():
-                valid_modes.append(
-                    (
-                        mode.width,
-                        mode.height,
-                    )
-                )
-
-            if (width, height) in valid_modes:
-                self.camera.setVideoMode(
-                    width=width,
-                    height=height,
-                    fps=fps,
-                    pixelFormat=VideoMode.PixelFormat.kMJPEG,
-                )
-            else:
-                err(
-                    f"Warning: Invalid video mode (width={width}, height={height}). Using default settings."
-                )
-
-    def getResolution(self) -> Size:
+    def getResolution(self) -> Tuple[int, int]:
         videoMode = self.camera.getVideoMode()
         return (videoMode.width, videoMode.height)
 

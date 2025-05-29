@@ -58,8 +58,8 @@ class RangeConstraint(Constraint):
 
     def __init__(
         self,
-        minValue: Union[int, float],
-        maxValue: Union[int, float],
+        minValue: Optional[Union[int, float]] = None,
+        maxValue: Optional[Union[int, float]] = None,
         step: Optional[Union[int, float]] = None,
     ):
         super().__init__(ConstraintType.kRange)
@@ -70,17 +70,23 @@ class RangeConstraint(Constraint):
     def validate(self, value: Any) -> ValidationResult:
         try:
             numValue = float(value)
-            if numValue < self.minValue or numValue > self.maxValue:
+            if self.minValue is not None and numValue < self.minValue:
                 return ValidationResult(
                     False,
-                    f"Value {value} is outside range [{self.minValue}, {self.maxValue}]",
+                    f"Value {value} is less than minimum {self.minValue}",
+                )
+            if self.maxValue is not None and numValue > self.maxValue:
+                return ValidationResult(
+                    False,
+                    f"Value {value} is greater than maximum {self.maxValue}",
                 )
 
-            if self.step and (numValue - self.minValue) % self.step != 0:
-                # Snap to nearest step
-                steps = round((numValue - self.minValue) / self.step)
-                normalized = self.minValue + (steps * self.step)
-                return ValidationResult(True, None, normalized)
+            if self.step and self.minValue is not None:
+                if (numValue - self.minValue) % self.step != 0:
+                    # Snap to nearest step
+                    steps = round((numValue - self.minValue) / self.step)
+                    normalized = self.minValue + (steps * self.step)
+                    return ValidationResult(True, None, normalized)
 
             return ValidationResult(True, None, numValue)
         except (ValueError, TypeError):
@@ -537,6 +543,12 @@ class PipelineSettings:
     exposure = settingField(RangeConstraint(0, 100), default=50)
     saturation = settingField(RangeConstraint(0, 100), default=50)
     orientation = settingField(RangeConstraint(0, 270, 90), default=0)
+    width = settingField(
+        RangeConstraint(minValue=0, maxValue=None), default=1280
+    )  # TODO: use enumerated video modes
+    height = settingField(
+        RangeConstraint(minValue=0, maxValue=None), default=720
+    )  # TODO: use enumerated video modes
 
     def __init__(self, settings: Optional[PipelineSettingsMap] = None):
         """
@@ -562,11 +574,9 @@ class PipelineSettings:
                 if isinstance(value, bool):
                     constraint = BooleanConstraint()
                 elif isinstance(value, float | int):
-                    import math
-
                     constraint = RangeConstraint(
-                        minValue=-math.inf,
-                        maxValue=math.inf,
+                        minValue=-1_000_000.0,
+                        maxValue=1_000_000.0,
                         step=None if isinstance(value, float) else 1,
                     )
                 elif isinstance(value, str):

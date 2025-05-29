@@ -1,9 +1,9 @@
+from dataclasses import dataclass
 import importlib.util
 import threading
 import time
 import traceback
 from enum import Enum
-from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
 
@@ -11,20 +11,36 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory, CameraPropKeys,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraFactory,
+    CameraPropKeys,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
+from .pipeline import (
+    CameraConfig,
+    FrameResult,
+    GlobalSettings,
+    Pipeline,
+    PipelineSettings,
+)
 from .settings_api import PipelineSettingsMap
 
 
@@ -33,6 +49,15 @@ class NTKeys(Enum):
     kMetrics = "metrics"
     kProcessLatency = "processLatency"
     kCaptureLatency = "captureLatency"
+
+
+@dataclass
+class FPSView:
+    font = cv2.FONT_HERSHEY_PLAIN
+    fontScale = 3
+    thickness = 2
+    color = (0, 0, 0)
+    position = (10, 30)
 
 
 class PipelineHandler:
@@ -279,7 +304,7 @@ class PipelineHandler:
                 cameraTable.getSubTable(NTKeys.kSettings.value)
             )
 
-            def updateSettingListener(event: Event):
+            def updateSettingListener(event: Event, cameraIndex=cameraIndex):
                 prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
                 value: Any = self.getEventDataValue(event)
                 self.pipelineSettings[self.pipelineBindings[cameraIndex]].setSetting(
@@ -289,7 +314,7 @@ class PipelineHandler:
                 if prop in CSCORE_TO_CV_PROPS.keys():
                     self.cameras[cameraIndex].setProperty(
                         prop=prop,
-                        value=value,
+                        value=int(value),
                     )
 
             for key in pipeline_config.getMap().keys():
@@ -303,7 +328,6 @@ class PipelineHandler:
                         )
 
     @staticmethod
-    @cache
     def getEventDataValue(
         event: Event,
     ) -> DataValue:
@@ -501,19 +525,20 @@ class PipelineHandler:
                 end_time = Timer.getFPGATimestamp()  # End time for FPS calculation
                 processLatency = end_time - process_start
                 fps = 1.0 / (end_time - start_time)  # Calculate FPS
-
+                camera.setSetting("fps", fps)
                 self.sendLatency(cameraIndex, captureLatency, processLatency)
 
                 # Overlay FPS on the frame
-                cv2.putText(
-                    processed_frame,
-                    f"FPS: {fps:.2f}",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 255, 0),
-                    2,
-                )
+                # cv2.putText(
+                #     processed_frame,
+                #     f"FPS: {fps:.2f}",
+                #     FPSView.position,
+                #     FPSView.font,
+                #     FPSView.fontScale,
+                #     FPSView.color,
+                #     FPSView.thickness,
+                #     lineType=cv2.LINE_8,
+                # )
 
                 if processed_frame is not None:
                     resized_frame = cv2.resize(
@@ -648,8 +673,8 @@ class PipelineHandler:
                     )
 
         camera.setVideoMode(
-            width=settings["width"],
-            height=settings["height"],
+            width=int(settings["width"]),
+            height=int(settings["height"]),
             fps=100,
         )
 
