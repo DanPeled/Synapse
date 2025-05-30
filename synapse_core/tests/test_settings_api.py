@@ -1,12 +1,7 @@
-from synapse.core.settings_api import (
-    BooleanConstraint,
-    ColorConstraint,
-    ConstraintType,
-    ListConstraint,
-    ListOptionsConstraint,
-    RangeConstraint,
-    StringConstraint,
-)
+from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
+                                       ConstraintType, ListConstraint,
+                                       ListOptionsConstraint, RangeConstraint,
+                                       StringConstraint)
 
 from synapse_core.src.synapse.core.settings_api import ColorFormat
 
