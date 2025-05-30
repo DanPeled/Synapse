@@ -1,7 +1,20 @@
 from dataclasses import dataclass
 from pathlib import Path
-
 import yaml
+
+
+@dataclass
+class ProjectConfig:
+    hostname: str
+    username: str
+    password: str
+
+    def __init__(self, filePath: Path) -> None:
+        with open(filePath) as file:
+            dictData: dict = yaml.full_load(file)
+            self.hostname = dictData["hostname"]
+            self.username = dictData["username"]
+            self.password = dictData["username"]
 
 
 @dataclass
@@ -19,9 +32,6 @@ class NetworkConfig:
 
     teamNumber: int
     name: str
-    hostname: str
-    user: str
-    password: str
 
     @classmethod
     def fromJson(cls, data: dict) -> "NetworkConfig":
@@ -37,9 +47,6 @@ class NetworkConfig:
         return NetworkConfig(
             teamNumber=data["team_number"],
             name=data["name"],
-            hostname=data["hostname"],
-            user=data["user"],
-            password=data["password"],
         )
 
 

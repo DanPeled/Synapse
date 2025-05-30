@@ -9,8 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoSource)
+from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
@@ -339,20 +338,26 @@ class CsCoreCamera(SynapseCamera):
 
     def _frameGrabberLoop(self) -> None:
         while self._running:
-            ret, frame = self.sink.grabFrame(self.frameBuffer)
-            hasFrame = ret != 0
-            if hasFrame:
-                frame_copy = frame.copy()  # Make a deep copy
-                try:
-                    self._frameQueue.put_nowait((hasFrame, frame_copy))
-                except queue.Full:
+            result = self.sink.grabFrame(self.frameBuffer)
+            if len(result) > 0:
+                ret, frame = result
+                hasFrame = ret != 0
+                if hasFrame:
+                    frame_copy = frame.copy()  # Make a deep copy
                     try:
-                        self._frameQueue.get_nowait()  # drop oldest frame
-                    except queue.Empty:
-                        pass
-                    self._frameQueue.put_nowait((hasFrame, frame_copy))
-            else:
-                time.sleep(1 / self.getMaxFPS() / 2)  # Half the expected frame interval
+                        self._frameQueue.put_nowait((hasFrame, frame_copy))
+                    except queue.Full:
+                        try:
+                            self._frameQueue.get_nowait()  # drop oldest frame
+                        except queue.Empty:
+                            pass
+                        self._frameQueue.put_nowait((hasFrame, frame_copy))
+                else:
+                    self._waitForNextFrame()
+            self._waitForNextFrame()
+
+    def _waitForNextFrame(self):
+        time.sleep(1 / self.getMaxFPS() / 2)  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
         try:

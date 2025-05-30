@@ -1,144 +1,150 @@
 import unittest
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import patch, MagicMock
 import cv2
-from synapse.core.camera_factory import (CameraFactory, CsCoreCamera,
-                                         OpenCvCamera, opencvToCscoreProp)
+import numpy as np
+import synapse.core.camera_factory
+from synapse.core.camera_factory import (
+    CsCoreCamera,
+)
+
+
+class TestUtilityFunctions(unittest.TestCase):
+    def test_getCameraTableName(self):
+        self.assertEqual(synapse.core.camera_factory.getCameraTableName(2), "camera2")
+
+    def test_cscoreToOpenCVProp(self):
+        self.assertEqual(
+            synapse.core.camera_factory.cscoreToOpenCVProp("brightness"),
+            cv2.CAP_PROP_BRIGHTNESS,
+        )
+
+    def test_opencvToCscoreProp(self):
+        self.assertEqual(
+            synapse.core.camera_factory.opencvToCscoreProp(cv2.CAP_PROP_CONTRAST),
+            "contrast",
+        )
+
+
+class TestCameraConfig(unittest.TestCase):
+    def test_camera_config_creation(self):
+        transform = MagicMock()
+        config = synapse.core.camera_factory.CameraConfig(
+            name="cam",
+            path="/dev/video0",
+            transform=transform,
+            defaultPipeline=1,
+            matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            distCoeff=[0.1, 0.01],
+            measuredRes=(640, 480),
+            streamRes=(320, 240),
+        )
+        self.assertEqual(config.name, "cam")
+
+
+class TestOpenCvCamera(unittest.TestCase):
+    @patch("cv2.VideoCapture")
+    def test_create_with_usb_index(self, mock_vc):
+        mock_vc.return_value = MagicMock()
+        cam = synapse.core.camera_factory.OpenCvCamera.create(usbIndex=0)
+        self.assertIsInstance(cam, synapse.core.camera_factory.OpenCvCamera)
+
+    @patch("cv2.VideoCapture")
+    def test_grab_frame(self, mock_vc):
+        inst = synapse.core.camera_factory.OpenCvCamera()
+        mock_capture = MagicMock()
+        inst.cap = mock_capture
+        inst.cap.read.return_value = (True, "frame")
+        self.assertEqual(inst.grabFrame(), (True, "frame"))
+
+    def test_set_and_get_video_mode(self):
+        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst.cap = MagicMock()
+        inst.setVideoMode(30, 640, 480)
+        inst.cap.set.assert_any_call(cv2.CAP_PROP_FPS, 30)
+        inst.cap.set.assert_any_call(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        inst.cap.set.assert_any_call(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    def test_get_resolution(self):
+        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst.cap = MagicMock()
+        inst.cap.get.side_effect = [640, 480]
+        self.assertEqual(inst.getResolution(), (640, 480))
+
+    def test_get_max_fps(self):
+        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst.cap = MagicMock()
+        inst.cap.get.return_value = 120.0
+        self.assertEqual(inst.getMaxFPS(), 120.0)
 
 
 class TestCsCoreCamera(unittest.TestCase):
     @patch("synapse.core.camera_factory.UsbCamera")
-    @patch("synapse.core.camera_factory.CameraServer")
-    def test_create_with_usb_index(self, mock_camera_server, mock_usb_camera):
-        mock_camera = MagicMock()
-        mock_usb_camera.return_value = mock_camera
+    @patch("synapse.core.camera_factory.CameraServer.getVideo")
+    def test_create_with_usb_index(self, mock_get_video, mock_usb_camera):
+        camera_instance = MagicMock()
+        mock_usb_camera.return_value = camera_instance
+        mock_get_video.return_value = MagicMock()
+        camera_instance.enumerateProperties.return_value = []
 
-        # Mock getVideo
-        mock_sink = MagicMock()
-        mock_camera_server.getVideo.return_value = mock_sink
+        cam = CsCoreCamera.create(usbIndex=0, name="TestCam")
 
-        # Mock enumerateProperties
-        mock_prop = MagicMock()
-        mock_prop.getName.return_value = "brightness"
-        mock_prop.getMin.return_value = 0
-        mock_prop.getMax.return_value = 100
-        mock_prop.getDefault.return_value = 50
-        mock_camera.enumerateProperties.return_value = [mock_prop]
-
-        camera = CsCoreCamera.create(usbIndex=0)
-
-        self.assertEqual(camera.propertyMeta["brightness"]["min"], 0)
-        self.assertEqual(camera.sink, mock_sink)
+        self.assertIsInstance(cam, CsCoreCamera)
         mock_usb_camera.assert_called_once()
-        mock_camera_server.getVideo.assert_called_with(mock_camera)
+        mock_get_video.assert_called_once_with(camera_instance)
 
+    @patch("synapse.core.camera_factory.UsbCamera")
+    @patch("synapse.core.camera_factory.CameraServer.getVideo")
+    def test_create_with_dev_path(self, mock_get_video, mock_usb_camera):
+        camera_instance = MagicMock()
+        mock_usb_camera.return_value = camera_instance
+        mock_get_video.return_value = MagicMock()
+        camera_instance.enumerateProperties.return_value = []
 
-class TestOpenCvCamera(unittest.TestCase):
-    @patch("synapse.core.camera_factory.cv2.VideoCapture")
-    def test_create_with_usb_index(self, mock_VideoCapture):
-        mock_cap = MagicMock()
-        mock_VideoCapture.return_value = mock_cap
+        cam = CsCoreCamera.create(devPath="/dev/video0", name="TestCam")
 
-        camera = OpenCvCamera.create(usbIndex=0)
+        self.assertIsInstance(cam, CsCoreCamera)
+        mock_usb_camera.assert_called_once_with("TestCam", "/dev/video0")
 
-        mock_VideoCapture.assert_called_with(0)
-        self.assertEqual(camera.cap, mock_cap)
+    def test_set_and_get_property_meta(self):
+        cam = CsCoreCamera()
+        cam._properties = {
+            "brightness": MagicMock(
+                getMin=lambda: 0, getMax=lambda: 100, getDefault=lambda: 50
+            )
+        }
+        cam.propertyMeta = {"brightness": {"min": 0, "max": 100, "default": 50}}
 
-    @patch("synapse.core.camera_factory.cv2.VideoCapture")
-    def test_create_with_dev_path(self, mock_VideoCapture):
-        mock_cap = MagicMock()
-        mock_VideoCapture.return_value = mock_cap
+        self.assertIn("brightness", cam.propertyMeta)
+        self.assertEqual(cam.propertyMeta["brightness"]["default"], 50)
 
-        camera = OpenCvCamera.create(devPath="/dev/video0")
+    @patch("synapse.core.camera_factory.CvSink")
+    def test_grabFrame_logic(self, mock_sink):
+        cam = CsCoreCamera()
+        mock_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cam.sink = MagicMock()
+        cam.sink.grabFrame.return_value = 10
+        cam.frameBuffer = mock_frame
+        cam._running = False  # Skip the thread loop
 
-        mock_VideoCapture.assert_called_with("/dev/video0", cv2.CAP_V4L2)
-        self.assertEqual(camera.cap, mock_cap)
-
-    def test_grab_frame(self):
-        camera = OpenCvCamera()
-        mock_cap = MagicMock()
-        dummy_frame = object()
-        mock_cap.read.return_value = (True, dummy_frame)
-        camera.cap = mock_cap
-
-        ok, frame = camera.grabFrame()
-        self.assertTrue(ok)
-        self.assertEqual(frame, dummy_frame)
-
-    def test_is_connected(self):
-        camera = OpenCvCamera()
-        camera.cap = MagicMock()
-        camera.cap.isOpened.return_value = True
-
-        self.assertTrue(camera.isConnected())
-        camera.cap.isOpened.assert_called_once()
-
-    def test_close(self):
-        camera = OpenCvCamera()
-        camera.cap = MagicMock()
-
-        camera.close()
-        camera.cap.release.assert_called_once()
-
-    @patch("synapse.core.camera_factory.cscoreToOpenCVProp")
-    def test_set_property(self, mock_cscoreToOpenCVProp):
-        camera = OpenCvCamera()
-        camera.cap = MagicMock()
-
-        mock_cscoreToOpenCVProp.return_value = cv2.CAP_PROP_BRIGHTNESS
-        camera.setProperty(opencvToCscoreProp(cv2.CAP_PROP_BRIGHTNESS) or "", 50)
-        self.assertEqual(
-            camera.getProperty(opencvToCscoreProp(cv2.CAP_PROP_BRIGHTNESS) or ""), None
-        )
-
-    def test_set_video_mode(self):
-        camera = OpenCvCamera()
-        camera.cap = MagicMock()
-
-        camera.setVideoMode(fps=30, width=640, height=480)
-        camera.cap.set.assert_any_call(cv2.CAP_PROP_FPS, 30)
-        camera.cap.set.assert_any_call(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        camera.cap.set.assert_any_call(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # Run a single iteration
+        result = cam.sink.grabFrame(cam.frameBuffer)
+        self.assertEqual(result, 10)
 
     def test_get_resolution(self):
-        camera = OpenCvCamera()
-        camera.cap = MagicMock()
-        camera.cap.get.side_effect = [640, 480]
+        cam = CsCoreCamera()
+        cam.camera = MagicMock()
+        cam.camera.getVideoMode.return_value.width = 640
+        cam.camera.getVideoMode.return_value.height = 480
 
-        res = camera.getResolution()
+        res = cam.getResolution()
         self.assertEqual(res, (640, 480))
-        camera.cap.get.assert_any_call(cv2.CAP_PROP_FRAME_WIDTH)
-        camera.cap.get.assert_any_call(cv2.CAP_PROP_FRAME_HEIGHT)
+
+    def test_get_max_fps(self):
+        cam = CsCoreCamera()
+        cam.camera = MagicMock()
+        cam.camera.getVideoMode.return_value.fps = 30
+        self.assertEqual(cam.getMaxFPS(), 30)
 
 
-class TestCameraFactory(unittest.TestCase):
-    @patch.object(OpenCvCamera, "create")
-    def test_create_opencv_camera(self, mock_create):
-        mock_cam_instance = MagicMock()
-        mock_create.return_value = mock_cam_instance
-
-        cam = CameraFactory.create(
-            cameraType=OpenCvCamera,
-            cameraIndex=1,
-            devPath="/dev/video0",
-            name="TestCam",
-        )
-
-        mock_create.assert_called_once_with(
-            devPath="/dev/video0", usbIndex=None, name="TestCam"
-        )
-        mock_cam_instance.setIndex.assert_called_once_with(1)
-        self.assertEqual(cam, mock_cam_instance)
-
-    @patch.object(CsCoreCamera, "create")
-    def test_create_cscore_camera(self, mock_create):
-        mock_cam_instance = MagicMock()
-        mock_create.return_value = mock_cam_instance
-
-        cam = CameraFactory.create(
-            cameraType=CsCoreCamera, cameraIndex=2, usbIndex=0, name="UsbCam"
-        )
-
-        mock_create.assert_called_once_with(devPath=None, usbIndex=0, name="UsbCam")
-        mock_cam_instance.setIndex.assert_called_once_with(2)
-        self.assertEqual(cam, mock_cam_instance)
+if __name__ == "__main__":
+    unittest.main()

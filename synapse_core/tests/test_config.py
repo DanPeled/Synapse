@@ -9,9 +9,6 @@ sample_yaml: str = """
 network:
   team_number: 1234
   name: "TestTeam"
-  hostname: "10.12.34.2"
-  user: "admin"
-  password: "secret"
 """
 
 
@@ -19,17 +16,11 @@ def test_network_config_from_json() -> None:
     data: dict = {
         "team_number": 1234,
         "name": "TestTeam",
-        "hostname": "10.12.34.2",
-        "user": "admin",
-        "password": "secret",
     }
     config = NetworkConfig.fromJson(data)
 
     assert config.teamNumber == 1234
     assert config.name == "TestTeam"
-    assert config.hostname == "10.12.34.2"
-    assert config.user == "admin"
-    assert config.password == "secret"
 
 
 def test_config_load_and_get_instance() -> None:
