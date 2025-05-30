@@ -127,8 +127,8 @@ def deploy(
 
 def load_config(base_path: Path) -> dict:
     config = synconfig.Config()
-    config.load(Path(base_path) / "config" / "settings.yml")
-    return config.getConfigMap()["network"]
+    config.load(Path(base_path) / "config" / ".synapseproject")
+    return config.getConfigMap()
 
 
 def main():
