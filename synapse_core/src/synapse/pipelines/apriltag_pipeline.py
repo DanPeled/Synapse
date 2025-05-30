@@ -97,7 +97,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
     def __init__(self, settings: ApriltagPipelineSettings, cameraIndex: int):
-        super().__init__(settings, cameraIndex)
+        super().__init__(cameraIndex, settings)
         self.settings: ApriltagPipelineSettings = settings
         self.camera_matrix: np.ndarray = np.array(
             self.getCameraMatrix(cameraIndex), dtype=np.float32
