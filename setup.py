@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-WPILIB_VERSION = "2025.0.0b3"
+WPILIB_VERSION = "2025.2.1.1"
 
 
 def wpilibDep(name: str) -> str:
