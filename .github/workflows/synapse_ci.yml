@@ -6,11 +6,13 @@ on:
       - main
     paths:
       - 'synapse_core/**'
+      - 'synapse_net/**'
   pull_request:
     branches:
       - main
     paths:
       - 'synapse_core/**'
+      - 'synapse_net/**'
 
 jobs:
   build:
@@ -51,12 +53,10 @@ jobs:
       - name: Install Ruff and isort
         run: |
           pip install ruff isort
-        working-directory: synapse_core
 
       - name: Run Ruff linting
         run: |
           ruff check .
-        working-directory: synapse_core
 
       - name: Run isort check
         run: |
@@ -81,12 +81,10 @@ jobs:
       - name: Install Pyright
         run: |
           pip install pyright
-        working-directory: synapse_core
 
       - name: Run Pyright type checks
         run: |
           pyright
-        working-directory: synapse_core 
 
   test:
     strategy:
@@ -110,9 +108,7 @@ jobs:
       - name: Install PyTest
         run: |
           pip install pytest
-        working-directory: synapse_core
 
       - name: Run Tests
         run: |
           pytest .
-        working-directory: synapse_core/tests

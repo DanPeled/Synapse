@@ -9,7 +9,10 @@ import numpy as np
 import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
-from synapse.core.pipeline import GlobalSettings, Pipeline, PipelineSettings
+from synapse.core.pipeline import GlobalSettings, Pipeline
+from synapse.core.settings_api import (BooleanConstraint,
+                                       ListOptionsConstraint, PipelineSettings,
+                                       RangeConstraint, Setting, settingField)
 from synapse.stypes import Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
@@ -61,30 +64,41 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     if verbosity.value <= ApriltagVerbosity.kTagDetails.value:
         ignored.update({"pose_err", "decision_margin", ApriltagPipeline.kHammingKey})
     if verbosity.value <= ApriltagVerbosity.kPoseOnly.value:
-        ignored.update({ApriltagPipeline.kTagFamilyKey, ApriltagPipeline.kTagIDKey})
+        ignored.update(
+            {ApriltagPipelineSettings.tag_family.key, ApriltagPipeline.kTagIDKey}
+        )
 
     return ignored
 
 
-class ApriltagPipeline(Pipeline):
-    kTagSizeKey: Final[str] = "tag_size"
+class ApriltagPipelineSettings(PipelineSettings):
+    tag_size: Setting = settingField(
+        RangeConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
+    )
+    tag_family: Setting = settingField(
+        ListOptionsConstraint(["tag36h11", "tag16h5"]), default="tag36h11"
+    )
+    stick_to_ground = settingField(BooleanConstraint(), default=False)
+    fieldpose = settingField(BooleanConstraint(), default=True)
+    verbosity = settingField(
+        ListOptionsConstraint(options=[ver.value for ver in ApriltagVerbosity]),
+        default=ApriltagVerbosity.kPoseOnly,
+    )
+
+
+class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
-    kTagFamilyKey: Final[str] = "tag_family"
-    kTagFamily: Final[str] = "tag36h11"
-    kGetFieldPoseKey: Final[str] = "fieldpose"
-    kStickToGroundKey: Final[str] = "stick_to_ground"
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
     kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
     kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
-    kResultVerbosityKey: Final[str] = "verbosity"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
-    def __init__(self, settings: PipelineSettings, cameraIndex: int):
-        super().__init__(settings, cameraIndex)
-        self.settings: PipelineSettings = settings
+    def __init__(self, settings: ApriltagPipelineSettings, cameraIndex: int):
+        super().__init__(cameraIndex, settings)
+        self.settings: ApriltagPipelineSettings = settings
         self.camera_matrix: np.ndarray = np.array(
             self.getCameraMatrix(cameraIndex), dtype=np.float32
         )
@@ -97,14 +111,20 @@ class ApriltagPipeline(Pipeline):
             apriltag.AprilTagDetector.Config()
         )
 
-        detectorConfig.numThreads = int(settings.get("num_threads") or 1)
+        detectorConfig.numThreads = int(settings.getSetting("num_threads") or 1)
         self.apriltagDetector.setConfig(detectorConfig)
-        self.apriltagDetector.addFamily("tag36h11")
+        self.apriltagDetector.addFamily(
+            settings.getSetting(ApriltagPipelineSettings.tag_family.key)
+            or ApriltagPipelineSettings.tag_family.defaultValue
+        )
 
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
-                    tagSize=float(settings.get(ApriltagPipeline.kTagSizeKey) or 0.1651),
+                    tagSize=float(
+                        settings.getSetting(ApriltagPipelineSettings.tag_size.key)
+                        or ApriltagPipelineSettings.tag_size.defaultValue
+                    ),
                     fx=self.camera_matrix[0][0],
                     fy=self.camera_matrix[1][1],
                     cx=self.camera_matrix[0][2],
@@ -131,7 +151,7 @@ class ApriltagPipeline(Pipeline):
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        tagSize = self.getSetting(self.kTagSizeKey)
+        tagSize = self.getSetting(ApriltagPipelineSettings.tag_size.key)
 
         tags = self.apriltagDetector.detect(gray)
         results: List[ApriltagResult] = []
@@ -180,7 +200,10 @@ class ApriltagPipeline(Pipeline):
                 ],
             )
 
-            if self.getSetting(self.kGetFieldPoseKey) and self.camera_transform:
+            if (
+                self.getSetting(ApriltagPipelineSettings.fieldpose.key)
+                and self.camera_transform
+            ):
                 tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.getId())
 
                 if tagFieldPose:
@@ -221,8 +244,8 @@ class ApriltagPipeline(Pipeline):
                 results,
                 getIgnoredDataByVerbosity(
                     ApriltagVerbosity.fromValue(
-                        self.getSetting(ApriltagPipeline.kResultVerbosityKey)
-                        or ApriltagVerbosity.kPoseOnly.value
+                        self.getSetting(ApriltagPipelineSettings.verbosity.key)
+                        or ApriltagPipelineSettings.verbosity.defaultValue
                     )
                 ),
             ),
@@ -345,58 +368,58 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param z_sign: The direction of the z-axis.
         """
-
-        # Creates object points
-        opoints = (
-            np.array(
-                [
-                    -1,
-                    -1,
-                    0,
-                    1,
-                    -1,
-                    0,
-                    1,
-                    1,
-                    0,
-                    -1,
-                    1,
-                    0,
-                    -1,
-                    -1,
-                    -2 * z_sign,
-                    1,
-                    -1,
-                    -2 * z_sign,
-                    1,
-                    1,
-                    -2 * z_sign,
-                    -1,
-                    1,
-                    -2 * z_sign,
-                ]
-            ).reshape(-1, 1, 3)
-            * 0.5
-            * tagSize
-        )
-
-        # Creates edges
-        edges = np.array(
-            [0, 1, 1, 2, 2, 3, 3, 0, 0, 4, 1, 5, 2, 6, 3, 7, 4, 5, 5, 6, 6, 7, 7, 4]
-        ).reshape(-1, 2)
-
-        # Calulcates rotation and translation vectors for each AprilTag
-        rVecs = pose.rotation().toVector()
-        tVecs = pose.translation().toVector()
-
-        # Calulate image points of each AprilTag
-        ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
-        ipoints = np.round(ipoints).astype(int)
-        ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
-
-        # Draws lines between all the edges
-        for i, j in edges:
-            cv2.line(img, ipoints[i], ipoints[j], (0, 255, 0), 4, 16)
+        # # Creates object points
+        # opoints = (
+        #     np.array(
+        #         [
+        #             -1,
+        #             -1,
+        #             0,
+        #             1,
+        #             -1,
+        #             0,
+        #             1,
+        #             1,
+        #             0,
+        #             -1,
+        #             1,
+        #             0,
+        #             -1,
+        #             -1,
+        #             -2 * z_sign,
+        #             1,
+        #             -1,
+        #             -2 * z_sign,
+        #             1,
+        #             1,
+        #             -2 * z_sign,
+        #             -1,
+        #             1,
+        #             -2 * z_sign,
+        #         ]
+        #     ).reshape(-1, 1, 3)
+        #     * 0.5
+        #     * tagSize
+        # )
+        #
+        # # Creates edges
+        # edges = np.array(
+        #     [0, 1, 1, 2, 2, 3, 3, 0, 0, 4, 1, 5, 2, 6, 3, 7, 4, 5, 5, 6, 6, 7, 7, 4]
+        # ).reshape(-1, 2)
+        #
+        # TODO: fix to not use toVector
+        # # Calulcates rotation and translation vectors for each AprilTag
+        # rVecs = pose.rotation().toVector()
+        # tVecs = pose.translation().toVector()
+        #
+        # # Calulate image points of each AprilTag
+        # ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
+        # ipoints = np.round(ipoints).astype(int)
+        # ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
+        #
+        # # Draws lines between all the edges
+        # for i, j in edges:
+        #     cv2.line(img, ipoints[i], ipoints[j], (0, 255, 0), 4, 16)
 
     @staticmethod
     def drawPoseAxes(
@@ -415,29 +438,30 @@ class ApriltagPipeline(Pipeline):
         :param pose: The ``Pose3d`` of the tag.
         :param center: The center of the AprilTag.
         """
-        rVecs = pose.rotation().toVector()
-        tVecs = pose.translation().toVector()
-
-        # Calculate object points of each AprilTag
-        opoints = (
-            np.float32([[1, 0, 0], [0, -1, 0], [0, 0, -1]]).reshape(  # pyright: ignore
-                -1, 3
-            )
-            * tagSize
-        )
-
-        # Calulate image points of each AprilTag
-        ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
-        ipoints = np.round(ipoints).astype(int)
-
-        # Calulates the center
-        center = np.round(center).astype(int)
-        center = tuple(center.ravel())
-
-        # Draws the 3d pose lines
-        cv2.line(img, center, tuple(ipoints[0].ravel()), (0, 0, 255), 3)
-        cv2.line(img, center, tuple(ipoints[1].ravel()), (0, 255, 0), 3)
-        cv2.line(img, center, tuple(ipoints[2].ravel()), (255, 0, 0), 3)
+        # TODO: fix to not use toVector
+        # rVecs = pose.rotation().toVector()
+        # tVecs = pose.translation().toVector()
+        #
+        # # Calculate object points of each AprilTag
+        # opoints = (
+        #     np.float32([[1, 0, 0], [0, -1, 0], [0, 0, -1]]).reshape(  # pyright: ignore
+        #         -1, 3
+        #     )
+        #     * tagSize
+        # )
+        #
+        # # Calulate image points of each AprilTag
+        # ipoints, _ = cv2.projectPoints(opoints, rVecs, tVecs, camera_matrix, dcoeffs)
+        # ipoints = np.round(ipoints).astype(int)
+        #
+        # # Calulates the center
+        # center = np.round(center).astype(int)
+        # center = tuple(center.ravel())
+        #
+        # # Draws the 3d pose lines
+        # cv2.line(img, center, tuple(ipoints[0].ravel()), (0, 0, 255), 3)
+        # cv2.line(img, center, tuple(ipoints[1].ravel()), (0, 255, 0), 3)
+        # cv2.line(img, center, tuple(ipoints[2].ravel()), (255, 0, 0), 3)
 
 
 class ApriltagFieldJson:

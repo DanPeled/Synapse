@@ -1,13 +1,13 @@
-name: Synapse Bridge
+name: Synapse Lib
 
 on:
   push:
     branches: [main]
     paths:
-      - 'synapse_bridge/**'
+      - 'synapse_lib/**'
   pull_request:
     paths:
-      - 'synapse_bridge/**'
+      - 'synapse_lib/**'
 
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Project
         run: |
-          cd synapse_bridge
+          cd synapse_lib
           ./gradlew build
 
   spotless-check:
@@ -50,5 +50,5 @@ jobs:
 
       - name: Run Spotless Check
         run: |
-          cd synapse_bridge
+          cd synapse_lib
           ./gradlew spotlessCheck

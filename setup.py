@@ -1,20 +1,27 @@
 from setuptools import find_packages, setup
 
+WPILIB_VERSION = "2025.2.1.1"
+
+
+def wpilibDep(name: str) -> str:
+    return f"{name}=={WPILIB_VERSION}"
+
+
 setup(
     name="Synapse",
     version="0.1.0",
-    packages=[
-        *find_packages(where="synapse_core/src"),
-    ],
+    packages=find_packages(where="synapse_net/src/")
+    + find_packages(where="synapse_core/src"),
     package_dir={
+        "synapse_net": "synapse_net/src/synapse_net",
         "": "synapse_core/src/",
     },
     install_requires=[
-        "robotpy_wpimath",
-        "robotpy_apriltag",
-        "robotpy_cscore",
-        "wpilib",
-        "pyntcore",
+        wpilibDep("robotpy_wpimath"),
+        wpilibDep("robotpy_apriltag"),
+        wpilibDep("robotpy_cscore"),
+        wpilibDep("wpilib"),
+        wpilibDep("pyntcore"),
         "PyYAML",
         "opencv_python",
         "opencv_contrib_python",
@@ -26,4 +33,5 @@ setup(
         "pytest",
         "build",
     ],
+    include_package_data=True,
 )

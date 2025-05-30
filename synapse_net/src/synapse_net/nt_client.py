@@ -1,11 +1,13 @@
 import atexit
 import time
+from functools import lru_cache
 from typing import Final, Optional
 
 from ntcore import Event, EventFlags, NetworkTableInstance
 from synapse.log import err, log
 
 
+@lru_cache
 def teamNumberToIP(teamNumber: int, lastOctet: int) -> str:
     te = str(teamNumber // 100)
     am = str(teamNumber % 100).zfill(2)
@@ -23,9 +25,8 @@ class NtClient:
         nt_inst (NetworkTableInstance): The instance of NetworkTableInstance used for communication.
         server (Optional[NetworkTableInstance]): The server instance if the client is running as a server, otherwise None.
     """
-
-    INSTANCE: Optional["NtClient"] = None
     TABLE: str = ""
+    INSTANCE: Optional["NtClient"] = None
 
     def setup(self, teamNumber: int, name: str, isServer: bool, isSim: bool) -> bool:
         """
@@ -40,7 +41,6 @@ class NtClient:
             bool: True if the connection or server start was successful, False if it timed out.
         """
         NtClient.INSTANCE = self
-
         # Initialize NetworkTables instance
         self.nt_inst = NetworkTableInstance.getDefault()
 
@@ -59,7 +59,6 @@ class NtClient:
         # Client mode: set the server and start the client
         self.nt_inst.startClient4(name)
 
-        # Attempt to connect to the server with a timeout of 120 seconds
         timeout = 120  # seconds
         start_time = time.time()
 
@@ -68,7 +67,7 @@ class NtClient:
                 log(f"Connected to NetworkTables server ({event.data.remote_ip})")  # pyright: ignore
             if event.is_(EventFlags.kDisconnected):
                 log(
-                    f"kDisconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
+                    f"Disconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
                 )
 
         NetworkTableInstance.getDefault().addConnectionListener(
@@ -81,12 +80,21 @@ class NtClient:
                 err(
                     f"connection to server ({'127.0.0.1' if isServer else teamNumber}) from client ({name}) timed out after {curr} seconds"
                 )
+                self.cleanup()
                 return False
             if not isServer:
                 log(f"Trying to connect to {teamNumberToIP(teamNumber, 4)}...")
+            else:
+                log("Trying to establish connection with server...")
             time.sleep(1)
 
         atexit.register(self.cleanup)
         return True
 
-    def cleanup(self) -> None: ...
+    def cleanup(self) -> None:
+        self.nt_inst.stopClient()
+        NetworkTableInstance.destroy(self.nt_inst)
+        if self.server:
+            self.server.stopServer()
+            NetworkTableInstance.destroy(self.server)
+            self.server = None

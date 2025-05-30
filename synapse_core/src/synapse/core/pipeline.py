@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, Optional, Union
+from typing import Any, Callable, Generic, Iterable, Optional, TypeVar, Union
 
-from ntcore import Event, EventFlags, NetworkTable, NetworkTableEntry
+from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err
 from synapse.stypes import Frame
 from typing_extensions import Dict
@@ -10,177 +10,26 @@ from wpiutil import Sendable, SendableBuilder
 
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
-
-
-class PipelineSettings:
-    """
-    A class for managing and sending pipeline settings to a NetworkTable.
-
-    Attributes:
-        PipelineSettingsMap: A dictionary representing the settings for the pipeline.
-        PipelineSettingsMapValue: A type alias for the allowed values in the settings map.
-
-    Methods:
-        sendSettings: Sends the current settings to a NetworkTable.
-        get: Retrieves a setting by its key.
-        set: Sets a setting with a specified key and value.
-        getMap: Returns the entire settings map.
-        setEntryValue: A static method for setting a NetworkTable entry's value.
-    """
-
-    PipelineSettingsMapValue = Any
-
-    PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
-
-    def __init__(
-        self,
-        settings: Optional[PipelineSettingsMap] = None,
-    ):
-        """
-        Initializes the PipelineSettings instance with optional settings.
-
-        Args:
-            settings (Optional[PipelineSettingsMap]): A dictionary of settings to initialize with.
-        """
-        self.__settings: PipelineSettings.PipelineSettingsMap = (
-            settings if settings is not None else {}
-        )
-
-    def sendSettings(self, nt_table: NetworkTable):
-        """
-        Sends the current settings to the specified NetworkTable.
-
-        Args:
-            nt_table (NetworkTable): The NetworkTable to send the settings to.
-        """
-        for key in self.__settings.keys():
-            value = self.__settings[key]
-            PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
-
-    def get(self, key: str, defaultValue=None) -> Optional[PipelineSettingsMapValue]:
-        """
-        Retrieves the setting for a given key.
-
-        Args:
-            key (str): The key of the setting to retrieve.
-
-        Returns:
-            Optional[PipelineSettingsMapValue]: The value of the setting, or None if not found.
-        """
-        return self.__settings.get(key, defaultValue)
-
-    def set(self, key: str, value: PipelineSettingsMapValue):
-        """
-        Sets a new value for a given setting key.
-
-        Args:
-            key (str): The key of the setting to set.
-            value (PipelineSettingsMapValue): The value to set for the setting.
-        """
-        self.__settings[key] = value
-        # TODO: Send to NetworkTables, update, and save to file
-
-    def __getitem__(self, key: str):
-        """
-        Retrieves the setting for a given key using the indexing syntax.
-
-        Args:
-            key (str): The key of the setting to retrieve.
-
-        Returns:
-            Optional[PipelineSettingsMapValue]: The value of the setting.
-        """
-        return self.get(key)
-
-    def __setitem__(self, key: str, value: PipelineSettingsMapValue):
-        """
-        Sets a value for a given setting key using the indexing syntax.
-
-        Args:
-            key (str): The key of the setting to set.
-            value (PipelineSettingsMapValue): The value to set for the setting.
-        """
-        self.set(key, value)
-
-    def __delitem__(self, key: str):
-        """
-        Deletes a setting for a given key.
-
-        Args:
-            key (str): The key of the setting to delete.
-        """
-        del self.__settings[key]
-
-    def __str__(self) -> str:
-        """
-        Returns a string representation of the settings map.
-
-        Returns:
-            str: A string representation of the settings.
-        """
-        return str(self.__settings)
-
-    def __contains__(self, key: Any) -> bool:
-        return key in self.__settings.keys()
-
-    def getMap(self) -> PipelineSettingsMap:
-        """
-        Returns the entire settings map.
-
-        Returns:
-            PipelineSettingsMap: The dictionary of settings.
-        """
-        return self.__settings
-
-    def setMap(self, map: Dict[str, Any]) -> None:
-        self.__settings = map
-
-    @staticmethod
-    def setEntryValue(entry: NetworkTableEntry, value):
-        """
-        Sets the value of a NetworkTable entry based on the type of value.
-
-        Args:
-            entry (NetworkTableEntry): The NetworkTable entry to set the value for.
-            value: The value to set in the entry, which can be an int, float, bool, string, or list.
-
-        Raises:
-            ValueError: If the value type is unsupported.
-        """
-        if isinstance(value, int):
-            entry.setInteger(value)
-        elif isinstance(value, float):
-            entry.setFloat(value)
-        elif isinstance(value, bool):
-            entry.setBoolean(value)
-        elif isinstance(value, str):
-            entry.setString(value)
-        elif isinstance(value, list):
-            if all(isinstance(i, int) for i in value):
-                entry.setIntegerArray(value)
-            elif all(isinstance(i, float) for i in value):
-                entry.setFloatArray(value)
-            elif all(isinstance(i, bool) for i in value):
-                entry.setBooleanArray(value)
-            elif all(isinstance(i, str) for i in value):
-                entry.setStringArray(value)
-            else:
-                raise ValueError("Unsupported list type")
-        else:
-            raise ValueError("Unsupported type")
-
+from .settings_api import (PipelineSettings, PipelineSettingsMap,
+                           PipelineSettingsMapValue)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
+TSettingsType = TypeVar("TSettingsType", bound=PipelineSettings)
 
-class Pipeline(ABC):
+
+class Pipeline(ABC, Generic[TSettingsType]):
     __is_enabled__ = True
     VALID_ENTRY_TYPES = Any
+    nt_table: Optional[NetworkTable] = None
+    builder_cache: dict[str, SendableBuilder] = {}
 
     @abstractmethod
-    def __init__(self, settings: PipelineSettings, cameraIndex: int):
-        self.nt_table: Optional[NetworkTable] = None
-        self.builder_cache: dict[str, SendableBuilder] = {}
+    def __init__(
+        self,
+        cameraIndex: int,
+        settings: TSettingsType,
+    ):
         self.settings = settings
         self.cameraIndex = cameraIndex
 
@@ -219,7 +68,7 @@ class Pipeline(ABC):
         if self.nt_table is not None:
             return self.nt_table.getSubTable("settings").getValue(key, None)
         else:
-            return self.settings.get(key)
+            return self.settings.getSetting(key)
 
     def setDataListener(
         self,
@@ -279,7 +128,7 @@ class GlobalSettingsMeta(type):
     kCameraConfigsKey: str = "camera_configs"
     __settings: Optional[PipelineSettings] = None
 
-    def setup(cls, settings: PipelineSettings.PipelineSettingsMap) -> bool:
+    def setup(cls, settings: PipelineSettingsMap) -> bool:
         """
         Initializes the global settings with the provided settings map.
 
@@ -320,9 +169,7 @@ class GlobalSettingsMeta(type):
     def getCameraConfigMap(cls) -> Dict[int, CameraConfig]:
         return cls.__cameraConfigs
 
-    def get(
-        cls, key: str, defaultValue=None
-    ) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
+    def getSetting(cls, key: str) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves a setting by its key from the global settings.
 
@@ -333,10 +180,10 @@ class GlobalSettingsMeta(type):
             Optional[PipelineSettings.PipelineSettingsMapValue]: The value of the setting, or None if not found.
         """
         if cls.__settings is not None:
-            return cls.__settings.get(key, defaultValue)
+            return cls.__settings.getSetting(key)
         return None
 
-    def set(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue) -> None:
+    def setSetting(cls, key: str, value: PipelineSettingsMapValue) -> None:
         """
         Sets a new value for a given setting key in the global settings.
 
@@ -345,11 +192,9 @@ class GlobalSettingsMeta(type):
             value (PipelineSettings.PipelineSettingsMapValue): The value to set for the setting.
         """
         if cls.__settings is not None:
-            cls.__settings.set(key, value)
+            cls.__settings.setSetting(key, value)
 
-    def __getitem__(
-        cls, key: str
-    ) -> Optional[PipelineSettings.PipelineSettingsMapValue]:
+    def __getitem__(cls, key: str) -> Optional[PipelineSettingsMapValue]:
         """
         Retrieves a setting by its key using indexing syntax.
 
@@ -359,9 +204,9 @@ class GlobalSettingsMeta(type):
         Returns:
             Optional[PipelineSettings.PipelineSettingsMapValue]: The value of the setting.
         """
-        return cls.get(key) or None
+        return cls.getSetting(key) or None
 
-    def __setitem__(cls, key: str, value: PipelineSettings.PipelineSettingsMapValue):
+    def __setitem__(cls, key: str, value: PipelineSettingsMapValue):
         """
         Sets a value for a given setting key using indexing syntax.
 
@@ -369,7 +214,7 @@ class GlobalSettingsMeta(type):
             key (str): The key of the setting to set.
             value (PipelineSettings.PipelineSettingsMapValue): The value to set for the setting.
         """
-        cls.set(key, value)
+        cls.setSetting(key, value)
 
     def __delitem__(cls, key: str):
         """
@@ -381,7 +226,7 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             del cls.__settings.getMap()[key]
 
-    def getMap(cls) -> PipelineSettings.PipelineSettingsMap:
+    def getMap(cls) -> PipelineSettingsMap:
         """
         Returns the global settings map.
 

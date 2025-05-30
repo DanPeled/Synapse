@@ -12,8 +12,9 @@ A library for running custom vision code on an FRC coprocessor.
 - **Dynamic Pipeline Creation:** Create and modify pipelines dynamically.
 
 ## Project Structure
-- `synapse-lib`: Contains the core Python library for Synapse.
-- `synapse-bridge` Contains the vendordep library for the robot to communicate with the Synapse runtime.
+- `synapse-core`: Contains the core Python library for Synapse.
+- `synapse-net` Contains networking library for the runtime (NetworkTables comm, Socket comm).
+- `synapse-lib` Contains the vendordep library for the robot to communicate with the Synapse runtime.
 
 ## Getting Started
 1. Clone the repository.

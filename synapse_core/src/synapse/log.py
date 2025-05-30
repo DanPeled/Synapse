@@ -59,3 +59,15 @@ def err(text: str):
     This function calls the `log` function and formats the message to indicate an error.
     """
     log(bcolors.FAIL + f"[ERROR]: {text}" + bcolors.ENDC)
+
+
+def warn(text: str):
+    """
+    Logs a warning message with the current timestamp by prepending '[WARNING]' to the message.
+
+    Args:
+        text (str): The warning message to log.
+
+    This function calls the `log` function and formats the message to indicate an warning.
+    """
+    log(bcolors.WARNING + f"[WARNING]: {text}" + bcolors.ENDC)
