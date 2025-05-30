@@ -1,11 +1,10 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import cv2
 import numpy as np
 import synapse.core.camera_factory
-from synapse.core.camera_factory import (
-    CsCoreCamera,
-)
+from synapse.core.camera_factory import CsCoreCamera
 
 
 class TestUtilityFunctions(unittest.TestCase):
