@@ -204,21 +204,21 @@ class ColorConstraint(Constraint):
         r"^hsv\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
     )
 
-    def __init__(self, formatType: ColorFormat = ColorFormat.kHex):
+    def __init__(self, formatType: str = ColorFormat.kHex.value):
         """
         Initialize a ColorConstraint instance.
 
         Args:
-            formatType (ColorFormat, optional): The expected color format.
+            formatType (str, optional): The expected color format.
                 Supported values include "hex", "rgb", "hsv".
                 Defaults to "hex".
 
         """
         super().__init__(ConstraintType.kColor)
-        self.formatType = formatType
+        self.formatType: str = formatType
 
     def validate(self, value: Any) -> ValidationResult:
-        if self.formatType == ColorFormat.kHex:
+        if self.formatType == ColorFormat.kHex.value:
             if isinstance(value, int):
                 hex_str = f"#{value:06X}"
                 return ValidationResult(True, None, hex_str)
@@ -246,7 +246,7 @@ class ColorConstraint(Constraint):
             except ValueError:
                 return ValidationResult(False, "Invalid hex color value")
 
-        elif self.formatType == ColorFormat.kRGB:
+        elif self.formatType == ColorFormat.kRGB.value:
             # Accept tuple of ints (r, g, b)
             if isinstance(value, tuple):
                 if len(value) != 3:
@@ -293,7 +293,7 @@ class ColorConstraint(Constraint):
             normalized = f"rgb({r}, {g}, {b})"
             return ValidationResult(True, None, normalized)
 
-        elif self.formatType == ColorFormat.kHSV:
+        elif self.formatType == ColorFormat.kHSV.value:
             # Accept tuple of ints (h, s, v)
             if isinstance(value, tuple):
                 if len(value) != 3:
@@ -349,7 +349,7 @@ class ColorConstraint(Constraint):
         return ValidationResult(True, None, value)
 
     def toDict(self) -> Dict[str, Any]:
-        return {"type": self.constraintType.value, "formatType": self.formatType.value}
+        return {"type": self.constraintType.value, "formatType": self.formatType}
 
 
 class ListConstraint(Constraint):

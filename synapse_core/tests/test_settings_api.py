@@ -1,7 +1,14 @@
-from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
-                                       ConstraintType, ListConstraint,
-                                       ListOptionsConstraint, RangeConstraint,
-                                       StringConstraint)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ColorConstraint,
+    ConstraintType,
+    ListConstraint,
+    ListOptionsConstraint,
+    RangeConstraint,
+    StringConstraint,
+)
+
+from synapse_core.src.synapse.core.settings_api import ColorFormat
 
 # ------------------ RangeConstraint ------------------
 
@@ -61,149 +68,149 @@ def test_list_options_constraint_multiple_invalid():
 
 
 def test_color_constraint_hex_valid_string_short():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate("#abc")
     assert result.isValid
     assert result.normalizedValue == "#ABC"
 
 
 def test_color_constraint_hex_valid_string_full():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate("#aabbcc")
     assert result.isValid
     assert result.normalizedValue == "#AABBCC"
 
 
 def test_color_constraint_hex_valid_string_with_0x():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate("0xAABBCC")
     assert result.isValid
     assert result.normalizedValue == "#AABBCC"
 
 
 def test_color_constraint_hex_valid_int():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate(0xAABBCC)
     assert result.isValid
     assert result.normalizedValue == "#AABBCC"
 
 
 def test_color_constraint_hex_invalid_format():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate("abc")
     assert not result.isValid
 
 
 def test_color_constraint_hex_invalid_length():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate("#abcd")
     assert not result.isValid
 
 
 def test_color_constraint_hex_invalid_value():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate("#ghz")
     assert not result.isValid
 
 
 def test_color_constraint_rgb_string_valid():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate("rgb(10, 20, 30)")
     assert result.isValid
     assert result.normalizedValue == "rgb(10, 20, 30)"
 
 
 def test_color_constraint_rgb_tuple_valid():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate((10, 20, 30))
     assert result.isValid
     assert result.normalizedValue == "rgb(10, 20, 30)"
 
 
 def test_color_constraint_rgb_tuple_invalid_length():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate((10, 20))
     assert not result.isValid
 
 
 def test_color_constraint_rgb_tuple_invalid_type():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate((10, "20", 30))
     assert not result.isValid
 
 
 def test_color_constraint_rgb_value_out_of_range():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate((256, 20, 30))
     assert not result.isValid
 
 
 def test_color_constraint_rgb_string_invalid_format():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate("rgb(10,20)")  # missing third value
     assert not result.isValid
 
 
 def test_color_constraint_rgb_string_with_percent_not_allowed():
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate("rgb(10%, 20%, 30%)")
     assert not result.isValid
 
 
 def test_color_constraint_hsv_string_valid():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate("hsv(180, 50, 75)")
     assert result.isValid
     assert result.normalizedValue == "hsv(180, 50, 75)"
 
 
 def test_color_constraint_hsv_tuple_valid():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate((180, 50, 75))
     assert result.isValid
     assert result.normalizedValue == "hsv(180, 50, 75)"
 
 
 def test_color_constraint_hsv_tuple_invalid_length():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate((180, 50))
     assert not result.isValid
 
 
 def test_color_constraint_hsv_tuple_invalid_type():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate((180, 50, "75"))
     assert not result.isValid
 
 
 def test_color_constraint_hsv_value_out_of_range():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate((361, 50, 75))  # Hue > 360
     assert not result.isValid
 
 
 def test_color_constraint_hsv_string_invalid_format():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate("hsv(180, 50)")  # missing V
     assert not result.isValid
 
 
 def test_color_constraint_hsv_string_with_percent_not_allowed():
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate("hsv(180, 50%, 75%)")
     assert not result.isValid
 
 
 def test_color_constraint_wrong_type_input():
-    c = ColorConstraint(formatType="hex")
+    c = ColorConstraint(formatType=ColorFormat.kHex.value)
     result = c.validate(12.34)  # float invalid for hex
     assert not result.isValid
 
-    c = ColorConstraint(formatType="rgb")
+    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate(123)  # int invalid for rgb string/tuple
     assert not result.isValid
 
-    c = ColorConstraint(formatType="hsv")
+    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate("notacolor")
     assert not result.isValid
 
@@ -214,11 +221,11 @@ def test_color_constraint_to_dict():
     assert d["type"] == ConstraintType.kColor.value
     assert d["formatType"] == "hex"
 
-    c_rgb = ColorConstraint(formatType="rgb")
+    c_rgb = ColorConstraint(formatType=ColorFormat.kRGB.value)
     d_rgb = c_rgb.toDict()
     assert d_rgb["formatType"] == "rgb"
 
-    c_hsv = ColorConstraint(formatType="hsv")
+    c_hsv = ColorConstraint(formatType=ColorFormat.kHSV.value)
     d_hsv = c_hsv.toDict()
     assert d_hsv["formatType"] == "hsv"
 
