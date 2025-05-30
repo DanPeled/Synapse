@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, Optional, Union
+from typing import Any, Callable, Generic, Iterable, Optional, TypeVar, Union
 
 from ntcore import Event, EventFlags, NetworkTable
 from synapse.log import err
@@ -10,20 +10,29 @@ from wpiutil import Sendable, SendableBuilder
 
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
-from .settings_api import (PipelineSettings, PipelineSettingsMap,
-                           PipelineSettingsMapValue)
+from .settings_api import (
+    PipelineSettings,
+    PipelineSettingsMap,
+    PipelineSettingsMapValue,
+)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
+TSettingsType = TypeVar("TSettingsType", bound=PipelineSettings)
 
-class Pipeline(ABC):
+
+class Pipeline(ABC, Generic[TSettingsType]):
     __is_enabled__ = True
     VALID_ENTRY_TYPES = Any
+    nt_table: Optional[NetworkTable] = None
+    builder_cache: dict[str, SendableBuilder] = {}
 
     @abstractmethod
-    def __init__(self, settings: PipelineSettings, cameraIndex: int):
-        self.nt_table: Optional[NetworkTable] = None
-        self.builder_cache: dict[str, SendableBuilder] = {}
+    def __init__(
+        self,
+        cameraIndex: int,
+        settings: TSettingsType,
+    ):
         self.settings = settings
         self.cameraIndex = cameraIndex
 

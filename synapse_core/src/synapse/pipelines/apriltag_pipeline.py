@@ -10,11 +10,24 @@ import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.pipeline import GlobalSettings, Pipeline
-from synapse.core.settings_api import PipelineSettings
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ListOptionsConstraint,
+    PipelineSettings,
+    RangeConstraint,
+    Setting,
+    settingField,
+)
 from synapse.stypes import Frame
 from wpimath import geometry, units
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
-                              Transform3d, Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation3d,
+    Transform3d,
+    Translation3d,
+)
 
 
 @dataclass
@@ -62,30 +75,41 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     if verbosity.value <= ApriltagVerbosity.kTagDetails.value:
         ignored.update({"pose_err", "decision_margin", ApriltagPipeline.kHammingKey})
     if verbosity.value <= ApriltagVerbosity.kPoseOnly.value:
-        ignored.update({ApriltagPipeline.kTagFamilyKey, ApriltagPipeline.kTagIDKey})
+        ignored.update(
+            {ApriltagPipelineSettings.tag_family.key, ApriltagPipeline.kTagIDKey}
+        )
 
     return ignored
 
 
-class ApriltagPipeline(Pipeline):
-    kTagSizeKey: Final[str] = "tag_size"
+class ApriltagPipelineSettings(PipelineSettings):
+    tag_size: Setting = settingField(
+        RangeConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
+    )
+    tag_family: Setting = settingField(
+        ListOptionsConstraint(["tag36h11", "tag16h5"]), default="tag36h11"
+    )
+    stick_to_ground = settingField(BooleanConstraint(), default=False)
+    fieldpose = settingField(BooleanConstraint(), default=True)
+    verbosity = settingField(
+        ListOptionsConstraint(options=[ver.value for ver in ApriltagVerbosity]),
+        default=ApriltagVerbosity.kPoseOnly,
+    )
+
+
+class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
-    kTagFamilyKey: Final[str] = "tag_family"
-    kTagFamily: Final[str] = "tag36h11"
-    kGetFieldPoseKey: Final[str] = "fieldpose"
-    kStickToGroundKey: Final[str] = "stick_to_ground"
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
     kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
     kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
-    kResultVerbosityKey: Final[str] = "verbosity"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
-    def __init__(self, settings: PipelineSettings, cameraIndex: int):
+    def __init__(self, settings: ApriltagPipelineSettings, cameraIndex: int):
         super().__init__(settings, cameraIndex)
-        self.settings: PipelineSettings = settings
+        self.settings: ApriltagPipelineSettings = settings
         self.camera_matrix: np.ndarray = np.array(
             self.getCameraMatrix(cameraIndex), dtype=np.float32
         )
@@ -100,13 +124,17 @@ class ApriltagPipeline(Pipeline):
 
         detectorConfig.numThreads = int(settings.getSetting("num_threads") or 1)
         self.apriltagDetector.setConfig(detectorConfig)
-        self.apriltagDetector.addFamily("tag36h11")
+        self.apriltagDetector.addFamily(
+            settings.getSetting(ApriltagPipelineSettings.tag_family.key)
+            or ApriltagPipelineSettings.tag_family.defaultValue
+        )
 
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
                     tagSize=float(
-                        settings.getSetting(ApriltagPipeline.kTagSizeKey) or 0.1651
+                        settings.getSetting(ApriltagPipelineSettings.tag_size.key)
+                        or ApriltagPipelineSettings.tag_size.defaultValue
                     ),
                     fx=self.camera_matrix[0][0],
                     fy=self.camera_matrix[1][1],
@@ -134,7 +162,7 @@ class ApriltagPipeline(Pipeline):
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        tagSize = self.getSetting(self.kTagSizeKey)
+        tagSize = self.getSetting(ApriltagPipelineSettings.tag_size.key)
 
         tags = self.apriltagDetector.detect(gray)
         results: List[ApriltagResult] = []
@@ -183,7 +211,10 @@ class ApriltagPipeline(Pipeline):
                 ],
             )
 
-            if self.getSetting(self.kGetFieldPoseKey) and self.camera_transform:
+            if (
+                self.getSetting(ApriltagPipelineSettings.fieldpose.key)
+                and self.camera_transform
+            ):
                 tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.getId())
 
                 if tagFieldPose:
@@ -224,8 +255,8 @@ class ApriltagPipeline(Pipeline):
                 results,
                 getIgnoredDataByVerbosity(
                     ApriltagVerbosity.fromValue(
-                        self.getSetting(ApriltagPipeline.kResultVerbosityKey)
-                        or ApriltagVerbosity.kPoseOnly.value
+                        self.getSetting(ApriltagPipelineSettings.verbosity.key)
+                        or ApriltagPipelineSettings.verbosity.defaultValue
                     )
                 ),
             ),

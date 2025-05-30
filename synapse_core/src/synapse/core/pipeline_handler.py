@@ -6,25 +6,42 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
+import typing
 
 import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
 from synapse.stypes import DataValue, Frame
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory, CameraPropKeys,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraFactory,
+    CameraPropKeys,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
+from .pipeline import (
+    CameraConfig,
+    FrameResult,
+    GlobalSettings,
+    Pipeline,
+    PipelineSettings,
+)
 from .settings_api import PipelineSettingsMap
 
 
@@ -44,6 +61,16 @@ class FPSView:
     position = (10, 30)
 
 
+def resolveGenericArgument(cls):
+    orig_bases = getattr(cls, "__orig_bases__", ())
+    for base in orig_bases:
+        if typing.get_origin(base) is Pipeline:
+            args = typing.get_args(base)
+            if args:
+                return args[0]
+    return None
+
+
 class PipelineHandler:
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
 
@@ -56,7 +83,7 @@ class PipelineHandler:
         self.cameras: Dict[int, SynapseCamera] = {}
         self.pipelineInstanceBindings: Dict[int, Pipeline] = {}
         self.pipelineSettings: Dict[int, PipelineSettings] = {}
-        self.pipelines: Dict[str, type[Pipeline]] = {}
+        self.pipelines: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[int, int] = {}
         self.pipelineBindings: Dict[int, int] = {}
         self.streamSizes: Dict[int, Tuple[int, int]] = {}
@@ -264,13 +291,11 @@ class PipelineHandler:
         :param pipeline: A pipeline class or list of pipeline classes to assign to the camera
         """
         # Create instances for each pipeline only when setting them
+        settings = self.pipelineSettings[self.pipelineBindings[cameraIndex]]
+        currPipeline = pipelineType(settings=settings, cameraIndex=cameraIndex)
 
-        self.pipelineInstanceBindings[cameraIndex] = pipelineType(
-            settings=self.pipelineSettings[self.pipelineBindings[cameraIndex]],
-            cameraIndex=cameraIndex,
-        )
+        self.pipelineInstanceBindings[cameraIndex] = currPipeline
 
-        currPipeline = self.pipelineInstanceBindings[cameraIndex]
         cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
         self.setCameraConfigs(
             {
@@ -635,9 +660,13 @@ class PipelineHandler:
 
             log.log(f"Loaded pipeline #{index} with type {pipeline['type']}")
 
-            self.setPipelineSettings(index, pipeline[NTKeys.kSettings.value])
-
             self.pipelineTypes[index] = pipeline["type"]
+
+            self.setPipelineSettings(
+                self.pipelines[self.pipelineTypes[index]],
+                index,
+                pipeline[NTKeys.kSettings.value],
+            )
 
         for cameraIndex in self.cameras.keys():
             pipeline = self.defaultPipelineIndexes[cameraIndex]
@@ -709,10 +738,12 @@ class PipelineHandler:
 
     def setPipelineSettings(
         self,
+        pipelineType: Type[Pipeline],
         pipeline_index: int,
         settings: PipelineSettingsMap,
     ) -> None:
-        self.pipelineSettings[pipeline_index] = PipelineSettings(settings)
+        settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
+        self.pipelineSettings[pipeline_index] = settingsType(settings)
 
     def cleanup(self) -> None:
         """

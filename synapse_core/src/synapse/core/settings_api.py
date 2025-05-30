@@ -62,6 +62,18 @@ class RangeConstraint(Constraint):
         maxValue: Optional[Union[int, float]] = None,
         step: Optional[Union[int, float]] = None,
     ):
+        """
+        Initialize a RangeConstraint instance.
+
+        Args:
+            minValue (Optional[Union[int, float]]): The minimum allowed value for the range.
+                If None, no minimum constraint is applied.
+            maxValue (Optional[Union[int, float]]): The maximum allowed value for the range.
+                If None, no maximum constraint is applied.
+            step (Optional[Union[int, float]]): The step size or increment within the range.
+                If None, any value within the range is allowed.
+
+        """
         super().__init__(ConstraintType.kRange)
         self.minValue = minValue
         self.maxValue = maxValue
@@ -105,6 +117,13 @@ class ClassValueConstraint(Constraint):
     """Constraint for values of a specific class"""
 
     def __init__(self, expectedClass: Type):
+        """
+        Initialize a ClassValueConstraint instance.
+
+        Args:
+            expectedClass (Type): The expected class type that values must be an instance of.
+
+        """
         super().__init__(ConstraintType.kClass)
         self.expectedClass = expectedClass
 
@@ -127,6 +146,15 @@ class ListOptionsConstraint(Constraint):
     """Constraint for selecting from predefined options"""
 
     def __init__(self, options: List[Any], allowMultiple: bool = False):
+        """
+        Initialize a ListOptionsConstraint instance.
+
+        Args:
+            options (List[Any]): The list of predefined valid options to select from.
+            allowMultiple (bool, optional): Whether multiple selections are allowed.
+                Defaults to False.
+
+        """
         super().__init__(ConstraintType.kListOptions)
         self.options = options
         self.allowMultiple = allowMultiple
@@ -158,10 +186,16 @@ class ListOptionsConstraint(Constraint):
         }
 
 
+class ColorFormat(Enum):
+    kHex = "hex"
+    kRGB = "rgb"
+    kHSV = "hsv"
+
+
 class ColorConstraint(Constraint):
     import re
 
-    """Constraint for color values (hex, rgb, hsv, etc.)"""
+    """Constraint for color values (hex, rgb, hsv)"""
 
     RGB_REGEX = re.compile(
         r"^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
@@ -170,12 +204,21 @@ class ColorConstraint(Constraint):
         r"^hsv\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
     )
 
-    def __init__(self, formatType: str = "hex"):
+    def __init__(self, formatType: ColorFormat = ColorFormat.kHex):
+        """
+        Initialize a ColorConstraint instance.
+
+        Args:
+            formatType (ColorFormat, optional): The expected color format.
+                Supported values include "hex", "rgb", "hsv".
+                Defaults to "hex".
+
+        """
         super().__init__(ConstraintType.kColor)
-        self.formatType = formatType  # "hex", "rgb", "rgba", "hsl", "hsv"
+        self.formatType = formatType
 
     def validate(self, value: Any) -> ValidationResult:
-        if self.formatType == "hex":
+        if self.formatType == ColorFormat.kHex:
             if isinstance(value, int):
                 hex_str = f"#{value:06X}"
                 return ValidationResult(True, None, hex_str)
@@ -203,7 +246,7 @@ class ColorConstraint(Constraint):
             except ValueError:
                 return ValidationResult(False, "Invalid hex color value")
 
-        elif self.formatType == "rgb":
+        elif self.formatType == ColorFormat.kRGB:
             # Accept tuple of ints (r, g, b)
             if isinstance(value, tuple):
                 if len(value) != 3:
@@ -250,7 +293,7 @@ class ColorConstraint(Constraint):
             normalized = f"rgb({r}, {g}, {b})"
             return ValidationResult(True, None, normalized)
 
-        elif self.formatType == "hsv":
+        elif self.formatType == ColorFormat.kHSV:
             # Accept tuple of ints (h, s, v)
             if isinstance(value, tuple):
                 if len(value) != 3:
@@ -306,11 +349,7 @@ class ColorConstraint(Constraint):
         return ValidationResult(True, None, value)
 
     def toDict(self) -> Dict[str, Any]:
-        return {"type": self.constraintType.value, "formatType": self.formatType}
-
-    @classmethod
-    def fromDict(cls, data: Dict[str, Any]) -> "ColorConstraint":
-        return cls(data.get("formatType", "hex"))
+        return {"type": self.constraintType.value, "formatType": self.formatType.value}
 
 
 class ListConstraint(Constraint):
@@ -323,6 +362,20 @@ class ListConstraint(Constraint):
         maxLength: Optional[int] = None,
         depth: int = 1,
     ):
+        """
+        Initialize a ListConstraint instance.
+
+        Args:
+            itemConstraint (Optional[Constraint]): A constraint that each item in the list must satisfy.
+                If None, no per-item constraint is applied.
+            minLength (Optional[int]): The minimum number of items allowed in the list.
+                If None, no minimum constraint is applied.
+            maxLength (Optional[int]): The maximum number of items allowed in the list.
+                If None, no maximum constraint is applied.
+            depth (int): The allowed level of list nesting. For example, a depth of 2 means a 2D list.
+                Defaults to 1.
+
+        """
         super().__init__(ConstraintType.kList)
         self.itemConstraint = itemConstraint
         self.minLength = minLength
@@ -389,6 +442,18 @@ class StringConstraint(Constraint):
         maxLength: Optional[int] = None,
         pattern: Optional[str] = None,
     ):
+        """
+        Initialize a StringConstraint instance.
+
+        Args:
+            minLength (Optional[int]): The minimum number of characters allowed in the string.
+                If None, no minimum length constraint is applied.
+            maxLength (Optional[int]): The maximum number of characters allowed in the string.
+                If None, no maximum length constraint is applied.
+            pattern (Optional[str]): A regular expression pattern that the string must match.
+                If None, no pattern constraint is applied.
+
+        """
         super().__init__(ConstraintType.kString)
         self.minLength = minLength
         self.maxLength = maxLength
@@ -433,6 +498,11 @@ class BooleanConstraint(Constraint):
     """Constraint for boolean values"""
 
     def __init__(self):
+        """
+        Initialize a BooleanConstraint instance.
+
+        This constraint restricts values to boolean types (True or False).
+        """
         super().__init__(ConstraintType.kBoolean)
 
     def validate(self, value: Any) -> ValidationResult:
@@ -462,7 +532,15 @@ class BooleanConstraint(Constraint):
 
 @dataclass
 class Setting:
-    """A single setting with its constraint and metadata"""
+    """A single setting with its constraint and metadata
+
+    Attributes:
+        key (str): The unique identifier for the setting.
+        constraint (Constraint): The constraint that validates the setting's value.
+        defaultValue (Any): The default value for the setting.
+        description (Optional[str]): A human-readable description of the setting.
+        category (Optional[str]): The category under which the setting is grouped.
+    """
 
     key: str
     constraint: Constraint
@@ -532,41 +610,61 @@ def settingField(
     description: Optional[str] = None,
     category: Optional[str] = None,
 ) -> Setting:
-    """Helper function to create Setting instances for use in SettingsCollection classes"""
+    """
+    Creates a Setting instance for use in SettingsCollection classes.
+
+    Args:
+        constraint (Constraint): A constraint that validates the value of the setting.
+        default (Any): The default value for the setting.
+        description (Optional[str]): An optional human-readable description of the setting.
+        category (Optional[str]): An optional category to group the setting under.
+
+    Returns:
+        Setting: A new Setting object with the specified configuration.
+    """
     return Setting("", constraint, default, description, category)
 
 
 class PipelineSettings:
-    """Base class for creating pipeline settings collections"""
+    """Base class for creating pipeline settings collections.
+
+    Attributes:
+        brightness (Setting): Brightness setting (0–100).
+        exposure (Setting): Exposure setting (0–100).
+        saturation (Setting): Saturation setting (0–100).
+        orientation (Setting): Orientation setting (0, 90, 180, 270).
+        width (Setting): Width setting (e.g., 1280).
+        height (Setting): Height setting (e.g., 720).
+    """
 
     brightness = settingField(RangeConstraint(0, 100), default=50)
     exposure = settingField(RangeConstraint(0, 100), default=50)
     saturation = settingField(RangeConstraint(0, 100), default=50)
     orientation = settingField(RangeConstraint(0, 270, 90), default=0)
-    width = settingField(
-        RangeConstraint(minValue=0, maxValue=None), default=1280
-    )  # TODO: use enumerated video modes
-    height = settingField(
-        RangeConstraint(minValue=0, maxValue=None), default=720
-    )  # TODO: use enumerated video modes
+    width = settingField(RangeConstraint(minValue=0, maxValue=None), default=1280)
+    height = settingField(RangeConstraint(minValue=0, maxValue=None), default=720)
 
     def __init__(self, settings: Optional[PipelineSettingsMap] = None):
         """
-        Initializes the PipelineSettings instance with optional settings.
+        Initialize the PipelineSettings instance.
 
         Args:
-            settings (Optional[PipelineSettingsMap]): A dictionary of settings to initialize with.
+            settings (Optional[PipelineSettingsMap]): Initial settings map to load values from.
         """
         self._settingsApi = SettingsAPI()
         self._fieldNames = []
         self._initializeSettings()
 
-        # self.__settings: PipelineSettingsMap = settings if settings is not None else {}
-
         if settings:
             self.generateSettingsFromMap(settings)
 
     def generateSettingsFromMap(self, settingsMap: PipelineSettingsMap) -> None:
+        """
+        Populate the settings from a given map, generating constraints dynamically if necessary.
+
+        Args:
+            settingsMap (PipelineSettingsMap): A dictionary of setting keys to values.
+        """
         prexistingKeys = self.getSchema().keys()
         for field, value in settingsMap.items():
             if field not in prexistingKeys:
@@ -587,17 +685,13 @@ class PipelineSettings:
                         if not isinstance(value, list):
                             return 0
                         if not value:
-                            return 1  # An empty list still counts as one level
+                            return 1
                         return 1 + max(getListDepth(item) for item in value)
 
                     constraint = ListConstraint(depth=getListDepth(value))
                 if constraint is not None:
                     self._settingsApi.addSetting(
-                        Setting(
-                            key=field,
-                            constraint=constraint,
-                            defaultValue=value,
-                        )
+                        Setting(key=field, constraint=constraint, defaultValue=value)
                     )
             else:
                 setting = self._settingsApi.settings[field]
@@ -613,77 +707,60 @@ class PipelineSettings:
 
     def sendSettings(self, nt_table: NetworkTable):
         """
-        Sends the current settings to the specified NetworkTable.
+        Send all current settings to the provided NetworkTable.
 
         Args:
-            nt_table (NetworkTable): The NetworkTable to send the settings to.
+            nt_table (NetworkTable): The table to send settings to.
         """
         for key, value in self._settingsApi.values.items():
             PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
 
     def __getitem__(self, key: str) -> Optional[PipelineSettingsMapValue]:
-        """
-        Retrieves the setting for a given key using the indexing syntax.
-
-        Args:
-            key (str): The key of the setting to retrieve.
-
-        Returns:
-            Optional[PipelineSettingsMapValue]: The value of the setting.
-        """
+        """Access a setting's value using dictionary-style indexing."""
         return self.getSetting(key)
 
     def __setitem__(self, key: str, value: PipelineSettingsMapValue):
-        """
-        Sets a value for a given setting key using the indexing syntax.
-
-        Args:
-            key (str): The key of the setting to set.
-            value (PipelineSettingsMapValue): The value to set for the setting.
-        """
+        """Set a setting's value using dictionary-style indexing."""
         self.setSetting(key, value)
 
     def __delitem__(self, key: str):
-        """
-        Deletes a setting for a given key.
-
-        Args:
-            key (str): The key of the setting to delete.
-        """
+        """Delete a setting by key."""
         del self.__settings[key]
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the settings map.
-
-        Returns:
-            str: A string representation of the settings.
-        """
+        """Return a string representation of the settings dictionary."""
         return str(self.__settings)
 
     def __contains__(self, key: Any) -> bool:
+        """Check if a key is in the settings."""
         return key in self.__settings.keys()
 
     def getMap(self) -> Dict[str, Setting]:
         """
-        Returns the entire settings map.
+        Get the internal settings map.
 
         Returns:
-            PipelineSettingsMap: The dictionary of settings.
+            Dict[str, Setting]: Map of key to Setting objects.
         """
         return self._settingsApi.settings
 
     def setMap(self, map: Dict[str, Any]) -> None:
+        """
+        Set the internal raw settings map (unsafe).
+
+        Args:
+            map (Dict[str, Any]): The settings map to set.
+        """
         self.__settings = map
 
     @staticmethod
     def setEntryValue(entry: NetworkTableEntry, value):
         """
-        Sets the value of a NetworkTable entry based on the type of value.
+        Set a NetworkTable entry's value according to its Python type.
 
         Args:
-            entry (NetworkTableEntry): The NetworkTable entry to set the value for.
-            value: The value to set in the entry, which can be an int, float, bool, string, or list.
+            entry (NetworkTableEntry): Entry to set.
+            value (Any): Value to write to the entry.
 
         Raises:
             ValueError: If the value type is unsupported.
@@ -711,7 +788,7 @@ class PipelineSettings:
             raise ValueError("Unsupported type")
 
     def _initializeSettings(self):
-        """Initialize settings based on class annotations and field definitions"""
+        """Initialize declared settings by inspecting class-level attributes."""
         for attrName in dir(self.__class__):
             if not attrName.startswith("_"):
                 attrValue = getattr(self.__class__, attrName)
@@ -722,14 +799,28 @@ class PipelineSettings:
                     self._fieldNames.append(attrName)
 
     def getSetting(self, name: str) -> Optional[Any]:
-        """Get setting value by name"""
+        """
+        Retrieve the value of a setting by name.
+
+        Args:
+            name (str): The setting key.
+
+        Returns:
+            Optional[Any]: The setting value, or None if not found.
+        """
         if name in self._settingsApi.settings.keys():
             return self._settingsApi.getValue(name)
         err(f"'{self.__class__.__name__}' object has no setting '{name}'")
         return None
 
     def setSetting(self, name: str, value: Any) -> None:
-        """Set setting value by name with validation"""
+        """
+        Set the value of a setting with validation.
+
+        Args:
+            name (str): The setting key.
+            value (Any): The new value.
+        """
         if name in self._settingsApi.settings.keys():
             result = self._settingsApi.setValue(name, value)
             if not result.isValid:
@@ -738,6 +829,15 @@ class PipelineSettings:
             err(f"'{self.__class__.__name__}' object has no setting '{name}'")
 
     def validate(self, **kwargs) -> Dict[str, ValidationResult]:
+        """
+        Validate a batch of values.
+
+        Args:
+            **kwargs: Mapping of keys to values.
+
+        Returns:
+            Dict[str, ValidationResult]: Results for each key.
+        """
         results = {}
         for key, value in kwargs.items():
             if key in self._settingsApi.settings.keys():
@@ -747,6 +847,15 @@ class PipelineSettings:
         return results
 
     def update(self, **kwargs) -> Dict[str, ValidationResult]:
+        """
+        Update settings values with validation.
+
+        Args:
+            **kwargs: Mapping of keys to new values.
+
+        Returns:
+            Dict[str, ValidationResult]: Validation results for each updated key.
+        """
         results = {}
         for key, value in kwargs.items():
             if key in self._settingsApi.settings.keys():
@@ -756,22 +865,56 @@ class PipelineSettings:
         return results
 
     def toDict(self) -> Dict[str, Any]:
+        """
+        Convert the current setting values to a dictionary.
+
+        Returns:
+            Dict[str, Any]: Mapping of key to value.
+        """
         return {name: self.getSetting(name) for name in self._fieldNames}
 
     def fromDict(self, data: Dict[str, Any]) -> Dict[str, ValidationResult]:
+        """
+        Update the settings from a dictionary.
+
+        Args:
+            data (Dict[str, Any]): Key-value pairs to apply.
+
+        Returns:
+            Dict[str, ValidationResult]: Validation results.
+        """
         return self.update(**data)
 
     def serialize(self) -> str:
+        """
+        Serialize the settings to a JSON string.
+
+        Returns:
+            str: The serialized settings.
+        """
         return self._settingsApi.serialize()
 
     def getSchema(self) -> Dict[str, Any]:
+        """
+        Get the schema for all settings.
+
+        Returns:
+            Dict[str, Any]: Dictionary of schema information.
+        """
         return self._settingsApi.getSettingsSchema()
 
     def resetToDefaults(self):
+        """Reset all settings to their default values."""
         for name in self._fieldNames:
             setting = self._settingsApi.settings[name]
             self._settingsApi.values[name] = setting.defaultValue
 
     def __repr__(self) -> str:
+        """
+        Return a detailed string representation of the settings.
+
+        Returns:
+            str: Representation string.
+        """
         values = {name: self.getSetting(name) for name in self._fieldNames}
         return f"{self.__class__.__name__}({', '.join(f'{k}={v!r}' for k, v in values.items())})"
