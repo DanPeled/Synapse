@@ -1,7 +1,7 @@
 import atexit
 import time
 from functools import lru_cache
-from typing import Final, Optional
+from typing import Optional
 
 from ntcore import Event, EventFlags, NetworkTableInstance
 from synapse.log import err, log
@@ -15,7 +15,7 @@ def teamNumberToIP(teamNumber: int, lastOctet: int) -> str:
 
 
 class NtClient:
-    NT_TABLE: Final[str] = "Synapse"
+    NT_TABLE: str = "Synapse"
     """
     A class that handles the connection and communication with a NetworkTables server.
     It can be configured as either a client or a server.
@@ -41,6 +41,7 @@ class NtClient:
             bool: True if the connection or server start was successful, False if it timed out.
         """
         NtClient.INSTANCE = self
+        NtClient.NT_TABLE = name
         # Initialize NetworkTables instance
         self.nt_inst = NetworkTableInstance.getDefault()
 

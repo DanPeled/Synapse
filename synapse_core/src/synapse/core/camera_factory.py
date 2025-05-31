@@ -18,6 +18,8 @@ from synapse.stypes import Frame
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
 
+PropertMetaDict = Dict[str, Dict[str, Union[int, float]]]
+
 
 class CameraPropKeys(Enum):
     kBrightness = "brightness"
@@ -145,6 +147,9 @@ class SynapseCamera(ABC):
     def getResolution(self) -> Size: ...
 
     @abstractmethod
+    def getPropertyMeta(self) -> Optional[PropertMetaDict]: ...
+
+    @abstractmethod
     def getMaxFPS(self) -> float: ...
 
     def getSettingEntry(self, key: str) -> Optional[NetworkTableEntry]:
@@ -225,6 +230,9 @@ class OpenCvCamera(SynapseCamera):
 
         return inst
 
+    def getPropertyMeta(self) -> Optional[PropertMetaDict]:
+        return None
+
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         return self.cap.read()
 
@@ -273,7 +281,7 @@ class CsCoreCamera(SynapseCamera):
         self.camera: VideoCamera
         self.frameBuffer: np.ndarray
         self.sink: CvSink
-        self.propertyMeta: Dict[str, Dict[str, Union[int, float]]] = {}
+        self.propertyMeta: PropertMetaDict = {}
         self._properties: Dict[str, Any] = {}
         self._videoModes: List[Any] = []
         self._validVideoModes: List[VideoMode] = []
@@ -317,6 +325,8 @@ class CsCoreCamera(SynapseCamera):
             for name, prop in inst._properties.items()
         }
 
+        print(inst.propertyMeta)
+
         # Cache video modes and valid resolutions
         inst._videoModes = inst.camera.enumerateVideoModes()
         inst._validVideoModes = [mode for mode in inst._videoModes]
@@ -330,6 +340,9 @@ class CsCoreCamera(SynapseCamera):
 
         return inst
 
+    def getPropertyMeta(self) -> Optional[PropertMetaDict]:
+        return self.propertyMeta
+
     def _startFrameThread(self) -> None:
         if self._running:
             return
@@ -338,6 +351,8 @@ class CsCoreCamera(SynapseCamera):
         self._thread.start()
 
     def _frameGrabberLoop(self) -> None:
+        while not self.isConnected():
+            time.sleep(0.1)
         while self._running:
             result = self.sink.grabFrame(self.frameBuffer)
             if len(result) > 0:
@@ -358,7 +373,8 @@ class CsCoreCamera(SynapseCamera):
             self._waitForNextFrame()
 
     def _waitForNextFrame(self):
-        time.sleep(1 / self.getMaxFPS() / 2)  # Half the expected frame interval
+        if self.isConnected():
+            time.sleep(1.0 / self.getMaxFPS() / 2.0)  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
         try:

@@ -72,10 +72,10 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
 
 
 class ApriltagPipelineSettings(PipelineSettings):
-    tag_size: Setting = settingField(
+    tag_size = settingField(
         RangeConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
     )
-    tag_family: Setting = settingField(
+    tag_family = settingField(
         ListOptionsConstraint(["tag36h11", "tag16h5"]), default="tag36h11"
     )
     stick_to_ground = settingField(BooleanConstraint(), default=False)

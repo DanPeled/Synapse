@@ -20,7 +20,7 @@ from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory, CameraPropKeys,
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
                              CameraSettingsKeys, SynapseCamera, getCameraTable,
                              getCameraTableName)
 from .config import Config
@@ -246,7 +246,7 @@ class PipelineHandler:
         for attempt in range(MAX_RETRIES):
             if camera.isConnected():
                 break
-            log.err(
+            log.log(
                 f"Trying to open camera #{cameraIndex} ({path}), attempt {attempt + 1}"
             )
             time.sleep(1)
@@ -683,7 +683,7 @@ class PipelineHandler:
         return updated_settings
 
     def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
-        orientation = settings.getSetting(CameraPropKeys.kOrientation.value)
+        orientation = settings.getSetting(PipelineSettings.orientation.key)
 
         rotations = {
             90: cv2.ROTATE_90_CLOCKWISE,

@@ -2,10 +2,11 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse.bcolors import bcolors
+from synapse.core.camera_factory import SynapseCamera
 from synapse.log import err
 
 PipelineSettingsMapValue = Any
@@ -53,6 +54,9 @@ class Constraint(ABC):
         pass
 
 
+TConstraintType = TypeVar("TConstraintType", bound=Constraint)
+
+
 class RangeConstraint(Constraint):
     """Constraint for numeric ranges"""
 
@@ -92,7 +96,6 @@ class RangeConstraint(Constraint):
                     False,
                     f"Value {value} is greater than maximum {self.maxValue}",
                 )
-
             if self.step and self.minValue is not None:
                 if (numValue - self.minValue) % self.step != 0:
                     # Snap to nearest step
@@ -195,7 +198,7 @@ class ColorFormat(Enum):
 class ColorConstraint(Constraint):
     import re
 
-    """Constraint for color values (hex, rgb, hsv)"""
+    """Constraint for color values (hex, rgb, hsv) or ranges of them."""
 
     RGB_REGEX = re.compile(
         r"^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
@@ -204,29 +207,52 @@ class ColorConstraint(Constraint):
         r"^hsv\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
     )
 
-    def __init__(self, formatType: str = ColorFormat.kHex.value):
+    def __init__(
+        self, formatType: str = ColorFormat.kHex.value, rangeMode: bool = False
+    ):
         """
         Initialize a ColorConstraint instance.
 
         Args:
-            formatType (str, optional): The expected color format.
-                Supported values include "hex", "rgb", "hsv".
-                Defaults to "hex".
-
+            formatType (str): Color format ("hex", "rgb", "hsv").
+            rangeMode (bool): If True, expects a range (e.g., tuple of two colors).
         """
         super().__init__(ConstraintType.kColor)
-        self.formatType: str = formatType
+        self.formatType = formatType
+        self.rangeMode = rangeMode
 
     def validate(self, value: Any) -> ValidationResult:
+        if self.rangeMode:
+            if not (isinstance(value, (tuple, list)) and len(value) == 2):
+                return ValidationResult(False, "Range must be a (lower, upper) tuple")
+
+            low_result = self._validate_single(value[0])
+            if not low_result.isValid:
+                return ValidationResult(
+                    False, f"Lower bound error: {low_result.errorMessage}"
+                )
+
+            high_result = self._validate_single(value[1])
+            if not high_result.isValid:
+                return ValidationResult(
+                    False, f"Upper bound error: {high_result.errorMessage}"
+                )
+
+            return ValidationResult(
+                True, None, (low_result.normalizedValue, high_result.normalizedValue)
+            )
+
+        # Single value mode
+        return self._validate_single(value)
+
+    def _validate_single(self, value: Any) -> ValidationResult:
         if self.formatType == ColorFormat.kHex.value:
             if isinstance(value, int):
                 hex_str = f"#{value:06X}"
                 return ValidationResult(True, None, hex_str)
 
             if not isinstance(value, str):
-                return ValidationResult(
-                    False, "Color value must be a string or integer for hex format"
-                )
+                return ValidationResult(False, "Hex value must be string or int")
 
             value = value.strip()
             if value.startswith("#"):
@@ -235,121 +261,63 @@ class ColorConstraint(Constraint):
                 hex_part = value[2:]
                 value = f"#{hex_part}"
             else:
-                return ValidationResult(False, "Hex color must start with '#' or '0x'")
+                return ValidationResult(False, "Hex must start with '#' or '0x'")
 
             if len(hex_part) not in [3, 6, 8]:
-                return ValidationResult(False, "Invalid hex color length")
+                return ValidationResult(False, "Invalid hex length")
 
             try:
                 int(hex_part, 16)
                 return ValidationResult(True, None, value.upper())
             except ValueError:
-                return ValidationResult(False, "Invalid hex color value")
+                return ValidationResult(False, "Invalid hex digits")
 
         elif self.formatType == ColorFormat.kRGB.value:
-            # Accept tuple of ints (r, g, b)
             if isinstance(value, tuple):
-                if len(value) != 3:
-                    return ValidationResult(
-                        False, "RGB tuple must have exactly 3 elements"
-                    )
-                if not all(isinstance(v, int) for v in value):
-                    return ValidationResult(
-                        False, "RGB tuple elements must be integers"
-                    )
-
+                if len(value) != 3 or not all(isinstance(v, int) for v in value):
+                    return ValidationResult(False, "RGB must be tuple of 3 ints")
                 r, g, b = value
-                if not (0 <= r <= 255):
-                    return ValidationResult(False, "Red (r) must be between 0 and 255")
-                if not (0 <= g <= 255):
-                    return ValidationResult(
-                        False, "Green (g) must be between 0 and 255"
-                    )
-                if not (0 <= b <= 255):
-                    return ValidationResult(False, "Blue (b) must be between 0 and 255")
+                if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
+                    return ValidationResult(False, "RGB components must be in 0–255")
+                return ValidationResult(True, None, tuple(value))
 
-                normalized = f"rgb({r}, {g}, {b})"
-                return ValidationResult(True, None, normalized)
+            if isinstance(value, str):
+                match = self.RGB_REGEX.match(value.strip())
+                if match:
+                    r, g, b = map(int, match.groups())
+                    return self._validate_single((r, g, b))
+                return ValidationResult(False, "Invalid RGB string format")
 
-            # Or accept string "rgb(r, g, b)"
-            if not isinstance(value, str):
-                return ValidationResult(
-                    False, "RGB color value must be a string or tuple"
-                )
-
-            value = value.strip()
-            match = self.RGB_REGEX.match(value)
-            if not match:
-                return ValidationResult(False, "Invalid RGB format")
-
-            r, g, b = map(int, match.groups())
-            if not (0 <= r <= 255):
-                return ValidationResult(False, "Red (r) must be between 0 and 255")
-            if not (0 <= g <= 255):
-                return ValidationResult(False, "Green (g) must be between 0 and 255")
-            if not (0 <= b <= 255):
-                return ValidationResult(False, "Blue (b) must be between 0 and 255")
-
-            normalized = f"rgb({r}, {g}, {b})"
-            return ValidationResult(True, None, normalized)
+            return ValidationResult(False, "Invalid RGB format")
 
         elif self.formatType == ColorFormat.kHSV.value:
-            # Accept tuple of ints (h, s, v)
             if isinstance(value, tuple):
-                if len(value) != 3:
-                    return ValidationResult(
-                        False, "HSV tuple must have exactly 3 elements"
-                    )
-                if not all(isinstance(v, int) for v in value):
-                    return ValidationResult(
-                        False, "HSV tuple elements must be integers"
-                    )
-
+                if len(value) != 3 or not all(isinstance(v, int) for v in value):
+                    return ValidationResult(False, "HSV must be tuple of 3 ints")
                 h, s, v = value
-                if not (0 <= h <= 360):
-                    return ValidationResult(False, "Hue (h) must be between 0 and 360")
-                if not (0 <= s <= 100):
+                if not (0 <= h <= 179 and 0 <= s <= 255 and 0 <= v <= 255):
                     return ValidationResult(
-                        False, "Saturation (s) must be between 0 and 100"
+                        False, "HSV components must be in OpenCV range"
                     )
-                if not (0 <= v <= 100):
-                    return ValidationResult(
-                        False, "Value (v) must be between 0 and 100"
-                    )
+                return ValidationResult(True, None, tuple(value))
 
-                normalized = f"hsv({h}, {s}, {v})"
-                return ValidationResult(True, None, normalized)
+            if isinstance(value, str):
+                match = self.HSV_REGEX.match(value.strip())
+                if match:
+                    h, s, v = map(int, match.groups())
+                    return self._validate_single((h, s, v))
+                return ValidationResult(False, "Invalid HSV string format")
 
-            # Or accept string "hsv(h, s, v)" no %
-            if not isinstance(value, str):
-                return ValidationResult(
-                    False, "HSV color value must be a string or tuple"
-                )
+            return ValidationResult(False, "Invalid HSV format")
 
-            value = value.strip()
-            match = self.HSV_REGEX.match(value)
-            if not match:
-                return ValidationResult(
-                    False, "Invalid HSV format (must not contain '%')"
-                )
-
-            h, s, v = map(int, match.groups())
-            if not (0 <= h <= 360):
-                return ValidationResult(False, "Hue (h) must be between 0 and 360")
-            if not (0 <= s <= 100):
-                return ValidationResult(
-                    False, "Saturation (s) must be between 0 and 100"
-                )
-            if not (0 <= v <= 100):
-                return ValidationResult(False, "Value (v) must be between 0 and 100")
-
-            normalized = f"hsv({h}, {s}, {v})"
-            return ValidationResult(True, None, normalized)
-
-        return ValidationResult(True, None, value)
+        return ValidationResult(False, f"Unknown formatType: {self.formatType}")
 
     def toDict(self) -> Dict[str, Any]:
-        return {"type": self.constraintType.value, "formatType": self.formatType}
+        return {
+            "type": self.constraintType.value,
+            "formatType": self.formatType,
+            "rangeMode": self.rangeMode,
+        }
 
 
 class ListConstraint(Constraint):
@@ -531,7 +499,7 @@ class BooleanConstraint(Constraint):
 
 
 @dataclass
-class Setting:
+class Setting(Generic[TConstraintType]):
     """A single setting with its constraint and metadata
 
     Attributes:
@@ -543,7 +511,7 @@ class Setting:
     """
 
     key: str
-    constraint: Constraint
+    constraint: TConstraintType
     defaultValue: Any
     description: Optional[str] = None
     category: Optional[str] = None
@@ -605,11 +573,11 @@ class SettingsAPI:
 
 
 def settingField(
-    constraint: Constraint,
+    constraint: TConstraintType,
     default: Any,
     description: Optional[str] = None,
     category: Optional[str] = None,
-) -> Setting:
+) -> Setting[TConstraintType]:
     """
     Creates a Setting instance for use in SettingsCollection classes.
 
@@ -622,7 +590,7 @@ def settingField(
     Returns:
         Setting: A new Setting object with the specified configuration.
     """
-    return Setting("", constraint, default, description, category)
+    return Setting[TConstraintType]("", constraint, default, description, category)
 
 
 class PipelineSettings:
@@ -637,12 +605,36 @@ class PipelineSettings:
         height (Setting): Height setting (e.g., 720).
     """
 
-    brightness = settingField(RangeConstraint(0, 100), default=50)
-    exposure = settingField(RangeConstraint(0, 100), default=50)
-    saturation = settingField(RangeConstraint(0, 100), default=50)
-    orientation = settingField(RangeConstraint(0, 270, 90), default=0)
-    width = settingField(RangeConstraint(minValue=0, maxValue=None), default=1280)
-    height = settingField(RangeConstraint(minValue=0, maxValue=None), default=720)
+    kCameraPropsCategory = "Camera Properties"
+
+    brightness = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    exposure = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    saturation = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    sharpness = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    gain = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    orientation = settingField(
+        RangeConstraint(0, 270, 90), default=0, category=kCameraPropsCategory
+    )
+    width = settingField(
+        RangeConstraint(minValue=0, maxValue=None),
+        default=1280,
+        category=kCameraPropsCategory,
+    )
+    height = settingField(
+        RangeConstraint(minValue=0, maxValue=None),
+        default=720,
+        category=kCameraPropsCategory,
+    )
 
     def __init__(self, settings: Optional[PipelineSettingsMap] = None):
         """
@@ -657,6 +649,10 @@ class PipelineSettings:
 
         if settings:
             self.generateSettingsFromMap(settings)
+
+    def assignCamera(
+        self, camera: SynapseCamera
+    ) -> None: ...  # TODO: set defaults and ranges according to camera props
 
     def generateSettingsFromMap(self, settingsMap: PipelineSettingsMap) -> None:
         """
