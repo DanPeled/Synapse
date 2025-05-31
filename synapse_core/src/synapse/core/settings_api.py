@@ -669,8 +669,8 @@ class PipelineSettings:
                     constraint = BooleanConstraint()
                 elif isinstance(value, float | int):
                     constraint = RangeConstraint(
-                        minValue=-1_000_000.0,
-                        maxValue=1_000_000.0,
+                        minValue=None,
+                        maxValue=None,
                         step=None if isinstance(value, float) else 1,
                     )
                 elif isinstance(value, str):
