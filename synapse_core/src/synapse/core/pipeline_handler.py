@@ -5,6 +5,7 @@ import traceback
 import typing
 from dataclasses import dataclass
 from enum import Enum
+from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
 
@@ -41,7 +42,7 @@ class FPSView:
     font = cv2.FONT_HERSHEY_PLAIN
     fontScale = 3
     thickness = 2
-    color = (0, 0, 0)
+    color = (0, 256, 0)
     position = (10, 30)
 
 
@@ -249,23 +250,304 @@ class PipelineLoader:
         return self.getPipelineTypeByName(self.pipelineTypeNames[index])
 
 
-class PipelineHandler:
+class CameraHandler:
+    """
+    Handles the lifecycle and operations of multiple cameras, including initialization,
+    streaming, recording, and configuration based on global settings.
+    """
+
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
+    """Default resolution (width, height) used when no specific stream size is configured."""
+
+    def __init__(self) -> None:
+        """
+        Initializes empty dictionaries to hold camera instances, output streams,
+        stream sizes, recording outputs, and camera configuration bindings.
+        """
+        self.cameras: Dict[CameraID, SynapseCamera] = {}
+        self.outputs: Dict[CameraID, cs.CvSource] = {}
+        self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
+        self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
+        self.cameraBindings: Dict[CameraID, CameraConfig] = {}
+
+    def setup(self) -> None:
+        """
+        Sets up the camera system by creating cameras, generating output streams,
+        and initializing recording outputs.
+        """
+        self.createCameras()
+        self.outputs = self.getCameraOutputs()
+        self.recordingOutputs = self.generateRecordingOutputs(list(self.cameras.keys()))
+
+    def createCameras(self) -> None:
+        """
+        Retrieves camera configuration from global settings and attempts to add
+        each configured camera to the handler.
+        """
+        self.cameraBindings = GlobalSettings.getCameraConfigMap()
+
+        for cameraIndex in self.cameraBindings:
+            if not (self.addCamera(cameraIndex)):
+                continue
+
+    def getCamera(self, cameraIndex: CameraID) -> Optional[SynapseCamera]:
+        """
+        Retrieves a specific camera instance by its index.
+
+        Args:
+            cameraIndex (CameraID): Index of the camera to retrieve.
+
+        Returns:
+            Optional[SynapseCamera]: The camera instance if it exists, otherwise None.
+        """
+        return self.cameras.get(cameraIndex, None)
+
+    def getCameraOutputs(self) -> Dict[CameraID, cs.CvSource]:
+        """
+        Initializes and returns video output streams for all configured cameras.
+
+        For each camera index in `self.cameras`, retrieves its desired streaming resolution
+        from the global camera configuration (if available), falls back to the default resolution
+        otherwise, and creates a new video stream via `cs.CameraServer.putVideo`.
+
+        Also updates `self.streamSizes` with the resolved stream resolution for each camera.
+
+        Returns:
+            dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
+            to their corresponding video output objects.
+        """
+
+        def getStreamRes(cameraIndex: CameraID) -> Tuple[int, int]:
+            """
+            Retrieves the streaming resolution for the given camera index.
+
+            If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
+            returns its configured stream resolution and updates `self.streamSizes`.
+            Otherwise, returns a default resolution.
+
+            Args:
+                cameraIndex (CameraID): The index of the camera.
+
+            Returns:
+                Tuple[int, int]: The width and height of the stream resolution.
+            """
+            cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
+                cameraIndex
+            )
+
+            if cameraConfig is not None:
+                streamRes = cameraConfig.streamRes
+                self.streamSizes[cameraIndex] = streamRes
+                return (streamRes[0], streamRes[1])
+
+            return self.DEFAULT_STREAM_SIZE
+
+        return {
+            cameraIndex: cs.CameraServer.putVideo(
+                f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
+                width=getStreamRes(cameraIndex)[0],
+                height=getStreamRes(cameraIndex)[1],
+            )
+            for cameraIndex in self.cameras.keys()
+        }
+
+    def generateRecordingOutputs(
+        self, cameraIndecies: List[CameraID]
+    ) -> Dict[CameraID, cv2.VideoWriter]:
+        """
+        Creates recording outputs for the specified camera indices if all cameras exist.
+
+        Args:
+            cameraIndecies (List[CameraID]): List of camera indices to generate outputs for.
+
+        Returns:
+            Dict[CameraID, cv2.VideoWriter]: Mapping from camera ID to the video writer object.
+        """
+        if all(i in self.cameras.keys() for i in cameraIndecies):
+            finalDict: Dict[CameraID, cv2.VideoWriter] = {
+                index: cv2.VideoWriter(
+                    log.LOG_FILE + ".avi",
+                    cv2.VideoWriter.fourcc("M", "J", "P", "G"),
+                    30,
+                    self.cameras[index].getResolution(),
+                )
+                for index in cameraIndecies
+            }
+            return finalDict
+        return {}
+
+    @cache
+    def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
+        """
+        Retrieves the video output stream for a specific camera.
+
+        Args:
+            cameraIndex (CameraID): The camera index.
+
+        Returns:
+            cs.CvSource: The associated video output stream.
+        """
+        return self.outputs[cameraIndex]
+
+    @cache
+    def getRecordOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
+        """
+        Retrieves the recording output writer for a specific camera.
+
+        Args:
+            cameraIndex (CameraID): The camera index.
+
+        Returns:
+            cv2.VideoWriter: The associated video writer.
+        """
+        return self.recordingOutputs[cameraIndex]
+
+    def publishFrame(self, frame: Frame, camera: SynapseCamera) -> None:
+        """
+        Publishes a frame to the output stream and optionally writes it to the recording output
+        if recording is enabled.
+
+        Args:
+            frame (Frame): The image frame to publish.
+            camera (SynapseCamera): The camera that produced the frame.
+        """
+        if frame is not None:
+            resized_frame = cv2.resize(
+                frame,
+                self.streamSizes[camera.cameraIndex],
+                interpolation=cv2.INTER_AREA,
+            )
+            self.getOutput(camera.cameraIndex).putFrame(resized_frame)
+            if camera.getSetting("record", False):
+                self.getRecordOutput(camera.cameraIndex).write(frame)
+
+    def addCamera(self, cameraIndex: CameraID) -> bool:
+        """
+        Adds a camera to the handler by opening it through OpenCV.
+
+        Args:
+            cameraIndex (CameraID): Camera index to open.
+
+        Returns:
+            bool: True if the camera was successfully added, False otherwise.
+        """
+        camera_config = self.cameraBindings.get(cameraIndex)
+        if camera_config is None:
+            log.err(f"No camera defined for index {cameraIndex}")
+            return False
+
+        path = camera_config.path
+
+        try:
+            camera = CameraFactory.create(
+                cameraType=CameraFactory.kCameraServer,
+                cameraIndex=cameraIndex,
+                devPath=path,
+                name=f"{camera_config.name}(#{cameraIndex})",
+            )
+            camera.setIndex(cameraIndex)
+        except Exception as e:
+            log.err(f"Failed to start camera capture: {e}")
+            return False
+
+        MAX_RETRIES = 30
+        for attempt in range(MAX_RETRIES):
+            if camera.isConnected():
+                break
+            log.log(
+                f"Trying to open camera #{cameraIndex} ({path}), attempt {attempt + 1}"
+            )
+            time.sleep(1)
+
+        if camera.isConnected():
+            self.cameras[cameraIndex] = camera
+            log.log(
+                f"Camera (name={camera_config.name}, path={camera_config.path}, id={cameraIndex}) added successfully."
+            )
+            return True
+
+        log.err(
+            f"Failed to open camera #{cameraIndex} ({path}) after {MAX_RETRIES} retries."
+        )
+        return False
+
+    def setCameraConfigs(
+        self, settings: Dict[str, Any], camera: SynapseCamera
+    ) -> Dict[str, Any]:
+        """
+        Applies the specified settings to a camera and sets its video mode.
+
+        Args:
+            settings (Dict[str, Any]): Dictionary of property names and values to apply.
+            camera (SynapseCamera): The camera to configure.
+
+        Returns:
+            Dict[str, Any]: Dictionary of updated settings (currently unused).
+        """
+        updated_settings = {}
+        for name in settings.keys():
+            if name in CSCORE_TO_CV_PROPS.keys():
+                setting_value = settings.get(name)
+                if setting_value is not None:
+                    camera.setProperty(
+                        prop=name,
+                        value=setting_value,
+                    )
+
+        camera.setVideoMode(
+            width=int(settings["width"]),
+            height=int(settings["height"]),
+            fps=int(camera.getMaxFPS()),
+        )
+
+        return updated_settings
+
+    def cleanup(self) -> None:
+        """
+        Releases all video writers and closes all active camera connections.
+        """
+        for record in self.recordingOutputs.values():
+            record.release()
+        for camera in self.cameras.values():
+            camera.close()
+
+
+class PipelineHandler:
+    """
+    Handles the loading, configuration, and runtime execution of vision pipelines
+    across multiple camera devices. It interfaces with NetworkTables for dynamic
+    pipeline control and provides metrics reporting for system diagnostics.
+    """
 
     def __init__(self, directory: Path):
+        """
+        Initializes the PipelineHandler by preparing the loader and camera handler.
+
+        Args:
+            directory (Path): Root directory containing pipeline definitions.
+        """
         """
         Initializes the handler, loads all pipeline classes in the specified directory.
         :param pipelineDirectory: Root directory to search for pipeline files
         """
+
         self.pipelineLoader: PipelineLoader = PipelineLoader(directory)
-        self.cameras: Dict[CameraID, SynapseCamera] = {}
+        self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
-        self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
-        self.outputs: Dict[CameraID, cs.CvSource] = {}
-        self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
-        self.cameraBindings: Dict[CameraID, CameraConfig] = {}
 
     def setup(self, directory: Path):
+        """
+        Initializes all components:
+        - Loads pipelines from the directory.
+        - Initializes camera configurations.
+        - Assigns default pipelines to each camera.
+        - Starts metrics collection and monitoring.
+        - Registers cleanup routine on exit.
+
+        Args:
+            directory (Path): Path to directory containing pipelines and configurations.
+        """
+
         import atexit
 
         log.log(
@@ -281,7 +563,7 @@ class PipelineHandler:
 
         self.pipelineLoader.setup(directory)
 
-        self.createCameras()
+        self.cameraHandler.setup()
         self.assignDefaultPipelines()
 
         self.setupNetworkTables()
@@ -291,7 +573,11 @@ class PipelineHandler:
         atexit.register(self.cleanup)
 
     def assignDefaultPipelines(self) -> None:
-        for cameraIndex in self.cameras.keys():
+        """
+        Assigns the default pipeline to each connected camera based on predefined configuration.
+        """
+
+        for cameraIndex in self.cameraHandler.cameras.keys():
             pipeline = self.pipelineLoader.getDefaultPipeline(cameraIndex)
             self.setPipelineByIndex(
                 cameraIndex=cameraIndex,
@@ -299,19 +585,13 @@ class PipelineHandler:
             )
             log.log(f"Setup default pipeline (#{pipeline}) for camera ({cameraIndex})")
 
-    def createCameras(self) -> None:
-        self.cameraBindings = GlobalSettings.getCameraConfigMap()
-
-        for cameraIndex in self.cameraBindings:
-            if not (self.addCamera(cameraIndex)):
-                continue
-
     def startMetricsThread(self):
         from multiprocessing import Process, Queue
 
         """
-        Starts a separate process that collects system metrics,
-        then publishes them to NetworkTables from the main process as double array.
+        Starts a multiprocessing process and thread to:
+        - Collect system metrics from a background process.
+        - Publish metrics as a double array to NetworkTables from the main process.
         """
 
         def metricsProcess(queue: Queue):
@@ -367,65 +647,6 @@ class PipelineHandler:
         )
         publisher_thread.start()
 
-    def generateRecordingOutputs(
-        self, cameraIndecies: List[CameraID]
-    ) -> Dict[CameraID, cv2.VideoWriter]:
-        finalDict: Dict[CameraID, cv2.VideoWriter] = {
-            index: cv2.VideoWriter(
-                log.LOG_FILE + ".avi",
-                cv2.VideoWriter.fourcc("M", "J", "P", "G"),
-                30,
-                self.cameras[index].getResolution(),
-            )
-            for index in cameraIndecies
-        }
-        return finalDict
-
-    def addCamera(self, cameraIndex: CameraID) -> bool:
-        """
-        Adds a camera to the handler by opening it through OpenCV.
-        :param cameraIndex: Camera index to open
-        """
-        camera_config = self.cameraBindings.get(cameraIndex)
-        if camera_config is None:
-            log.err(f"No camera defined for index {cameraIndex}")
-            return False
-
-        path = camera_config.path
-
-        try:
-            camera = CameraFactory.create(
-                cameraType=CameraFactory.kCameraServer,
-                cameraIndex=cameraIndex,
-                devPath=path,
-                name=f"{camera_config.name}(#{cameraIndex})",
-            )
-            camera.setIndex(cameraIndex)
-        except Exception as e:
-            log.err(f"Failed to start camera capture: {e}")
-            return False
-
-        MAX_RETRIES = 30
-        for attempt in range(MAX_RETRIES):
-            if camera.isConnected():
-                break
-            log.log(
-                f"Trying to open camera #{cameraIndex} ({path}), attempt {attempt + 1}"
-            )
-            time.sleep(1)
-
-        if camera.isConnected():
-            self.cameras[cameraIndex] = camera
-            log.log(
-                f"Camera (name={camera_config.name}, path={camera_config.path}, id={cameraIndex}) added successfully."
-            )
-            return True
-
-        log.err(
-            f"Failed to open camera #{cameraIndex} ({path}) after {MAX_RETRIES} retries."
-        )
-        return False
-
     def __setupPipelineForCamera(
         self,
         cameraIndex: CameraID,
@@ -433,10 +654,17 @@ class PipelineHandler:
         pipeline_config: PipelineSettings,
     ):
         """
-        Sets the pipeline(s) to be used for a specific camera.
-        :param cameraIndex: Index of the camera
-        :param pipeline: A pipeline class or list of pipeline classes to assign to the camera
+        Internal method that configures a specific pipeline instance for a camera.
+        - Initializes the pipeline.
+        - Applies settings from configuration.
+        - Sets up NetworkTables listeners to allow dynamic pipeline reconfiguration.
+
+        Args:
+            cameraIndex (CameraID): The camera index to configure.
+            pipelineType (Type[Pipeline]): The class type of the pipeline to instantiate.
+            pipeline_config (PipelineSettings): The configuration for the pipeline.
         """
+
         # Create instances for each pipeline only when setting them
         settings = self.pipelineLoader.getPipelineSettings(
             self.pipelineBindings[cameraIndex]
@@ -449,13 +677,15 @@ class PipelineHandler:
         )
 
         cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
-        self.setCameraConfigs(
-            {
-                key: pipeline_config.getSetting(key)
-                for key in pipeline_config.getMap().keys()
-            },
-            self.cameras[cameraIndex],
-        )
+        camera: Optional[SynapseCamera] = self.cameraHandler.getCamera(cameraIndex)
+        if camera is not None:
+            self.cameraHandler.setCameraConfigs(
+                {
+                    key: pipeline_config.getSetting(key)
+                    for key in pipeline_config.getMap().keys()
+                },
+                camera,
+            )
 
         if cameraTable is not None:
             setattr(currPipeline, "nt_table", cameraTable)
@@ -473,10 +703,12 @@ class PipelineHandler:
                 ).setSetting(prop, value)
 
                 if prop in CSCORE_TO_CV_PROPS.keys():
-                    self.cameras[cameraIndex].setProperty(
-                        prop=prop,
-                        value=int(value),
-                    )
+                    camera = self.cameraHandler.getCamera(cameraIndex)
+                    if camera is not None:
+                        camera.setProperty(
+                            prop=prop,
+                            value=int(value),
+                        )
 
             for key in pipeline_config.getMap().keys():
                 nt_table = getCameraTable(cameraIndex)
@@ -493,16 +725,13 @@ class PipelineHandler:
         event: Event,
     ) -> DataValue:
         """
-        Extracts the correctly typed value from a NetworkTables event based on its topic type.
+        Extracts the correctly typed value from a NetworkTables event based on topic type.
 
         Args:
-            event (Event): The NetworkTables event containing the topic and value.
+            event (Event): Event containing NetworkTables data.
 
         Returns:
-            Any: The value interpreted according to its NetworkTableType.
-
-        Raises:
-            ValueError: If the topic type is unsupported.
+            DataValue: The parsed value from the event.
         """
         topic = event.data.topic  # pyright: ignore
         topic_type = topic.getType()
@@ -549,9 +778,9 @@ class PipelineHandler:
             cameraIndex (int): The index of the target camera.
             pipelineIndex (int): The index of the pipeline to assign.
         """
-        if cameraIndex not in self.cameras.keys():
+        if cameraIndex not in self.cameraHandler.cameras.keys():
             log.err(
-                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameras.keys())-1})."
+                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameraHandler.cameras.keys())-1})."
             )
             return
 
@@ -603,66 +832,13 @@ class PipelineHandler:
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
 
-    def getCameraOutputs(self) -> Dict[CameraID, cs.CvSource]:
-        """
-        Initializes and returns video output streams for all configured cameras.
-
-        For each camera index in `self.cameras`, retrieves its desired streaming resolution
-        from the global camera configuration (if available), falls back to the default resolution
-        otherwise, and creates a new video stream via `cs.CameraServer.putVideo`.
-
-        Also updates `self.streamSizes` with the resolved stream resolution for each camera.
-
-        Returns:
-            dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
-            to their corresponding video output objects.
-        """
-
-        def getStreamRes(cameraIndex: CameraID) -> Tuple[int, int]:
-            """
-            Retrieves the streaming resolution for the given camera index.
-
-            If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
-            returns its configured stream resolution and updates `self.streamSizes`.
-            Otherwise, returns a default resolution.
-
-            Args:
-                cameraIndex (CameraID): The index of the camera.
-
-            Returns:
-                Tuple[int, int]: The width and height of the stream resolution.
-            """
-            cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
-                cameraIndex
-            )
-
-            if cameraConfig is not None:
-                streamRes = cameraConfig.streamRes
-                self.streamSizes[cameraIndex] = streamRes
-                return (streamRes[0], streamRes[1])
-
-            return self.DEFAULT_STREAM_SIZE
-
-        return {
-            cameraIndex: cs.CameraServer.putVideo(
-                f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
-                width=getStreamRes(cameraIndex)[0],
-                height=getStreamRes(cameraIndex)[1],
-            )
-            for cameraIndex in self.cameras.keys()
-        }
-
     def run(self):
         """
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
-        self.outputs = self.getCameraOutputs()
-        self.recordingOutputs = self.generateRecordingOutputs(list(self.cameras.keys()))
 
         def processCamera(cameraIndex: CameraID):
-            output = self.outputs[cameraIndex]
-            recordingOutput = self.recordingOutputs[cameraIndex]
-            camera: SynapseCamera = self.cameras[cameraIndex]
+            camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
             log.log(f"Started Camera #{cameraIndex} loop")
 
@@ -708,7 +884,7 @@ class PipelineHandler:
                 # Overlay FPS on the frame
                 cv2.putText(
                     processed_frame,
-                    f"FPS: {fps:.2f}",
+                    f"{int(fps)}",
                     FPSView.position,
                     FPSView.font,
                     FPSView.fontScale,
@@ -717,18 +893,10 @@ class PipelineHandler:
                     lineType=cv2.LINE_8,
                 )
 
-                if processed_frame is not None:
-                    resized_frame = cv2.resize(
-                        processed_frame,
-                        self.streamSizes[cameraIndex],
-                        interpolation=cv2.INTER_AREA,
-                    )
-                    output.putFrame(resized_frame)
-                    if camera.getSetting("record", False):
-                        recordingOutput.write(processed_frame)
+                self.cameraHandler.publishFrame(processed_frame, camera)
 
         def initThreads():
-            for cameraIndex in self.cameras.keys():
+            for cameraIndex in self.cameraHandler.cameras.keys():
                 thread = threading.Thread(target=processCamera, args=(cameraIndex,))
                 thread.daemon = True
                 thread.start()
@@ -760,7 +928,7 @@ class PipelineHandler:
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        entry = getCameraTable(cameraIndex).getEntry("view_id")
+        entry = getCameraTable(cameraIndex).getEntry(CameraSettingsKeys.kViewID.value)
         DEFAULT_STEP = "step_0"
 
         if result is None:
@@ -790,7 +958,7 @@ class PipelineHandler:
         cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
 
     def setupNetworkTables(self) -> None:
-        for cameraIndex, camera in self.cameras.items():
+        for cameraIndex, camera in self.cameraHandler.cameras.items():
             entry = camera.getSettingEntry(CameraSettingsKeys.kPipeline.value)
 
             if entry is None:
@@ -807,25 +975,6 @@ class PipelineHandler:
             )
 
             entry.setInteger(self.pipelineLoader.defaultPipelineIndexes[cameraIndex])
-
-    def setCameraConfigs(
-        self, settings: Dict[str, Any], camera: SynapseCamera
-    ) -> Dict[str, Any]:
-        updated_settings = {}
-        for name in settings.keys():
-            if name in CSCORE_TO_CV_PROPS.keys():
-                setting_value = settings.get(name)
-                if setting_value is not None:
-                    camera.setProperty(
-                        prop=name,
-                        value=setting_value,
-                    )
-
-        camera.setVideoMode(
-            width=int(settings["width"]), height=int(settings["height"]), fps=100
-        )
-
-        return updated_settings
 
     def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
         orientation = settings.getSetting(PipelineSettings.orientation.key)
@@ -873,6 +1022,5 @@ class PipelineHandler:
         """
         cv2.destroyAllWindows()
 
-        for record in self.recordingOutputs.values():
-            record.release()
+        self.cameraHandler.cleanup()
         log.log("Cleaned up all resources.")

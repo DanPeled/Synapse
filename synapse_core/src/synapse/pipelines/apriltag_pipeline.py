@@ -159,7 +159,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         if not tags:
             self.setDataValue("hasResults", False)
             self.setDataValue("results", ApriltagsJson.empty())
-            return gray
+            return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
             tagPoseEstimate: apriltag.AprilTagPoseEstimate = self.estimateTagPose(tag)
@@ -251,7 +251,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             ),
         )
 
-        return gray
+        return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
     def opencvToWPI(self, opencv: Transform3d) -> Transform3d:
         return Transform3d(  # NOTE: Should be correct
