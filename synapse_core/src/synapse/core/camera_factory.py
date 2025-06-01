@@ -53,8 +53,8 @@ class CameraSettingsKeys(Enum):
     kPipeline = "pipeline"
 
 
-def getCameraTableName(index: int) -> str:
-    return f"camera{index}"
+def getCameraTableName(cameraIndex: CameraID) -> str:
+    return f"camera{cameraIndex}"
 
 
 @dataclass
