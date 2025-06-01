@@ -15,7 +15,7 @@ import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType)
 from synapse.bcolors import bcolors
-from synapse.stypes import DataValue, Frame
+from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
@@ -27,10 +27,6 @@ from .config import Config
 from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
                        PipelineSettings)
 from .settings_api import PipelineSettingsMap
-
-CameraID = int
-PipelineID = int
-PipelineName = str
 
 
 class NTKeys(Enum):

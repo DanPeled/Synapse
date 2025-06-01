@@ -14,7 +14,7 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
-from synapse.stypes import Frame
+from synapse.stypes import CameraID, Frame
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
 
@@ -95,7 +95,7 @@ class CameraConfigKey(Enum):
 
 
 @cache
-def getCameraTable(cameraIndex: int) -> NetworkTable:
+def getCameraTable(cameraIndex: CameraID) -> NetworkTable:
     return (
         NetworkTableInstance.getDefault()
         .getTable(NtClient.NT_TABLE)
@@ -122,8 +122,8 @@ class SynapseCamera(ABC):
         name: str = "",
     ) -> "SynapseCamera": ...
 
-    def setIndex(self, cameraIndex: int) -> None:
-        self.cameraIndex: int = cameraIndex
+    def setIndex(self, cameraIndex: CameraID) -> None:
+        self.cameraIndex: CameraID = cameraIndex
 
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
@@ -443,7 +443,7 @@ class CameraFactory:
         cls,
         *_,
         cameraType: Type[SynapseCamera] = kDefault,
-        cameraIndex: int,
+        cameraIndex: CameraID,
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",

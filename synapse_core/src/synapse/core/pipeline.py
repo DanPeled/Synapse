@@ -8,6 +8,7 @@ from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
+from ..stypes import CameraID
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
 from .settings_api import (PipelineSettings, PipelineSettingsMap,
@@ -27,7 +28,7 @@ class Pipeline(ABC, Generic[TSettingsType]):
     @abstractmethod
     def __init__(
         self,
-        cameraIndex: int,
+        cameraIndex: CameraID,
         settings: TSettingsType,
     ):
         self.settings = settings
@@ -136,7 +137,7 @@ class GlobalSettingsMeta(type):
             settings (PipelineSettings.PipelineSettingsMap): The settings to initialize with.
         """
         cls.__settings = PipelineSettings(settings)
-        cls.__cameraConfigs: Dict[int, CameraConfig] = {}
+        cls.__cameraConfigs: Dict[CameraID, CameraConfig] = {}
 
         if cls.kCameraConfigsKey in settings:
             for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
@@ -158,15 +159,15 @@ class GlobalSettingsMeta(type):
             err("No camera configs provided")
             return False
 
-    def hasCameraData(cls, cameraIndex: int) -> bool:
+    def hasCameraData(cls, cameraIndex: CameraID) -> bool:
         return cameraIndex in cls.__cameraConfigs.keys()
 
-    def getCameraConfig(cls, cameraIndex: int) -> Optional[CameraConfig]:
+    def getCameraConfig(cls, cameraIndex: CameraID) -> Optional[CameraConfig]:
         if cls.hasCameraData(cameraIndex):
             return cls.__cameraConfigs[cameraIndex]
         return None
 
-    def getCameraConfigMap(cls) -> Dict[int, CameraConfig]:
+    def getCameraConfigMap(cls) -> Dict[CameraID, CameraConfig]:
         return cls.__cameraConfigs
 
     def getSetting(cls, key: str) -> Optional[PipelineSettingsMapValue]:

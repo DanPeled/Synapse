@@ -13,7 +13,7 @@ from synapse.core.pipeline import GlobalSettings, Pipeline
 from synapse.core.settings_api import (BooleanConstraint,
                                        ListOptionsConstraint, PipelineSettings,
                                        RangeConstraint, settingField)
-from synapse.stypes import Frame
+from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
                               Transform3d, Translation3d)
@@ -96,7 +96,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
-    def __init__(self, settings: ApriltagPipelineSettings, cameraIndex: int):
+    def __init__(self, settings: ApriltagPipelineSettings, cameraIndex: CameraID):
         super().__init__(cameraIndex, settings)
         self.settings: ApriltagPipelineSettings = settings
         self.camera_matrix: np.ndarray = np.array(
@@ -313,7 +313,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         robotInField: Pose3d = tagFieldPose.transformBy(robotInTagSpace)
         return RobotPoseEstimate(robotInTagSpace, robotInField)
 
-    def getCameraMatrix(self, cameraIndex: int) -> Optional[List[List[float]]]:
+    def getCameraMatrix(self, cameraIndex: CameraID) -> Optional[List[List[float]]]:
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if camConfig:
             measured_res = camConfig.measuredRes
@@ -339,13 +339,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         log.err("No camera matrix found, invalid results for AprilTag detection")
         return None
 
-    def getDistCoeffs(self, cameraIndex: int) -> Optional[List[float]]:
+    def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
         if data:
             return data.distCoeff
         return None
 
-    def getCameraTransform(self, cameraIndex: int) -> Optional[Transform3d]:
+    def getCameraTransform(self, cameraIndex: CameraID) -> Optional[Transform3d]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
         if data:
             return data.transform

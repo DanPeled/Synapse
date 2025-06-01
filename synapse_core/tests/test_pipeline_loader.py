@@ -5,12 +5,13 @@ from unittest.mock import MagicMock, patch
 from synapse.core.pipeline import FrameResult
 from synapse.core.pipeline_handler import (Pipeline, PipelineLoader,
                                            PipelineSettings)
+from synapse.stypes import CameraID
 
 
 class DummyPipeline(Pipeline[PipelineSettings]):
     __is_enabled__ = True
 
-    def __init__(self, cameraIndex: int, settings: PipelineSettings):
+    def __init__(self, cameraIndex: CameraID, settings: PipelineSettings):
         super().__init__(cameraIndex, settings)
 
     def processFrame(self, img, timestamp: float) -> FrameResult:
