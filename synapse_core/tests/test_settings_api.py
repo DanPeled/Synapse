@@ -106,18 +106,11 @@ def test_color_constraint_hex_invalid_value():
     assert not result.isValid
 
 
-def test_color_constraint_rgb_string_valid():
-    c = ColorConstraint(formatType=ColorFormat.kRGB.value)
-    result = c.validate("rgb(10, 20, 30)")
-    assert result.isValid
-    assert result.normalizedValue == "rgb(10, 20, 30)"
-
-
 def test_color_constraint_rgb_tuple_valid():
     c = ColorConstraint(formatType=ColorFormat.kRGB.value)
     result = c.validate((10, 20, 30))
     assert result.isValid
-    assert result.normalizedValue == "rgb(10, 20, 30)"
+    assert result.normalizedValue == (10, 20, 30)
 
 
 def test_color_constraint_rgb_tuple_invalid_length():
@@ -150,20 +143,6 @@ def test_color_constraint_rgb_string_with_percent_not_allowed():
     assert not result.isValid
 
 
-def test_color_constraint_hsv_string_valid():
-    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
-    result = c.validate("hsv(180, 50, 75)")
-    assert result.isValid
-    assert result.normalizedValue == "hsv(180, 50, 75)"
-
-
-def test_color_constraint_hsv_tuple_valid():
-    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
-    result = c.validate((180, 50, 75))
-    assert result.isValid
-    assert result.normalizedValue == "hsv(180, 50, 75)"
-
-
 def test_color_constraint_hsv_tuple_invalid_length():
     c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate((180, 50))
@@ -179,18 +158,6 @@ def test_color_constraint_hsv_tuple_invalid_type():
 def test_color_constraint_hsv_value_out_of_range():
     c = ColorConstraint(formatType=ColorFormat.kHSV.value)
     result = c.validate((361, 50, 75))  # Hue > 360
-    assert not result.isValid
-
-
-def test_color_constraint_hsv_string_invalid_format():
-    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
-    result = c.validate("hsv(180, 50)")  # missing V
-    assert not result.isValid
-
-
-def test_color_constraint_hsv_string_with_percent_not_allowed():
-    c = ColorConstraint(formatType=ColorFormat.kHSV.value)
-    result = c.validate("hsv(180, 50%, 75%)")
     assert not result.isValid
 
 

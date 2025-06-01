@@ -14,9 +14,11 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
-from synapse.stypes import Frame
+from synapse.stypes import CameraID, Frame
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
+
+PropertMetaDict = Dict[str, Dict[str, Union[int, float]]]
 
 
 class CameraPropKeys(Enum):
@@ -51,8 +53,8 @@ class CameraSettingsKeys(Enum):
     kPipeline = "pipeline"
 
 
-def getCameraTableName(index: int) -> str:
-    return f"camera{index}"
+def getCameraTableName(cameraIndex: CameraID) -> str:
+    return f"camera{cameraIndex}"
 
 
 @dataclass
@@ -93,7 +95,7 @@ class CameraConfigKey(Enum):
 
 
 @cache
-def getCameraTable(cameraIndex: int) -> NetworkTable:
+def getCameraTable(cameraIndex: CameraID) -> NetworkTable:
     return (
         NetworkTableInstance.getDefault()
         .getTable(NtClient.NT_TABLE)
@@ -120,8 +122,8 @@ class SynapseCamera(ABC):
         name: str = "",
     ) -> "SynapseCamera": ...
 
-    def setIndex(self, cameraIndex: int) -> None:
-        self.cameraIndex: int = cameraIndex
+    def setIndex(self, cameraIndex: CameraID) -> None:
+        self.cameraIndex: CameraID = cameraIndex
 
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
@@ -143,6 +145,9 @@ class SynapseCamera(ABC):
 
     @abstractmethod
     def getResolution(self) -> Size: ...
+
+    @abstractmethod
+    def getPropertyMeta(self) -> Optional[PropertMetaDict]: ...
 
     @abstractmethod
     def getMaxFPS(self) -> float: ...
@@ -225,6 +230,9 @@ class OpenCvCamera(SynapseCamera):
 
         return inst
 
+    def getPropertyMeta(self) -> Optional[PropertMetaDict]:
+        return None
+
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
         return self.cap.read()
 
@@ -273,7 +281,7 @@ class CsCoreCamera(SynapseCamera):
         self.camera: VideoCamera
         self.frameBuffer: np.ndarray
         self.sink: CvSink
-        self.propertyMeta: Dict[str, Dict[str, Union[int, float]]] = {}
+        self.propertyMeta: PropertMetaDict = {}
         self._properties: Dict[str, Any] = {}
         self._videoModes: List[Any] = []
         self._validVideoModes: List[VideoMode] = []
@@ -330,6 +338,9 @@ class CsCoreCamera(SynapseCamera):
 
         return inst
 
+    def getPropertyMeta(self) -> Optional[PropertMetaDict]:
+        return self.propertyMeta
+
     def _startFrameThread(self) -> None:
         if self._running:
             return
@@ -338,6 +349,8 @@ class CsCoreCamera(SynapseCamera):
         self._thread.start()
 
     def _frameGrabberLoop(self) -> None:
+        while not self.isConnected():
+            time.sleep(0.1)
         while self._running:
             result = self.sink.grabFrame(self.frameBuffer)
             if len(result) > 0:
@@ -358,7 +371,8 @@ class CsCoreCamera(SynapseCamera):
             self._waitForNextFrame()
 
     def _waitForNextFrame(self):
-        time.sleep(1 / self.getMaxFPS() / 2)  # Half the expected frame interval
+        if self.isConnected():
+            time.sleep(1.0 / self.getMaxFPS() / 2.0)  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
         try:
@@ -429,7 +443,7 @@ class CameraFactory:
         cls,
         *_,
         cameraType: Type[SynapseCamera] = kDefault,
-        cameraIndex: int,
+        cameraIndex: CameraID,
         devPath: Optional[str] = None,
         usbIndex: Optional[int] = None,
         name: str = "",

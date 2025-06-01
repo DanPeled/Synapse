@@ -130,7 +130,6 @@ class Synapse:
 
         This method is responsible for running the pipeline after it has been initialized.
         """
-        self.pipeline_handler.loadPipelineSettings()
         self.pipeline_handler.run()
 
     @staticmethod
