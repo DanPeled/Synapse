@@ -2,8 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from synapse.core.pipeline_handler import \
-    PipelineHandler  # replace with actual import
+from synapse.core.pipeline_handler import PipelineHandler
 
 
 class TestPipelineHandler(unittest.TestCase):
