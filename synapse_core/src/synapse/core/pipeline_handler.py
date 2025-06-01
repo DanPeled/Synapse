@@ -49,7 +49,7 @@ class FPSView:
     position = (10, 30)
 
 
-def resolveGenericArgument(cls):
+def resolveGenericArgument(cls) -> Optional[Type]:
     orig_bases = getattr(cls, "__orig_bases__", ())
     for base in orig_bases:
         if typing.get_origin(base) is Pipeline:
@@ -60,7 +60,14 @@ def resolveGenericArgument(cls):
 
 
 class PipelineLoader:
+    """Loads, manages, and binds pipeline configurations and instances."""
+
     def __init__(self, pipelineDirectory: Path):
+        """Initializes the PipelineLoader with the specified directory.
+
+        Args:
+            pipelineDirectory (Path): Path to the directory containing pipeline files.
+        """
         self.pipelineTypeNames: Dict[PipelineID, PipelineName] = {}
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
         self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
@@ -69,25 +76,40 @@ class PipelineLoader:
         self.pipelineDirectory: Path = pipelineDirectory
 
     def setup(self, directory: Path):
+        """Initializes the pipeline system by loading pipeline classes and their settings.
+
+        Args:
+            directory (Path): The directory containing pipeline implementations.
+        """
         self.pipelineTypes = self.loadPipelines(directory)
         self.loadPipelineSettings()
 
     def loadPipelines(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
-        """
-        Loads all classes that extend Pipeline from Python files in the directory.
-        :return: A dictionary of Pipeline subclasses
-        """
+        """Loads all classes that extend Pipeline from Python files in the directory.
 
+        Args:
+            directory (Path): The root directory to search for pipeline implementations.
+
+        Returns:
+            Dict[PipelineName, Type[Pipeline]]: A dictionary mapping pipeline names to their types.
+        """
         ignoredFiles: Final[list] = ["setup.py"]
 
         def loadPipelineClasses(directory: Path):
+            """Helper function to load pipeline classes from files in a directory.
+
+            Args:
+                directory (Path): The directory to search.
+
+            Returns:
+                Dict[str, Type[Pipeline]]: Loaded pipeline classes found in the directory.
+            """
             pipelineClasses = {}
             for file_path in directory.rglob("*_pipeline.py"):
                 if file_path.name not in ignoredFiles:
-                    module_name = file_path.stem  # Get filename without extension
+                    module_name = file_path.stem
 
                     try:
-                        # Load module directly from file path
                         spec = importlib.util.spec_from_file_location(
                             module_name, str(file_path)
                         )
@@ -97,7 +119,6 @@ class PipelineLoader:
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
 
-                        # Look for Pipeline subclasses in the loaded module
                         for attr in dir(module):
                             cls = getattr(module, attr)
                             if (
@@ -120,6 +141,10 @@ class PipelineLoader:
         return pipelines
 
     def loadPipelineSettings(self) -> None:
+        """Loads the pipeline settings from the global configuration.
+
+        Populates default pipelines per camera and creates settings for each pipeline.
+        """
         settings: dict = Config.getInstance().getConfigMap()
         camera_configs = GlobalSettings.getCameraConfigMap()
 
@@ -151,27 +176,80 @@ class PipelineLoader:
         pipelineIndex: PipelineID,
         settings: PipelineSettingsMap,
     ) -> None:
+        """Creates and stores the settings object for a given pipeline.
+
+        Args:
+            pipelineType (Type[Pipeline]): The class type of the pipeline.
+            pipelineIndex (PipelineID): The index associated with this pipeline.
+            settings (PipelineSettingsMap): The settings dictionary for the pipeline.
+        """
         settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
         self.pipelineSettings[pipelineIndex] = settingsType(settings)
 
     def getDefaultPipeline(self, cameraIndex: CameraID) -> PipelineID:
+        """Returns the default pipeline index for a given camera.
+
+        Args:
+            cameraIndex (CameraID): The camera ID.
+
+        Returns:
+            PipelineID: The default pipeline index for the camera.
+        """
         return self.defaultPipelineIndexes.get(cameraIndex, 0)
 
     def getPipelineSettings(self, pipelineIndex: PipelineID) -> PipelineSettings:
+        """Returns the settings for a given pipeline.
+
+        Args:
+            pipelineIndex (PipelineID): The index of the pipeline.
+
+        Returns:
+            PipelineSettings: The settings object for the pipeline.
+        """
         return self.pipelineSettings[pipelineIndex]
 
-    def getPipeline(self, pipelineIndex: PipelineID) -> Pipeline:
-        return self.pipelineInstanceBindings[pipelineIndex]
+    def getPipeline(self, pipelineIndex: PipelineID) -> Optional[Pipeline]:
+        """Returns the pipeline instance bound to a given index, if any.
+
+        Args:
+            pipelineIndex (PipelineID): The pipeline index.
+
+        Returns:
+            Optional[Pipeline]: The pipeline instance, or None if not bound.
+        """
+        return self.pipelineInstanceBindings.get(pipelineIndex, None)
 
     def setPipelineInstance(
         self, pipelineIndex: PipelineID, pipeline: Pipeline
     ) -> None:
+        """Binds a pipeline instance to a given index.
+
+        Args:
+            pipelineIndex (PipelineID): The pipeline index.
+            pipeline (Pipeline): The pipeline instance to bind.
+        """
         self.pipelineInstanceBindings[pipelineIndex] = pipeline
 
     def getPipelineTypeByName(self, name: PipelineName) -> Type[Pipeline]:
+        """Returns the pipeline class type given its name.
+
+        Args:
+            name (PipelineName): The name of the pipeline.
+
+        Returns:
+            Type[Pipeline]: The class type of the pipeline.
+        """
         return self.pipelineTypes[name]
 
     def getPipelineTypeByIndex(self, index: PipelineID) -> Type[Pipeline]:
+        """Returns the pipeline class type given its index.
+
+        Args:
+            index (PipelineID): The pipeline index.
+
+        Returns:
+            Type[Pipeline]: The class type of the pipeline.
+        """
         return self.getPipelineTypeByName(self.pipelineTypeNames[index])
 
 
@@ -605,9 +683,10 @@ class PipelineHandler:
                 frame = self.fixtureFrame(cameraIndex, frame)
 
                 process_start = Timer.getFPGATimestamp()
-                pipeline = self.pipelineLoader.pipelineInstanceBindings.get(
-                    self.pipelineBindings[cameraIndex], None
+                pipeline = self.pipelineLoader.getPipeline(
+                    self.pipelineBindings[cameraIndex]
                 )
+
                 processed_frame: Frame = frame
 
                 if pipeline is not None:
