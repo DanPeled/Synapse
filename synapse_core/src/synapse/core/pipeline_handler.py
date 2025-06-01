@@ -368,9 +368,9 @@ class PipelineHandler:
         publisher_thread.start()
 
     def generateRecordingOutputs(
-        self, cameraIndecies: List[int]
-    ) -> Dict[int, cv2.VideoWriter]:
-        finalDict: Dict[int, cv2.VideoWriter] = {
+        self, cameraIndecies: List[CameraID]
+    ) -> Dict[CameraID, cv2.VideoWriter]:
+        finalDict: Dict[CameraID, cv2.VideoWriter] = {
             index: cv2.VideoWriter(
                 log.LOG_FILE + ".avi",
                 cv2.VideoWriter.fourcc("M", "J", "P", "G"),
@@ -614,7 +614,7 @@ class PipelineHandler:
         Also updates `self.streamSizes` with the resolved stream resolution for each camera.
 
         Returns:
-            dict[int, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
+            dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
             to their corresponding video output objects.
         """
 
