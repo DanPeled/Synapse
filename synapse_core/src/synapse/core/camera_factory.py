@@ -325,8 +325,6 @@ class CsCoreCamera(SynapseCamera):
             for name, prop in inst._properties.items()
         }
 
-        print(inst.propertyMeta)
-
         # Cache video modes and valid resolutions
         inst._videoModes = inst.camera.enumerateVideoModes()
         inst._validVideoModes = [mode for mode in inst._videoModes]

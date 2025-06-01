@@ -12,7 +12,7 @@ from cv2.typing import MatLike
 from synapse.core.pipeline import GlobalSettings, Pipeline
 from synapse.core.settings_api import (BooleanConstraint,
                                        ListOptionsConstraint, PipelineSettings,
-                                       RangeConstraint, Setting, settingField)
+                                       RangeConstraint, settingField)
 from synapse.stypes import Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
