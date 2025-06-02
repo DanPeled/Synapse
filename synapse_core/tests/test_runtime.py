@@ -2,12 +2,12 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from synapse.core import Synapse
-from synapse.core.pipeline_handler import PipelineHandler
+from synapse.core.runtime_handler import RuntimeManager
 
 
 def test_synapse_run_called_when_init_succeeds():
     root = Path(__file__).parent
-    handler = PipelineHandler(root)
+    handler = RuntimeManager(root)
     s = Synapse()
 
     s.init = MagicMock(return_value=True)
@@ -21,7 +21,7 @@ def test_synapse_run_called_when_init_succeeds():
 
 def test_synapse_run_not_called_when_init_fails():
     root = Path(__file__).parent
-    handler = PipelineHandler(root)
+    handler = RuntimeManager(root)
     s = Synapse()
 
     s.run = MagicMock()

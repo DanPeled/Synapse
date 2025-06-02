@@ -15,6 +15,7 @@ from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
 from synapse.stypes import CameraID, Frame
+from synapse.util import transform3dToList
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
 
@@ -81,6 +82,18 @@ class CameraConfig:
     distCoeff: List[float]
     measuredRes: Tuple[int, int]
     streamRes: Tuple[int, int]
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            CameraConfigKey.kName.value: self.name,
+            CameraConfigKey.kPath.value: self.path,
+            CameraConfigKey.kTransform.value: transform3dToList(self.transform),
+            CameraConfigKey.kDefaultPipeline.value: self.defaultPipeline,
+            CameraConfigKey.kMatrix.value: self.matrix,
+            CameraConfigKey.kDistCoeff.value: list(self.distCoeff),
+            CameraConfigKey.kMeasuredRes.value: list(self.measuredRes),
+            CameraConfigKey.kStreamRes.value: list(self.streamRes),
+        }
 
 
 class CameraConfigKey(Enum):

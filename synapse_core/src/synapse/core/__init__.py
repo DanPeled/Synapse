@@ -1,4 +1,4 @@
-from .pipeline_handler import PipelineHandler
+from .runtime_handler import RuntimeManager
 from .synapse import Synapse
 
-__all__ = ["Synapse", "PipelineHandler"]
+__all__ = ["Synapse", "RuntimeManager"]
