@@ -116,20 +116,17 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         )
 
         detectorConfig.numThreads = int(
-            self.settings.getSetting(ApriltagPipelineSettings.num_threads.key)
-            or ApriltagPipelineSettings.num_threads.defaultValue
+            self.settings.getSetting(ApriltagPipelineSettings.num_threads)
         )
         self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily(
-            self.settings.getSetting(ApriltagPipelineSettings.tag_family.key)
-            or ApriltagPipelineSettings.tag_family.defaultValue
+            self.settings.getSetting(ApriltagPipelineSettings.tag_family)
         )
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
                     tagSize=float(
-                        self.settings.getSetting(ApriltagPipelineSettings.tag_size.key)
-                        or ApriltagPipelineSettings.tag_size.defaultValue
+                        self.settings.getSetting(ApriltagPipelineSettings.tag_size)
                     ),
                     fx=self.cameraMatrix[0][0],
                     fy=self.cameraMatrix[1][1],
@@ -155,7 +152,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        tagSize = self.getSetting(ApriltagPipelineSettings.tag_size.key)
+        tagSize = self.getSetting(ApriltagPipelineSettings.tag_size)
 
         tags = self.apriltagDetector.detect(gray)
         results: List[ApriltagResult] = []
@@ -205,7 +202,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             )
 
             if (
-                self.getSetting(ApriltagPipelineSettings.fieldpose.key)
+                self.getSetting(ApriltagPipelineSettings.fieldpose)
                 and self.camera_transform
             ):
                 tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.getId())
@@ -248,8 +245,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
                 results,
                 getIgnoredDataByVerbosity(
                     ApriltagVerbosity.fromValue(
-                        self.getSetting(ApriltagPipelineSettings.verbosity.key)
-                        or ApriltagPipelineSettings.verbosity.defaultValue
+                        self.getSetting(ApriltagPipelineSettings.verbosity)
                     )
                 ),
             ),
@@ -322,8 +318,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         if camConfig:
             measured_res = camConfig.measuredRes
             current_res = [
-                self.getSetting(PipelineSettings.height.key),
-                self.getSetting(PipelineSettings.width.key),
+                self.getSetting(PipelineSettings.height),
+                self.getSetting(PipelineSettings.width),
             ]
 
             if measured_res != current_res:
