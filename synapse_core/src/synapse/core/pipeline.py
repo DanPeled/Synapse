@@ -28,14 +28,13 @@ class Pipeline(ABC, Generic[TSettingsType]):
     @abstractmethod
     def __init__(
         self,
-        cameraIndex: CameraID,
         settings: TSettingsType,
     ):
         self.settings = settings
-        self.cameraIndex = cameraIndex
+        self.cameraIndex = -1
 
-    def setup(self):
-        pass
+    def bind(self, cameraIndex: CameraID):
+        self.cameraIndex = cameraIndex
 
     @abstractmethod
     def processFrame(self, img, timestamp: float) -> FrameResult:
@@ -66,10 +65,7 @@ class Pipeline(ABC, Generic[TSettingsType]):
         self,
         key: str,
     ) -> Optional[Any]:
-        if self.nt_table is not None:
-            return self.nt_table.getSubTable("settings").getValue(key, None)
-        else:
-            return self.settings.getSetting(key)
+        return self.settings.getSetting(key)
 
     def setDataListener(
         self,
@@ -114,6 +110,9 @@ class Pipeline(ABC, Generic[TSettingsType]):
             builder.startListeners()
             self.builder_cache[key] = builder
         return self.builder_cache[key]
+
+    def toDict(self, type: str) -> dict:
+        return {"type": type, "settings": self.settings.toDict()}
 
 
 def disabled(cls):
@@ -227,6 +226,11 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             del cls.__settings.getMap()[key]
 
+    def toDict(self) -> dict:
+        if self.__settings is not None:
+            return {key: self.getSetting(key) for key in self.__settings.getMap()}
+        return {}
+
     def getMap(cls) -> PipelineSettingsMap:
         """
         Returns the global settings map.
@@ -235,7 +239,7 @@ class GlobalSettingsMeta(type):
             PipelineSettings.PipelineSettingsMap: The dictionary of global settings.
         """
         if cls.__settings is not None:
-            return cls.__settings.getMap()
+            return cls.__settings.toDict()
         return {}
 
     def __contains__(cls, key: str) -> bool:

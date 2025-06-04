@@ -2,25 +2,25 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from synapse.core.pipeline_handler import PipelineHandler
+from synapse.core.runtime_handler import RuntimeManager
 
 
-class TestPipelineHandler(unittest.TestCase):
+class TestRuntimeManager(unittest.TestCase):
     def setUp(self):
         self.mock_loader = MagicMock()
         self.mock_camera_handler = MagicMock()
 
         with (
             patch(
-                "synapse.core.pipeline_handler.PipelineLoader",
+                "synapse.core.runtime_handler.PipelineLoader",
                 return_value=self.mock_loader,
             ),
             patch(
-                "synapse.core.pipeline_handler.CameraHandler",
+                "synapse.core.runtime_handler.CameraHandler",
                 return_value=self.mock_camera_handler,
             ),
         ):
-            self.handler = PipelineHandler(directory=Path("."))
+            self.handler = RuntimeManager(directory=Path("."))
 
     def test_assign_default_pipelines(self):
         self.mock_camera_handler.cameras = {0: "Camera0", 1: "Camera1"}
@@ -38,7 +38,7 @@ class TestPipelineHandler(unittest.TestCase):
         self.mock_camera_handler.cameras = {0: "Camera0"}
         self.mock_loader.pipelineTypeNames = {1: "PipelineA"}
 
-        with patch("synapse.core.pipeline_handler.log.err") as mock_log:
+        with patch("synapse.core.runtime_handler.log.err") as mock_log:
             self.handler.setPipelineByIndex(cameraIndex=5, pipelineIndex=1)
             mock_log.assert_called_once()
 
@@ -48,7 +48,7 @@ class TestPipelineHandler(unittest.TestCase):
         self.handler.pipelineBindings = {0: 1}
         self.handler.setNTPipelineIndex = MagicMock()
 
-        with patch("synapse.core.pipeline_handler.log.err") as mock_log:
+        with patch("synapse.core.runtime_handler.log.err") as mock_log:
             self.handler.setPipelineByIndex(cameraIndex=0, pipelineIndex=99)
             mock_log.assert_called_once()
             self.handler.setNTPipelineIndex.assert_called_with(0, 1)
@@ -60,9 +60,7 @@ class TestPipelineHandler(unittest.TestCase):
         mock_event.data.topic.getType = type_prop
         mock_event.data.value = value
 
-        with patch(
-            "synapse.core.pipeline_handler.NetworkTableType.kBoolean", "Boolean"
-        ):
+        with patch("synapse.core.runtime_handler.NetworkTableType.kBoolean", "Boolean"):
             result = self.handler.getEventDataValue(mock_event)
             self.assertTrue(result)
 
@@ -70,7 +68,7 @@ class TestPipelineHandler(unittest.TestCase):
         mock_entry = MagicMock()
 
         with patch(
-            "synapse.core.pipeline_handler.NetworkTableInstance.getDefault"
+            "synapse.core.runtime_handler.NetworkTableInstance.getDefault"
         ) as mock_nt:
             mock_table = MagicMock()
             mock_nt.return_value.getTable.return_value = mock_table
@@ -96,6 +94,45 @@ class TestPipelineHandler(unittest.TestCase):
             assign_defaults.assert_called_once()
             setup_nt.assert_called_once()
             start_metrics.assert_called_once()
+
+    def test_to_dict_and_save(self):
+        # Setup fake camera config and pipeline binding
+        fake_config = MagicMock()
+        fake_config.toDict.return_value = {"mock": "camera_config"}
+        self.mock_loader.pipelineTypeNames = {"pipe1": "MockType"}
+        fake_pipeline = MagicMock()
+        fake_pipeline.toDict.return_value = {"mock": "pipeline_config"}
+
+        with patch(
+            "synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap"
+        ) as mock_camera_map:
+            mock_camera_map.return_value = {0: fake_config}
+            self.mock_loader.pipelineInstanceBindings = {"pipe1": fake_pipeline}
+
+            expected_dict = {
+                "global": {"camera_configs": {0: {"mock": "camera_config"}}},
+                "pipelines": {"pipe1": {"mock": "pipeline_config"}},
+            }
+
+            # Test toDict
+            result_dict = self.handler.toDict()
+            self.assertEqual(result_dict, expected_dict)
+
+            # Test save (write to a temp path)
+            with patch(
+                "builtins.open",
+                new_callable=unittest.mock.mock_open,  # pyright: ignore
+            ) as mock_open:
+                with patch("yaml.safe_dump") as mock_yaml_dump:
+                    self.handler.save()
+                    mock_yaml_dump.assert_called_once_with(
+                        expected_dict,
+                        default_flow_style=None,
+                        sort_keys=False,
+                        indent=2,
+                        width=80,
+                    )
+                    mock_open.assert_called_once()  # Ensure a file write was attempted
 
 
 if __name__ == "__main__":

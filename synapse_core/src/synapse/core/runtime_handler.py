@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import threading
 import time
 import traceback
@@ -16,6 +17,7 @@ import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType)
 from synapse.bcolors import bcolors
+from synapse.core.config import yaml
 from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
 from wpilib import Timer
@@ -80,6 +82,14 @@ class PipelineLoader:
         """
         self.pipelineTypes = self.loadPipelines(directory)
         self.loadPipelineSettings()
+        self.loadPipelineInstances()
+
+    def loadPipelineInstances(self):
+        for pipelineIndex, settings in self.pipelineSettings.items():
+            pipelineType = self.getPipelineTypeByIndex(pipelineIndex)
+            currPipeline = pipelineType(settings=settings)
+
+            self.setPipelineInstance(pipelineIndex, currPipeline)
 
     def loadPipelines(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
         """Loads all classes that extend Pipeline from Python files in the directory.
@@ -471,7 +481,7 @@ class CameraHandler:
         )
         return False
 
-    def setCameraConfigs(
+    def setCameraProps(
         self, settings: Dict[str, Any], camera: SynapseCamera
     ) -> Dict[str, Any]:
         """
@@ -512,7 +522,7 @@ class CameraHandler:
             camera.close()
 
 
-class PipelineHandler:
+class RuntimeManager:
     """
     Handles the loading, configuration, and runtime execution of vision pipelines
     across multiple camera devices. It interfaces with NetworkTables for dynamic
@@ -521,7 +531,7 @@ class PipelineHandler:
 
     def __init__(self, directory: Path):
         """
-        Initializes the PipelineHandler by preparing the loader and camera handler.
+        Initializes the RuntimeManager by preparing the loader and camera handler.
 
         Args:
             directory (Path): Root directory containing pipeline definitions.
@@ -650,7 +660,6 @@ class PipelineHandler:
     def __setupPipelineForCamera(
         self,
         cameraIndex: CameraID,
-        pipelineType: Type[Pipeline],
         pipeline_config: PipelineSettings,
     ):
         """
@@ -666,20 +675,18 @@ class PipelineHandler:
         """
 
         # Create instances for each pipeline only when setting them
-        settings = self.pipelineLoader.getPipelineSettings(
+        currPipeline = self.pipelineLoader.getPipeline(
             self.pipelineBindings[cameraIndex]
         )
 
-        currPipeline = pipelineType(settings=settings, cameraIndex=cameraIndex)
-
-        self.pipelineLoader.setPipelineInstance(
-            self.pipelineBindings[cameraIndex], currPipeline
-        )
+        if not currPipeline:
+            log.err(f"No pipeline with index: {self.pipelineBindings[cameraIndex]}")
+            return
 
         cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
         camera: Optional[SynapseCamera] = self.cameraHandler.getCamera(cameraIndex)
         if camera is not None:
-            self.cameraHandler.setCameraConfigs(
+            self.cameraHandler.setCameraProps(
                 {
                     key: pipeline_config.getSetting(key)
                     for key in pipeline_config.getMap().keys()
@@ -690,7 +697,7 @@ class PipelineHandler:
         if cameraTable is not None:
             setattr(currPipeline, "nt_table", cameraTable)
             setattr(currPipeline, "builder_cache", {})
-            currPipeline.setup()
+            currPipeline.bind(cameraIndex)
             pipeline_config.sendSettings(
                 cameraTable.getSubTable(NTKeys.kSettings.value)
             )
@@ -800,7 +807,6 @@ class PipelineHandler:
 
         self.__setupPipelineForCamera(
             cameraIndex=cameraIndex,
-            pipelineType=self.pipelineLoader.getPipelineTypeByIndex(pipelineIndex),
             pipeline_config=settings,
         )
 
@@ -1015,6 +1021,32 @@ class PipelineHandler:
         # frame = self.fixBlackLevelOffset(settings, frame)
 
         return frame
+
+    def toDict(self) -> dict:
+        return {
+            "global": {
+                "camera_configs": {
+                    index: config.toDict()
+                    for index, config in GlobalSettings.getCameraConfigMap().items()
+                }
+            },
+            "pipelines": {
+                key: pipeline.toDict(self.pipelineLoader.pipelineTypeNames[key])
+                for key, pipeline in self.pipelineLoader.pipelineInstanceBindings.items()
+            },
+        }
+
+    def save(self) -> None:
+        y = yaml.safe_dump(
+            self.toDict(),
+            default_flow_style=None,  # use block style by default
+            sort_keys=False,  # preserve key order
+            indent=2,  # control indentation
+            width=80,  # wrap width for long lists
+        )
+
+        with open(Path(os.getcwd()) / "config" / "settings.yml", "w") as f:
+            f.write(y)
 
     def cleanup(self) -> None:
         """

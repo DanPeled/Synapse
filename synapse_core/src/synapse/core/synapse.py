@@ -8,7 +8,7 @@ from synapse.log import err, log
 from synapse_net import NtClient
 
 from .pipeline import GlobalSettings
-from .pipeline_handler import PipelineHandler
+from .runtime_handler import RuntimeManager
 
 
 class Synapse:
@@ -16,21 +16,21 @@ class Synapse:
     handles the initialization and running of the Synapse runtime, including network setup and loading global settings.
 
         Attributes:
-            pipeline_handler (PipelineHandler): The handler responsible for managing the pipelines' lifecycles.
+            runtime_handler (RuntimeManager): The handler responsible for managing the pipelines' lifecycles.
             settings_dict (dict): A dictionary containing the configuration settings loaded from the `settings.yml` file.
             nt_client (NtClient): The instance of NtClient used to manage the NetworkTables connection.
     """
 
     def init(
         self,
-        pipeline_handler: PipelineHandler,
+        runtime_handler: RuntimeManager,
         config_path: Path,
     ) -> bool:
         """
         Initializes the Synapse pipeline by loading configuration settings and setting up NetworkTables and global settings.
 
         Args:
-            pipeline_handler (PipelineHandler): The handler responsible for managing the pipeline's lifecycle.
+            runtime_handler (RuntimeManager): The handler responsible for managing the pipeline's lifecycle.
             config_path (str, optional): The path to the configuration file. Defaults to "./config/settings.yml".
 
         Returns:
@@ -47,7 +47,7 @@ class Synapse:
             + bcolors.ENDC
         )
 
-        self.pipeline_handler = pipeline_handler
+        self.runtime_handler = runtime_handler
 
         if config_path.exists():
             try:
@@ -71,7 +71,7 @@ class Synapse:
 
                 nt_good = self.__init_networktables(config.network)
                 if nt_good:
-                    self.pipeline_handler.setup(Path(os.getcwd()))
+                    self.runtime_handler.setup(Path(os.getcwd()))
                 else:
                     err(
                         f"Something went wrong while setting up networktables with params: {config.network}"
@@ -130,11 +130,11 @@ class Synapse:
 
         This method is responsible for running the pipeline after it has been initialized.
         """
-        self.pipeline_handler.run()
+        self.runtime_handler.run()
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:
-        handler = PipelineHandler(root)
+        handler = RuntimeManager(root)
         s = Synapse()
         if s.init(handler, root / "config" / "settings.yml"):
             s.run()

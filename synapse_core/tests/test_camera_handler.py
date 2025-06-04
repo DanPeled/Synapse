@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from synapse.core.pipeline_handler import \
+from synapse.core.runtime_handler import \
     CameraHandler  # adjust import if needed
 
 
@@ -9,13 +9,13 @@ class TestCameraHandler(unittest.TestCase):
     def setUp(self):
         self.handler = CameraHandler()
 
-    @patch("synapse.core.pipeline_handler.GlobalSettings.getCameraConfigMap")
+    @patch("synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap")
     def test_createCameras_adds_cameras(self, mock_getCameraConfigMap):
         mock_getCameraConfigMap.return_value = {
             0: MagicMock(path="/dev/video0", name="TestCam")
         }
 
-        with patch("synapse.core.pipeline_handler.CameraFactory.create") as mock_create:
+        with patch("synapse.core.runtime_handler.CameraFactory.create") as mock_create:
             mock_camera = MagicMock()
             mock_camera.isConnected.return_value = True
             mock_create.return_value = mock_camera
@@ -23,8 +23,8 @@ class TestCameraHandler(unittest.TestCase):
             self.handler.createCameras()
             self.assertIn(0, self.handler.cameras)
 
-    @patch("synapse.core.pipeline_handler.GlobalSettings.getCameraConfig")
-    @patch("synapse.core.pipeline_handler.cs.CameraServer.putVideo")
+    @patch("synapse.core.runtime_handler.GlobalSettings.getCameraConfig")
+    @patch("synapse.core.runtime_handler.cs.CameraServer.putVideo")
     def test_getCameraOutputs_with_config(self, mock_putVideo, mock_getCameraConfig):
         mock_getCameraConfig.return_value = MagicMock(streamRes=(640, 480))
         self.handler.cameras = {0: MagicMock()}
@@ -44,7 +44,7 @@ class TestCameraHandler(unittest.TestCase):
         self.handler.cameras[2] = mock_camera
         self.assertEqual(self.handler.getCamera(2), mock_camera)
 
-    @patch("synapse.core.pipeline_handler.cv2.VideoWriter")
+    @patch("synapse.core.runtime_handler.cv2.VideoWriter")
     def test_generateRecordingOutputs_valid(self, mock_writer):
         camera_mock = MagicMock()
         camera_mock.getResolution.return_value = (320, 240)
@@ -66,7 +66,7 @@ class TestCameraHandler(unittest.TestCase):
         self.handler.outputs[0] = MagicMock()
         self.handler.recordingOutputs[0] = MagicMock()
 
-        with patch("synapse.core.pipeline_handler.cv2.resize", return_value=frame):
+        with patch("synapse.core.runtime_handler.cv2.resize", return_value=frame):
             self.handler.publishFrame(frame, camera)
             self.handler.outputs[0].putFrame.assert_called_with(frame)
             self.handler.recordingOutputs[0].write.assert_called_with(frame)

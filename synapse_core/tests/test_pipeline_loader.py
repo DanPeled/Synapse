@@ -3,16 +3,15 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from synapse.core.pipeline import FrameResult
-from synapse.core.pipeline_handler import (Pipeline, PipelineLoader,
-                                           PipelineSettings)
-from synapse.stypes import CameraID
+from synapse.core.runtime_handler import (Pipeline, PipelineLoader,
+                                          PipelineSettings)
 
 
 class DummyPipeline(Pipeline[PipelineSettings]):
     __is_enabled__ = True
 
-    def __init__(self, cameraIndex: CameraID, settings: PipelineSettings):
-        super().__init__(cameraIndex, settings)
+    def __init__(self, settings: PipelineSettings):
+        super().__init__(settings)
 
     def processFrame(self, img, timestamp: float) -> FrameResult:
         pass
@@ -28,8 +27,8 @@ class TestPipelineLoader(unittest.TestCase):
         self.pipeline_dir = Path("/fake/path")
         self.loader = PipelineLoader(self.pipeline_dir)
 
-    @patch("synapse.core.pipeline_handler.importlib.util.spec_from_file_location")
-    @patch("synapse.core.pipeline_handler.importlib.util.module_from_spec")
+    @patch("synapse.core.runtime_handler.importlib.util.spec_from_file_location")
+    @patch("synapse.core.runtime_handler.importlib.util.module_from_spec")
     def test_load_pipelines_loads_enabled_classes(
         self, mock_module_from_spec, mock_spec_from_file_location
     ):
@@ -45,7 +44,7 @@ class TestPipelineLoader(unittest.TestCase):
             mod, "DummyPipeline", DummyPipeline
         )
 
-        with patch("synapse.core.pipeline_handler.Path.rglob") as mock_rglob:
+        with patch("synapse.core.runtime_handler.Path.rglob") as mock_rglob:
             mock_rglob.return_value = [Path("dummy_pipeline.py")]
 
             pipelines = self.loader.loadPipelines(Path("."))
@@ -53,8 +52,8 @@ class TestPipelineLoader(unittest.TestCase):
         self.assertIn("DummyPipeline", pipelines)
         self.assertEqual(pipelines["DummyPipeline"], DummyPipeline)
 
-    @patch("synapse.core.pipeline_handler.Config.getInstance")
-    @patch("synapse.core.pipeline_handler.GlobalSettings.getCameraConfigMap")
+    @patch("synapse.core.runtime_handler.Config.getInstance")
+    @patch("synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap")
     def test_load_pipeline_settings(self, mock_camera_config_map, mock_config_instance):
         self.loader.pipelineTypes = {"DummyPipeline": DummyPipeline}
 
@@ -67,7 +66,7 @@ class TestPipelineLoader(unittest.TestCase):
         mock_config_instance.return_value = mock_config
 
         with patch(
-            "synapse.core.pipeline_handler.resolveGenericArgument",
+            "synapse.core.runtime_handler.resolveGenericArgument",
             return_value=DummySettings,
         ):
             self.loader.loadPipelineSettings()
@@ -77,7 +76,7 @@ class TestPipelineLoader(unittest.TestCase):
         self.assertIsInstance(self.loader.pipelineSettings[0], DummySettings)
 
     def test_set_and_get_pipeline_instance(self):
-        dummy_pipeline = DummyPipeline(0, PipelineSettings())
+        dummy_pipeline = DummyPipeline(PipelineSettings())
         self.loader.setPipelineInstance(1, dummy_pipeline)
 
         self.assertEqual(self.loader.getPipeline(1), dummy_pipeline)

@@ -84,6 +84,7 @@ class ApriltagPipelineSettings(PipelineSettings):
         ListOptionsConstraint(options=[ver.value for ver in ApriltagVerbosity]),
         default=ApriltagVerbosity.kPoseOnly,
     )
+    num_threads = settingField(RangeConstraint(minValue=1, maxValue=6), default=1)
 
 
 class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
@@ -96,14 +97,17 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
 
-    def __init__(self, settings: ApriltagPipelineSettings, cameraIndex: CameraID):
-        super().__init__(cameraIndex, settings)
+    def __init__(self, settings: ApriltagPipelineSettings):
+        super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
-        self.camera_matrix: np.ndarray = np.array(
-            self.getCameraMatrix(cameraIndex), dtype=np.float32
+        ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
+
+    def bind(self, cameraIndex: CameraID):
+        self.cameraMatrix: List[List[float]] = (
+            self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
         )
 
-        self.distCoeffs = np.array(self.getDistCoeffs(cameraIndex), dtype=np.float32)
+        self.distCoeffs = self.getDistCoeffs(cameraIndex)
         self.camera_transform = self.getCameraTransform(cameraIndex)
         self.apriltagDetector: apriltag.AprilTagDetector = apriltag.AprilTagDetector()
 
@@ -111,35 +115,35 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             apriltag.AprilTagDetector.Config()
         )
 
-        detectorConfig.numThreads = int(settings.getSetting("num_threads") or 1)
+        detectorConfig.numThreads = int(
+            self.settings.getSetting(ApriltagPipelineSettings.num_threads.key)
+            or ApriltagPipelineSettings.num_threads.defaultValue
+        )
         self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily(
-            settings.getSetting(ApriltagPipelineSettings.tag_family.key)
+            self.settings.getSetting(ApriltagPipelineSettings.tag_family.key)
             or ApriltagPipelineSettings.tag_family.defaultValue
         )
-
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
                     tagSize=float(
-                        settings.getSetting(ApriltagPipelineSettings.tag_size.key)
+                        self.settings.getSetting(ApriltagPipelineSettings.tag_size.key)
                         or ApriltagPipelineSettings.tag_size.defaultValue
                     ),
-                    fx=self.camera_matrix[0][0],
-                    fy=self.camera_matrix[1][1],
-                    cx=self.camera_matrix[0][2],
-                    cy=self.camera_matrix[1][2],
+                    fx=self.cameraMatrix[0][0],
+                    fy=self.cameraMatrix[1][1],
+                    cx=self.cameraMatrix[0][2],
+                    cy=self.cameraMatrix[1][2],
                 )
             )
         )
 
-        self.distCoeffs: np.ndarray = np.array(
-            self.getDistCoeffs(cameraIndex), dtype=np.float32
-        )
+        self.distCoeffs = self.getDistCoeffs(cameraIndex)
+
         self.camera_transform: Optional[Transform3d] = self.getCameraTransform(
             cameraIndex
         )
-        ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
     @lru_cache(maxsize=100)
     def estimateTagPose(
@@ -277,14 +281,14 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         if tagSize is not None and tagSize > 0:
             # self.drawPoseBox(
             #     img,
-            #     self.camera_matrix,
+            #     self.cameraMatrix,
             #     self.distCoeffs,
             #     tagTransform,
             #     tagSize,
             # )
             # self.drawPoseAxes(
             #     img,
-            #     self.camera_matrix,
+            #     self.cameraMatrix,
             #     self.distCoeffs,
             #     tagTransform,
             #     np.array([tag.getCenter().x, tag.getCenter().y]),
@@ -317,26 +321,28 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if camConfig:
             measured_res = camConfig.measuredRes
-            current_res = [self.getSetting("width"), self.getSetting("height")]
+            current_res = [
+                self.getSetting(PipelineSettings.height.key),
+                self.getSetting(PipelineSettings.width.key),
+            ]
 
-            if current_res[0] and current_res[1]:
-                if measured_res != current_res:
-                    scale_x = current_res[0] / measured_res[0]
-                    scale_y = current_res[1] / measured_res[1]
+            if measured_res != current_res:
+                scale_x = current_res[0] / measured_res[0]  # pyright: ignore
+                scale_y = current_res[1] / measured_res[1]  # pyright: ignore
 
-                    matrix = camConfig.matrix
+                matrix = camConfig.matrix
 
-                    scaled_matrix = [
-                        [matrix[0][0] * scale_x, matrix[0][1], matrix[0][2] * scale_x],
-                        [matrix[1][0], matrix[1][1] * scale_y, matrix[1][2] * scale_y],
-                        [matrix[2][0], matrix[2][1], matrix[2][2]],
-                    ]
+                scaled_matrix = [
+                    [matrix[0][0] * scale_x, matrix[0][1], matrix[0][2] * scale_x],
+                    [matrix[1][0], matrix[1][1] * scale_y, matrix[1][2] * scale_y],
+                    [matrix[2][0], matrix[2][1], matrix[2][2]],
+                ]
 
-                    return scaled_matrix
+                return scaled_matrix
 
-                return camConfig.matrix
-
-        log.err("No camera matrix found, invalid results for AprilTag detection")
+            return camConfig.matrix
+        else:
+            log.err("No camera matrix found, invalid results for AprilTag detection")
         return None
 
     def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
