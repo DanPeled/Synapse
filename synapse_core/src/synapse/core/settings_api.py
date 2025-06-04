@@ -2,7 +2,8 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import (Any, Dict, Generic, List, Optional, Type, TypeVar, Union,
+                    overload)
 
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse.bcolors import bcolors
@@ -530,20 +531,41 @@ class Setting(Generic[TConstraintType]):
 
 
 class SettingsAPI:
-    """Main settings API for managing settings with constraints"""
+    """Main settings API for managing settings with constraints.
+
+    This class provides methods to register new settings, validate
+    and assign values to them, and serialize the current configuration.
+    """
 
     def __init__(self):
+        """Initializes the SettingsAPI with empty settings and values dictionaries."""
         self.settings: Dict[str, Setting] = {}
         self.values: Dict[str, Any] = {}
 
     def addSetting(self, setting: Setting):
-        """Add a new setting"""
+        """Adds a new setting to the API.
+
+        If a default value is specified and no value is already set,
+        the default is used.
+
+        Args:
+            setting (Setting): The setting to add.
+        """
         self.settings[setting.key] = setting
         if setting.key not in self.values:
             self.values[setting.key] = setting.defaultValue
 
     def setValue(self, key: str, value: Any) -> ValidationResult:
-        """Set a setting value with validation"""
+        """Sets the value of a setting with validation.
+
+        Args:
+            key (str): The key of the setting to update.
+            value (Any): The value to assign to the setting.
+
+        Returns:
+            ValidationResult: The result of the validation process, including
+            whether the value is valid and the normalized value if applicable.
+        """
         if key not in self.settings:
             return ValidationResult(False, f"Setting '{key}' does not exist")
 
@@ -554,11 +576,22 @@ class SettingsAPI:
         return result
 
     def getValue(self, key: str) -> Any:
-        """Get a setting value"""
+        """Retrieves the current value of a setting.
+
+        Args:
+            key (str): The key of the setting to retrieve.
+
+        Returns:
+            Any: The current value assigned to the setting, or None if not set.
+        """
         return self.values.get(key)
 
     def serialize(self) -> str:
-        """Serialize the entire settings configuration to JSON"""
+        """Serializes all settings and their current values to a JSON string.
+
+        Returns:
+            str: A JSON-formatted string representing the settings and values.
+        """
         settings_data = {
             "settings": {
                 key: setting.toDict() for key, setting in self.settings.items()
@@ -568,7 +601,13 @@ class SettingsAPI:
         return json.dumps(settings_data, indent=2)
 
     def getSettingsSchema(self) -> Dict[str, Any]:
-        """Get the schema of all settings (useful for UI generation)"""
+        """Retrieves the schema of all registered settings.
+
+        Useful for generating user interfaces or validation tools.
+
+        Returns:
+            Dict[str, Any]: A dictionary mapping setting keys to their schema representations.
+        """
         return {key: setting.toDict() for key, setting in self.settings.items()}
 
 
@@ -711,11 +750,13 @@ class PipelineSettings:
         for key, value in self._settingsApi.values.items():
             PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
 
-    def __getitem__(self, key: str) -> Optional[PipelineSettingsMapValue]:
+    def __getitem__(
+        self, key: Union[str, Setting]
+    ) -> Optional[PipelineSettingsMapValue]:
         """Access a setting's value using dictionary-style indexing."""
         return self.getSetting(key)
 
-    def __setitem__(self, key: str, value: PipelineSettingsMapValue):
+    def __setitem__(self, key: Union[str, Setting], value: PipelineSettingsMapValue):
         """Set a setting's value using dictionary-style indexing."""
         self.setSetting(key, value)
 
@@ -727,8 +768,9 @@ class PipelineSettings:
         """Return a string representation of the settings dictionary."""
         return str(self.__settings)
 
-    def __contains__(self, key: Any) -> bool:
+    def __contains__(self, setting: Union[str, Setting]) -> bool:
         """Check if a key is in the settings."""
+        key = setting if isinstance(setting, str) else setting.key
         return key in self.__settings.keys()
 
     def getMap(self) -> Dict[str, Setting]:
@@ -794,35 +836,43 @@ class PipelineSettings:
                     self._settingsApi.addSetting(attrValue)
                     self._fieldNames.append(attrName)
 
-    def getSetting(self, name: str) -> Optional[Any]:
+    @overload
+    def getSetting(self, setting: str) -> Optional[Any]: ...
+
+    @overload
+    def getSetting(self, setting: Setting) -> Any: ...
+
+    def getSetting(self, setting: Union[str, Setting]) -> Optional[Any]:
         """
-        Retrieve the value of a setting by name.
+        Retrieve a setting's value by key or Setting instance.
 
         Args:
-            name (str): The setting key.
+            setting (Union[str, Setting]): Key or Setting.
 
         Returns:
-            Optional[Any]: The setting value, or None if not found.
+            Optional[Any]: Value if found, otherwise None or default.
         """
-        if name in self._settingsApi.settings.keys():
-            return self._settingsApi.getValue(name)
-        err(f"'{self.__class__.__name__}' object has no setting '{name}'")
-        return None
+        key = setting if isinstance(setting, str) else setting.key
+        if key in self._settingsApi.settings.keys():
+            return self._settingsApi.getValue(key)
+        err(f"'{self.__class__.__name__}' object has no setting '{key}'")
+        return None if isinstance(setting, str) else setting.defaultValue
 
-    def setSetting(self, name: str, value: Any) -> None:
+    def setSetting(self, setting: Union[Setting, str], value: Any) -> None:
         """
-        Set the value of a setting with validation.
+        Set a setting’s value with validation.
 
         Args:
-            name (str): The setting key.
-            value (Any): The new value.
+            setting (Union[str, Setting]): Setting key or object.
+            value (Any): Value to assign.
         """
-        if name in self._settingsApi.settings.keys():
-            result = self._settingsApi.setValue(name, value)
+        key = setting if isinstance(setting, str) else setting.key
+        if key in self._settingsApi.settings.keys():
+            result = self._settingsApi.setValue(key, value)
             if not result.isValid:
-                err(f"Invalid value for {name}: {result.errorMessage}")
+                err(f"Invalid value for {setting}: {result.errorMessage}")
         else:
-            err(f"'{self.__class__.__name__}' object has no setting '{name}'")
+            err(f"'{self.__class__.__name__}' object has no setting '{setting}'")
 
     def validate(self, **kwargs) -> Dict[str, ValidationResult]:
         """
