@@ -32,10 +32,6 @@ setup(
         "numpy==1.23.3",
         "pytest",
         "build",
-        # macOS-only: provides AVFoundation
-        "pyobjc-framework-AVFoundation; sys_platform == 'darwin'",
-        # Windows-only: provides pythoncom and win32com.client
-        "pywin32; sys_platform == 'win32'",
     ],
     include_package_data=True,
 )
