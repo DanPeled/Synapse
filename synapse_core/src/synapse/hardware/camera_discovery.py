@@ -1,7 +1,6 @@
 import platform
-
+import synapse.log as log
 import cv2
-from synapse.core.camera_factory import time
 
 
 def list_cameras():
@@ -55,7 +54,7 @@ def list_linux_cameras():
 
 # ---- macOS: list cameras via AVFoundation ----
 def list_macos_cameras():
-    import AVFoundation
+    import AVFoundation  # pyright: ignore
 
     devices = AVFoundation.AVCaptureDevice.devicesWithMediaType_("vide")
     if not devices:
@@ -76,49 +75,46 @@ def test_camera_open(device):
     return ret
 
 
-# ---- Main: detect + test ----
-def main():
-    start = time.time()
+def detect():
     system = platform.system()
-    print(f"Platform: {system}\n")
+    log.log(f"Platform: {system}\n")
 
     cameras = list_cameras()
     if not cameras:
-        print("No cameras found.")
-        return
+        log.log("No cameras found.")
+        return []
 
-    print("Detected cameras:")
+    log.log("Detected cameras:")
+    working_cameras = []
 
     if system == "Linux":
-        # cameras are (device_path, name)
         for device_path, name in cameras:
-            print(f" - {device_path}: {name}")
-        print("\nTesting cameras with OpenCV:")
+            log.log(f" - {device_path}: {name}")
+        log.log("\nTesting cameras with OpenCV:")
         for device_path, name in cameras:
             result = test_camera_open(device_path)
-            print(f" {device_path}: {'✅ works' if result else '❌ failed'}")
+            log.log(f" {device_path}: {'✅ works' if result else '❌ failed'}")
+            if result:
+                working_cameras.append((device_path, name))
 
     elif system == "Windows":
-        # cameras are names only, OpenCV needs indices - try indices 0..9
         for i, name in enumerate(cameras):
-            print(f" - Index {i}: {name}")
-        print("\nTesting cameras with OpenCV by index:")
+            log.log(f" - Index {i}: {name}")
+        log.log("\nTesting cameras with OpenCV by index:")
         for i in range(min(10, len(cameras))):
             result = test_camera_open(i)
-            print(f" Index {i}: {'✅ works' if result else '❌ failed'}")
+            log.log(f" Index {i}: {'✅ works' if result else '❌ failed'}")
+            if result:
+                working_cameras.append((i, cameras[i]))
 
     elif system == "Darwin":
-        # cameras are names only, OpenCV needs indices - try indices 0..9
         for i, name in enumerate(cameras):
-            print(f" - Index {i}: {name}")
-        print("\nTesting cameras with OpenCV by index:")
+            log.log(f" - Index {i}: {name}")
+        log.log("\nTesting cameras with OpenCV by index:")
         for i in range(min(10, len(cameras))):
             result = test_camera_open(i)
-            print(f" Index {i}: {'✅ works' if result else '❌ failed'}")
+            log.log(f" Index {i}: {'✅ works' if result else '❌ failed'}")
+            if result:
+                working_cameras.append((i, cameras[i]))
 
-    end_time = time.time()
-    print(end_time - start)
-
-
-if __name__ == "__main__":
-    main()
+    return working_cameras
