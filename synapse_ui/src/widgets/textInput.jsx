@@ -1,0 +1,114 @@
+import React, { useState, useEffect } from "react";
+import { styled } from "styled-components";
+import { lighten, darken } from "polished";
+import { getDivColor } from "../services/style";
+
+// Styled Components
+const Container = styled.div`
+  position: relative;
+  width: ${(props) => props.$width || "95%"};
+  opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
+  pointer-events: ${(props) => (props.$disabled ? "none" : "auto")};
+`;
+
+const InputWrapper = styled.div`
+  background-color: ${darken(0.05, getDivColor())};
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #eee;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 600;
+  user-select: none;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+`;
+
+const Label = styled.label`
+  min-width: 80px;
+  font-size: 18px;
+  color: white;
+`;
+
+const StyledInput = styled.input`
+  flex-grow: 1;
+  background-color: ${darken(0.15, getDivColor())};
+  color: ${(props) => (props.$invalid ? "#ff6b6b" : "#eee")};
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: ${(props) => (props.disabled ? "not-allowed" : "text")};
+
+  &:focus {
+    outline: 2px solid ${lighten(0.15, getDivColor())};
+    background-color: ${darken(0.2, getDivColor())};
+  }
+`;
+
+const ErrorText = styled.span`
+  color: #ff6b6b;
+  font-size: 14px;
+  position: absolute;
+  bottom: -18px;
+  left: 14px;
+`;
+
+// Component
+export default function TextInput({
+  label = "Input",
+  initialValue = "",
+  onChange = (_) => { },
+  placeholder = "",
+  pattern = ".*",
+  errorMessage = "Invalid input",
+  allowedChars = null,
+  width,
+  disabled = false,
+}) {
+  const [value, setValue] = useState(initialValue);
+  const [invalid, setInvalid] = useState(false);
+
+  function handleChange(e) {
+    let val = e.target.value;
+
+    if (allowedChars) {
+      const regex = new RegExp(allowedChars);
+      val = [...val].filter((ch) => regex.test(ch)).join("");
+    }
+
+    setValue(val);
+
+    const patternRegex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
+    const isInvalid = val !== "" && !patternRegex.test(val);
+    setInvalid(isInvalid);
+
+    if (!isInvalid) {
+      onChange(val);
+    }
+  }
+
+  useEffect(() => {
+    const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
+    setInvalid(value !== "" && !regex.test(value));
+  }, [value, pattern]);
+
+  return (
+    <Container $width={width} $disabled={disabled}>
+      <InputWrapper>
+        <Label>{label}</Label>
+        <StyledInput
+          type="text"
+          value={value}
+          onChange={handleChange}
+          placeholder={placeholder}
+          $invalid={invalid}
+          disabled={disabled}
+        />
+      </InputWrapper>
+      {invalid && <ErrorText>{errorMessage}</ErrorText>}
+    </Container>
+  );
+}

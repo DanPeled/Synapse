@@ -8,8 +8,6 @@ on:
       - 'synapse_core/**'
       - 'synapse_net/**'
   pull_request:
-    branches:
-      - main
     paths:
       - 'synapse_core/**'
       - 'synapse_net/**'

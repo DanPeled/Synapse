@@ -1,0 +1,64 @@
+.sidebar {
+  width: 60px;
+  background-color: #202225;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  height: 100vh;
+}
+
+/* For nav icons: keep margin */
+a.icon-wrapper-nav {
+  position: relative;
+  color: #b9bbbe;
+  cursor: pointer;
+}
+
+a.icon-wrapper-nav:hover {
+  color: white;
+  text-color: white;
+}
+
+/* Tooltip styles unchanged */
+.tooltip {
+  position: absolute;
+  left: 70px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #111;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  user-select: none;
+  z-index: 999;
+}
+
+.icon-wrapper-nav:hover .tooltip {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.network-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* spacing between the two icons */
+  margin-top: auto; /* push the whole group to bottom */
+  margin-bottom: 30px;
+  align-items: center;
+}
+
+.network-icon-wrapper,
+.backend-icon-wrapper {
+  color: #b9bbbe;
+  pointer: normal;
+}
+
+.icon-wrapper-nav {
+  position: relative;
+  color: #b9bbbe;
+}
