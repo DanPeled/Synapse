@@ -13,13 +13,13 @@ export function Row({ children, style = {}, fitMaxWidth = false, ...props }) {
   // If fitMaxWidth is true, clone children to add flex: 1 style
   const childrenWithFlex = fitMaxWidth
     ? React.Children.map(children, (child) => {
-      if (React.isValidElement(child)) {
-        // Merge child's existing style with flex: 1
-        const childStyle = { ...(child.props.style || {}), flex: 1 };
-        return React.cloneElement(child, { style: childStyle });
-      }
-      return child;
-    })
+        if (React.isValidElement(child)) {
+          // Merge child's existing style with flex: 1
+          const childStyle = { ...(child.props.style || {}), flex: 1 };
+          return React.cloneElement(child, { style: childStyle });
+        }
+        return child;
+      })
     : children;
 
   return (

@@ -58,4 +58,3 @@ export const styles = {
     // remove width
   },
 };
-

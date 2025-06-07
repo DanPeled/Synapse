@@ -122,7 +122,14 @@ const ValueInput = styled.input`
   -moz-appearance: textfield;
 `;
 
-function Slider({ min = 0, max = 100, step = 1, initial = 50, label = "Value", labelGap = "0px" }) {
+function Slider({
+  min = 0,
+  max = 100,
+  step = 1,
+  initial = 50,
+  label = "Value",
+  labelGap = "0px",
+}) {
   const [value, setValue] = useState(initial);
   const valuePercent = ((value - min) / (max - min)) * 100;
 

@@ -89,7 +89,8 @@ const DropdownArrow = styled.span`
   transition: transform 0.3s ease;
   transform-origin: center;
   /* animate only rotate, apply translateY separately */
-  transform: translateY(-50%) rotate(${(props) => (props.$open ? "180deg" : "0deg")});
+  transform: translateY(-50%)
+    rotate(${(props) => (props.$open ? "180deg" : "0deg")});
 `;
 
 // Component

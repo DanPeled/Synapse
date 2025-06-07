@@ -60,7 +60,7 @@ const ErrorText = styled.span`
 export default function TextInput({
   label = "Input",
   initialValue = "",
-  onChange = (_) => { },
+  onChange = (_) => {},
   placeholder = "",
   pattern = ".*",
   errorMessage = "Invalid input",
@@ -81,7 +81,8 @@ export default function TextInput({
 
     setValue(val);
 
-    const patternRegex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
+    const patternRegex =
+      pattern instanceof RegExp ? pattern : new RegExp(pattern);
     const isInvalid = val !== "" && !patternRegex.test(val);
     setInvalid(isInvalid);
 

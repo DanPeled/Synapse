@@ -9,12 +9,14 @@ import AddPipelineDialog from "../../widgets/pipeline/addPipelineDialog";
 import TabView from "../../widgets/tabview";
 import Slider from "../../widgets/slider";
 
-function StreamAndPipelineControls({ }) {
+function StreamAndPipelineControls({}) {
   const [showAddPipelineDialog, setShowAddPipelineDialog] = useState(false);
-  const [pipelines, setPipelines] = useState(Array.of(
-    { label: "Apriltag Pipeline", value: "ApriltagPipeline" },
-    { label: "Colored Shape", value: "ColorPipeline" },
-  ));
+  const [pipelines, setPipelines] = useState(
+    Array.of(
+      { label: "Apriltag Pipeline", value: "ApriltagPipeline" },
+      { label: "Colored Shape", value: "ColorPipeline" },
+    ),
+  );
   const [currentPipeline, setCurrentPipeline] = useState(null);
 
   useEffect(() => {
@@ -28,7 +30,6 @@ function StreamAndPipelineControls({ }) {
     { label: "Another Placeholder", value: "ColorPipeline" },
   ];
 
-
   const dropdownWidth = "80%";
   return (
     <div style={{ ...styles.placeholderCard, height: 200, gap: 10 }}>
@@ -41,9 +42,14 @@ function StreamAndPipelineControls({ }) {
         width={dropdownWidth}
       />
       <Row>
-        <Dropdown label="Pipeline" options={pipelines} width={dropdownWidth} onChange={(val) => {
-          setCurrentPipeline(val);
-        }} />
+        <Dropdown
+          label="Pipeline"
+          options={pipelines}
+          width={dropdownWidth}
+          onChange={(val) => {
+            setCurrentPipeline(val);
+          }}
+        />
         <div style={{ display: "flex", alignItems: "center" }}>
           <IconMenu
             options={[
@@ -54,15 +60,17 @@ function StreamAndPipelineControls({ }) {
               },
               {
                 icon: <Plus />,
-                onClick: () => { setShowAddPipelineDialog(true); },
+                onClick: () => {
+                  setShowAddPipelineDialog(true);
+                },
                 tooltip: "Add Pipeline",
               },
               {
                 icon: <Trash color="red" />,
                 onClick: () => {
                   setPipelines(
-                    pipelines.filter((val) => val.value !== currentPipeline)
-                  )
+                    pipelines.filter((val) => val.value !== currentPipeline),
+                  );
                 },
                 tooltip: "Delete",
               },
@@ -70,9 +78,12 @@ function StreamAndPipelineControls({ }) {
                 icon: <Copy />,
                 onClick: () => {
                   setPipelines([
-                    ...pipelines, { label: `Copy of ${currentPipeline}`, value: `Copy of ${currentPipeline}` }
-                  ]
-                  )
+                    ...pipelines,
+                    {
+                      label: `Copy of ${currentPipeline}`,
+                      value: `Copy of ${currentPipeline}`,
+                    },
+                  ]);
                 },
                 tooltip: "Duplicate",
               },
@@ -85,17 +96,21 @@ function StreamAndPipelineControls({ }) {
         options={pipelineTypes}
         width={dropdownWidth}
       />
-      {showAddPipelineDialog && <AddPipelineDialog visible={showAddPipelineDialog} setVisible={setShowAddPipelineDialog}
-        addPipelines={(val) => {
-          setPipelines([...pipelines, val]);
-        }}
-        style={{ width: "80%", height: "80%" }}
-      />}
+      {showAddPipelineDialog && (
+        <AddPipelineDialog
+          visible={showAddPipelineDialog}
+          setVisible={setShowAddPipelineDialog}
+          addPipelines={(val) => {
+            setPipelines([...pipelines, val]);
+          }}
+          style={{ width: "80%", height: "80%" }}
+        />
+      )}
     </div>
   );
 }
 
-function CameraView({ }) {
+function CameraView({}) {
   return (
     <div
       style={{
@@ -147,45 +162,67 @@ function CameraView({ }) {
   );
 }
 
-function PipelineConfigControl({ }) {
-  return <TabView
-    width="97%"
-    tabs={[
-      {
-        key: 0, label: "Input", content:
-          <div>
-            <Slider label="Brightness" labelGap="100px" />
-            <Slider label="Exposure" labelGap="100px" />
-            <Slider label="Camera Gain" labelGap="100px" />
-            <Slider label="Saturation" labelGap="100px" />
-            <Dropdown options={[
-              { label: "Normal", value: 0 }, { label: "90deg CW", value: 90 }, { label: "180deg", value: 180 }, { label: "90deg CCW", value: 270 }
-            ]} label="Orientation" />
-            <div style={{ height: 10 }}></div>
-            <Dropdown options={[
-              { label: "1920x1080 @ 100FPS", value: 0 }, { label: "1080x720 @ 100FPS", value: 90 }, { label: "640x480 @ 100FPS", value: 180 }
-            ]} label="Resolution" />
-            <div style={{ height: 30 }}></div>
-          </div>
-      },
-      { key: 1, label: "Pipeline", content: <div>Pipeline Settings</div> },
-      { key: 2, label: "Output", content: <div>Output</div> },
-    ]}
-  />
+function PipelineConfigControl({}) {
+  return (
+    <TabView
+      width="97%"
+      tabs={[
+        {
+          key: 0,
+          label: "Input",
+          content: (
+            <div>
+              <Slider label="Brightness" labelGap="100px" />
+              <Slider label="Exposure" labelGap="100px" />
+              <Slider label="Camera Gain" labelGap="100px" />
+              <Slider label="Saturation" labelGap="100px" />
+              <Dropdown
+                options={[
+                  { label: "Normal", value: 0 },
+                  { label: "90deg CW", value: 90 },
+                  { label: "180deg", value: 180 },
+                  { label: "90deg CCW", value: 270 },
+                ]}
+                label="Orientation"
+              />
+              <div style={{ height: 10 }}></div>
+              <Dropdown
+                options={[
+                  { label: "1920x1080 @ 100FPS", value: 0 },
+                  { label: "1080x720 @ 100FPS", value: 90 },
+                  { label: "640x480 @ 100FPS", value: 180 },
+                ]}
+                label="Resolution"
+              />
+              <div style={{ height: 30 }}></div>
+            </div>
+          ),
+        },
+        { key: 1, label: "Pipeline", content: <div>Pipeline Settings</div> },
+        { key: 2, label: "Output", content: <div>Output</div> },
+      ]}
+    />
+  );
 }
 
-function ResultsView({ }) {
-  return <div style={{ ...styles.placeholderCard, height: "630px", padding: "10px" }}>
-    <h3 style={{ textAlign: "center" }}>Results</h3>
-    <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
-  </div>
+function ResultsView({}) {
+  return (
+    <div
+      style={{ ...styles.placeholderCard, height: "630px", padding: "10px" }}
+    >
+      <h3 style={{ textAlign: "center" }}>Results</h3>
+      <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
+    </div>
+  );
 }
 
 export default function Dashboard() {
   return (
     <Row style={{ gap: "0px" }}>
       <Column style={{ flex: 3, gap: "8px" }}>
-        <div style={{ width: "158%" }}> {/*Only god knows why this works */}
+        <div style={{ width: "158%" }}>
+          {" "}
+          {/*Only god knows why this works */}
           <CameraView />
         </div>
         <div style={{ width: "98.5%" }}>

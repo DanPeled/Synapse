@@ -6,7 +6,11 @@ import { Column, Row } from "../containers";
 import Dropdown from "../dropdown";
 import TextInput from "../textInput";
 
-export default function AddPipelineDialog({ visible, setVisible, addPipelines: addPipeline }) {
+export default function AddPipelineDialog({
+  visible,
+  setVisible,
+  addPipelines: addPipeline,
+}) {
   const [pipelineName, setPipelineName] = useState("New Pipeline");
   const [pipelineIndex, setPipelineIndex] = useState(-1); // TODO
   const pipelineTypes = [
@@ -54,7 +58,9 @@ export default function AddPipelineDialog({ visible, setVisible, addPipelines: a
       style={{ width: "40%", height: "30%", transform: "translate(0%, -20%)" }}
     >
       <Column>
-        <h2 style={{ textAlign: "center", userSelect: "none" }}>Add A New Pipeline (ID: #{pipelineIndex})</h2>
+        <h2 style={{ textAlign: "center", userSelect: "none" }}>
+          Add A New Pipeline (ID: #{pipelineIndex})
+        </h2>
         <TextInput
           label="Pipeline Name"
           onChange={(val) => setPipelineName(val)}
@@ -67,7 +73,9 @@ export default function AddPipelineDialog({ visible, setVisible, addPipelines: a
             onClick={() => setVisible(false)}
             style={{ minWidth: 100 }}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
               <Ban /> Cancel
             </span>
           </Button>
@@ -81,7 +89,9 @@ export default function AddPipelineDialog({ visible, setVisible, addPipelines: a
             }}
             style={{ minWidth: 100 }}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
               <SquarePlus /> Create
             </span>
           </Button>

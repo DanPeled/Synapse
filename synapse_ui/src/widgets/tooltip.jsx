@@ -28,7 +28,8 @@ const TooltipWrapper = styled.div`
     margin-left: -6px;
     border-width: 6px;
     border-style: solid;
-    border-color: ${darken(0.2, getDivColor())} transparent transparent transparent;
+    border-color: ${darken(0.2, getDivColor())} transparent transparent
+      transparent;
   }
 
   &.visible {

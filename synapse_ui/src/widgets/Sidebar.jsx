@@ -32,8 +32,8 @@ NavigationIcon.propTypes = {
   key: PropTypes.string,
   icon: PropTypes.element,
   label: PropTypes.string,
-  url: PropTypes.string
-}
+  url: PropTypes.string,
+};
 
 export default function Sidebar() {
   return (

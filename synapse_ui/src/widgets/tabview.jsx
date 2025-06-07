@@ -23,9 +23,7 @@ const TabHeader = styled.div`
 
 const TabButton = styled.button`
   background-color: ${(props) =>
-    props.active
-      ? darken(0.15, getDivColor())
-      : darken(0.10, getDivColor())};
+    props.active ? darken(0.15, getDivColor()) : darken(0.1, getDivColor())};
   color: #eee;
   padding: 10px 12px;
   border: none;
@@ -37,9 +35,7 @@ const TabButton = styled.button`
 
   &:hover {
     background-color: ${(props) =>
-    props.active
-      ? darken(0.18, getDivColor())
-      : darken(0.2, getDivColor())};
+      props.active ? darken(0.18, getDivColor()) : darken(0.2, getDivColor())};
   }
 
   &:focus {

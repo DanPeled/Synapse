@@ -3,7 +3,7 @@ import React from "react";
 export default function ToggleButton({
   label = "Toggle",
   value = false,
-  onToggle = () => { },
+  onToggle = () => {},
   disabled = false,
   labelGap = 12, // New configurable gap
 }) {

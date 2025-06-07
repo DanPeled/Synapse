@@ -1,5 +1,11 @@
 import { React, useState } from "react";
-import { iconColor, styles, iconSize, getDivColor, setDivColor } from "../../services/style";
+import {
+  iconColor,
+  styles,
+  iconSize,
+  getDivColor,
+  setDivColor,
+} from "../../services/style";
 import {
   ChartColumnBig,
   Computer,
@@ -20,7 +26,7 @@ import { Column, Row } from "../../widgets/containers";
 import { Button, DangerButton } from "../../widgets/button";
 import AlertDialog from "../../widgets/alert";
 import ToggleButton from "../../widgets/toggle";
-import Dropdown from "../../widgets/dropdown.jsx"
+import Dropdown from "../../widgets/dropdown.jsx";
 
 const teamNumberRegex = "\\d+(\\.\\d+)?";
 const ipAddressRegex = "((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)(\\.(?!$)|$)){4}";
@@ -48,7 +54,7 @@ function Stats() {
         ...styles.card,
         ...settingsStyles.statsCard,
         height: 420,
-        width: "100%"
+        width: "100%",
       }}
     >
       <h2
@@ -130,7 +136,7 @@ function NetworkSettings({
         ...styles.placeholderCard,
         height: "500px",
         gap: "10px",
-        flex: 1,        // add this instead so it fills parent's flex space
+        flex: 1, // add this instead so it fills parent's flex space
       }}
     >
       <h2
@@ -144,7 +150,11 @@ function NetworkSettings({
         Network Settings
       </h2>
       <TextInput
-        label={<p>Team Number / <br /> NetworkTables Server Address</p>}
+        label={
+          <p>
+            Team Number / <br /> NetworkTables Server Address
+          </p>
+        }
         pattern={teamNumberOrIPRegex}
         errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
         onChange={(val) => {
@@ -159,12 +169,17 @@ function NetworkSettings({
           {
             label: IPMode.dhcp,
             value: IPMode.dhcp,
-            tooltip: <p style={{ textAlign: "center" }}>Router will automatically assign an IP address <br /> that changes across reboots</p>
+            tooltip: (
+              <p style={{ textAlign: "center" }}>
+                Router will automatically assign an IP address <br /> that
+                changes across reboots
+              </p>
+            ),
           },
           {
             label: IPMode.static,
             value: IPMode.static,
-            tooltip: "User-picked IP address that doesn't change"
+            tooltip: "User-picked IP address that doesn't change",
           },
         ]}
         onChange={(val) => {
@@ -173,34 +188,43 @@ function NetworkSettings({
         value={ipMode}
         disabled={!manageDeviceNetworking}
       />
-      {
-        ipMode === IPMode.static && (
-          <TextInput
-            label="Static IP Address"
-            pattern={ipAddressRegex}
-            errorMessage="Invalid IPv4 Address"
-            onChange={(val) => {
-              setStaticIPAddr(val);
-            }}
-            disabled={!manageDeviceNetworking}
-          />
-        )
-      }
-      <TextInput label="Hostname" pattern="^\S+$" onChange={setHostname} disabled={!manageDeviceNetworking} />
+      {ipMode === IPMode.static && (
+        <TextInput
+          label="Static IP Address"
+          pattern={ipAddressRegex}
+          errorMessage="Invalid IPv4 Address"
+          onChange={(val) => {
+            setStaticIPAddr(val);
+          }}
+          disabled={!manageDeviceNetworking}
+        />
+      )}
+      <TextInput
+        label="Hostname"
+        pattern="^\S+$"
+        onChange={setHostname}
+        disabled={!manageDeviceNetworking}
+      />
       <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
       <h2>Advanced Networking</h2>
-      <ToggleButton label="Manage Device Networking" labelGap={"30%"} value={manageDeviceNetworking} onToggle={(val) => setManageDeviceNetworking(val)} />
+      <ToggleButton
+        label="Manage Device Networking"
+        labelGap={"30%"}
+        value={manageDeviceNetworking}
+        onToggle={(val) => setManageDeviceNetworking(val)}
+      />
       <Dropdown
         label="NetworkManager Interface"
-        tooltip={"Name of the interface Synapse should manage the IP address of"}
+        tooltip={
+          "Name of the interface Synapse should manage the IP address of"
+        }
         options={[
           {
             label: "eth0",
             value: "eth0",
           },
         ]}
-        onChange={(val) => {
-        }}
+        onChange={(val) => {}}
         disabled={!manageDeviceNetworking}
       />
       <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
@@ -212,7 +236,7 @@ function NetworkSettings({
       >
         Save
       </Button>
-    </Column >
+    </Column>
   );
 }
 
@@ -330,7 +354,9 @@ export default function Settings() {
   return (
     <Row style={{ gap: "0px" }}>
       <Column style={{ flex: 3, gap: "8px" }}>
-        <div style={{ width: "190%" }}> {/*Only god knows why this works */}
+        <div style={{ width: "190%" }}>
+          {" "}
+          {/*Only god knows why this works */}
           <Stats />
         </div>
         <div style={{ width: "190%" }}>

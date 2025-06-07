@@ -41,7 +41,7 @@ export default function IconMenu({ icon = <Menu />, options = [] }) {
       const rect = iconRef.current.getBoundingClientRect();
       setMenuPosition({
         top: rect.bottom + window.scrollY - 15,
-        right: window.innerWidth - (rect.right) + 20,
+        right: window.innerWidth - rect.right + 20,
       });
     }
   }, [renderMenu]);

@@ -6,7 +6,7 @@ export default function OptionSelector({
   labelTooltip = "", // tooltip text for the label
   options = [], // Array of { label, value, tooltip? }
   value,
-  onChange = () => { },
+  onChange = () => {},
   disabled = false,
 }) {
   const [hoveredOption, setHoveredOption] = useState(null);
