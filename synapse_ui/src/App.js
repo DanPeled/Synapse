@@ -68,6 +68,7 @@ function App() {
             backgroundColor: "black",
             color: "white",
             overflowY: "auto",
+            overflowX: "hidden",
           }}
         >
           {view === "#/dashboard" && <Dashboard />}

@@ -160,58 +160,60 @@ function NetworkSettings({
         onChange={(val) => {
           setNetworkTablesAddr(val);
         }}
-        disabled={!manageDeviceNetworking}
       />
       <div style={{ height: "12px" }}></div>
-      <OptionSelector
-        label="IP Assignment Mode"
-        options={[
-          {
-            label: IPMode.dhcp,
-            value: IPMode.dhcp,
-            tooltip: (
-              <p style={{ textAlign: "center" }}>
-                Router will automatically assign an IP address <br /> that
-                changes across reboots
-              </p>
-            ),
-          },
-          {
-            label: IPMode.static,
-            value: IPMode.static,
-            tooltip: "User-picked IP address that doesn't change",
-          },
-        ]}
-        onChange={(val) => {
-          setIPMode(val);
-        }}
-        value={ipMode}
-        disabled={!manageDeviceNetworking}
-      />
-      {ipMode === IPMode.static && (
-        <TextInput
-          label="Static IP Address"
-          pattern={ipAddressRegex}
-          errorMessage="Invalid IPv4 Address"
-          onChange={(val) => {
-            setStaticIPAddr(val);
-          }}
-          disabled={!manageDeviceNetworking}
-        />
-      )}
-      <TextInput
-        label="Hostname"
-        pattern="^\S+$"
-        onChange={setHostname}
-        disabled={!manageDeviceNetworking}
-      />
-      <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
-      <h2>Advanced Networking</h2>
       <ToggleButton
         label="Manage Device Networking"
         labelGap={"30%"}
         value={manageDeviceNetworking}
         onToggle={(val) => setManageDeviceNetworking(val)}
+      />
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "0px" }}>
+        <TextInput
+          label={
+            ipMode === IPMode.static ? "Static IP (CIDR)" : "Current IP (DHCP)"
+          }
+          placeholder="placeholder/24"
+          pattern={ipAddressRegex}
+          errorMessage="Invalid IPv4 Address"
+          onChange={(val) => {
+            if (ipMode === IPMode.static) setStaticIPAddr(val);
+          }}
+          disabled={ipMode === IPMode.dhcp || !manageDeviceNetworking}
+          style={{ flex: 1 }}
+        />
+        <OptionSelector
+          gap={0}
+          label=""
+          options={[
+            {
+              label: IPMode.dhcp,
+              value: IPMode.dhcp,
+              tooltip: (
+                <p style={{ textAlign: "center" }}>
+                  Router will automatically assign an IP address <br /> that
+                  changes across reboots
+                </p>
+              ),
+            },
+            {
+              label: IPMode.static,
+              value: IPMode.static,
+              tooltip: "User-picked IP address that doesn't change",
+            },
+          ]}
+          onChange={(val) => {
+            setIPMode(val);
+          }}
+          value={ipMode}
+          disabled={!manageDeviceNetworking}
+        />
+      </div>
+      <TextInput
+        label="Hostname"
+        pattern="^\S+$"
+        onChange={setHostname}
+        disabled={!manageDeviceNetworking}
       />
       <Dropdown
         label="NetworkManager Interface"

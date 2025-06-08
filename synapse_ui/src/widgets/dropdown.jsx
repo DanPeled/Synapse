@@ -24,25 +24,32 @@ const DropdownWrapper = styled.div`
 const Label = styled.label`
   min-width: 80px;
   font-size: 18px;
-  color: white;
+  color: ${(props) => (props.disabled ? "white" : "white")};
+  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `;
 
 const DropdownButton = styled.button`
   flex-grow: 1;
   width: 100%;
-  background-color: ${darken(0.15, getDivColor())};
+  background-color: ${(props) =>
+    props.disabled ? darken(0.05, getDivColor()) : darken(0.15, getDivColor())};
   color: #eee;
   padding: 8px 12px;
   border: none;
   border-radius: 8px;
   text-align: left;
   font-size: 18px;
-  cursor: pointer;
+  cursor: ${(props) => (props.disabled ? "not-allowed" : "pointer")};
   position: relative;
+  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 
   &:focus {
-    outline: 2px solid ${lighten(0.15, getDivColor())};
-    background-color: ${darken(0.2, getDivColor())};
+    outline: ${(props) =>
+      props.disabled ? "none" : `2px solid ${lighten(0.15, getDivColor())}`};
+    background-color: ${(props) =>
+      props.disabled
+        ? darken(0.05, getDivColor())
+        : darken(0.2, getDivColor())};
   }
 `;
 
@@ -88,14 +95,20 @@ const DropdownArrow = styled.span`
   pointer-events: none;
   transition: transform 0.3s ease;
   transform-origin: center;
-  /* animate only rotate, apply translateY separately */
   transform: translateY(-50%)
     rotate(${(props) => (props.$open ? "180deg" : "0deg")});
 `;
 
 // Component
 
-function Dropdown({ options, label = "Select", onChange, width, tooltip }) {
+function Dropdown({
+  options,
+  label = "Select",
+  onChange,
+  width,
+  tooltip,
+  disabled = false,
+}) {
   const [selected, setSelected] = useState(
     options.length > 0 ? (options[0].value ?? options[0]) : "",
   );
@@ -112,6 +125,13 @@ function Dropdown({ options, label = "Select", onChange, width, tooltip }) {
       if (onChange) onChange(value);
     }
   };
+
+  // Close dropdown if disabled while open
+  useEffect(() => {
+    if (disabled && open) {
+      setOpen(false);
+    }
+  }, [disabled, open]);
 
   // Detect clicks outside the dropdown
   useEffect(() => {
@@ -136,19 +156,15 @@ function Dropdown({ options, label = "Select", onChange, width, tooltip }) {
       let top, bottom;
 
       if (spaceBelow >= dropdownMaxHeight + 8) {
-        // Enough space below, dropdown goes below button
         top = rect.bottom + window.scrollY + 8 + "px"; // 8px gap
         bottom = "auto";
       } else if (spaceAbove >= dropdownMaxHeight + 8) {
-        // Enough space above, dropdown goes above button
         top = "auto";
         bottom = window.innerHeight - rect.top + window.scrollY + 8 + "px"; // 8px gap
       } else if (spaceBelow >= spaceAbove) {
-        // Not enough space either way, but more below
         top = rect.bottom + window.scrollY + 8 + "px";
         bottom = "auto";
       } else {
-        // Not enough space either way, more space above
         top = "auto";
         bottom = window.innerHeight - rect.top + window.scrollY + 8 + "px";
       }
@@ -169,45 +185,48 @@ function Dropdown({ options, label = "Select", onChange, width, tooltip }) {
 
   return (
     <DropdownWrapper $width={width} ref={wrapperRef}>
-      <Label>{label}</Label>
+      <Label disabled={disabled}>{label}</Label>
       <div style={{ position: "relative", flexGrow: 1 }}>
         <DropdownButton
           ref={buttonRef}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            if (!disabled) setOpen((o) => !o);
+          }}
           aria-haspopup="listbox"
           aria-expanded={open}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
+          onMouseEnter={() => !disabled && setHovered(true)}
+          onMouseLeave={() => !disabled && setHovered(false)}
+          disabled={disabled}
         >
           {selectedLabel}
-          <DropdownArrow open={open}>▾</DropdownArrow>
+          <DropdownArrow $open={open}>▾</DropdownArrow>
           {tooltip && <Tooltip visible={hovered}>{tooltip}</Tooltip>}
         </DropdownButton>
-        {open &&
-          ReactDOM.createPortal(
-            <DropdownList
-              role="listbox"
-              style={dropdownStyles}
-              onMouseDown={(e) => e.stopPropagation()} // prevent losing focus on click
-            >
-              {options.map((opt, i) => {
-                const val = opt.value ?? opt;
-                const lbl = opt.label ?? opt;
-                return (
-                  <DropdownItem
-                    key={i}
-                    onClick={() => handleSelect(val)}
-                    role="option"
-                    aria-selected={val === selected}
-                  >
-                    {lbl}
-                  </DropdownItem>
-                );
-              })}
-            </DropdownList>,
-            document.body,
-          )}
       </div>
+      {open &&
+        ReactDOM.createPortal(
+          <DropdownList
+            role="listbox"
+            style={dropdownStyles}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {options.map((opt, i) => {
+              const val = opt.value ?? opt;
+              const lbl = opt.label ?? opt;
+              return (
+                <DropdownItem
+                  key={i}
+                  onClick={() => handleSelect(val)}
+                  role="option"
+                  aria-selected={val === selected}
+                >
+                  {lbl}
+                </DropdownItem>
+              );
+            })}
+          </DropdownList>,
+          document.body,
+        )}
     </DropdownWrapper>
   );
 }

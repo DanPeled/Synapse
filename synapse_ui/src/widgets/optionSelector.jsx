@@ -1,23 +1,60 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Tooltip from "./tooltip";
 
 export default function OptionSelector({
-  label = "Choose an option",
-  labelTooltip = "", // tooltip text for the label
-  options = [], // Array of { label, value, tooltip? }
+  label = "IP Mode",
+  labelTooltip = "",
+  options = [],
   value,
   onChange = () => {},
   disabled = false,
 }) {
   const [hoveredOption, setHoveredOption] = useState(null);
   const [labelHovered, setLabelHovered] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({
+    top: 0,
+    left: 0,
+    visible: false,
+  });
+
+  const buttonRefs = useRef({});
+  const tooltipRef = useRef(null);
+
+  useEffect(() => {
+    if (!hoveredOption || !tooltipRef.current) {
+      setTooltipPos((pos) => ({ ...pos, visible: false }));
+      return;
+    }
+
+    const button = buttonRefs.current[hoveredOption];
+    const tooltip = tooltipRef.current;
+    if (!button) return;
+
+    const btnRect = button.getBoundingClientRect();
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+
+    const fitsBelow = window.innerHeight > btnRect.bottom + tooltipHeight + 8;
+    const fitsRight = window.innerWidth > btnRect.right + tooltipWidth + 8;
+
+    const top = fitsBelow
+      ? btnRect.bottom + 4
+      : btnRect.top - tooltipHeight - 4;
+    const left = fitsBelow ? btnRect.left : btnRect.right + 4;
+
+    setTooltipPos({
+      top: Math.max(0, top),
+      left: Math.max(0, left),
+      visible: true,
+    });
+  }, [hoveredOption]);
 
   return (
     <div
       style={{
         marginBottom: 12,
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: "center",
         opacity: disabled ? 0.5 : 1,
         pointerEvents: disabled ? "none" : "auto",
         userSelect: disabled ? "none" : "auto",
@@ -48,19 +85,21 @@ export default function OptionSelector({
         )}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          marginLeft: 300,
-          position: "relative",
-        }}
-      >
+      <div style={{ display: "flex", gap: 8 }}>
         {options.map((opt) => {
           const isSelected = value === opt.value;
           return (
-            <div key={opt.value} style={{ position: "relative" }}>
+            <div
+              key={opt.value}
+              style={{ position: "relative" }}
+              ref={(el) => (buttonRefs.current[opt.value] = el)}
+              onMouseEnter={() => {
+                if (!disabled) setHoveredOption(opt.value);
+              }}
+              onMouseLeave={() => {
+                if (!disabled) setHoveredOption(null);
+              }}
+            >
               <button
                 onClick={() => onChange(opt.value)}
                 disabled={disabled}
@@ -75,22 +114,37 @@ export default function OptionSelector({
                   fontSize: 16,
                   userSelect: "none",
                 }}
-                onMouseEnter={() => {
-                  if (!disabled) setHoveredOption(opt.value);
-                }}
-                onMouseLeave={() => {
-                  if (!disabled) setHoveredOption(null);
-                }}
               >
                 {opt.label}
               </button>
-              {opt.tooltip && hoveredOption === opt.value && (
-                <Tooltip visible={true}>{opt.tooltip}</Tooltip>
-              )}
             </div>
           );
         })}
       </div>
+
+      {tooltipPos.visible &&
+        hoveredOption &&
+        options.find((o) => o.value === hoveredOption)?.tooltip && (
+          <Tooltip
+            ref={tooltipRef}
+            visible={true}
+            style={{
+              position: "fixed",
+              top: tooltipPos.top,
+              left: tooltipPos.left,
+              zIndex: 1000,
+              whiteSpace: "nowrap",
+              backgroundColor: "rgba(0,0,0,0.85)",
+              color: "white",
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontSize: 14,
+              maxWidth: 300,
+            }}
+          >
+            {options.find((o) => o.value === hoveredOption)?.tooltip}
+          </Tooltip>
+        )}
     </div>
   );
 }
