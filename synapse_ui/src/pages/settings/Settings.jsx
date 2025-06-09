@@ -137,6 +137,7 @@ function NetworkSettings({
         height: "500px",
         gap: "10px",
         flex: 1, // add this instead so it fills parent's flex space
+        padding: "10px 10px",
       }}
     >
       <h2
@@ -168,20 +169,33 @@ function NetworkSettings({
         value={manageDeviceNetworking}
         onToggle={(val) => setManageDeviceNetworking(val)}
       />
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "0px" }}>
-        <TextInput
-          label={
-            ipMode === IPMode.static ? "Static IP (CIDR)" : "Current IP (DHCP)"
-          }
-          placeholder="placeholder/24"
-          pattern={ipAddressRegex}
-          errorMessage="Invalid IPv4 Address"
-          onChange={(val) => {
-            if (ipMode === IPMode.static) setStaticIPAddr(val);
-          }}
-          disabled={ipMode === IPMode.dhcp || !manageDeviceNetworking}
-          style={{ flex: 1 }}
-        />
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
+        <Row style={{ width: "600px", flexDirection: "row" }}>
+          <TextInput
+            label={ipMode == IPMode.static ? "Static IP" : "Current IP (DHCP)"}
+            placeholder="192.168.1.10"
+            pattern={ipAddressRegex}
+            errorMessage="Invalid IPv4 Address"
+            onChange={(val) => {
+              setStaticIPAddr(val);
+            }}
+            disabled={!manageDeviceNetworking || ipMode == IPMode.dhcp}
+            width="500px"
+          />
+          {ipMode == IPMode.static && (
+            <TextInput
+              label="/"
+              placeholder="24"
+              errorMessage="Invalid CIDR"
+              onChange={(val) => {
+                return val;
+              }}
+              disabled={!manageDeviceNetworking || ipMode == IPMode.dhcp}
+              style={{ width: "4rem" }}
+              width="100px"
+            />
+          )}
+        </Row>
         <OptionSelector
           gap={0}
           label=""
@@ -202,9 +216,7 @@ function NetworkSettings({
               tooltip: "User-picked IP address that doesn't change",
             },
           ]}
-          onChange={(val) => {
-            setIPMode(val);
-          }}
+          onChange={(val) => setIPMode(val)}
           value={ipMode}
           disabled={!manageDeviceNetworking}
         />

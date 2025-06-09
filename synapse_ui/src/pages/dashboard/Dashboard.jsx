@@ -32,7 +32,14 @@ function StreamAndPipelineControls({}) {
 
   const dropdownWidth = "80%";
   return (
-    <div style={{ ...styles.placeholderCard, height: 200, gap: 10 }}>
+    <div
+      style={{
+        ...styles.placeholderCard,
+        height: 200,
+        gap: 10,
+        paddingLeft: "50px",
+      }}
+    >
       <Dropdown
         label="Camera"
         options={[

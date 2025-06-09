@@ -5,13 +5,19 @@ import { getDivColor } from "../services/style";
 
 // Styled Components
 const Container = styled.div`
-  position: relative;
+  box-sizing: border-box;
   width: ${(props) => props.$width || "95%"};
+  max-width: 100%;
   opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
   pointer-events: ${(props) => (props.$disabled ? "none" : "auto")};
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 `;
 
 const InputWrapper = styled.div`
+  box-sizing: border-box;
+  width: 100%;
   background-color: ${darken(0.05, getDivColor())};
   border-radius: 12px;
   padding: 10px 14px;
@@ -27,12 +33,14 @@ const InputWrapper = styled.div`
 `;
 
 const Label = styled.label`
-  min-width: 80px;
+  min-width: 0px;
   font-size: 18px;
   color: white;
 `;
 
 const StyledInput = styled.input`
+  box-sizing: border-box;
+  min-width: 0;
   flex-grow: 1;
   background-color: ${darken(0.15, getDivColor())};
   color: ${(props) => (props.$invalid ? "#ff6b6b" : "#eee")};
