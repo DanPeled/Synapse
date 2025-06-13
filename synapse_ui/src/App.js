@@ -4,7 +4,10 @@ import Dashboard from "./pages/dashboard/Dashboard";
 import Settings from "./pages/settings/Settings";
 import CameraConfig from "./pages/cameraConfig/CameraConfig";
 import { createGlobalStyle } from "styled-components";
-import { BackendContextProvider, useBackendContext } from "./services/backend/backendContext";
+import {
+  BackendContextProvider,
+  useBackendContext,
+} from "./services/backend/backendContext";
 
 const GlobalStyle = createGlobalStyle`
   /* Webkit-based browsers (Chrome, Safari, Edge) */
@@ -54,30 +57,32 @@ function AppContent() {
   }, []);
 
   return (
-    <>
+    <div
+      style={{
+        backgroundColor: "#8a1e60",
+        overflowX: "hidden",
+      }}
+    >
       <GlobalStyle />
-      <div
-        className="App"
-        style={{ display: "flex", height: "100vh", overflow: "hidden" }}
-      >
+      <div className="App" style={{ display: "flex", height: "100vh" }}>
         <Sidebar />
         <main
           style={{
             flex: 1,
             height: "100vh",
-            padding: 15,
-            backgroundColor: "#8a1e60",
             color: "white",
-            overflowY: "auto",
-            overflowX: "hidden",
+            paddingLeft: "70px",
+            paddingTop: "5px",
+            paddingRight: "10px",
           }}
         >
           {view === "#/dashboard" && <Dashboard />}
           {view === "#/settings" && <Settings />}
           {view === "#/camera" && <CameraConfig />}
+          <div style={{ height: "15px" }}></div>
         </main>
       </div>
-    </>
+    </div>
   );
 }
 

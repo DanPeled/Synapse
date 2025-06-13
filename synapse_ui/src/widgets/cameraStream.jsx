@@ -1,5 +1,6 @@
 import { Eye } from "lucide-react";
 import React, { useState } from "react";
+import { teamColor } from "../services/style";
 
 export default function CameraStream({ url }) {
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export default function CameraStream({ url }) {
           >
             <Eye
               size={40}
-              color="#3498db"
+              color={teamColor}
               style={{
                 animation: "spin 1.5s linear infinite",
               }}

@@ -45,8 +45,9 @@ export function Button({
           ? disabledColors.background
           : enabledColors.background,
         color: disabled ? disabledColors.color : enabledColors.color,
-        border: `2px solid ${disabled ? disabledColors.border : enabledColors.border
-          }`,
+        border: `2px solid ${
+          disabled ? disabledColors.border : enabledColors.border
+        }`,
         borderRadius: "8px",
         cursor: disabled ? "not-allowed" : "pointer",
         fontSize: "16px",
@@ -132,7 +133,7 @@ export function DangerButton({
     border: "#5c2a0e",
   },
   warning = "",
-  onClick = () => { },
+  onClick = () => {},
   ...props
 }) {
   const [showConfirm, setShowConfirm] = useState(false);

@@ -4,6 +4,7 @@ export namespace BackendStateSystem {
     pipelines: any[];
     hostname: string;
     connection: ConnectionState;
+    networktable: string;
   }
 
   // Define action types with a discriminated union
@@ -11,10 +12,11 @@ export namespace BackendStateSystem {
     | { type: `SET_${Uppercase<keyof State & string>}`; payload: any }
     | { type: string; payload?: any }; // fallback for unknown actions
 
-
   // Type for the setters dynamically created
   export type StateSetter = {
-    [K in keyof State as `set${Capitalize<string & K>}`]: (value: State[K]) => void;
+    [K in keyof State as `set${Capitalize<string & K>}`]: (
+      value: State[K],
+    ) => void;
   };
 
   // Context value type combines state and setters
@@ -24,4 +26,4 @@ export namespace BackendStateSystem {
 export interface ConnectionState {
   backend: boolean;
   networktables: boolean;
-} 
+}

@@ -1,6 +1,6 @@
 import React from "react";
 import { styled } from "styled-components";
-import { darken } from "polished";
+import { lighten } from "polished";
 import { getDivColor } from "../services/style";
 
 const TooltipWrapper = styled.div`
@@ -8,7 +8,7 @@ const TooltipWrapper = styled.div`
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%) translateY(-8px);
-  background-color: ${darken(0.2, getDivColor())};
+  background-color: ${lighten(0.2, getDivColor())};
   color: #eee;
   padding: 6px 10px;
   border-radius: 8px;
@@ -28,7 +28,7 @@ const TooltipWrapper = styled.div`
     margin-left: -6px;
     border-width: 6px;
     border-style: solid;
-    border-color: ${darken(0.2, getDivColor())} transparent transparent
+    border-color: ${lighten(0.2, getDivColor())} transparent transparent
       transparent;
   }
 

@@ -15,7 +15,7 @@ const cardStyle = {
   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
   overflow: "auto", // scroll if contents overflow
   maxHeight: "100vh",
-  color: teamColor
+  color: teamColor,
 };
 
 export const iconSize = 16;

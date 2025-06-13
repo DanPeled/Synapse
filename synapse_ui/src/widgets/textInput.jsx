@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { styled } from "styled-components";
 import { lighten, darken } from "polished";
 import { getDivColor, teamColor } from "../services/style";
+import Tooltip from "./tooltip";
 
 // Styled Components
 const Container = styled.div`
@@ -12,7 +13,7 @@ const Container = styled.div`
   pointer-events: ${(props) => (props.$disabled ? "none" : "auto")};
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 `;
 
 const InputWrapper = styled.div`
@@ -20,7 +21,7 @@ const InputWrapper = styled.div`
   width: 100%;
   background-color: ${darken(0.05, getDivColor())};
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 0px 14px;
   color: #eee;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-weight: 600;
@@ -63,11 +64,10 @@ const ErrorText = styled.span`
   user-select: none;
 `;
 
-// Component
 export default function TextInput({
   label = "Input",
   initialValue = "",
-  onChange = (_) => { },
+  onChange = (_) => {},
   placeholder = "",
   pattern = "^.*$",
   errorMessage = "Invalid input",
@@ -75,9 +75,11 @@ export default function TextInput({
   width,
   disabled = false,
   maxLength = null,
+  tooltip = null,
 }) {
   const [value, setValue] = useState(initialValue);
   const [invalid, setInvalid] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   function handleChange(e) {
     let val = e.target.value;
@@ -110,7 +112,11 @@ export default function TextInput({
 
   return (
     <Container $width={width} $disabled={disabled}>
-      <InputWrapper>
+      <InputWrapper
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {tooltip && <Tooltip visible={hovered}>{tooltip}</Tooltip>}
         <Label>{label}</Label>
         <StyledInput
           type="text"

@@ -7,7 +7,7 @@ export default function OptionSelector({
   labelTooltip = "",
   options = [],
   value,
-  onChange = () => { },
+  onChange = () => {},
   disabled = false,
 }) {
   const [hoveredOption, setHoveredOption] = useState(null);
@@ -108,7 +108,9 @@ export default function OptionSelector({
                   padding: "6px 12px",
                   borderRadius: 6,
                   border: "1px solid #00bfa5",
-                  backgroundColor: isSelected ? "rgb(50, 50, 50)" : "transparent",
+                  backgroundColor: isSelected
+                    ? "rgb(50, 50, 50)"
+                    : "transparent",
                   color: teamColor,
                   fontWeight: "bold",
                   cursor: disabled ? "not-allowed" : "pointer",

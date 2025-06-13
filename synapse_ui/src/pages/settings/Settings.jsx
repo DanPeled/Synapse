@@ -64,7 +64,7 @@ function Stats() {
           display: "flex",
           alignItems: "center",
           gap: "0.5em",
-          color: teamColor
+          color: teamColor,
         }}
       >
         <ChartColumnBig stroke={iconColor} size={24} fill="none" />
@@ -127,22 +127,28 @@ function Stats() {
 function NetworkSettings({
   ipMode,
   setIPMode,
-  setNetworkTablesAddr,
+  setNetworkTablesIPAddr,
   setHostname: setPropHostname,
   setStaticIPAddr,
 }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
-  const { deviceIP, setDeviceIP, hostname, setHostname: contextSetHostname } = useBackendContext();
-
+  const {
+    deviceIP,
+    setDeviceIP,
+    hostname,
+    setHostname: contextSetHostname,
+    networktable,
+    setNetworktable,
+  } = useBackendContext();
 
   return (
     <Column
       style={{
         ...styles.placeholderCard,
-        gap: "10px",
+        gap: "20px",
         flex: 1, // add this instead so it fills parent's flex space
         padding: "10px 10px",
-        color: teamColor
+        color: teamColor,
       }}
     >
       <h2
@@ -164,8 +170,16 @@ function NetworkSettings({
         pattern={teamNumberOrIPRegex}
         errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
         onChange={(val) => {
-          setNetworkTablesAddr(val);
+          setNetworkTablesIPAddr(val);
         }}
+      />
+      <TextInput
+        label={<p>NetworkTable</p>}
+        initialValue={networktable}
+        onChange={(val) => {
+          setNetworktable(val);
+        }}
+        tooltip="NetworkTable to publish values to"
       />
       <div style={{ height: "12px" }}></div>
       <ToggleButton
@@ -174,8 +188,10 @@ function NetworkSettings({
         value={manageDeviceNetworking}
         onToggle={(val) => setManageDeviceNetworking(val)}
       />
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
-        <Row style={{ width: "600px", flexDirection: "row" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <Row
+          style={{ width: "600px", flexDirection: "row", alignItems: "center" }}
+        >
           <TextInput
             label={ipMode == IPMode.static ? "Static IP" : "Current IP (DHCP)"}
             placeholder={deviceIP.valueOf()}
@@ -246,7 +262,7 @@ function NetworkSettings({
             value: "eth0",
           },
         ]}
-        onChange={(val) => { }}
+        onChange={(val) => {}}
         disabled={!manageDeviceNetworking}
       />
       <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
@@ -279,7 +295,14 @@ function DeviceControl() {
       <Column
         style={{ ...styles.card, height: "405px", gap: "15px", width: "50%" }}
       >
-        <h2 style={{ display: "flex", alignItems: "center", gap: "0.5em", color: teamColor }}>
+        <h2
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5em",
+            color: teamColor,
+          }}
+        >
           <Computer stroke={iconColor} size={24} fill="none" />
           Device Control
         </h2>
@@ -389,7 +412,7 @@ export default function Settings() {
         <NetworkSettings
           setIPMode={setIPMode}
           ipMode={ipMode}
-          setNetworkTablesAddr={setNetworkTablesAddr}
+          setNetworkTablesIPAddr={setNetworkTablesAddr}
           setHostname={setHostname}
           setStaticIPAddr={setStaticIPAddr}
         />

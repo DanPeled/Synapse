@@ -22,7 +22,11 @@ const icons = [
 function NavigationIcon({ key, icon, label, url }) {
   return (
     <div key={key} style={{ margin: "10px 0" }}>
-      <a href={`#/${url}`} className="icon-wrapper-nav" style={{ color: teamColor }}>
+      <a
+        href={`#/${url}`}
+        className="icon-wrapper-nav"
+        style={{ color: teamColor }}
+      >
         {icon}{" "}
       </a>
       <span className="tooltip" style={{ zIndex: 999 }}>
@@ -46,20 +50,36 @@ export default function Sidebar() {
     <div className="sidebar" style={{ backgroundColor: getDivColor() }}>
       {icons.map(({ icon, label, url }, i) => (
         <div key={i} className="icon-wrapper-nav" style={{ color: teamColor }}>
-          {<NavigationIcon key={i} icon={icon} label={label} url={url} style={{
-            color: teamColor
-          }} />}
+          {
+            <NavigationIcon
+              key={i}
+              icon={icon}
+              label={label}
+              url={url}
+              style={{
+                color: teamColor,
+              }}
+            />
+          }
         </div>
       ))}
 
       <div className="network-group">
-        <div className="icon-wrapper-nav network-icon-wrapper " style={{ color: teamColor }}>
+        <div
+          className="icon-wrapper-nav network-icon-wrapper "
+          style={{ color: teamColor }}
+        >
           {connection.networktables ? <Bot /> : <BotOff />}
           <span className="tooltip">
-            {connection.networktables ? "NetworkTables Connected" : "NetworkTables Disconnected"}
+            {connection.networktables
+              ? "NetworkTables Connected"
+              : "NetworkTables Disconnected"}
           </span>
         </div>
-        <div className="icon-wrapper-nav backend-icon-wrapper" style={{ color: teamColor }}>
+        <div
+          className="icon-wrapper-nav backend-icon-wrapper"
+          style={{ color: teamColor }}
+        >
           {connection.backend ? <Server /> : <ServerOff />}
           <span className="tooltip">
             {connection.backend ? "Backend Connected" : "Backend Disconnected"}

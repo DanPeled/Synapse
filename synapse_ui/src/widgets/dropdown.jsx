@@ -24,7 +24,7 @@ const DropdownWrapper = styled.div`
 const Label = styled.label`
   min-width: 80px;
   font-size: 18px;
-  color: ${(props) => (teamColor)};
+  color: ${(props) => teamColor};
   opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `;
 
@@ -45,11 +45,11 @@ const DropdownButton = styled.button`
 
   &:focus {
     outline: ${(props) =>
-    props.disabled ? "none" : `2px solid ${lighten(0.15, getDivColor())}`};
+      props.disabled ? "none" : `2px solid ${lighten(0.15, getDivColor())}`};
     background-color: ${(props) =>
-    props.disabled
-      ? darken(0.05, getDivColor())
-      : darken(0.2, getDivColor())};
+      props.disabled
+        ? darken(0.05, getDivColor())
+        : darken(0.2, getDivColor())};
   }
 `;
 
@@ -83,7 +83,7 @@ const DropdownItem = styled.li`
   padding: 10px 12px;
   cursor: pointer;
   color: ${teamColor};
-  font-weight: ${((props) => props.selected ? "bold" : "normal")};
+  font-weight: ${(props) => (props.selected ? "bold" : "normal")};
 
   &:hover {
     background-color: ${darken(0.25, getDivColor())};

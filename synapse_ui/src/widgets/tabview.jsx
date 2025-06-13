@@ -35,7 +35,9 @@ const TabButton = styled.button`
 
   &:hover {
     background-color: ${(props) =>
-    props.active ? lighten(0.18, getDivColor()) : lighten(0.2, getDivColor())};
+      props.active
+        ? lighten(0.18, getDivColor())
+        : lighten(0.2, getDivColor())};
   }
 
   &:focus {

@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "es6",
     "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,            // Allow JS files to be compiled
-    "checkJs": false,           // Set true if you want TS to type-check JS files too
+    "allowJs": true, // Allow JS files to be compiled
+    "checkJs": false, // Set true if you want TS to type-check JS files too
     "jsx": "react-jsx",
     "module": "esnext",
     "moduleResolution": "node",

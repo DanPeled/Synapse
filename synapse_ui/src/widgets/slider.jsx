@@ -131,7 +131,7 @@ function Slider({
   label = "Value",
   labelGap = "0px",
   className = "",
-  onChange = (val) => { }
+  onChange = (val) => {},
 }) {
   const [value, setValue] = useState(initial);
   const valuePercent = ((value - min) / (max - min)) * 100;

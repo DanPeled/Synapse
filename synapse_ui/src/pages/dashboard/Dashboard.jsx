@@ -8,8 +8,9 @@ import IconMenu from "../../widgets/iconMenu";
 import AddPipelineDialog from "../../widgets/pipeline/addPipelineDialog";
 import TabView from "../../widgets/tabview";
 import Slider from "../../widgets/slider";
+import { Transform3DVisualizer } from "../../widgets/trasform3DVisualizer";
 
-function StreamAndPipelineControls({ }) {
+function StreamAndPipelineControls({}) {
   const [showAddPipelineDialog, setShowAddPipelineDialog] = useState(false);
   const [pipelines, setPipelines] = useState(
     Array.of(
@@ -117,7 +118,7 @@ function StreamAndPipelineControls({ }) {
   );
 }
 
-function CameraView({ }) {
+function CameraView({}) {
   return (
     <div
       style={{
@@ -169,7 +170,7 @@ function CameraView({ }) {
   );
 }
 
-function PipelineConfigControl({ }) {
+function PipelineConfigControl({}) {
   return (
     <TabView
       width="97%"
@@ -212,11 +213,9 @@ function PipelineConfigControl({ }) {
   );
 }
 
-function ResultsView({ }) {
+function ResultsView({}) {
   return (
-    <div
-      style={{ ...styles.placeholderCard, height: "630px", padding: "10px" }}
-    >
+    <div style={{ ...styles.placeholderCard, height: "640px", padding: "0px" }}>
       <h3 style={{ textAlign: "center", color: teamColor }}>Results</h3>
       <hr style={{ width: "98%", border: "1px solid rgba(60,60,60,0.5)" }} />
     </div>
@@ -236,7 +235,7 @@ export default function Dashboard() {
           <PipelineConfigControl />
         </div>
       </Column>
-      <Column style={{ flex: 2 }}>
+      <Column style={{ flex: 2, position: "sticky" }}>
         <StreamAndPipelineControls />
         <ResultsView />
       </Column>

@@ -29,7 +29,6 @@ export function Row({ children, style = {}, fitMaxWidth = false, ...props }) {
         flexDirection: "row",
         alignItems: "flex-start",
         width: "100%",
-        height: "auto",
         gap: 12,
         ...style,
       }}
