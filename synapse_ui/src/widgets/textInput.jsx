@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { styled } from "styled-components";
 import { lighten, darken } from "polished";
-import { getDivColor } from "../services/style";
+import { getDivColor, teamColor } from "../services/style";
 
 // Styled Components
 const Container = styled.div`
@@ -35,15 +35,15 @@ const InputWrapper = styled.div`
 const Label = styled.label`
   min-width: 0px;
   font-size: 18px;
-  color: white;
+  color: ${teamColor};
 `;
 
 const StyledInput = styled.input`
   box-sizing: border-box;
   min-width: 0;
   flex-grow: 1;
-  background-color: ${darken(0.15, getDivColor())};
-  color: ${(props) => (props.$invalid ? "#ff6b6b" : "#eee")};
+  background-color: ${lighten(0.15, getDivColor())};
+  color: ${(props) => (props.$invalid ? "#ff6b6b" : "white")};
   padding: 8px 12px;
   border: none;
   border-radius: 8px;
@@ -52,7 +52,7 @@ const StyledInput = styled.input`
 
   &:focus {
     outline: 2px solid ${lighten(0.15, getDivColor())};
-    background-color: ${darken(0.2, getDivColor())};
+    background-color: ${lighten(0.2, getDivColor())};
   }
 `;
 
@@ -74,6 +74,7 @@ export default function TextInput({
   allowedChars = null,
   width,
   disabled = false,
+  maxLength = null,
 }) {
   const [value, setValue] = useState(initialValue);
   const [invalid, setInvalid] = useState(false);
@@ -84,6 +85,10 @@ export default function TextInput({
     if (allowedChars) {
       const regex = new RegExp(allowedChars);
       val = [...val].filter((ch) => regex.test(ch)).join("");
+    }
+
+    if (maxLength !== null && val.length > maxLength) {
+      val = val.slice(0, maxLength);
     }
 
     setValue(val);
@@ -114,6 +119,7 @@ export default function TextInput({
           placeholder={placeholder}
           $invalid={invalid}
           disabled={disabled}
+          maxLength={maxLength}
         />
       </InputWrapper>
       {invalid && <ErrorText>{errorMessage}</ErrorText>}

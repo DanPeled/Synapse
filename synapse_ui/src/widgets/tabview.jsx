@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { styled } from "styled-components";
 import { lighten, darken } from "polished";
-import { getDivColor } from "../services/style";
+import { getDivColor, teamColor } from "../services/style";
 import Tooltip from "./tooltip";
 
 const TabContainer = styled.div`
@@ -9,7 +9,7 @@ const TabContainer = styled.div`
   background-color: ${darken(0.05, getDivColor())};
   border-radius: 12px;
   padding: 10px 14px;
-  color: #eee;
+  color: ${teamColor};
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   user-select: none;
 `;
@@ -23,8 +23,8 @@ const TabHeader = styled.div`
 
 const TabButton = styled.button`
   background-color: ${(props) =>
-    props.active ? darken(0.15, getDivColor()) : darken(0.1, getDivColor())};
-  color: #eee;
+    props.active ? lighten(0.15, getDivColor()) : lighten(0.07, getDivColor())};
+  color: ${teamColor};
   padding: 10px 12px;
   border: none;
   border-radius: 8px 8px 0 0;
@@ -35,7 +35,7 @@ const TabButton = styled.button`
 
   &:hover {
     background-color: ${(props) =>
-      props.active ? darken(0.18, getDivColor()) : darken(0.2, getDivColor())};
+    props.active ? lighten(0.18, getDivColor()) : lighten(0.2, getDivColor())};
   }
 
   &:focus {

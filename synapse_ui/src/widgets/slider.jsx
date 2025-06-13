@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import styled from "styled-components";
-import { lighten, darken } from "polished";
-import { getDivColor } from "../services/style";
+import { lighten } from "polished";
+import { getDivColor, teamColor } from "../services/style";
 
 const baseColor = getDivColor();
 
@@ -19,6 +19,7 @@ const SliderLabel = styled.label`
   font-weight: 600;
   flex-shrink: 0;
   min-width: 70px;
+  color: ${teamColor};
 `;
 
 const SliderContent = styled.div`
@@ -30,7 +31,7 @@ const SliderContent = styled.div`
 `;
 
 const StepButton = styled.button`
-  background: ${darken(0.2, baseColor)};
+  background: ${lighten(0.2, baseColor)};
   border: none;
   color: ${lighten(0.4, baseColor)};
   font-weight: 700;
@@ -43,7 +44,7 @@ const StepButton = styled.button`
   transition: background-color 0.2s ease;
 
   &:hover {
-    background: ${darken(0.1, baseColor)};
+    background: ${lighten(0.1, baseColor)};
   }
 
   &:disabled {
@@ -61,8 +62,8 @@ const StyledInput = styled.input`
     to right,
     ${lighten(0.2, baseColor)} 0%,
     ${lighten(0.2, baseColor)} ${(props) => props.valuePercent}%,
-    ${darken(0.15, baseColor)} ${(props) => props.valuePercent}%,
-    ${darken(0.15, baseColor)} 100%
+    ${lighten(0.15, baseColor)} ${(props) => props.valuePercent}%,
+    ${lighten(0.15, baseColor)} 100%
   );
   outline: none;
   cursor: pointer;
@@ -76,7 +77,7 @@ const StyledInput = styled.input`
     background: ${lighten(0.3, baseColor)};
     border-radius: 50%;
     cursor: pointer;
-    border: 3px solid ${darken(0.4, baseColor)};
+    border: 3px solid ${lighten(0.4, baseColor)};
     box-shadow: 0 0 8px ${lighten(0.3, baseColor)};
     margin-top: -7px;
     transition: background 0.3s ease;
@@ -87,7 +88,7 @@ const StyledInput = styled.input`
     background: ${lighten(0.3, baseColor)};
     border-radius: 50%;
     cursor: pointer;
-    border: 3px solid ${darken(0.4, baseColor)};
+    border: 3px solid ${lighten(0.4, baseColor)};
     box-shadow: 0 0 8px ${lighten(0.3, baseColor)};
     transition: background 0.3s ease;
   }
@@ -99,10 +100,10 @@ const StyledInput = styled.input`
 
 const ValueInput = styled.input`
   width: 50px;
-  background: ${darken(0.2, baseColor)};
+  background: ${lighten(0.2, baseColor)};
   border: none;
   border-radius: 6px;
-  color: ${lighten(0.8, baseColor)};
+  color: ${teamColor};
   font-weight: 600;
   text-align: center;
   font-size: 16px;
@@ -111,7 +112,7 @@ const ValueInput = styled.input`
 
   &:focus {
     outline: 2px solid ${lighten(0.3, baseColor)};
-    background: ${darken(0.1, baseColor)};
+    background: ${lighten(0.1, baseColor)};
   }
 
   &::-webkit-inner-spin-button,

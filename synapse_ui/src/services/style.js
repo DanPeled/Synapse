@@ -1,10 +1,10 @@
-const divColor = "#8a1e60";
+const divColor = "black";
 
 export function getDivColor() {
   return divColor;
 }
 export const teamColor = "#ff66c4";
-export const iconColor = "#b9bbbe";
+export const iconColor = teamColor;
 
 const cardStyle = {
   backgroundColor: divColor,
@@ -15,6 +15,7 @@ const cardStyle = {
   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
   overflow: "auto", // scroll if contents overflow
   maxHeight: "100vh",
+  color: teamColor
 };
 
 export const iconSize = 16;

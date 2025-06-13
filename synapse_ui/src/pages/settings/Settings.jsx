@@ -5,6 +5,7 @@ import {
   iconSize,
   getDivColor,
   setDivColor,
+  teamColor,
 } from "../../services/style";
 import {
   ChartColumnBig,
@@ -63,6 +64,7 @@ function Stats() {
           display: "flex",
           alignItems: "center",
           gap: "0.5em",
+          color: teamColor
         }}
       >
         <ChartColumnBig stroke={iconColor} size={24} fill="none" />
@@ -140,6 +142,7 @@ function NetworkSettings({
         gap: "10px",
         flex: 1, // add this instead so it fills parent's flex space
         padding: "10px 10px",
+        color: teamColor
       }}
     >
       <h2
@@ -183,6 +186,7 @@ function NetworkSettings({
             }}
             disabled={!manageDeviceNetworking || ipMode == IPMode.dhcp}
             width="500px"
+            allowedChars={"[\\d.]+"}
           />
           {ipMode == IPMode.static && (
             <TextInput
@@ -195,6 +199,8 @@ function NetworkSettings({
               disabled={!manageDeviceNetworking || ipMode == IPMode.dhcp}
               style={{ width: "4rem" }}
               width="100px"
+              maxLength={2}
+              allowedChars={"[0-9]"}
             />
           )}
         </Row>
@@ -273,7 +279,7 @@ function DeviceControl() {
       <Column
         style={{ ...styles.card, height: "405px", gap: "15px", width: "50%" }}
       >
-        <h2 style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
+        <h2 style={{ display: "flex", alignItems: "center", gap: "0.5em", color: teamColor }}>
           <Computer stroke={iconColor} size={24} fill="none" />
           Device Control
         </h2>

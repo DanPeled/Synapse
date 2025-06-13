@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import React, { useState } from "react";
-import { iconSize } from "../services/style";
+import { iconSize, teamColor } from "../services/style";
 import AlertDialog from "./alert";
 
 export function Button({
@@ -9,16 +9,16 @@ export function Button({
   disabled = false,
   style = {},
   enabledColors = {
-    background: "#2A2D34", // dark gray-blue
-    color: "#E0E3E7", // light gray
-    border: "#3F4451", // slightly lighter border
-    hoverBackground: "#3B4050", // a bit lighter and bluish on hover
-    hoverBorder: "#5A6074", // lighter blue-gray border on hover
+    background: "#2A2D34",
+    color: teamColor,
+    border: "#3F4451",
+    hoverBackground: "#3B4050",
+    hoverBorder: "#5A6074",
   },
   disabledColors = {
-    background: "#4B5060", // muted gray-blue
-    color: "#8A8F9C", // muted light gray
-    border: "#5A6074", // same as hover border but dimmer
+    background: "#4B5060",
+    color: "#8A8F9C",
+    border: "#5A6074",
   },
 }) {
   const [isPressed, setIsPressed] = useState(false);
@@ -120,10 +120,10 @@ function ConfirmDialog({ message, onConfirm, onCancel, visible }) {
 // DangerButton with confirmation dialog
 export function DangerButton({
   enabledColors = {
-    background: "#b22222",
-    color: "#fff",
-    border: "#800000",
-    hoverBackground: "#800000",
+    background: "#cc0c39",
+    color: "white",
+    border: "#cc0c39",
+    hoverBackground: "#91102e",
     hoverBorder: "#b22222",
   },
   disabledColors = {

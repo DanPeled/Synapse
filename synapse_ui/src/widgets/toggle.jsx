@@ -1,9 +1,10 @@
 import React from "react";
+import { teamColor } from "../services/style";
 
 export default function ToggleButton({
   label = "Toggle",
   value = false,
-  onToggle = () => {},
+  onToggle = () => { },
   disabled = false,
   labelGap = 12, // New configurable gap
 }) {
@@ -12,11 +13,12 @@ export default function ToggleButton({
     alignItems: "center",
     gap: labelGap,
     marginBottom: 12,
+    paddingLeft: 30
   };
 
   const labelStyle = {
     fontWeight: "bold",
-    color: "white",
+    color: teamColor,
     fontSize: 18,
     minWidth: 120,
   };

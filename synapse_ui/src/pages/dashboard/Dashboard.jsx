@@ -1,5 +1,5 @@
 import { Column, Row } from "../../widgets/containers";
-import { styles } from "../../services/style";
+import { styles, teamColor } from "../../services/style";
 import Dropdown from "../../widgets/dropdown";
 import CameraStream from "../../widgets/cameraStream";
 import { Copy, Pen, Plus, Trash } from "lucide-react";
@@ -126,7 +126,7 @@ function CameraView({ }) {
         height: 430,
       }}
     >
-      <h3 style={{ position: "relative" }}>
+      <h3 style={{ position: "relative", color: teamColor }}>
         <span>Camera Stream</span>
         <span
           style={{
@@ -217,8 +217,8 @@ function ResultsView({ }) {
     <div
       style={{ ...styles.placeholderCard, height: "630px", padding: "10px" }}
     >
-      <h3 style={{ textAlign: "center" }}>Results</h3>
-      <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
+      <h3 style={{ textAlign: "center", color: teamColor }}>Results</h3>
+      <hr style={{ width: "98%", border: "1px solid rgba(60,60,60,0.5)" }} />
     </div>
   );
 }

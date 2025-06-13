@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { lighten, darken } from "polished";
-import { getDivColor } from "../services/style";
+import { getDivColor, teamColor } from "../services/style";
 import { styled } from "styled-components";
 import Tooltip from "./tooltip";
 
 const DropdownWrapper = styled.div`
   width: ${(props) => props.$width || "95%"};
-  background-color: ${darken(0.05, getDivColor())};
+  background-color: ${lighten(0.1, getDivColor())};
   border-radius: 12px;
   padding: 10px 14px;
-  color: #eee;
+  color: ${teamColor};
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-weight: 600;
   user-select: none;
@@ -24,7 +24,7 @@ const DropdownWrapper = styled.div`
 const Label = styled.label`
   min-width: 80px;
   font-size: 18px;
-  color: ${(props) => (props.disabled ? "white" : "white")};
+  color: ${(props) => (teamColor)};
   opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `;
 
@@ -33,7 +33,7 @@ const DropdownButton = styled.button`
   width: 100%;
   background-color: ${(props) =>
     props.disabled ? darken(0.05, getDivColor()) : darken(0.15, getDivColor())};
-  color: #eee;
+  color: ${teamColor};
   padding: 8px 12px;
   border: none;
   border-radius: 8px;
@@ -45,17 +45,17 @@ const DropdownButton = styled.button`
 
   &:focus {
     outline: ${(props) =>
-      props.disabled ? "none" : `2px solid ${lighten(0.15, getDivColor())}`};
+    props.disabled ? "none" : `2px solid ${lighten(0.15, getDivColor())}`};
     background-color: ${(props) =>
-      props.disabled
-        ? darken(0.05, getDivColor())
-        : darken(0.2, getDivColor())};
+    props.disabled
+      ? darken(0.05, getDivColor())
+      : darken(0.2, getDivColor())};
   }
 `;
 
 const DropdownList = styled.ul`
   position: absolute;
-  background-color: ${darken(0.15, getDivColor())};
+  background-color: ${lighten(0.15, getDivColor())};
   border-radius: 8px;
   max-height: 200px;
   overflow-y: auto;
@@ -65,6 +65,7 @@ const DropdownList = styled.ul`
   list-style: none;
   animation: fadeIn 0.2s ease-out;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: ${teamColor};
 
   @keyframes fadeIn {
     from {
@@ -81,7 +82,8 @@ const DropdownList = styled.ul`
 const DropdownItem = styled.li`
   padding: 10px 12px;
   cursor: pointer;
-  color: #eee;
+  color: ${teamColor};
+  font-weight: ${((props) => props.selected ? "bold" : "normal")};
 
   &:hover {
     background-color: ${darken(0.25, getDivColor())};
@@ -219,6 +221,7 @@ function Dropdown({
                   onClick={() => handleSelect(val)}
                   role="option"
                   aria-selected={val === selected}
+                  selected={val === selected}
                 >
                   {lbl}
                 </DropdownItem>

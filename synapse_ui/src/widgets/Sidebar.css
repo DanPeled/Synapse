@@ -1,6 +1,5 @@
 .sidebar {
   width: 60px;
-  background-color: #202225;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -11,7 +10,6 @@
 /* For nav icons: keep margin */
 a.icon-wrapper-nav {
   position: relative;
-  color: #b9bbbe;
   cursor: pointer;
 }
 
@@ -54,11 +52,9 @@ a.icon-wrapper-nav:hover {
 
 .network-icon-wrapper,
 .backend-icon-wrapper {
-  color: #b9bbbe;
   pointer: normal;
 }
 
 .icon-wrapper-nav {
   position: relative;
-  color: #b9bbbe;
 }

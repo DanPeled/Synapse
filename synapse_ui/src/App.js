@@ -66,7 +66,7 @@ function AppContent() {
             flex: 1,
             height: "100vh",
             padding: 15,
-            backgroundColor: "black",
+            backgroundColor: "#8a1e60",
             color: "white",
             overflowY: "auto",
             overflowX: "hidden",
