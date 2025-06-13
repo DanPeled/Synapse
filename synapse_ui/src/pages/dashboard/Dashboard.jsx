@@ -9,7 +9,7 @@ import AddPipelineDialog from "../../widgets/pipeline/addPipelineDialog";
 import TabView from "../../widgets/tabview";
 import Slider from "../../widgets/slider";
 
-function StreamAndPipelineControls({}) {
+function StreamAndPipelineControls({ }) {
   const [showAddPipelineDialog, setShowAddPipelineDialog] = useState(false);
   const [pipelines, setPipelines] = useState(
     Array.of(
@@ -117,7 +117,7 @@ function StreamAndPipelineControls({}) {
   );
 }
 
-function CameraView({}) {
+function CameraView({ }) {
   return (
     <div
       style={{
@@ -169,7 +169,7 @@ function CameraView({}) {
   );
 }
 
-function PipelineConfigControl({}) {
+function PipelineConfigControl({ }) {
   return (
     <TabView
       width="97%"
@@ -212,7 +212,7 @@ function PipelineConfigControl({}) {
   );
 }
 
-function ResultsView({}) {
+function ResultsView({ }) {
   return (
     <div
       style={{ ...styles.placeholderCard, height: "630px", padding: "10px" }}

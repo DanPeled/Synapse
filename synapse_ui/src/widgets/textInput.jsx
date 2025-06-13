@@ -59,18 +59,17 @@ const StyledInput = styled.input`
 const ErrorText = styled.span`
   color: #ff6b6b;
   font-size: 14px;
-  position: absolute;
-  bottom: -18px;
-  left: 14px;
+  margin-top: 6px;
+  user-select: none;
 `;
 
 // Component
 export default function TextInput({
   label = "Input",
   initialValue = "",
-  onChange = (_) => {},
+  onChange = (_) => { },
   placeholder = "",
-  pattern = ".*",
+  pattern = "^.*$",
   errorMessage = "Invalid input",
   allowedChars = null,
   width,

@@ -1,13 +1,16 @@
 import React from "react";
 import {
+  Bot,
   BotOff,
   Camera,
   LayoutDashboard,
+  Server,
   ServerOff,
   Settings,
 } from "lucide-react";
 import "./Sidebar.css";
 import PropTypes from "prop-types";
+import { useBackendContext } from "../services/backend/backendContext";
 
 const icons = [
   { icon: <LayoutDashboard />, label: "Dashboard", url: "dashboard" },
@@ -36,6 +39,8 @@ NavigationIcon.propTypes = {
 };
 
 export default function Sidebar() {
+  const { connection } = useBackendContext();
+
   return (
     <div className="sidebar">
       {icons.map(({ icon, label, url }, i) => (
@@ -46,12 +51,16 @@ export default function Sidebar() {
 
       <div className="network-group">
         <div className="icon-wrapper-nav network-icon-wrapper ">
-          <BotOff />
-          <span className="tooltip">NetworkTables Disconnected</span>
+          {connection.networktables ? <Bot /> : <BotOff />}
+          <span className="tooltip">
+            {connection.networktables ? "NetworkTables Connected" : "NetworkTables Disconnected"}
+          </span>
         </div>
         <div className="icon-wrapper-nav backend-icon-wrapper">
-          <ServerOff />
-          <span className="tooltip">Backend Disconnected</span>
+          {connection.backend ? <Server /> : <ServerOff />}
+          <span className="tooltip">
+            {connection.backend ? "Backend Connected" : "Backend Disconnected"}
+          </span>
         </div>
       </div>
     </div>

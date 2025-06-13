@@ -4,6 +4,7 @@ import Dashboard from "./pages/dashboard/Dashboard";
 import Settings from "./pages/settings/Settings";
 import CameraConfig from "./pages/cameraConfig/CameraConfig";
 import { createGlobalStyle } from "styled-components";
+import { BackendContextProvider, useBackendContext } from "./services/backend/backendContext";
 
 const GlobalStyle = createGlobalStyle`
   /* Webkit-based browsers (Chrome, Safari, Edge) */
@@ -30,7 +31,7 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
-function App() {
+function AppContent() {
   const [view, setView] = useState(window.location.hash);
 
   const onHashChange = () => {
@@ -77,6 +78,14 @@ function App() {
         </main>
       </div>
     </>
+  );
+}
+
+function App() {
+  return (
+    <BackendContextProvider>
+      <AppContent />
+    </BackendContextProvider>
   );
 }
 

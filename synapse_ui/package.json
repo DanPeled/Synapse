@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@react-three/drei": "^10.2.0",
+    "@react-three/fiber": "^9.1.2",
     "cra-template-pwa": "2.0.0",
     "lucide-react": "^0.513.0",
     "polished": "^4.3.1",
@@ -11,6 +13,7 @@
     "react-scripts": "5.0.1",
     "styled-components": "^6.1.18",
     "testing-library": "^0.0.2",
+    "three": "^0.177.0",
     "web-vitals": "^5.0.2"
   },
   "scripts": {
@@ -38,6 +41,9 @@
     ]
   },
   "devDependencies": {
-    "prettier": "^3.5.3"
+    "@types/react": "^19.1.7",
+    "@types/react-dom": "^19.1.6",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
   }
 }

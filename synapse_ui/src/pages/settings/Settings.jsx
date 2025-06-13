@@ -27,6 +27,7 @@ import { Button, DangerButton } from "../../widgets/button";
 import AlertDialog from "../../widgets/alert";
 import ToggleButton from "../../widgets/toggle";
 import Dropdown from "../../widgets/dropdown.jsx";
+import { useBackendContext } from "../../services/backend/backendContext";
 
 const teamNumberRegex = "\\d+(\\.\\d+)?";
 const ipAddressRegex = "((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)(\\.(?!$)|$)){4}";
@@ -125,16 +126,17 @@ function NetworkSettings({
   ipMode,
   setIPMode,
   setNetworkTablesAddr,
-  setHostname,
+  setHostname: setPropHostname,
   setStaticIPAddr,
 }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
+  const { deviceIP, setDeviceIP, hostname, setHostname: contextSetHostname } = useBackendContext();
+
 
   return (
     <Column
       style={{
         ...styles.placeholderCard,
-        height: "500px",
         gap: "10px",
         flex: 1, // add this instead so it fills parent's flex space
         padding: "10px 10px",
@@ -173,7 +175,7 @@ function NetworkSettings({
         <Row style={{ width: "600px", flexDirection: "row" }}>
           <TextInput
             label={ipMode == IPMode.static ? "Static IP" : "Current IP (DHCP)"}
-            placeholder="192.168.1.10"
+            placeholder={deviceIP.valueOf()}
             pattern={ipAddressRegex}
             errorMessage="Invalid IPv4 Address"
             onChange={(val) => {
@@ -223,9 +225,9 @@ function NetworkSettings({
       </div>
       <TextInput
         label="Hostname"
-        pattern="^\S+$"
-        onChange={setHostname}
+        onChange={setPropHostname}
         disabled={!manageDeviceNetworking}
+        initialValue={hostname}
       />
       <Dropdown
         label="NetworkManager Interface"
@@ -238,7 +240,7 @@ function NetworkSettings({
             value: "eth0",
           },
         ]}
-        onChange={(val) => {}}
+        onChange={(val) => { }}
         disabled={!manageDeviceNetworking}
       />
       <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />

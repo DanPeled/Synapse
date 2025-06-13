@@ -129,6 +129,8 @@ function Slider({
   initial = 50,
   label = "Value",
   labelGap = "0px",
+  className = "",
+  onChange = (val) => { }
 }) {
   const [value, setValue] = useState(initial);
   const valuePercent = ((value - min) / (max - min)) * 100;
@@ -148,6 +150,7 @@ function Slider({
     const num = Number(val);
     if (!isNaN(num)) {
       setValue(clampValue(num));
+      onChange(clampValue(num));
     }
   };
 
