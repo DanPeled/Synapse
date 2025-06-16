@@ -50,4 +50,5 @@ export interface HardwareMetrics {
   disk_usage: number;
   ram_usage: number;
   uptime: number;
+  last_fetched: string;
 }

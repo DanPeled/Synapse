@@ -22,7 +22,8 @@ const initialState: BackendStateSystem.State = {
     cpu_usage: 0,
     disk_usage: 0,
     ram_usage: 0,
-    uptime: 0
+    uptime: 0,
+    last_fetched: new Date().toLocaleTimeString()
   },
   pipelines: [],
   connection: {
@@ -36,7 +37,7 @@ const initialState: BackendStateSystem.State = {
   ], [
     "ApriltagPipeline"
   ]),
-  logs: []
+  logs: [] as BackendStateSystem.Log[],
 };
 
 export const BackendStateKeys = Object.keys(initialState).reduce(
@@ -116,26 +117,31 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         });
       },
       onMessage: (message) => {
-        const json = JSON.parse(message);
-        const messageObj = new Message(json["type"], json["message"]);
+        const jsonArr = splitConcatenatedJSON(message);
+        jsonArr.forEach((val) => {
+          const messageObj = val as Message;
 
-        switch (messageObj.type) {
-          case "send_device_info":
-            const deviceInfo: DeviceInfo = (messageObj.message as DeviceInfo);
-            setters.setDeviceinfo({ ...state.deviceinfo, ip: deviceInfo.ip, platform: deviceInfo.platform, hostname: deviceInfo.hostname ?? "Unknown", networkInterfaces: deviceInfo.networkInterfaces });
-            break;
-          case "hardware_metrics":
-            const hardwareMetrics: HardwareMetrics = (messageObj.message as HardwareMetrics);
-            setters.setHardwaremetrics({
-              ...state.hardwaremetrics,
-              cpu_temp: hardwareMetrics.cpu_temp,
-              cpu_usage: hardwareMetrics.cpu_usage,
-              disk_usage: hardwareMetrics.disk_usage,
-              ram_usage: hardwareMetrics.ram_usage,
-              uptime: hardwareMetrics.uptime,
-            });
-            break;
-        }
+          switch (messageObj.type) {
+            case "send_device_info":
+              const deviceInfo: DeviceInfo = (messageObj.message as DeviceInfo);
+              setters.setDeviceinfo({ ...state.deviceinfo, ip: deviceInfo.ip, platform: deviceInfo.platform, hostname: deviceInfo.hostname ?? "Unknown", networkInterfaces: deviceInfo.networkInterfaces });
+              break;
+            case "hardware_metrics":
+              const hardwareMetrics: HardwareMetrics = (messageObj.message as HardwareMetrics);
+              setters.setHardwaremetrics({
+                ...state.hardwaremetrics,
+                cpu_temp: hardwareMetrics.cpu_temp,
+                cpu_usage: hardwareMetrics.cpu_usage,
+                disk_usage: hardwareMetrics.disk_usage,
+                ram_usage: hardwareMetrics.ram_usage,
+                uptime: hardwareMetrics.uptime,
+                last_fetched: new Date().toLocaleTimeString()
+              });
+              break;
+            case "log":
+              break;
+          }
+        });
       },
     });
   });
@@ -160,3 +166,47 @@ export const useBackendContext = (): BackendStateSystem.BackendContextType => {
   }
   return context;
 };
+
+function splitConcatenatedJSON(input: string): unknown[] {
+  const values: unknown[] = [];
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let start = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (char === '\\') {
+        escape = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else {
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{' || char === '[') {
+        depth++;
+      } else if (char === '}' || char === ']') {
+        depth--;
+      }
+    }
+
+    if (depth === 0 && !inString && i >= start) {
+      const chunk = input.slice(start, i + 1).trim();
+      if (chunk) {
+        try {
+          values.push(JSON.parse(chunk));
+        } catch (e) {
+          console.error("Failed to parse:", chunk);
+        }
+      }
+      start = i + 1;
+    }
+  }
+
+  return values;
+}

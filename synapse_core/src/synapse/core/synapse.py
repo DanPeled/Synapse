@@ -45,6 +45,8 @@ class Synapse:
             bool: True if initialization was successful, False otherwise.
         """
 
+        self.setupWebsocket()
+
         log(
             bcolors.OKGREEN
             + bcolors.BOLD
@@ -113,7 +115,6 @@ class Synapse:
             isServer=self.__isServer,
             isSim=self.__isSim,
         )
-        self.setupWebsocket()
 
         return setup_good
 

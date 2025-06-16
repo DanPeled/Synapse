@@ -27,7 +27,7 @@ sys.stderr = writer()
 
 
 class LogMessageType(Enum):
-    INFO = "log"
+    INFO = "info"
     ERR = "error"
     WARN = "warning"
 
@@ -36,7 +36,9 @@ def socketLog(
     text: str, msgType: LogMessageType, socket: Optional[WebSocketServer]
 ) -> None:
     if socket:
-        socket.sendToAllSync(createMessageFromDict(msgType.value, text))
+        socket.sendToAllSync(
+            createMessageFromDict("log", {"message": text, "type": msgType.value})
+        )
 
 
 def logInternal(text: str):

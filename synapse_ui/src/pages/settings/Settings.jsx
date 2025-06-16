@@ -66,12 +66,16 @@ function Stats() {
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: "0.5em",
           color: teamColor,
         }}
       >
-        <ChartColumnBig stroke={iconColor} size={24} fill="none" />
-        Stats
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
+          <ChartColumnBig stroke={iconColor} size={24} fill="none" />
+          Stats
+        </div>
+        <span style={{ fontSize: 16 }}>Last Fetched: {hardwaremetrics.last_fetched}</span>
       </h2>
 
       <div style={styles.section}>
