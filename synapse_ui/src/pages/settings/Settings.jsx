@@ -50,6 +50,9 @@ const IPMode = Object.freeze({
 });
 
 function Stats() {
+  const { deviceinfo, hardwaremetrics
+  } = useBackendContext();
+
   return (
     <div
       style={{
@@ -85,8 +88,8 @@ function Stats() {
             <tbody>
               <tr>
                 <td style={styles.td}>Unknown</td>
-                <td style={styles.td}>Unknown</td>
-                <td style={styles.td}>Unknown</td>
+                <td style={styles.td}>{deviceinfo.platform}</td>
+                <td style={styles.td}>{deviceinfo.ip}</td>
               </tr>
             </tbody>
           </table>
@@ -102,19 +105,19 @@ function Stats() {
                 <th style={styles.th}>CPU Temp</th>
                 <th style={styles.th}>CPU Usage</th>
                 <th style={styles.th}>Memory Usage</th>
-                <th style={styles.th}>CPU Throttling</th>
                 <th style={styles.th}>Uptime</th>
                 <th style={styles.th}>Disk Usage</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style={styles.td}>---</td>
-                <td style={styles.td}>---</td>
-                <td style={styles.td}>---</td>
-                <td style={styles.td}>---</td>
-                <td style={styles.td}>---</td>
-                <td style={styles.td}>---</td>
+                <td style={styles.td}>
+                  {hardwaremetrics.cpu_temp > 0 ? `${hardwaremetrics.cpu_temp}°` : "---"}
+                </td>
+                <td style={styles.td}>{hardwaremetrics.cpu_usage > 0 ? `${hardwaremetrics.cpu_usage}%` : '---'}</td>
+                <td style={styles.td}>{hardwaremetrics.ram_usage > 0 ? `${hardwaremetrics.ram_usage}%` : '---'}</td>
+                <td style={styles.td}>{hardwaremetrics.uptime > 0 ? `${hardwaremetrics.uptime}s` : '---'}</td>
+                <td style={styles.td}>{hardwaremetrics.disk_usage > 0 ? `${hardwaremetrics.disk_usage}%` : '---'}</td>
               </tr>
             </tbody>
           </table>
@@ -133,10 +136,8 @@ function NetworkSettings({
 }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
-    deviceIP,
-    setDeviceIP,
-    hostname,
-    setHostname: contextSetHostname,
+    deviceinfo,
+    setDeviceinfo,
     networktable,
     setNetworktable,
   } = useBackendContext();
@@ -194,7 +195,7 @@ function NetworkSettings({
         >
           <TextInput
             label={ipMode == IPMode.static ? "Static IP" : "Current IP (DHCP)"}
-            placeholder={deviceIP.valueOf()}
+            initialValue={deviceinfo.ip}
             pattern={ipAddressRegex}
             errorMessage="Invalid IPv4 Address"
             onChange={(val) => {
@@ -249,20 +250,15 @@ function NetworkSettings({
         label="Hostname"
         onChange={setPropHostname}
         disabled={!manageDeviceNetworking}
-        initialValue={hostname}
+        initialValue={deviceinfo.hostname}
       />
       <Dropdown
         label="NetworkManager Interface"
         tooltip={
           "Name of the interface Synapse should manage the IP address of"
         }
-        options={[
-          {
-            label: "eth0",
-            value: "eth0",
-          },
-        ]}
-        onChange={(val) => {}}
+        options={deviceinfo.networkInterfaces.map((inter) => ({ label: inter, value: inter }))}
+        onChange={(val) => { }}
         disabled={!manageDeviceNetworking}
       />
       <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />

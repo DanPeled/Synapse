@@ -1,4 +1,4 @@
-const divColor = "black";
+const divColor = "rgb(20, 20 ,20)";
 
 export function getDivColor() {
   return divColor;

@@ -1,22 +1,43 @@
 import { Ban, SquarePlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AlertDialog from "../alert";
 import { Button } from "../button";
 import { Column, Row } from "../containers";
 import Dropdown from "../dropdown";
 import TextInput from "../textInput";
+import { useBackendContext } from "../../services/backend/backendContext";
+
+interface Option {
+  label: string;
+  value: string;
+}
+
+interface AddPipelineDialogProps {
+  visible: boolean;
+  setVisible: (visible: boolean) => void;
+  addPipeline: (pipeline: Option) => void;
+}
 
 export default function AddPipelineDialog({
   visible,
   setVisible,
-  addPipelines: addPipeline,
-}) {
-  const [pipelineName, setPipelineName] = useState("New Pipeline");
-  const [pipelineIndex, setPipelineIndex] = useState(-1); // TODO
-  const pipelineTypes = [
-    { label: "Apriltag", value: "ApriltagPipeline" },
-    { label: "Colored Shape", value: "ColorPipeline" },
-  ];
+  addPipeline,
+}: AddPipelineDialogProps) {
+  const { pipelineContext } = useBackendContext();
+  const [pipelineName, setPipelineName] = useState<string>("New Pipeline");
+  const [pipelineIndex, setPipelineIndex] = useState<number>(-1); // TODO: fix pipelineIndex logic
+  const [pipelineTypes, setPipelineTypes] = useState<Option[]>([]);
+
+  useEffect(() => {
+    if (pipelineContext?.pipelineTypes) {
+      setPipelineTypes(
+        pipelineContext.pipelineTypes.map((type: string) => ({
+          label: type,
+          value: type,
+        }))
+      );
+    }
+  }, [pipelineContext?.pipelineTypes]);
 
   const cancelColors = {
     enabledColors: {
@@ -48,7 +69,6 @@ export default function AddPipelineDialog({
     },
   };
 
-  // Optionally, you could add disabled states if needed later
   const isCreateDisabled = pipelineName.trim() === "";
 
   return (
@@ -63,11 +83,11 @@ export default function AddPipelineDialog({
         </h2>
         <TextInput
           label="Pipeline Name"
-          onChange={(val) => setPipelineName(val)}
+          onChange={(val: string) => setPipelineName(val)}
           initialValue={pipelineName}
         />
         <Dropdown label="Pipeline Type" options={pipelineTypes} />
-        <Row fitMaxWidth={true} style={{ marginTop: "12px", gap: 16 }}>
+        <Row style={{ marginTop: 12, gap: 16 }}>
           <Button
             {...cancelColors}
             onClick={() => setVisible(false)}
@@ -84,7 +104,7 @@ export default function AddPipelineDialog({
             {...createColors}
             disabled={isCreateDisabled}
             onClick={() => {
-              addPipeline({ label: pipelineName, value: pipelineName }); // TODO actual addition logic (talk to backend)
+              addPipeline({ label: pipelineName, value: pipelineName });
               setVisible(false);
             }}
             style={{ minWidth: 100 }}

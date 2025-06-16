@@ -5,7 +5,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final, Optional
 
-from synapse.log import err
 
 # Referenced from  https://github.com/PhotonVision/photonvision/
 
@@ -328,14 +327,5 @@ class MetricsManager:
         try:
             self.runCommand.executeBashCommand(command)
             return self.runCommand.getOutput()
-        except Exception as e:
-            err(
-                f'Command: "{command}" returned an error!\n'
-                f"Output Received: {self.runCommand.getOutput()}\n"
-                f"Standard Error: {self.runCommand.getError()}\n"
-                f"Command completed: {self.runCommand.isOutputCompleted()}\n"
-                f"Error completed: {self.runCommand.isErrorCompleted()}\n"
-                f"Exit code: {self.runCommand.getExitCode()}\n"
-                f"Exception: {e}"
-            )
+        except Exception as _:
             return ""

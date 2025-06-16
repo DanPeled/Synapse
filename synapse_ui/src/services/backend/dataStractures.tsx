@@ -1,10 +1,19 @@
+import { PipelineManagement } from "./pipelineContext";
+
 export namespace BackendStateSystem {
   export interface State {
-    deviceIP: string;
+    deviceinfo: DeviceInfo;
+    hardwaremetrics: HardwareMetrics;
     pipelines: any[];
-    hostname: string;
     connection: ConnectionState;
     networktable: string;
+    pipelineContext: PipelineManagement.PipelineContext;
+    logs: Log[];
+  }
+
+  export interface Log {
+    type: "warning" | "info" | "error";
+    message: string;
   }
 
   // Define action types with a discriminated union
@@ -26,4 +35,19 @@ export namespace BackendStateSystem {
 export interface ConnectionState {
   backend: boolean;
   networktables: boolean;
+}
+
+export interface DeviceInfo {
+  hostname: string;
+  ip: string;
+  platform: string;
+  networkInterfaces: string[];
+}
+
+export interface HardwareMetrics {
+  cpu_temp: number;
+  cpu_usage: number;
+  disk_usage: number;
+  ram_usage: number;
+  uptime: number;
 }

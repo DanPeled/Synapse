@@ -6,6 +6,7 @@
   padding: 10px 0;
   height: 100vh;
   position: fixed;
+  z-index: 9999;
 }
 
 /* For nav icons: keep margin */
@@ -22,10 +23,10 @@ a.icon-wrapper-nav:hover {
 /* Tooltip styles unchanged */
 .tooltip {
   position: absolute;
-  left: 70px;
+  left: 25px;
   top: 50%;
   transform: translateY(-50%);
-  background: #111;
+  background: rgb(30, 30, 30);
   color: white;
   padding: 5px 10px;
   border-radius: 4px;
@@ -34,7 +35,7 @@ a.icon-wrapper-nav:hover {
   pointer-events: none;
   transition: opacity 0.3s;
   user-select: none;
-  z-index: 999;
+  z-index: 9999;
 }
 
 .icon-wrapper-nav:hover .tooltip {

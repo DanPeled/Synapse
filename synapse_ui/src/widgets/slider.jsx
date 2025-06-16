@@ -6,19 +6,20 @@ import { getDivColor, teamColor } from "../services/style";
 const baseColor = getDivColor();
 
 const SliderWrapper = styled.div`
-  width: 98%;
-  padding: 20px;
-  border-radius: 12px;
+  width: 97%;
+  padding: 16px 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   color: ${lighten(0.8, baseColor)};
 `;
 
 const SliderLabel = styled.label`
   font-weight: 600;
-  flex-shrink: 0;
-  min-width: 70px;
+  font-size: 16px;
+  min-width: 80px;
   color: ${teamColor};
 `;
 
@@ -31,20 +32,21 @@ const SliderContent = styled.div`
 `;
 
 const StepButton = styled.button`
-  background: ${lighten(0.2, baseColor)};
-  border: none;
-  color: ${lighten(0.4, baseColor)};
+  background: ${lighten(0.1, baseColor)};
+  border: 1px solid ${lighten(0.2, baseColor)};
+  color: ${teamColor};
   font-weight: 700;
-  font-size: 20px;
-  width: 36px;
-  height: 24px;
-  border-radius: 8px;
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  display: grid;
+  place-items: center;
 
   &:hover {
-    background: ${lighten(0.1, baseColor)};
+    background: ${lighten(0.15, baseColor)};
   }
 
   &:disabled {
@@ -56,14 +58,14 @@ const StepButton = styled.button`
 const StyledInput = styled.input`
   -webkit-appearance: none;
   flex-grow: 1;
-  height: 8px;
+  height: 6px;
   border-radius: 5px;
   background: linear-gradient(
     to right,
-    ${lighten(0.2, baseColor)} 0%,
+    ${teamColor} 0%,
+    ${teamColor} ${(props) => props.valuePercent}%,
     ${lighten(0.2, baseColor)} ${(props) => props.valuePercent}%,
-    ${lighten(0.15, baseColor)} ${(props) => props.valuePercent}%,
-    ${lighten(0.15, baseColor)} 100%
+    ${lighten(0.2, baseColor)} 100%
   );
   outline: none;
   cursor: pointer;
@@ -72,47 +74,45 @@ const StyledInput = styled.input`
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 20px;
-    height: 20px;
-    background: ${lighten(0.3, baseColor)};
+    width: 18px;
+    height: 18px;
+    background: ${teamColor};
     border-radius: 50%;
-    cursor: pointer;
-    border: 3px solid ${lighten(0.4, baseColor)};
-    box-shadow: 0 0 8px ${lighten(0.3, baseColor)};
-    margin-top: -7px;
-    transition: background 0.3s ease;
-  }
-  &::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: ${lighten(0.3, baseColor)};
-    border-radius: 50%;
-    cursor: pointer;
-    border: 3px solid ${lighten(0.4, baseColor)};
-    box-shadow: 0 0 8px ${lighten(0.3, baseColor)};
+    border: 2px solid white;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
     transition: background 0.3s ease;
   }
 
+  &::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: ${teamColor};
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+  }
+
   &:hover::-webkit-slider-thumb {
-    background: ${lighten(0.4, baseColor)};
+    background: ${lighten(0.1, teamColor)};
   }
 `;
 
 const ValueInput = styled.input`
-  width: 50px;
-  background: ${lighten(0.2, baseColor)};
-  border: none;
-  border-radius: 6px;
+  width: 60px;
+  padding: 8px;
+  background: ${lighten(0.08, baseColor)};
+  border: 1px solid ${lighten(0.2, baseColor)};
+  border-radius: 8px;
   color: ${teamColor};
   font-weight: 600;
   text-align: center;
   font-size: 16px;
-  padding: 6px 0;
-  user-select: text;
+  transition: all 0.2s ease;
 
   &:focus {
-    outline: 2px solid ${lighten(0.3, baseColor)};
-    background: ${lighten(0.1, baseColor)};
+    outline: none;
+    border-color: ${teamColor};
+    background: ${lighten(0.05, baseColor)};
   }
 
   &::-webkit-inner-spin-button,
@@ -120,6 +120,7 @@ const ValueInput = styled.input`
     -webkit-appearance: none;
     margin: 0;
   }
+
   -moz-appearance: textfield;
 `;
 
@@ -131,7 +132,7 @@ function Slider({
   label = "Value",
   labelGap = "0px",
   className = "",
-  onChange = (val) => {},
+  onChange = (val) => { },
 }) {
   const [value, setValue] = useState(initial);
   const valuePercent = ((value - min) / (max - min)) * 100;
@@ -139,7 +140,9 @@ function Slider({
   const clampValue = (val) => Math.min(max, Math.max(min, val));
 
   const handleSliderChange = (e) => {
-    setValue(clampValue(Number(e.target.value)));
+    const val = clampValue(Number(e.target.value));
+    setValue(val);
+    onChange(val);
   };
 
   const handleInputChange = (e) => {
@@ -150,8 +153,9 @@ function Slider({
     }
     const num = Number(val);
     if (!isNaN(num)) {
-      setValue(clampValue(num));
-      onChange(clampValue(num));
+      const clamped = clampValue(num);
+      setValue(clamped);
+      onChange(clamped);
     }
   };
 
@@ -161,11 +165,20 @@ function Slider({
     }
   };
 
-  const increment = () => setValue((v) => clampValue(Number(v) + step));
-  const decrement = () => setValue((v) => clampValue(Number(v) - step));
+  const increment = () => {
+    const clamped = clampValue(Number(value) + step);
+    setValue(clamped);
+    onChange(clamped);
+  };
+
+  const decrement = () => {
+    const clamped = clampValue(Number(value) - step);
+    setValue(clamped);
+    onChange(clamped);
+  };
 
   return (
-    <SliderWrapper>
+    <SliderWrapper className={className}>
       <SliderLabel>{label}</SliderLabel>
       <SliderContent labelGap={labelGap}>
         <StepButton onClick={decrement} disabled={value <= min}>

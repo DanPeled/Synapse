@@ -8,6 +8,7 @@ import {
   BackendContextProvider,
   useBackendContext,
 } from "./services/backend/backendContext";
+import { darken } from "polished";
 
 const GlobalStyle = createGlobalStyle`
   /* Webkit-based browsers (Chrome, Safari, Edge) */
@@ -59,7 +60,7 @@ function AppContent() {
   return (
     <div
       style={{
-        backgroundColor: "#8a1e60",
+        backgroundColor: darken(0.1, "#8a1e60"),
         overflowX: "hidden",
       }}
     >

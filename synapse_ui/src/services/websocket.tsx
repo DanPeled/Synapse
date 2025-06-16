@@ -19,10 +19,10 @@ export default class WebSocketWrapper {
 
   constructor(url: string, options: WebSocketWrapperOptions = {}) {
     this.url = url;
-    this.onOpen = options.onOpen || (() => {});
-    this.onClose = options.onClose || (() => {});
-    this.onMessage = options.onMessage || (() => {});
-    this.onError = options.onError || (() => {});
+    this.onOpen = options.onOpen || (() => { });
+    this.onClose = options.onClose || (() => { });
+    this.onMessage = options.onMessage || (() => { });
+    this.onError = options.onError || (() => { });
     this.reconnectInterval = options.reconnectInterval ?? 200;
   }
 
@@ -67,4 +67,8 @@ export default class WebSocketWrapper {
   public isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
+}
+
+export class Message {
+  constructor(public type: string, public message: unknown) { }
 }

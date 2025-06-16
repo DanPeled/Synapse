@@ -9,17 +9,17 @@ import React from "react";
  * @param {React.CSSProperties} [props.style={}] - Optional additional inline styles to apply.
  * @param {object} [rest] - Other props passed to the container div.
  */
-export function Row({ children, style = {}, fitMaxWidth = false, ...props }) {
+export function Row({ children = [], style = {}, fitMaxWidth = false, ...props }) {
   // If fitMaxWidth is true, clone children to add flex: 1 style
   const childrenWithFlex = fitMaxWidth
     ? React.Children.map(children, (child) => {
-        if (React.isValidElement(child)) {
-          // Merge child's existing style with flex: 1
-          const childStyle = { ...(child.props.style || {}), flex: 1 };
-          return React.cloneElement(child, { style: childStyle });
-        }
-        return child;
-      })
+      if (React.isValidElement(child)) {
+        // Merge child's existing style with flex: 1
+        const childStyle = { ...(child.props.style || {}), flex: 1 };
+        return React.cloneElement(child, { style: childStyle });
+      }
+      return child;
+    })
     : children;
 
   return (

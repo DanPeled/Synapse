@@ -19,7 +19,6 @@ const Container = styled.div`
 const InputWrapper = styled.div`
   box-sizing: border-box;
   width: 100%;
-  background-color: ${darken(0.05, getDivColor())};
   border-radius: 12px;
   padding: 0px 14px;
   color: #eee;
@@ -36,7 +35,7 @@ const InputWrapper = styled.div`
 const Label = styled.label`
   min-width: 0px;
   font-size: 18px;
-  color: ${teamColor};
+  color: ${(props) => props.textColor ?? teamColor};
 `;
 
 const StyledInput = styled.input`
@@ -67,19 +66,24 @@ const ErrorText = styled.span`
 export default function TextInput({
   label = "Input",
   initialValue = "",
-  onChange = (_) => {},
+  onChange = (_) => { },
   placeholder = "",
   pattern = "^.*$",
   errorMessage = "Invalid input",
   allowedChars = null,
-  width,
+  width = "auto",
   disabled = false,
   maxLength = null,
   tooltip = null,
+  textColor = teamColor
 }) {
   const [value, setValue] = useState(initialValue);
   const [invalid, setInvalid] = useState(false);
   const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
 
   function handleChange(e) {
     let val = e.target.value;
@@ -117,10 +121,10 @@ export default function TextInput({
         onMouseLeave={() => setHovered(false)}
       >
         {tooltip && <Tooltip visible={hovered}>{tooltip}</Tooltip>}
-        <Label>{label}</Label>
+        <Label textColor={textColor}>{label}</Label>
         <StyledInput
           type="text"
-          value={value}
+          value={disabled ? initialValue : value}
           onChange={handleChange}
           placeholder={placeholder}
           $invalid={invalid}

@@ -6,7 +6,7 @@ import Tooltip from "./tooltip";
 
 const TabContainer = styled.div`
   width: ${(props) => props.$width || "100%"};
-  background-color: ${darken(0.05, getDivColor())};
+  background-color: ${getDivColor()};
   border-radius: 12px;
   padding: 10px 14px;
   color: ${teamColor};
@@ -35,9 +35,9 @@ const TabButton = styled.button`
 
   &:hover {
     background-color: ${(props) =>
-      props.active
-        ? lighten(0.18, getDivColor())
-        : lighten(0.2, getDivColor())};
+    props.active
+      ? lighten(0.18, getDivColor())
+      : lighten(0.2, getDivColor())};
   }
 
   &:focus {
@@ -46,7 +46,7 @@ const TabButton = styled.button`
 `;
 
 const TabContent = styled.div`
-  background-color: ${darken(0.1, getDivColor())};
+  background-color: ${getDivColor()};
   padding: 16px;
   border-radius: 0 0 8px 8px;
 `;

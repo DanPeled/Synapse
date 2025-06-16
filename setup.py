@@ -32,6 +32,7 @@ setup(
         "numpy==1.23.3",
         "pytest",
         "build",
+        "psutil",
     ],
     include_package_data=True,
 )

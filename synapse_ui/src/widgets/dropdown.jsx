@@ -7,112 +7,114 @@ import Tooltip from "./tooltip";
 
 const DropdownWrapper = styled.div`
   width: ${(props) => props.$width || "95%"};
-  background-color: ${lighten(0.1, getDivColor())};
-  border-radius: 12px;
-  padding: 10px 14px;
   color: ${teamColor};
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  font-weight: 600;
-  user-select: none;
-
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 10px;
   position: relative;
+  transition: background-color 0.2s ease;
 `;
 
 const Label = styled.label`
   min-width: 80px;
   font-size: 18px;
-  color: ${(props) => teamColor};
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  color: ${teamColor};
+  opacity: ${(props) => (props.disabled ? 0.5 : 0.9)};
+  font-weight: bold;
 `;
 
 const DropdownButton = styled.button`
   flex-grow: 1;
   width: 100%;
   background-color: ${(props) =>
-    props.disabled ? darken(0.05, getDivColor()) : darken(0.15, getDivColor())};
+    props.disabled ? darken(0.02, getDivColor()) : darken(0.1, getDivColor())};
   color: ${teamColor};
-  padding: 8px 12px;
-  border: none;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid ${lighten(0.1, getDivColor())};
+  border-radius: 10px;
   text-align: left;
-  font-size: 18px;
+  font-size: 16px;
   cursor: ${(props) => (props.disabled ? "not-allowed" : "pointer")};
-  position: relative;
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: ${(props) =>
+    props.disabled
+      ? darken(0.02, getDivColor())
+      : darken(0.12, getDivColor())};
+  }
 
   &:focus {
-    outline: ${(props) =>
-      props.disabled ? "none" : `2px solid ${lighten(0.15, getDivColor())}`};
-    background-color: ${(props) =>
-      props.disabled
-        ? darken(0.05, getDivColor())
-        : darken(0.2, getDivColor())};
+    outline: none;
+    box-shadow: 0 0 0 2px ${lighten(0.2, getDivColor())};
   }
 `;
 
 const DropdownList = styled.ul`
   position: absolute;
-  background-color: ${lighten(0.15, getDivColor())};
-  border-radius: 8px;
-  max-height: 200px;
+  background-color: ${lighten(0.1, getDivColor())};
+  border: 1px solid ${lighten(0.2, getDivColor())};
+  border-radius: 10px;
+  max-height: 220px;
   overflow-y: auto;
-  padding: 0;
+  padding: 4px 0;
   margin: 0;
   z-index: 9999;
   list-style: none;
-  animation: fadeIn 0.2s ease-out;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  color: ${teamColor};
+  animation: fadeIn 0.15s ease-out;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 
   @keyframes fadeIn {
     from {
       opacity: 0;
-      transform: scaleY(0.95);
+      transform: translateY(-5px);
     }
     to {
       opacity: 1;
-      transform: scaleY(1);
+      transform: translateY(0);
     }
   }
 `;
 
 const DropdownItem = styled.li`
-  padding: 10px 12px;
+  padding: 10px 14px;
   cursor: pointer;
+  font-size: 15px;
+  font-weight: ${(props) => (props.selected ? 600 : 400)};
+  background: ${(props) => (props.selected ? darken(0.15, getDivColor()) : "transparent")};
   color: ${teamColor};
-  font-weight: ${(props) => (props.selected ? "bold" : "normal")};
+  transition: background 0.15s ease;
 
   &:hover {
-    background-color: ${darken(0.25, getDivColor())};
+    background-color: ${darken(0.2, getDivColor())};
   }
 `;
 
 const DropdownArrow = styled.span`
   position: absolute;
-  right: 12px;
+  right: 14px;
   top: 50%;
-  pointer-events: none;
-  transition: transform 0.3s ease;
-  transform-origin: center;
   transform: translateY(-50%)
     rotate(${(props) => (props.$open ? "180deg" : "0deg")});
+  transition: transform 0.3s ease;
+  pointer-events: none;
+  font-size: 14px;
 `;
-
-// Component
 
 function Dropdown({
   options,
   label = "Select",
-  onChange,
-  width,
-  tooltip,
+  onChange = (val) => { },
+  width = "auto",
+  tooltip = "",
   disabled = false,
+  initialValue = options[0].value
 }) {
   const [selected, setSelected] = useState(
-    options.length > 0 ? (options[0].value ?? options[0]) : "",
+    initialValue,
   );
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);

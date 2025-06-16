@@ -1,8 +1,12 @@
 import datetime
+from enum import Enum
 import os
 import sys
+from typing import Optional
 
 from synapse.bcolors import bcolors
+
+from synapse_net.socketServer import WebSocketServer, createMessageFromDict
 
 # Flag to control printing to the console
 PRINTS = True
@@ -22,7 +26,20 @@ class writer(object):
 sys.stderr = writer()
 
 
-def log(text: str):
+class LogMessageType(Enum):
+    INFO = "log"
+    ERR = "error"
+    WARN = "warning"
+
+
+def socketLog(
+    text: str, msgType: LogMessageType, socket: Optional[WebSocketServer]
+) -> None:
+    if socket:
+        socket.sendToAllSync(createMessageFromDict(msgType.value, text))
+
+
+def logInternal(text: str):
     """
     Logs a message with the current timestamp to both the console and a log file.
 
@@ -49,6 +66,11 @@ def log(text: str):
         f.write(str(final_string) + "\n")
 
 
+def log(text: str):
+    logInternal(text)
+    socketLog(text, LogMessageType.INFO, WebSocketServer.kInstance)
+
+
 def err(text: str):
     """
     Logs an error message with the current timestamp by prepending '[ERROR]' to the message.
@@ -58,7 +80,9 @@ def err(text: str):
 
     This function calls the `log` function and formats the message to indicate an error.
     """
-    log(bcolors.FAIL + f"[ERROR]: {text}" + bcolors.ENDC)
+    text = f"[ERROR]: {text}"
+    logInternal(bcolors.FAIL + text + bcolors.ENDC)
+    socketLog(text, LogMessageType.ERR, WebSocketServer.kInstance)
 
 
 def warn(text: str):
@@ -70,4 +94,6 @@ def warn(text: str):
 
     This function calls the `log` function and formats the message to indicate an warning.
     """
-    log(bcolors.WARNING + f"[WARNING]: {text}" + bcolors.ENDC)
+    text = f"[WARNING]: {text}"
+    logInternal(bcolors.WARNING + text + bcolors.WARNING)
+    socketLog(text, LogMessageType.WARN, WebSocketServer.kInstance)

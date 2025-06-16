@@ -1,131 +1,132 @@
 "use client";
 
-import React from "react";
-
-import { useRef, useState } from "react";
+import React, { useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, Text } from "@react-three/drei";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
-import { Column } from "./containers";
 import { Button } from "./button";
 
-class WPIPosition {
-  x: number;
-  y: number;
-  z: number;
-
-  constructor(x: number, y: number, z: number) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
-
-  public toThreeJSPose(): THREE.Vector3 {
-    return new THREE.Vector3(this.x, this.z, this.y);
-  }
+export interface Transform3DState {
+  rotation: { x: number; y: number; z: number };
+  translation: { x: number; y: number; z: number };
 }
 
-interface Transform3DState {
-  rotation: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  translation: {
-    x: number;
-    y: number;
-    z: number;
-  };
-}
-
-interface Transform3DVisualizerProps {
-  /** Initial transformation values */
-  initialTransform?: Transform3DState;
-  /** Whether to show the original reference shape */
-  showReference?: boolean;
-  /** Whether to show coordinate axes */
-  showAxes?: boolean;
-  /** Whether to show the grid */
-  showGrid?: boolean;
-  /** Custom shape to transform (defaults to box + cone) */
-  children?: React.ReactNode;
-  /** Callback when transformation changes */
-  onTransformChange?: (transform: Transform3DState) => void;
-  /** Canvas height */
-  height?: string | number;
-  /** Whether to show controls */
-  showControls?: boolean;
-  /** Custom colors for the shapes */
+export interface TransformableObjectState {
+  id: string;
+  transform: Transform3DState;
   color?: string;
-  /** Translation range limits */
-  translationRange?: {
-    min: number;
-    max: number;
-  };
+  shape?: React.ReactNode;
+  wireframe?: boolean;
+}
+
+export interface Transform3DVisualizerProps {
+  objects: TransformableObjectState[];
+  showReference?: boolean;
+  showAxes?: boolean;
+  showGrid?: boolean;
+  height?: string | number;
+  showControls?: boolean;
   controlsRef?: React.RefObject<OrbitControlsImpl | null>;
 }
 
 function TransformableObject({
   transform,
-  children,
   color = "#cbd5e1",
+  shape,
+  wireframe,
 }: {
   transform: Transform3DState;
-  children?: React.ReactNode;
   color?: string;
+  shape?: React.ReactNode;
+  wireframe?: boolean;
 }) {
-  const meshRef = useRef<THREE.Group>(null);
-
-  useFrame(() => {
-    if (meshRef.current) {
-      // Apply rotation
-      meshRef.current.rotation.x = (transform.rotation.x * Math.PI) / 180;
-      meshRef.current.rotation.y = (transform.rotation.y * Math.PI) / 180;
-      meshRef.current.rotation.z = (transform.rotation.z * Math.PI) / 180;
-
-      // Apply translation
-      meshRef.current.position.x = transform.translation.x;
-      meshRef.current.position.y = transform.translation.y;
-      meshRef.current.position.z = transform.translation.z;
-    }
-  });
-
-  const DefaultShape = () => (
-    <>
-      <mesh>
-        <boxGeometry args={[3, 0.5, 3]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-    </>
-  );
-
   return (
-    <>
-      {/* Transformed object */}
-      <group ref={meshRef}>{children || <DefaultShape />}</group>
-    </>
+    <group
+      rotation={[
+        (transform.rotation.x * Math.PI) / 180,
+        (transform.rotation.y * Math.PI) / 180,
+        (transform.rotation.z * Math.PI) / 180,
+      ]}
+      position={[
+        transform.translation.x,
+        transform.translation.z, // converts from WPI pose to THREEJS pose
+        transform.translation.y,
+      ]}
+    >
+      {shape ?? (
+        <mesh>
+          <boxGeometry args={[2.5, 0.5, 2.5]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      )}
+      {wireframe && (
+        <mesh>
+          <boxGeometry args={[2.7, 0.7, 2.7]} />
+          <meshBasicMaterial color="yellow" wireframe />
+        </mesh>
+      )}
+    </group>
   );
 }
 
-function CoordinateAxes() {
+function RoundedRectMesh({
+  width = 1.5,
+  height = 0.5,
+  radius = 0.1,
+  color = "white",
+  opacity = 0.6,
+  ...props
+}) {
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(radius, 0);
+    s.lineTo(width - radius, 0);
+    s.quadraticCurveTo(width, 0, width, radius);
+    s.lineTo(width, height - radius);
+    s.quadraticCurveTo(width, height, width - radius, height);
+    s.lineTo(radius, height);
+    s.quadraticCurveTo(0, height, 0, height - radius);
+    s.lineTo(0, radius);
+    s.quadraticCurveTo(0, 0, radius, 0);
+    return s;
+  }, [width, height, radius]);
+
+  const geometry = useMemo(() => {
+    const geom = new THREE.ShapeGeometry(shape);
+    geom.translate(-width / 2, -height / 2, 0);
+    return geom;
+  }, [shape, width, height]);
+
+  const material = useMemo(
+    () => new THREE.MeshBasicMaterial({ color, transparent: true, opacity }),
+    [color, opacity]
+  );
+
+  return <primitive object={new THREE.Mesh(geometry, material)} {...props} />;
+}
+
+export function CoordinateAxes() {
   const axisLineRadius = 0.03;
   const baseLength = 3.8;
   const padding = 0.4;
 
   const { camera } = useThree();
 
+  // Refs for axes lines
   const xAxisRef = useRef<THREE.Mesh>(null);
   const yAxisRef = useRef<THREE.Mesh>(null);
   const zAxisRef = useRef<THREE.Mesh>(null);
-  const xAxisLabelRef = useRef<THREE.Mesh>(null);
-  const zAxisLabelRef = useRef<THREE.Mesh>(null);
-  const yAxisLabelRef = useRef<THREE.Mesh>(null);
+
+  // Refs for label groups (to lookAt camera)
+  const xAxisLabelRef = useRef<THREE.Group>(null);
+  const yAxisLabelRef = useRef<THREE.Group>(null);
+  const zAxisLabelRef = useRef<THREE.Group>(null);
 
   useFrame(() => {
     const scale = camera.position.length() / 10;
 
-    // Scale axis meshes
+    // Scale and position axes lines
     if (xAxisRef.current) {
       xAxisRef.current.scale.set(1, scale, 1);
       xAxisRef.current.position.set((scale * baseLength) / 2, 0, 0);
@@ -139,21 +140,21 @@ function CoordinateAxes() {
       zAxisRef.current.position.set(0, 0, (-scale * baseLength) / 2);
     }
 
-    // Rotate labels toward camera
+    // Make labels face the camera and scale
     if (xAxisLabelRef.current) {
       xAxisLabelRef.current.lookAt(camera.position);
       xAxisLabelRef.current.position.set(scale * (baseLength + padding), 0, 0);
       xAxisLabelRef.current.scale.setScalar(scale);
     }
-    if (zAxisLabelRef.current) {
-      zAxisLabelRef.current.lookAt(camera.position);
-      zAxisLabelRef.current.position.set(0, scale * (baseLength + padding), 0);
-      zAxisLabelRef.current.scale.setScalar(scale);
-    }
     if (yAxisLabelRef.current) {
       yAxisLabelRef.current.lookAt(camera.position);
       yAxisLabelRef.current.position.set(0, 0, -scale * (baseLength + padding));
       yAxisLabelRef.current.scale.setScalar(scale);
+    }
+    if (zAxisLabelRef.current) {
+      zAxisLabelRef.current.lookAt(camera.position);
+      zAxisLabelRef.current.position.set(0, scale * (baseLength + padding), 0);
+      zAxisLabelRef.current.scale.setScalar(scale);
     }
   });
 
@@ -177,26 +178,51 @@ function CoordinateAxes() {
         <meshBasicMaterial color="green" />
       </mesh>
 
-      {/* Labels */}
-      <Text
-        ref={xAxisLabelRef}
-        fontSize={0.3}
-        color="#ef4444"
-        fontWeight={"bold"}
-      >
-        X (Front)
-      </Text>
-      <Text ref={zAxisLabelRef} fontSize={0.3} color="blue" fontWeight={"bold"}>
-        Z (Up)
-      </Text>
-      <Text
-        ref={yAxisLabelRef}
-        fontSize={0.3}
-        color="#22c55e"
-        fontWeight={"bold"}
-      >
-        Y (Left)
-      </Text>
+      {/* Labels with rounded background */}
+      {/* X Axis Label */}
+      <group ref={xAxisLabelRef}>
+        <RoundedRectMesh width={1.6} height={0.5} radius={0.15} color="gray" opacity={0.7} />
+        <Text
+          fontSize={0.3}
+          color="#ef4444"
+          fontWeight={"bold"}
+          position={[0, 0, 0.01]} // slight offset in z to prevent z-fighting
+          anchorX="center"
+          anchorY="middle"
+        >
+          X (Front)
+        </Text>
+      </group>
+
+      {/* Y Axis Label */}
+      <group ref={yAxisLabelRef}>
+        <RoundedRectMesh width={1.6} height={0.5} radius={0.15} color="gray" opacity={0.7} />
+        <Text
+          fontSize={0.3}
+          color="#22c55e"
+          fontWeight={"bold"}
+          position={[0, 0, 1]}
+          anchorX="center"
+          anchorY="middle"
+        >
+          Y (Left)
+        </Text>
+      </group>
+
+      {/* Z Axis Label */}
+      <group ref={zAxisLabelRef}>
+        <RoundedRectMesh width={1.6} height={0.5} radius={0.15} color="gray" opacity={0.7} />
+        <Text
+          fontSize={0.3}
+          color="blue"
+          fontWeight={"bold"}
+          position={[0, 0, 0.01]}
+          anchorX="center"
+          anchorY="middle"
+        >
+          Z (Up)
+        </Text>
+      </group>
     </group>
   );
 }
@@ -205,88 +231,55 @@ export function Transform3DVisualizer({
   showReference = true,
   showAxes = true,
   showGrid = true,
-  children,
   height = "500px",
   showControls = true,
-  color: color,
   controlsRef = React.createRef(),
+  objects,
 }: Transform3DVisualizerProps) {
-  const defaultCameraPose: [x: number, y: number, z: number] = [3, 3, -3];
+  const defaultCameraPose: [number, number, number] = [2.2, 2.2, -2.2];
 
   const resetCameraPose = () => {
     if (!controlsRef.current) return;
-
-    // Reset camera position (same as initial position in Canvas)
     const [x, y, z] = defaultCameraPose;
     controlsRef.current.object.position.set(x, y, z);
-
-    // Reset the target to origin (or wherever you want)
     controlsRef.current.target.set(0, 0, 0);
-
-    // Must call update after manual changes
     controlsRef.current.update();
   };
 
-  const Scene = () => (
-    <Canvas
-      camera={{ position: defaultCameraPose, fov: 50 }}
-      gl={{ preserveDrawingBuffer: true }}
-      onCreated={({ gl }) => {
-        gl.setClearColor("#0000");
-      }}
-    >
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
-
-      <TransformableObject
-        transform={{
-          rotation: { x: 0, y: 0, z: 0 },
-          translation: { x: 0, y: 0, z: 0 },
-        }}
-        color={color}
-      >
-        {children}
-      </TransformableObject>
-
-      {showAxes && <CoordinateAxes />}
-      {showGrid && (
-        <Grid
-          args={[20, 20, 20]}
-          sectionColor={"black"}
-          cellColor={"rgba(256,256, 256, 0.5)"}
-        />
-      )}
-
-      <OrbitControls
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={true}
-        ref={controlsRef}
-      />
-    </Canvas>
-  );
-
-  if (!showControls) {
-    return (
-      <div className="border rounded-lg bg-white" style={{ height }}>
-        <Scene />
-      </div>
-    );
-  }
-
   return (
-    <Column>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="border rounded-lg bg-white" style={{ height }}>
-            <Scene />
-          </div>
-          {showReference && (
-            <div className="mt-4 flex items-center gap-4"></div>
-          )}
-        </div>
-      </div>
-      <Button onClick={resetCameraPose}>Reset Camera Pose</Button>
-    </Column>
+    <div>
+      <Canvas
+        camera={{ position: defaultCameraPose, fov: 50 }}
+        gl={{ preserveDrawingBuffer: true }}
+        onCreated={({ gl }) => gl.setClearColor("#0000")}
+        style={{ height }}
+      >
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[10, 10, 5]} intensity={1} />
+
+        {objects.map((obj) => (
+          <TransformableObject
+            key={obj.id}
+            transform={obj.transform}
+            color={obj.color}
+            shape={obj.shape}
+            wireframe={obj.wireframe}
+          />
+        ))}
+
+        {showAxes && <CoordinateAxes />}
+        {showGrid && <Grid args={[20, 20]} sectionColor={"black"} cellColor={"rgba(256,256,256,0.5)"} />}
+        <OrbitControls ref={controlsRef} enablePan enableZoom enableRotate />
+      </Canvas>
+      {
+        showControls && (
+          <Button
+            onClick={resetCameraPose}
+          >
+            Reset Camera
+          </Button>
+        )
+      }
+    </div >
   );
 }

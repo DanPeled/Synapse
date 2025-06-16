@@ -1,3 +1,4 @@
+import atexit
 import os
 from pathlib import Path
 
@@ -5,8 +6,15 @@ from synapse.bcolors import bcolors
 from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
 
-from synapse_net import NtClient
-
+from synapse_net.nt_client import NtClient
+from synapse_net.socketServer import (
+    WebSocketServer,
+    SocketEvent,
+    Messages,
+    createMessageFromDict,
+)
+import asyncio
+import threading
 from .pipeline import GlobalSettings
 from .runtime_handler import RuntimeManager
 
@@ -105,6 +113,8 @@ class Synapse:
             isServer=self.__isServer,
             isSim=self.__isSim,
         )
+        self.setupWebsocket()
+
         return setup_good
 
     def __init_cmd_args(self) -> None:
@@ -131,6 +141,67 @@ class Synapse:
         This method is responsible for running the pipeline after it has been initialized.
         """
         self.runtime_handler.run()
+
+    def setupWebsocket(self) -> None:
+        import psutil
+
+        self.websocket = WebSocketServer("localhost", 8765)
+
+        @self.websocket.on(SocketEvent.kConnect)
+        async def on_connect(ws):
+            import socket
+            import synapse.hardware.metrics as metrics
+
+            addre = socket.gethostbyname(socket.gethostname())
+            await self.websocket.sendToClient(
+                ws,
+                createMessageFromDict(
+                    Messages.kSendDeviceInfo.value,
+                    {
+                        "ip": addre,
+                        "platform": metrics.Platform.getCurrentPlatform()
+                        .getOSType()
+                        .value,
+                        "hostname": socket.gethostname(),
+                        "networkInterfaces": list(psutil.net_if_addrs().keys()),
+                    },
+                ),
+            )
+
+        @self.websocket.on(SocketEvent.kMessage)
+        async def on_message(ws, msg):
+            print(f"Message from {ws.remote_address}: {msg}")
+
+        @self.websocket.on(SocketEvent.kDisconnect)
+        async def on_disconnect(ws):
+            print("Client disconnected:", ws.remote_address)
+
+        @self.websocket.on(SocketEvent.kError)
+        async def on_error(ws, error_msg):
+            print(f"Error with {ws.remote_address}: {error_msg}")
+
+        # Create and start a new event loop in a separate thread
+        def start_loop(loop):
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        new_loop = asyncio.new_event_loop()
+        self.websocketThread = threading.Thread(target=start_loop, args=(new_loop,))
+        self.websocketThread.start()
+
+        async def run_server():
+            await self.websocket.start()
+
+        asyncio.run_coroutine_threadsafe(run_server(), new_loop)
+
+        atexit.register(self.closeWebsocket)
+        print(
+            "WebSocket server started on ws://localhost:8765 (running in a separate thread)"
+        )
+
+    def closeWebsocket(self):
+        asyncio.run(self.websocket.close())
+        self.websocketThread.join()
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

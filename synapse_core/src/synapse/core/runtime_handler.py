@@ -9,13 +9,18 @@ from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
-
+from synapse_net.socketServer import WebSocketServer, createMessageFromDict
 import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
 from synapse.core.config import yaml
 from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
@@ -23,12 +28,22 @@ from synapse_net.nt_client import NtClient
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
+from .pipeline import (
+    CameraConfig,
+    FrameResult,
+    GlobalSettings,
+    Pipeline,
+    PipelineSettings,
+)
 from .settings_api import PipelineSettingsMap
 
 
@@ -605,7 +620,7 @@ class RuntimeManager:
         """
 
         def metricsProcess(queue: Queue):
-            from synapse.hardware import MetricsManager
+            from synapse.hardware.metrics import MetricsManager
 
             metricsManager: Final[MetricsManager] = MetricsManager()
             metricsManager.setConfig(None)  # Pass config if you have one
@@ -615,7 +630,6 @@ class RuntimeManager:
                     metricsManager.getTemp(),
                     metricsManager.getUtilization(),
                     metricsManager.getMemory(),
-                    metricsManager.getThrottleReason(),
                     metricsManager.getUptime(),
                     metricsManager.getGPUMemorySplit(),
                     metricsManager.getUsedRam(),
@@ -642,6 +656,19 @@ class RuntimeManager:
             while True:
                 try:
                     metrics = queue.get(timeout=2)
+                    if WebSocketServer.kInstance is not None:
+                        WebSocketServer.kInstance.sendToAllSync(
+                            createMessageFromDict(
+                                "hardware_metrics",
+                                {
+                                    "cpu_temp": metrics[0],
+                                    "cpu_usage": metrics[1],
+                                    "ram_usage": metrics[5],
+                                    "uptime": metrics[3],
+                                    "disk_usage": metrics[-2],
+                                },
+                            )
+                        )
                     entry.setDoubleArray(metrics)
                 except Exception:
                     continue
