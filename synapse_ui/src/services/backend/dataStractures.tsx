@@ -1,3 +1,4 @@
+import WebSocketWrapper from "../websocket";
 import { PipelineManagement } from "./pipelineContext";
 
 export namespace BackendStateSystem {
@@ -9,6 +10,7 @@ export namespace BackendStateSystem {
     networktable: string;
     pipelineContext: PipelineManagement.PipelineContext;
     logs: Log[];
+    socket?: WebSocketWrapper | null;
   }
 
   export interface Log {
@@ -38,8 +40,8 @@ export interface ConnectionState {
 }
 
 export interface DeviceInfo {
-  hostname: string;
-  ip: string;
+  hostname: string | null;
+  ip: string | null;
   platform: string;
   networkInterfaces: string[];
 }

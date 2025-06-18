@@ -1,10 +1,8 @@
-import { React, useState } from "react";
+import { React, useEffect, useState } from "react";
 import {
   iconColor,
   styles,
   iconSize,
-  getDivColor,
-  setDivColor,
   teamColor,
 } from "../../services/style";
 import {
@@ -18,7 +16,6 @@ import {
   RotateCcw,
   Skull,
   TriangleAlert,
-  Palette,
   X,
 } from "lucide-react";
 import TextInput from "../../widgets/textInput";
@@ -29,6 +26,7 @@ import AlertDialog from "../../widgets/alert";
 import ToggleButton from "../../widgets/toggle";
 import Dropdown from "../../widgets/dropdown.jsx";
 import { useBackendContext } from "../../services/backend/backendContext";
+import { createMessage } from "../../services/websocket";
 
 const teamNumberRegex = "\\d+(\\.\\d+)?";
 const ipAddressRegex = "((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)(\\.(?!$)|$)){4}";
@@ -134,9 +132,12 @@ function Stats() {
 function NetworkSettings({
   ipMode,
   setIPMode,
-  setNetworkTablesIPAddr,
+  setNetworkTablesServer,
+  networkTablesServer,
   setHostname: setPropHostname,
+  hostname,
   setStaticIPAddr,
+  staticIPAddr
 }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
@@ -144,7 +145,22 @@ function NetworkSettings({
     setDeviceinfo,
     networktable,
     setNetworktable,
+    connection,
+    socket
   } = useBackendContext();
+  const [networkInterface, setNetworkInterface] = useState(deviceinfo.networkInterfaces[0]);
+
+  useEffect(() => {
+    if (hostname == null) {
+      setPropHostname(deviceinfo.hostname);
+    }
+  }, [deviceinfo]);
+
+  useEffect(() => {
+    if (ipMode === IPMode.static && staticIPAddr == null) {
+      staticIPAddr = deviceinfo.ip;
+    }
+  }, [ipMode]);
 
   return (
     <Column
@@ -175,7 +191,7 @@ function NetworkSettings({
         pattern={teamNumberOrIPRegex}
         errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
         onChange={(val) => {
-          setNetworkTablesIPAddr(val);
+          setNetworkTablesServer(val);
         }}
       />
       <TextInput
@@ -198,18 +214,18 @@ function NetworkSettings({
           style={{ width: "600px", flexDirection: "row", alignItems: "center" }}
         >
           <TextInput
-            label={ipMode == IPMode.static ? "Static IP" : "Current IP (DHCP)"}
+            label={ipMode === IPMode.static ? "Static IP" : "Current IP (DHCP)"}
             initialValue={deviceinfo.ip}
             pattern={ipAddressRegex}
             errorMessage="Invalid IPv4 Address"
             onChange={(val) => {
               setStaticIPAddr(val);
             }}
-            disabled={!manageDeviceNetworking || ipMode == IPMode.dhcp}
+            disabled={!manageDeviceNetworking || ipMode === IPMode.dhcp}
             width="500px"
             allowedChars={"[\\d.]+"}
           />
-          {ipMode == IPMode.static && (
+          {ipMode === IPMode.static && (
             <TextInput
               label="/"
               placeholder="24"
@@ -217,7 +233,7 @@ function NetworkSettings({
               onChange={(val) => {
                 return val;
               }}
-              disabled={!manageDeviceNetworking || ipMode == IPMode.dhcp}
+              disabled={!manageDeviceNetworking || ipMode === IPMode.dhcp}
               style={{ width: "4rem" }}
               width="100px"
               maxLength={2}
@@ -262,15 +278,21 @@ function NetworkSettings({
           "Name of the interface Synapse should manage the IP address of"
         }
         options={deviceinfo.networkInterfaces.map((inter) => ({ label: inter, value: inter }))}
-        onChange={(val) => { }}
+        onChange={(val) => { setNetworkInterface(val); }}
         disabled={!manageDeviceNetworking}
       />
       <hr style={{ width: "98%", border: "1px solid rgba(20,20,20,0.5)" }} />
       <Button
         onClick={() => {
-          // TODO
+          socket?.send(createMessage("set_network_config", {
+            ip: ipMode == IPMode.static ? staticIPAddr : null,
+            networkInterface: networkInterface,
+            hostname: hostname,
+            networkTable: networktable ?? "Synapse",
+            networkTablesServer: networkTablesServer
+          }));
         }}
-        disabled={true}
+        disabled={!connection.backend}
       >
         Save
       </Button>
@@ -280,6 +302,7 @@ function NetworkSettings({
 
 function DeviceControl() {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
+  const { connection } = useBackendContext();
 
   const buttonContentStyle = {
     display: "flex",
@@ -350,13 +373,13 @@ function DeviceControl() {
         </h2>
 
         <Row fitMaxWidth={true}>
-          <DangerButton warning="Restarting Synapse will restart all runtime processes. Proceed only if necessary.">
+          <DangerButton warning="Restarting Synapse will restart all runtime processes. Proceed only if necessary." disabled={!connection.backend}>
             <span style={buttonContentStyle}>
               <RotateCcw size={iconSize} />
               Restart Synapse
             </span>
           </DangerButton>
-          <DangerButton warning="Restarting the device will stop all processes. Make sure to save your work.">
+          <DangerButton warning="Restarting the device will stop all processes. Make sure to save your work." disabled={!connection.backend}>
             <span style={buttonContentStyle}>
               <ListRestart size={iconSize} />
               Restart Device
@@ -364,13 +387,13 @@ function DeviceControl() {
           </DangerButton>
         </Row>
 
-        <DangerButton warning="WARNING: This action will factory reset the device and permanently delete all saved data. This cannot be undone.">
+        <DangerButton warning="WARNING: This action will factory reset the device and permanently delete all saved data. This cannot be undone." disabled={!connection.backend}>
           <span style={buttonContentStyle}>
             <Skull size={iconSize} />
             Factory Reset Synapse & Delete Everything
           </span>
         </DangerButton>
-      </Column>
+      </Column >
 
       {programLogsVisible && (
         <AlertDialog
@@ -385,14 +408,15 @@ function DeviceControl() {
             </span>
           </Button>
         </AlertDialog>
-      )}
+      )
+      }
     </>
   );
 }
 
 export default function Settings() {
   const [ipMode, setIPMode] = useState(IPMode.dhcp);
-  const [networkTablesAddr, setNetworkTablesAddr] = useState(null);
+  const [networkTablesServer, setNetworkTablesServer] = useState(null);
   const [hostname, setHostname] = useState(null);
   const [staticIPAddr, setStaticIPAddr] = useState(null);
 
@@ -412,9 +436,12 @@ export default function Settings() {
         <NetworkSettings
           setIPMode={setIPMode}
           ipMode={ipMode}
-          setNetworkTablesIPAddr={setNetworkTablesAddr}
+          setNetworkTablesServer={setNetworkTablesServer}
+          networkTablesServer={networkTablesServer}
           setHostname={setHostname}
+          hostname={hostname}
           setStaticIPAddr={setStaticIPAddr}
+          staticIPAddr={staticIPAddr}
         />
       </Column>
     </Row>

@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./widgets/Sidebar";
 import Dashboard from "./pages/dashboard/Dashboard";
 import Settings from "./pages/settings/Settings";
 import CameraConfig from "./pages/cameraConfig/CameraConfig";
 import { createGlobalStyle } from "styled-components";
-import {
-  BackendContextProvider,
-  useBackendContext,
-} from "./services/backend/backendContext";
+import { BackendContextProvider } from "./services/backend/backendContext";
 import { darken } from "polished";
 
 const GlobalStyle = createGlobalStyle`
-  /* Webkit-based browsers (Chrome, Safari, Edge) */
+ body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
   ::-webkit-scrollbar {
     width: 12px;
   }
@@ -28,7 +30,6 @@ const GlobalStyle = createGlobalStyle`
     background-color: #888;
   }
 
-  /* Firefox */
   * {
     scrollbar-width: thin;
     scrollbar-color: #555 #222;
@@ -36,51 +37,26 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 function AppContent() {
-  const [view, setView] = useState(window.location.hash);
-
-  const onHashChange = () => {
-    setView(window.location.hash);
-  };
-
-  useEffect(() => {
-    if (
-      !window.location.hash ||
-      window.location.hash === "#/" ||
-      window.location.hash === "#"
-    ) {
-      window.location.hash = "#/dashboard";
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
   return (
-    <div
-      style={{
-        backgroundColor: darken(0.1, "#8a1e60"),
-        overflowX: "hidden",
-      }}
-    >
+    <div style={{ backgroundColor: darken(0.1, "#8a1e60"), overflowX: "hidden" }}>
       <GlobalStyle />
-      <div className="App" style={{ display: "flex", height: "100vh" }}>
+      <div className="App">
         <Sidebar />
         <main
           style={{
             flex: 1,
             height: "100vh",
             color: "white",
-            paddingLeft: "70px",
-            paddingTop: "5px",
-            paddingRight: "10px",
+            padding: "5px 10px", // top right bottom left
+            marginLeft: "60px"
           }}
         >
-          {view === "#/dashboard" && <Dashboard />}
-          {view === "#/settings" && <Settings />}
-          {view === "#/camera" && <CameraConfig />}
-          <div style={{ height: "15px" }}></div>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/camera" element={<CameraConfig />} />
+          </Routes>
         </main>
       </div>
     </div>

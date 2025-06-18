@@ -5,6 +5,7 @@ import React, {
   ReactNode,
   useState,
   useEffect,
+  useRef,
 } from "react";
 import WebSocketWrapper, { Message } from "../websocket";
 import { BackendStateSystem, DeviceInfo, HardwareMetrics } from "./dataStractures";
@@ -12,8 +13,8 @@ import { PipelineManagement } from "./pipelineContext";
 
 const initialState: BackendStateSystem.State = {
   deviceinfo: {
-    hostname: "Unknown",
-    ip: "127.0.0.1",
+    hostname: null,
+    ip: null,
     platform: "Unknown",
     networkInterfaces: ["eth0"]
   },
@@ -102,8 +103,11 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
     return acc;
   }, {} as BackendStateSystem.StateSetter);
 
-  const [socket] = useState(() => {
-    return new WebSocketWrapper("ws://localhost:8765", {
+  const socket = useRef<WebSocketWrapper | null>(null);
+
+
+  useEffect(() => {
+    const ws = new WebSocketWrapper("ws://localhost:8765", {
       onOpen: () => {
         dispatch({
           type: "SET_CONNECTION",
@@ -120,38 +124,40 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         const jsonArr = splitConcatenatedJSON(message);
         jsonArr.forEach((val) => {
           const messageObj = val as Message;
-
           switch (messageObj.type) {
             case "send_device_info":
-              const deviceInfo: DeviceInfo = (messageObj.message as DeviceInfo);
-              setters.setDeviceinfo({ ...state.deviceinfo, ip: deviceInfo.ip, platform: deviceInfo.platform, hostname: deviceInfo.hostname ?? "Unknown", networkInterfaces: deviceInfo.networkInterfaces });
+              const deviceInfo: DeviceInfo = messageObj.message as DeviceInfo;
+              setters.setDeviceinfo({
+                ...state.deviceinfo,
+                ip: deviceInfo.ip,
+                platform: deviceInfo.platform,
+                hostname: deviceInfo.hostname ?? "Unknown",
+                networkInterfaces: deviceInfo.networkInterfaces,
+              });
               break;
             case "hardware_metrics":
-              const hardwareMetrics: HardwareMetrics = (messageObj.message as HardwareMetrics);
+              const hardwareMetrics: HardwareMetrics = messageObj.message as HardwareMetrics;
               setters.setHardwaremetrics({
                 ...state.hardwaremetrics,
-                cpu_temp: hardwareMetrics.cpu_temp,
-                cpu_usage: hardwareMetrics.cpu_usage,
-                disk_usage: hardwareMetrics.disk_usage,
-                ram_usage: hardwareMetrics.ram_usage,
-                uptime: hardwareMetrics.uptime,
-                last_fetched: new Date().toLocaleTimeString()
+                ...hardwareMetrics,
+                last_fetched: new Date().toLocaleTimeString(),
               });
               break;
             case "log":
+              // Handle logs if needed
               break;
           }
         });
       },
     });
-  });
 
-  useEffect(() => {
-    socket.connect();
-  }, [socket]);
+    socket.current = ws;
+    ws.connect();
+    setters.setSocket?.(ws);
+  }, []);
 
   return (
-    <BackendContextContext.Provider value={{ ...state, ...setters }}>
+    <BackendContextContext.Provider value={{ ...state, ...setters, socket: socket.current }}>
       {children}
     </BackendContextContext.Provider>
   );

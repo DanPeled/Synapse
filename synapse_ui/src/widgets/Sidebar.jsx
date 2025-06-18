@@ -12,23 +12,24 @@ import "./Sidebar.css";
 import PropTypes from "prop-types";
 import { useBackendContext } from "../services/backend/backendContext";
 import { getDivColor, teamColor } from "../services/style";
+import { Link } from "react-router-dom";
 
 const icons = [
-  { icon: <LayoutDashboard />, label: "Dashboard", url: "dashboard" },
-  { icon: <Camera />, label: "Camera", url: "camera" },
-  { icon: <Settings />, label: "Settings", url: "settings" },
+  { icon: <LayoutDashboard />, label: "Dashboard", url: "/dashboard" },
+  { icon: <Camera />, label: "Camera", url: "/camera" },
+  { icon: <Settings />, label: "Settings", url: "/settings" },
 ];
 
-function NavigationIcon({ key, icon, label, url }) {
+function NavigationIcon({ icon, label, url }) {
   return (
-    <div key={key} style={{ margin: "10px 0" }}>
-      <a
-        href={`#/${url}`}
+    <div style={{ margin: "10px 0" }}>
+      <Link
+        to={url}
         className="icon-wrapper-nav"
         style={{ color: teamColor }}
       >
-        {icon}{" "}
-      </a>
+        {icon}
+      </Link>
       <span className="tooltip" style={{ zIndex: 999 }}>
         {label}
       </span>
@@ -37,7 +38,6 @@ function NavigationIcon({ key, icon, label, url }) {
 }
 
 NavigationIcon.propTypes = {
-  key: PropTypes.string,
   icon: PropTypes.element,
   label: PropTypes.string,
   url: PropTypes.string,
@@ -49,19 +49,7 @@ export default function Sidebar() {
   return (
     <div className="sidebar" style={{ backgroundColor: getDivColor() }}>
       {icons.map(({ icon, label, url }, i) => (
-        <div key={i} className="icon-wrapper-nav" style={{ color: teamColor }}>
-          {
-            <NavigationIcon
-              key={i}
-              icon={icon}
-              label={label}
-              url={url}
-              style={{
-                color: teamColor,
-              }}
-            />
-          }
-        </div>
+        <NavigationIcon key={i} icon={icon} label={label} url={url} />
       ))}
 
       <div className="network-group">

@@ -72,3 +72,10 @@ export default class WebSocketWrapper {
 export class Message {
   constructor(public type: string, public message: unknown) { }
 }
+
+export function createMessage(type: string, message: any): string {
+  return JSON.stringify({
+    type: type,
+    message: message
+  });
+}

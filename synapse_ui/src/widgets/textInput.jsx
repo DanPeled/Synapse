@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { styled } from "styled-components";
-import { lighten, darken } from "polished";
+import { lighten } from "polished";
 import { getDivColor, teamColor } from "../services/style";
 import Tooltip from "./tooltip";
 

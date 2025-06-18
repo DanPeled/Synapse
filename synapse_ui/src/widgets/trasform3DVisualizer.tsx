@@ -247,7 +247,7 @@ export function Transform3DVisualizer({
   };
 
   return (
-    <div>
+    <>
       <Canvas
         camera={{ position: defaultCameraPose, fov: 50 }}
         gl={{ preserveDrawingBuffer: true }}
@@ -280,6 +280,6 @@ export function Transform3DVisualizer({
           </Button>
         )
       }
-    </div >
+    </ >
   );
 }

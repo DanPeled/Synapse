@@ -174,12 +174,11 @@ class Synapse:
             print(f"Message from {ws.remote_address}: {msg}")
 
         @self.websocket.on(SocketEvent.kDisconnect)
-        async def on_disconnect(ws):
-            print("Client disconnected:", ws.remote_address)
+        async def on_disconnect(ws): ...
 
         @self.websocket.on(SocketEvent.kError)
         async def on_error(ws, error_msg):
-            print(f"Error with {ws.remote_address}: {error_msg}")
+            err(f"Socket: {ws.remote_address}: {error_msg}")
 
         # Create and start a new event loop in a separate thread
         def start_loop(loop):
