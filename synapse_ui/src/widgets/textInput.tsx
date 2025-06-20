@@ -19,10 +19,9 @@ interface TextInputProps {
 export default function TextInput({
   label = "Input",
   initialValue = "",
-  onChange = () => {},
+  onChange,
   placeholder = "",
   pattern = "^.*$",
-  errorMessage = "Invalid input",
   allowedChars = null,
   disabled = false,
   maxLength = null,
@@ -57,7 +56,7 @@ export default function TextInput({
     setInvalid(isInvalid);
 
     if (!isInvalid) {
-      onChange(val);
+      onChange?.(val);
     }
   };
 

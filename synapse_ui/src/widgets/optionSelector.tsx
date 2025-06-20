@@ -1,11 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { teamColor } from "../services/style";
 
 type Option = {
@@ -25,10 +19,9 @@ interface OptionSelectorProps {
 
 export default function OptionSelector({
   label = "IP Mode",
-  labelTooltip = "",
   options,
   value,
-  onChange = () => {},
+  onChange = () => { },
   disabled = false,
 }: OptionSelectorProps) {
   const [hoveredOption, setHoveredOption] = useState<string | number | null>(
@@ -54,7 +47,6 @@ export default function OptionSelector({
     if (!button) return;
 
     const btnRect = button.getBoundingClientRect();
-    const tooltipWidth = tooltip.offsetWidth;
     const tooltipHeight = tooltip.offsetHeight;
 
     const fitsBelow = window.innerHeight > btnRect.bottom + tooltipHeight + 8;
@@ -77,6 +69,7 @@ export default function OptionSelector({
         disabled ? "opacity-50 pointer-events-none select-none" : "",
       )}
     >
+      <span>{label}</span>
       <div className="flex gap-2">
         {options.map((opt) => {
           const isSelected = value === opt.value;

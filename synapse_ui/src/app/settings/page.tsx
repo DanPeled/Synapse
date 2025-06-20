@@ -46,11 +46,10 @@ enum IPMode {
   dhcp = "DHCP",
 }
 
-function NetworkSettings({}) {
+function NetworkSettings({ }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
     deviceinfo,
-    setDeviceinfo,
     networktable,
     setNetworktable,
     connection,
@@ -76,13 +75,13 @@ function NetworkSettings({}) {
     if (hostname == null) {
       setPropHostname(deviceinfo.hostname);
     }
-  }, [deviceinfo]);
+  }, [deviceinfo.hostname, hostname]);
 
   useEffect(() => {
     if (ipMode === IPMode.static && staticIPAddr == null) {
       setStaticIPAddr(deviceinfo.ip);
     }
-  }, [ipMode]);
+  }, [ipMode, deviceinfo.ip, staticIPAddr]);
 
   return (
     <Card
@@ -175,7 +174,7 @@ function NetworkSettings({}) {
             disabled={!manageDeviceNetworking}
             initialValue={deviceinfo.hostname ?? "Unknown"}
           />
-          <Dropdown
+          <Dropdown<string>
             label="NetworkManager Interface"
             value={networkInterface}
             options={deviceinfo.networkInterfaces.map((inter) => ({
@@ -186,6 +185,8 @@ function NetworkSettings({}) {
               setNetworkInterface(val);
             }}
             disabled={!manageDeviceNetworking}
+            serialize={(val) => val}
+            deserialize={(val) => val}
           />
           <Button
             onClickAction={() => {
@@ -209,7 +210,7 @@ function NetworkSettings({}) {
   );
 }
 
-function DeviceInfo({}) {
+function DeviceInfo({ }) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
 
   return (
@@ -341,8 +342,7 @@ function DangerZone() {
   );
 }
 
-function DeviceControls({}) {
-  const { connection } = useBackendContext();
+function DeviceControls({ }) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
 
   return (
@@ -414,7 +414,7 @@ function DeviceControls({}) {
   );
 }
 
-export default function Settings({}) {
+export default function Settings({ }) {
   return (
     <div
       className="w-full min-h-screen text-pink-600"

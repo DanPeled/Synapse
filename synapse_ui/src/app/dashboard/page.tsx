@@ -86,7 +86,9 @@ function CameraAndPipelineControls() {
               setSelectedCamera(val);
             }}
             label="Camera"
-            options={mockData.cameras as DropdownOption[]}
+            options={mockData.cameras as DropdownOption<number>[]}
+            serialize={(val) => val.toString()}
+            deserialize={(val) => Number.parseInt(val)}
           />
         </div>
 
@@ -99,7 +101,9 @@ function CameraAndPipelineControls() {
             }))}
             label="Pipeline"
             value={selectedPipeline}
-            onValueChange={(val) => {}}
+            onValueChange={(val) => { setSelectedPipeline(val); }}
+            serialize={(val) => val}
+            deserialize={(val) => val}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -181,11 +185,13 @@ function CameraAndPipelineControls() {
           <Dropdown
             label="Pipeline Type"
             value={selectedPipelineType}
-            onValueChange={(val) => {}}
+            onValueChange={(val) => { setSelectedPipelineType(val); }}
             options={mockData.pipelineTypes.map((type) => ({
               label: type,
               value: type,
             }))}
+            serialize={(val) => val}
+            deserialize={(val) => val}
           />
         </div>
       </CardContent>
@@ -301,7 +307,7 @@ function PipelineConfigControl() {
                   setCameraGain(val);
                 }}
               />
-              <Dropdown
+              <Dropdown<string>
                 label="Orientation"
                 value={orientation}
                 onValueChange={setOrientation}
@@ -309,12 +315,16 @@ function PipelineConfigControl() {
                   value: o.value.toString(),
                   label: o.label,
                 }))}
+                serialize={(val) => val}
+                deserialize={(val) => val}
               />
-              <Dropdown
+              <Dropdown<string>
                 label="Resolution"
                 value={resolution}
                 onValueChange={setResolution}
                 options={mockData.resolutions}
+                serialize={(val) => val}
+                deserialize={(val) => val}
               />
             </div>
           </TabsContent>

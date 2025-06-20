@@ -7,33 +7,30 @@ import {
 } from "@/components/ui/select";
 import { teamColor } from "@/services/style";
 
-export interface DropdownOption {
-  value: any;
+export interface DropdownOption<T> {
+  value: T;
   label: string;
 }
 
-interface DropdownProps {
+interface DropdownProps<T> {
   label: string;
-  value: any;
-  onValueChange: (value: any) => void;
-  options: DropdownOption[];
+  value: T;
+  onValueChange: (value: T) => void;
+  options: DropdownOption<T>[];
   disabled?: boolean;
+  serialize: (value: T) => string;       // Convert T to string for Select
+  deserialize: (value: string) => T;     // Convert string back to T
 }
 
-function hexToRgba(hex: string, alpha: number) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-export function Dropdown({
+export function Dropdown<T>({
   label,
   value,
   onValueChange,
   options,
   disabled = false,
-}: DropdownProps) {
+  serialize,
+  deserialize,
+}: DropdownProps<T>) {
   const baseBg = "rgb(20, 20, 20)";
   const hoverBg = "rgb(30, 30, 30)";
   const selectedBg = "#333333";
@@ -55,7 +52,13 @@ export function Dropdown({
         {label}
       </label>
       <div className="flex-1 relative">
-        <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+        <Select
+          value={serialize(value)}
+          onValueChange={(val) => {
+            onValueChange(deserialize(val));
+          }}
+          disabled={disabled}
+        >
           <SelectTrigger
             className="w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none"
             style={{
@@ -75,29 +78,32 @@ export function Dropdown({
               zIndex: 9999,
             }}
           >
-            {options.map((opt) => (
-              <SelectItem
-                key={opt.value}
-                value={opt.value}
-                className="px-4 py-2 transition-colors font-normal cursor-pointer"
-                style={{
-                  color: teamColor,
-                  backgroundColor:
-                    value === opt.value ? selectedBg : "transparent",
-                  fontWeight: value === opt.value ? 600 : 400,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = hoverBg;
-                }}
-                onMouseLeave={(e) => {
-                  if (value !== opt.value) {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }
-                }}
-              >
-                {opt.label}
-              </SelectItem>
-            ))}
+            {options.map((opt) => {
+              const stringValue = serialize(opt.value);
+              return (
+                <SelectItem
+                  key={stringValue}
+                  value={stringValue}
+                  className="px-4 py-2 transition-colors font-normal cursor-pointer"
+                  style={{
+                    color: teamColor,
+                    backgroundColor:
+                      serialize(value) === stringValue ? selectedBg : "transparent",
+                    fontWeight: serialize(value) === stringValue ? 600 : 400,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hoverBg;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (serialize(value) !== stringValue) {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }
+                  }}
+                >
+                  {opt.label}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>

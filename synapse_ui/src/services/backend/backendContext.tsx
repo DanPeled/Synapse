@@ -94,12 +94,6 @@ interface BackendContextProviderProps {
   ) => void;
 }
 
-function handleValueChange(key: string, value: any) {
-  switch (key) {
-    case BackendStateKeys.deviceInfo:
-      break;
-  }
-}
 
 export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   children,
@@ -109,11 +103,8 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   const setters = Object.keys(initialState).reduce((acc, key) => {
     const functionName =
       `set${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof BackendStateSystem.StateSetter;
-    acc[functionName] = (value: any) => {
+    acc[functionName] = (value: unknown) => {
       dispatch({ type: `SET_${key.toUpperCase()}`, payload: value });
-      if (handleValueChange) {
-        handleValueChange(key as keyof BackendStateSystem.State, value);
-      }
     };
     return acc;
   }, {} as BackendStateSystem.StateSetter);
@@ -169,7 +160,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
     socket.current = ws;
     ws.connect();
     setters.setSocket?.(ws);
-  }, []);
+  }, [setters, state]);
 
   return (
     <BackendContextContext.Provider
@@ -224,7 +215,7 @@ function splitConcatenatedJSON(input: string): unknown[] {
         try {
           values.push(JSON.parse(chunk));
         } catch (e) {
-          console.error("Failed to parse:", chunk);
+          console.error(`Failed to parse: ${chunk} due to ${e}`);
         }
       }
       start = i + 1;

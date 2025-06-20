@@ -122,6 +122,14 @@ function ConfirmDialog({
   );
 }
 
+type ColorConfig = {
+  background: string;
+  color: string;
+  border: string;
+  hoverBackground: string;
+  hoverBorder: string;
+} | undefined;
+
 export function DangerButton({
   enabledColors = {
     background: "#cc0c39",
@@ -134,15 +142,17 @@ export function DangerButton({
     background: "#a0522d",
     color: "#ccc",
     border: "#5c2a0e",
+    hoverBackground: "#a0522d",
+    hoverBorder: "#5c2a0e",
   },
   warning = "",
-  onClickAction = () => {},
+  onClickAction,
   children,
   className,
   ...props
 }: {
-  enabledColors?: any;
-  disabledColors?: any;
+  enabledColors?: ColorConfig;
+  disabledColors?: ColorConfig;
   warning?: string;
   onClickAction?: () => void;
   className?: string;

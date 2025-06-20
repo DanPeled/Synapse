@@ -22,7 +22,7 @@ export function Slider({
   label = "Value",
   labelGap = "0px",
   className = "",
-  onChange = (_: number) => {},
+  onChange,
 }: SliderProps) {
   const [value, setValue] = useState<number | "">(initial);
   const valuePercent =
@@ -33,7 +33,7 @@ export function Slider({
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = clampValue(Number(e.target.value));
     setValue(val);
-    onChange(val);
+    onChange?.(val);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +46,7 @@ export function Slider({
     if (!isNaN(num)) {
       const clamped = clampValue(num);
       setValue(clamped);
-      onChange(clamped);
+      onChange?.(clamped);
     }
   };
 
@@ -59,13 +59,13 @@ export function Slider({
   const increment = () => {
     const clamped = clampValue(Number(value) + step);
     setValue(clamped);
-    onChange(clamped);
+    onChange?.(clamped);
   };
 
   const decrement = () => {
     const clamped = clampValue(Number(value) - step);
     setValue(clamped);
-    onChange(clamped);
+    onChange?.(clamped);
   };
 
   return (

@@ -2,10 +2,17 @@ import WebSocketWrapper from "../websocket";
 import { PipelineManagement } from "./pipelineContext";
 
 export namespace BackendStateSystem {
+  export interface Pipeline {
+    name: string;
+    type: string;
+    index: number;
+  };
+
+
   export interface State {
     deviceinfo: DeviceInfo;
     hardwaremetrics: HardwareMetrics;
-    pipelines: any[];
+    pipelines: Pipeline[];
     connection: ConnectionState;
     networktable: string;
     pipelineContext: PipelineManagement.PipelineContext;
@@ -21,8 +28,8 @@ export namespace BackendStateSystem {
 
   // Define action types with a discriminated union
   export type StateAction =
-    | { type: `SET_${Uppercase<keyof State & string>}`; payload: any }
-    | { type: string; payload?: any }; // fallback for unknown actions
+    | { type: `SET_${Uppercase<keyof State & string>}`; payload: unknown }
+    | { type: string; payload?: unknown }; // fallback for unknown actions
 
   // Type for the setters dynamically created
   export type StateSetter = {

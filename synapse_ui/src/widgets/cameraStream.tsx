@@ -1,6 +1,6 @@
 import { baseCardColor, teamColor } from "@/services/style";
 import { Eye } from "lucide-react";
-import { darken, lighten } from "polished";
+import { darken } from "polished";
 
 export function CameraStream() {
   return (

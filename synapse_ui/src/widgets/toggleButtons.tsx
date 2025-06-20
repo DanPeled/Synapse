@@ -7,7 +7,7 @@ import { teamColor } from "../services/style";
 export default function ToggleButton({
   label = "Toggle",
   value = false,
-  onToggleAction = () => {},
+  onToggleAction,
   disabled = false,
   labelGap = 3, // Tailwind spacing scale (12px ≈ gap-3)
 }: {
@@ -29,7 +29,7 @@ export default function ToggleButton({
           disabled && "opacity-50 cursor-not-allowed",
         )}
         onClick={() => {
-          if (!disabled) onToggleAction(!value);
+          if (!disabled) onToggleAction?.(!value);
         }}
       >
         <div
