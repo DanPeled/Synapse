@@ -11,6 +11,7 @@ export namespace BackendStateSystem {
     pipelineContext: PipelineManagement.PipelineContext;
     logs: Log[];
     socket?: WebSocketWrapper | null;
+    networkTablesServer: string | null;
   }
 
   export interface Log {

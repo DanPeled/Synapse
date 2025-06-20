@@ -9,14 +9,14 @@ export namespace PipelineManagement {
 
   export interface PipelineSetting {
     constraint: SettingsManagement.ConstraintType;
-  };
+  }
 
   export class Pipeline {
     constructor(
       public name: string,
       public type: string,
-      public settings: Map<string, PipelineSetting>
-    ) { }
+      public settings: Map<string, PipelineSetting>,
+    ) {}
   }
 
   export class PipelineContext {
@@ -28,7 +28,6 @@ export namespace PipelineManagement {
       this.pipelineTypes = [...pipelineTypes];
     }
 
-
     public addPipeline(pipeline: Pipeline) {
       this.pipelines.push(pipeline);
     }
@@ -36,7 +35,5 @@ export namespace PipelineManagement {
     public getPipeline(name: string): Pipeline | undefined {
       return this.pipelines.find((pipe) => pipe.name == name);
     }
-  };
-
-};
-
+  }
+}

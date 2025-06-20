@@ -1,14 +1,19 @@
+"use client";
+
 import React, {
   createContext,
   useContext,
   useReducer,
   ReactNode,
-  useState,
   useEffect,
   useRef,
 } from "react";
 import WebSocketWrapper, { Message } from "../websocket";
-import { BackendStateSystem, DeviceInfo, HardwareMetrics } from "./dataStractures";
+import {
+  BackendStateSystem,
+  DeviceInfo,
+  HardwareMetrics,
+} from "./dataStractures";
 import { PipelineManagement } from "./pipelineContext";
 
 const initialState: BackendStateSystem.State = {
@@ -16,7 +21,7 @@ const initialState: BackendStateSystem.State = {
     hostname: null,
     ip: null,
     platform: "Unknown",
-    networkInterfaces: ["eth0"]
+    networkInterfaces: ["eth0"],
   },
   hardwaremetrics: {
     cpu_temp: 0,
@@ -24,7 +29,7 @@ const initialState: BackendStateSystem.State = {
     disk_usage: 0,
     ram_usage: 0,
     uptime: 0,
-    last_fetched: new Date().toLocaleTimeString()
+    last_fetched: new Date().toLocaleTimeString(),
   },
   pipelines: [],
   connection: {
@@ -32,13 +37,23 @@ const initialState: BackendStateSystem.State = {
     networktables: false,
   },
   networktable: "Synapse",
-  pipelineContext: new PipelineManagement.PipelineContext([
-    new PipelineManagement.Pipeline("Sample Pipeline", "ApriltagPipeline", new Map()),
-    new PipelineManagement.Pipeline("Another Pipeline", "ApriltagPipeline", new Map())
-  ], [
-    "ApriltagPipeline"
-  ]),
+  pipelineContext: new PipelineManagement.PipelineContext(
+    [
+      new PipelineManagement.Pipeline(
+        "Sample Pipeline",
+        "ApriltagPipeline",
+        new Map(),
+      ),
+      new PipelineManagement.Pipeline(
+        "Another Pipeline",
+        "ApriltagPipeline",
+        new Map(),
+      ),
+    ],
+    ["ApriltagPipeline"],
+  ),
   logs: [] as BackendStateSystem.Log[],
+  networkTablesServer: null,
 };
 
 export const BackendStateKeys = Object.keys(initialState).reduce(
@@ -105,7 +120,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
   const socket = useRef<WebSocketWrapper | null>(null);
 
-
   useEffect(() => {
     const ws = new WebSocketWrapper("ws://localhost:8765", {
       onOpen: () => {
@@ -136,11 +150,12 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               });
               break;
             case "hardware_metrics":
-              const hardwareMetrics: HardwareMetrics = messageObj.message as HardwareMetrics;
+              const hardwareMetrics: HardwareMetrics =
+                messageObj.message as HardwareMetrics;
               setters.setHardwaremetrics({
                 ...state.hardwaremetrics,
                 ...hardwareMetrics,
-                last_fetched: new Date().toLocaleTimeString(),
+                last_fetched: formatHHMMSSLocal(new Date()),
               });
               break;
             case "log":
@@ -157,7 +172,9 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   }, []);
 
   return (
-    <BackendContextContext.Provider value={{ ...state, ...setters, socket: socket.current }}>
+    <BackendContextContext.Provider
+      value={{ ...state, ...setters, socket: socket.current }}
+    >
       {children}
     </BackendContextContext.Provider>
   );
@@ -186,7 +203,7 @@ function splitConcatenatedJSON(input: string): unknown[] {
     if (inString) {
       if (escape) {
         escape = false;
-      } else if (char === '\\') {
+      } else if (char === "\\") {
         escape = true;
       } else if (char === '"') {
         inString = false;
@@ -194,9 +211,9 @@ function splitConcatenatedJSON(input: string): unknown[] {
     } else {
       if (char === '"') {
         inString = true;
-      } else if (char === '{' || char === '[') {
+      } else if (char === "{" || char === "[") {
         depth++;
-      } else if (char === '}' || char === ']') {
+      } else if (char === "}" || char === "]") {
         depth--;
       }
     }
@@ -215,4 +232,9 @@ function splitConcatenatedJSON(input: string): unknown[] {
   }
 
   return values;
+}
+
+function formatHHMMSSLocal(date: Date): string {
+  const pad = (n: number): string => n.toString().padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }

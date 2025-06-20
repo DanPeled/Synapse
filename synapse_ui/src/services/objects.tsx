@@ -12,9 +12,8 @@ export namespace Models {
     width: 2.5,
     length: 2.5,
     height: 0.32,
-    color: "rgb(170, 170, 170)"
+    color: "rgb(170, 170, 170)",
   };
-
 
   export function createRobotModel(config: RobotModelConfig = kRobotDefaults) {
     const wheelRadius = 0.3;
@@ -26,15 +25,15 @@ export namespace Models {
 
     // Adjusted wheel positions inside chassis
     const wheelPositions: [number, number, number][] = [
-      [-halfW + wheelRadius, baseY - wheelThickness / 2, -halfL + wheelRadius],  // Front Left
-      [halfW - wheelRadius, baseY - wheelThickness / 2, -halfL + wheelRadius],   // Front Right
-      [-halfW + wheelRadius, baseY - wheelThickness / 2, halfL - wheelRadius],   // Back Left
-      [halfW - wheelRadius, baseY - wheelThickness / 2, halfL - wheelRadius],    // Back Right
+      [-halfW + wheelRadius, baseY - wheelThickness / 2, -halfL + wheelRadius], // Front Left
+      [halfW - wheelRadius, baseY - wheelThickness / 2, -halfL + wheelRadius], // Front Right
+      [-halfW + wheelRadius, baseY - wheelThickness / 2, halfL - wheelRadius], // Back Left
+      [halfW - wheelRadius, baseY - wheelThickness / 2, halfL - wheelRadius], // Back Right
     ];
 
     // Bumper dimensions
-    const bumperThickness = 0.1;  // thickness of the bumper
-    const bumperHeight = 0.3;    // height of the bumper above the baseY
+    const bumperThickness = 0.1; // thickness of the bumper
+    const bumperHeight = 0.3; // height of the bumper above the baseY
 
     return (
       <>
@@ -53,7 +52,11 @@ export namespace Models {
         {/* Bumper */}
         <mesh position={[0, 0, 0]}>
           <boxGeometry
-            args={[config.width + bumperThickness * 2, bumperHeight, config.length + bumperThickness * 2]}
+            args={[
+              config.width + bumperThickness * 2,
+              bumperHeight,
+              config.length + bumperThickness * 2,
+            ]}
           />
           <meshStandardMaterial color="orange" />
         </mesh>
@@ -62,7 +65,9 @@ export namespace Models {
         {wheelPositions.map(([x, y, z], i) => (
           <group key={i} position={[x, y, z]} rotation={[0, 0, 0]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[wheelRadius, wheelRadius, wheelThickness, 20]} />
+              <cylinderGeometry
+                args={[wheelRadius, wheelRadius, wheelThickness, 20]}
+              />
               <meshStandardMaterial color="gray" />
             </mesh>
           </group>
