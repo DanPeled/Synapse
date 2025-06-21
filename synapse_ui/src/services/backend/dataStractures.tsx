@@ -6,8 +6,7 @@ export namespace BackendStateSystem {
     name: string;
     type: string;
     index: number;
-  };
-
+  }
 
   export interface State {
     deviceinfo: DeviceInfo;

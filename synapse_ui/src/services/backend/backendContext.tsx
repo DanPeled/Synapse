@@ -94,7 +94,6 @@ interface BackendContextProviderProps {
   ) => void;
 }
 
-
 export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   children,
 }) => {

@@ -21,7 +21,7 @@ export default function OptionSelector({
   label = "IP Mode",
   options,
   value,
-  onChange = () => { },
+  onChange = () => {},
   disabled = false,
 }: OptionSelectorProps) {
   const [hoveredOption, setHoveredOption] = useState<string | number | null>(

@@ -18,8 +18,8 @@ interface DropdownProps<T> {
   onValueChange: (value: T) => void;
   options: DropdownOption<T>[];
   disabled?: boolean;
-  serialize: (value: T) => string;       // Convert T to string for Select
-  deserialize: (value: string) => T;     // Convert string back to T
+  serialize: (value: T) => string; // Convert T to string for Select
+  deserialize: (value: string) => T; // Convert string back to T
 }
 
 export function Dropdown<T>({
@@ -88,7 +88,9 @@ export function Dropdown<T>({
                   style={{
                     color: teamColor,
                     backgroundColor:
-                      serialize(value) === stringValue ? selectedBg : "transparent",
+                      serialize(value) === stringValue
+                        ? selectedBg
+                        : "transparent",
                     fontWeight: serialize(value) === stringValue ? 600 : 400,
                   }}
                   onMouseEnter={(e) => {

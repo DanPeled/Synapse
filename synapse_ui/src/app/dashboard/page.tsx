@@ -101,7 +101,9 @@ function CameraAndPipelineControls() {
             }))}
             label="Pipeline"
             value={selectedPipeline}
-            onValueChange={(val) => { setSelectedPipeline(val); }}
+            onValueChange={(val) => {
+              setSelectedPipeline(val);
+            }}
             serialize={(val) => val}
             deserialize={(val) => val}
           />
@@ -185,7 +187,9 @@ function CameraAndPipelineControls() {
           <Dropdown
             label="Pipeline Type"
             value={selectedPipelineType}
-            onValueChange={(val) => { setSelectedPipelineType(val); }}
+            onValueChange={(val) => {
+              setSelectedPipelineType(val);
+            }}
             options={mockData.pipelineTypes.map((type) => ({
               label: type,
               value: type,

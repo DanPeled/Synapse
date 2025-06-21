@@ -1,12 +1,15 @@
 {
-  "name": "camera-dashboard",
-  "version": "0.1.0",
+  "name": "synapseclient",
+  "productName": "Synapse Client",
+  "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0",
-    "build": "next build",
+    "build": "prettier 'src/**/*.{js,ts,tsx}' --write && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.15",
@@ -26,14 +29,24 @@
     "three": "^0.176.0"
   },
   "devDependencies": {
+    "@babel/preset-react": "^7.27.1",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.177.0",
+    "babel-jest": "^30.0.2",
     "eslint": "^9",
     "eslint-config-next": "15.3.3",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.0.2",
+    "jest-environment-jsdom": "^30.0.2",
+    "prettier": "^3.5.3",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5"

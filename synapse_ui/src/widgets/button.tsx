@@ -122,13 +122,15 @@ function ConfirmDialog({
   );
 }
 
-type ColorConfig = {
-  background: string;
-  color: string;
-  border: string;
-  hoverBackground: string;
-  hoverBorder: string;
-} | undefined;
+type ColorConfig =
+  | {
+      background: string;
+      color: string;
+      border: string;
+      hoverBackground: string;
+      hoverBorder: string;
+    }
+  | undefined;
 
 export function DangerButton({
   enabledColors = {
