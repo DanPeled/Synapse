@@ -11,8 +11,9 @@ import React, {
 import { BackendStateSystem } from "./dataStractures";
 import { PipelineManagement } from "./pipelineContext";
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
-import { MessageProto } from "@/proto/v1/message";
+import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
+import { formatHHMMSSLocal } from "../timeUtil";
 
 const initialState: BackendStateSystem.State = {
   deviceinfo: {
@@ -27,7 +28,7 @@ const initialState: BackendStateSystem.State = {
     diskUsage: 0,
     ramUsage: 0,
     uptime: 0,
-    lastFetched: undefined,
+    lastFetched: "---",
   },
   pipelines: [],
   connection: {
@@ -128,7 +129,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         console.log(messageObj);
         if (messageObj.payload !== undefined) {
           switch (messageObj.type) {
-            case "send_device_info":
+            case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO:
               const deviceInfo: DeviceInfoProto = DeviceInfoProto.decode(
                 messageObj.payload.value,
               );
@@ -137,7 +138,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
                 ...deviceInfo,
               });
               break;
-            case "hardware_metrics":
+            case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
               const hardwareMetrics: HardwareMetricsProto =
                 HardwareMetricsProto.decode(messageObj.payload.value);
               console.log(hardwareMetrics);
@@ -148,8 +149,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
                 lastFetched: formatHHMMSSLocal(new Date()),
               });
               break;
-            case "log":
-              // Handle logs if needed
+            default:
               break;
           }
         }
@@ -183,8 +183,3 @@ export const useBackendContext = (): BackendStateSystem.BackendContextType => {
   }
   return context;
 };
-
-function formatHHMMSSLocal(date: Date): string {
-  const pad = (n: number): string => n.toString().padStart(2, "0");
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15proto/v1/device.proto\x12\x08proto.v1\"]\n\x0f\x44\x65viceInfoProto\x12\x10\n\x08hostname\x18\x01 \x01(\t\x12\n\n\x02ip\x18\x02 \x01(\t\x12\x10\n\x08platform\x18\x03 \x01(\t\x12\x1a\n\x12network_interfaces\x18\x04 \x03(\t\"\x9e\x01\n\x14HardwareMetricsProto\x12\x10\n\x08\x63pu_temp\x18\x01 \x01(\x02\x12\x11\n\tcpu_usage\x18\x02 \x01(\x02\x12\x12\n\ndisk_usage\x18\x03 \x01(\x02\x12\x11\n\tram_usage\x18\x04 \x01(\x02\x12\x0e\n\x06uptime\x18\x05 \x01(\x02\x12\x19\n\x0clast_fetched\x18\x06 \x01(\tH\x00\x88\x01\x01\x42\x0f\n\r_last_fetchedb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15proto/v1/device.proto\x12\x08proto.v1\"]\n\x0f\x44\x65viceInfoProto\x12\x10\n\x08hostname\x18\x01 \x01(\t\x12\n\n\x02ip\x18\x02 \x01(\t\x12\x10\n\x08platform\x18\x03 \x01(\t\x12\x1a\n\x12network_interfaces\x18\x04 \x03(\t\"\x88\x01\n\x14HardwareMetricsProto\x12\x10\n\x08\x63pu_temp\x18\x01 \x01(\x02\x12\x11\n\tcpu_usage\x18\x02 \x01(\x02\x12\x12\n\ndisk_usage\x18\x03 \x01(\x02\x12\x11\n\tram_usage\x18\x04 \x01(\x02\x12\x0e\n\x06uptime\x18\x05 \x01(\x02\x12\x14\n\x0clast_fetched\x18\x06 \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,5 +34,5 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_DEVICEINFOPROTO']._serialized_start=35
   _globals['_DEVICEINFOPROTO']._serialized_end=128
   _globals['_HARDWAREMETRICSPROTO']._serialized_start=131
-  _globals['_HARDWAREMETRICSPROTO']._serialized_end=289
+  _globals['_HARDWAREMETRICSPROTO']._serialized_end=267
 # @@protoc_insertion_point(module_scope)

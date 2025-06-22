@@ -15,5 +15,5 @@ message HardwareMetricsProto {
   float disk_usage = 3;
   float ram_usage = 4;
   float uptime = 5;
-  optional string last_fetched = 6;
+  string last_fetched = 6;
 }

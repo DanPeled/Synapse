@@ -9,7 +9,8 @@ from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
-from synapse_net.proto.v1 import device_pb2
+from synapse_net.proto.v1 import device_pb2  # pyright: ignore
+from synapse_net.proto.v1 import message_pb2  # pyright: ignore
 from synapse_net.socketServer import WebSocketServer, createMessage
 import cscore as cs
 import cv2
@@ -665,7 +666,9 @@ class RuntimeManager:
                     metricsMessage.disk_usage = metrics[-2]
 
                     WebSocketServer.kInstance.sendToAllSync(
-                        createMessage("hardware_metrics", metricsMessage)
+                        createMessage(
+                            message_pb2.MESSAGE_TYPE_PROTO_SEND_METRICS, metricsMessage
+                        )
                     )
                 entry.setDoubleArray(metrics)
                 time.sleep(1)

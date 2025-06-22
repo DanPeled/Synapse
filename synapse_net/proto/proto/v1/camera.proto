@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package proto.v1;
+
+message CameraProto {
+  string name = 1;
+  string stream_path = 2;
+  string physical_connection = 3;
+  int32 index = 4;
+}

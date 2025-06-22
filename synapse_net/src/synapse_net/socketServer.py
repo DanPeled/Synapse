@@ -2,7 +2,7 @@ import asyncio
 import websockets
 from enum import Enum
 from typing import Callable, Dict, Optional, Set
-from synapse_net.proto.v1 import message_pb2
+from synapse_net.proto.v1 import message_pb2  # pyright: ignore
 from google.protobuf.any_pb2 import Any as AnyProto
 
 
@@ -11,10 +11,6 @@ class SocketEvent(Enum):
     kMessage = "message"
     kDisconnect = "disconnect"
     kError = "error"
-
-
-class Messages(Enum):
-    kSendDeviceInfo = "send_device_info"
 
 
 def createMessage(type: str, data: AnyProto) -> bytes:

@@ -71,12 +71,6 @@ function CameraAndPipelineControls() {
       style={{ backgroundColor: baseCardColor, color: teamColor }}
       className="border-gray-700"
     >
-      <CardHeader className="pb-0">
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="w-5 h-5" />
-          Pipeline Controls
-        </CardTitle>
-      </CardHeader>
       <CardContent className="space-y-0">
         {/* Camera Selection */}
         <div className="space-y-0">

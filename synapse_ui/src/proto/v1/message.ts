@@ -10,22 +10,58 @@ import { Any } from "../../google/protobuf/any";
 
 export const protobufPackage = "proto.v1";
 
+export enum MessageTypeProto {
+  MESSAGE_TYPE_PROTO_UNSPECIFIED = 0,
+  MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1,
+  MESSAGE_TYPE_PROTO_SEND_METRICS = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
+  switch (object) {
+    case 0:
+    case "MESSAGE_TYPE_PROTO_UNSPECIFIED":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_UNSPECIFIED;
+    case 1:
+    case "MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO;
+    case 2:
+    case "MESSAGE_TYPE_PROTO_SEND_METRICS":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return MessageTypeProto.UNRECOGNIZED;
+  }
+}
+
+export function messageTypeProtoToJSON(object: MessageTypeProto): string {
+  switch (object) {
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_UNSPECIFIED:
+      return "MESSAGE_TYPE_PROTO_UNSPECIFIED";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO:
+      return "MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
+      return "MESSAGE_TYPE_PROTO_SEND_METRICS";
+    case MessageTypeProto.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface MessageProto {
-  type: string;
+  type: MessageTypeProto;
   payload: Any | undefined;
 }
 
 function createBaseMessageProto(): MessageProto {
-  return { type: "", payload: undefined };
+  return { type: 0, payload: undefined };
 }
 
 export const MessageProto: MessageFns<MessageProto> = {
-  encode(
-    message: MessageProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
-    if (message.type !== "") {
-      writer.uint32(10).string(message.type);
+  encode(message: MessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.type !== 0) {
+      writer.uint32(8).int32(message.type);
     }
     if (message.payload !== undefined) {
       Any.encode(message.payload, writer.uint32(18).fork()).join();
@@ -34,19 +70,18 @@ export const MessageProto: MessageFns<MessageProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MessageProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMessageProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 10) {
+          if (tag !== 8) {
             break;
           }
 
-          message.type = reader.string();
+          message.type = reader.int32() as any;
           continue;
         }
         case 2: {
@@ -68,15 +103,15 @@ export const MessageProto: MessageFns<MessageProto> = {
 
   fromJSON(object: any): MessageProto {
     return {
-      type: isSet(object.type) ? globalThis.String(object.type) : "",
+      type: isSet(object.type) ? messageTypeProtoFromJSON(object.type) : 0,
       payload: isSet(object.payload) ? Any.fromJSON(object.payload) : undefined,
     };
   },
 
   toJSON(message: MessageProto): unknown {
     const obj: any = {};
-    if (message.type !== "") {
-      obj.type = message.type;
+    if (message.type !== 0) {
+      obj.type = messageTypeProtoToJSON(message.type);
     }
     if (message.payload !== undefined) {
       obj.payload = Any.toJSON(message.payload);
@@ -84,49 +119,30 @@ export const MessageProto: MessageFns<MessageProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<MessageProto>, I>>(
-    base?: I,
-  ): MessageProto {
+  create<I extends Exact<DeepPartial<MessageProto>, I>>(base?: I): MessageProto {
     return MessageProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(
-    object: I,
-  ): MessageProto {
+  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(object: I): MessageProto {
     const message = createBaseMessageProto();
-    message.type = object.type ?? "";
-    message.payload =
-      object.payload !== undefined && object.payload !== null
-        ? Any.fromPartial(object.payload)
-        : undefined;
+    message.type = object.type ?? 0;
+    message.payload = (object.payload !== undefined && object.payload !== null)
+      ? Any.fromPartial(object.payload)
+      : undefined;
     return message;
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

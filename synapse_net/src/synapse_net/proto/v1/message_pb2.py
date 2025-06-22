@@ -25,13 +25,15 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16proto/v1/message.proto\x12\x08proto.v1\x1a\x19google/protobuf/any.proto\"C\n\x0cMessageProto\x12\x0c\n\x04type\x18\x01 \x01(\t\x12%\n\x07payload\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Anyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16proto/v1/message.proto\x12\x08proto.v1\x1a\x19google/protobuf/any.proto\"_\n\x0cMessageProto\x12(\n\x04type\x18\x01 \x01(\x0e\x32\x1a.proto.v1.MessageTypeProto\x12%\n\x07payload\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any*\x84\x01\n\x10MessageTypeProto\x12\"\n\x1eMESSAGE_TYPE_PROTO_UNSPECIFIED\x10\x00\x12\'\n#MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO\x10\x01\x12#\n\x1fMESSAGE_TYPE_PROTO_SEND_METRICS\x10\x02\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'proto.v1.message_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
+  _globals['_MESSAGETYPEPROTO']._serialized_start=161
+  _globals['_MESSAGETYPEPROTO']._serialized_end=293
   _globals['_MESSAGEPROTO']._serialized_start=63
-  _globals['_MESSAGEPROTO']._serialized_end=130
+  _globals['_MESSAGEPROTO']._serialized_end=158
 # @@protoc_insertion_point(module_scope)

@@ -2,41 +2,45 @@
 // versions:
 //   protoc-gen-ts_proto  v2.7.5
 //   protoc               unknown
-// source: proto/v1/pipeline.proto
+// source: proto/v1/camera.proto
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.v1";
 
-export interface PipelineProto {
+export interface CameraProto {
   name: string;
-  type: string;
+  streamPath: string;
+  physicalConnection: string;
   index: number;
 }
 
-function createBasePipelineProto(): PipelineProto {
-  return { name: "", type: "", index: 0 };
+function createBaseCameraProto(): CameraProto {
+  return { name: "", streamPath: "", physicalConnection: "", index: 0 };
 }
 
-export const PipelineProto: MessageFns<PipelineProto> = {
-  encode(message: PipelineProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CameraProto: MessageFns<CameraProto> = {
+  encode(message: CameraProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.type !== "") {
-      writer.uint32(18).string(message.type);
+    if (message.streamPath !== "") {
+      writer.uint32(18).string(message.streamPath);
+    }
+    if (message.physicalConnection !== "") {
+      writer.uint32(26).string(message.physicalConnection);
     }
     if (message.index !== 0) {
-      writer.uint32(24).uint32(message.index);
+      writer.uint32(32).int32(message.index);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): PipelineProto {
+  decode(input: BinaryReader | Uint8Array, length?: number): CameraProto {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePipelineProto();
+    const message = createBaseCameraProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -53,15 +57,23 @@ export const PipelineProto: MessageFns<PipelineProto> = {
             break;
           }
 
-          message.type = reader.string();
+          message.streamPath = reader.string();
           continue;
         }
         case 3: {
-          if (tag !== 24) {
+          if (tag !== 26) {
             break;
           }
 
-          message.index = reader.uint32();
+          message.physicalConnection = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.index = reader.int32();
           continue;
         }
       }
@@ -73,21 +85,25 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     return message;
   },
 
-  fromJSON(object: any): PipelineProto {
+  fromJSON(object: any): CameraProto {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      type: isSet(object.type) ? globalThis.String(object.type) : "",
+      streamPath: isSet(object.streamPath) ? globalThis.String(object.streamPath) : "",
+      physicalConnection: isSet(object.physicalConnection) ? globalThis.String(object.physicalConnection) : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
     };
   },
 
-  toJSON(message: PipelineProto): unknown {
+  toJSON(message: CameraProto): unknown {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
     }
-    if (message.type !== "") {
-      obj.type = message.type;
+    if (message.streamPath !== "") {
+      obj.streamPath = message.streamPath;
+    }
+    if (message.physicalConnection !== "") {
+      obj.physicalConnection = message.physicalConnection;
     }
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
@@ -95,13 +111,14 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<PipelineProto>, I>>(base?: I): PipelineProto {
-    return PipelineProto.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<CameraProto>, I>>(base?: I): CameraProto {
+    return CameraProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<PipelineProto>, I>>(object: I): PipelineProto {
-    const message = createBasePipelineProto();
+  fromPartial<I extends Exact<DeepPartial<CameraProto>, I>>(object: I): CameraProto {
+    const message = createBaseCameraProto();
     message.name = object.name ?? "";
-    message.type = object.type ?? "";
+    message.streamPath = object.streamPath ?? "";
+    message.physicalConnection = object.physicalConnection ?? "";
     message.index = object.index ?? 0;
     return message;
   },

@@ -10,7 +10,6 @@ from synapse_net.nt_client import NtClient
 from synapse_net.socketServer import (
     WebSocketServer,
     SocketEvent,
-    Messages,
     createMessage,
 )
 import asyncio
@@ -151,7 +150,8 @@ class Synapse:
         async def on_connect(ws):
             import socket
             import synapse.hardware.metrics as metrics
-            from synapse_net.proto.v1 import device_pb2
+            from synapse_net.proto.v1 import device_pb2  # pyright: ignore
+            from synapse_net.proto.v1 import message_pb2  # pyright: ignore
 
             deviceInfo: device_pb2.DeviceInfoProto = device_pb2.DeviceInfoProto()  # pyright: ignore
             deviceInfo.ip = socket.gethostbyname(socket.gethostname())
@@ -163,7 +163,9 @@ class Synapse:
 
             await self.websocket.sendToClient(
                 ws,
-                createMessage(Messages.kSendDeviceInfo.value, deviceInfo),
+                createMessage(
+                    message_pb2.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO, deviceInfo
+                ),
             )
 
         @self.websocket.on(SocketEvent.kMessage)
