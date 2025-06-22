@@ -38,6 +38,13 @@ install_buf:
 		echo "protoc-gen-python already exists."; \
 	fi
 
+	@if ! command -v protoc-gen-ts_proto > /dev/null; then \
+		echo "Installing protoc-gen-ts_proto..."; \
+		npm install -g ts-proto; \
+	else \
+		echo "protoc-gen-ts_proto is already installed."; \
+	fi
+
 install:  # installs the synapse runtime pip package locally
 	pip install .
 
