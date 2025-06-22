@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "proto/settings/v1/constraint_type.proto";
+import "proto/settings/v1/value.proto";
+
+message ConstraintProto {
+  ConstraintTypeProto type = 4;
+  ConstraintConfigProto constraint = 5;
+}
+
+message SettingProto {
+  string name = 1;
+  string description = 2;
+  SettingValueProto value = 3;
+  ConstraintProto constraint = 4;
+}

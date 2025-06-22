@@ -22,8 +22,6 @@ class ConstraintType(Enum):
     kList = "list"
     kString = "string"
     kBoolean = "boolean"
-    kInteger = "integer"
-    kFloat = "float"
 
 
 @dataclass
@@ -295,8 +293,8 @@ class ListConstraint(Constraint):
     def __init__(
         self,
         itemConstraint: Optional[Constraint] = None,
-        minLength: Optional[int] = None,
-        maxLength: Optional[int] = None,
+        minLength: int = 0,
+        maxLength: int = 0,
         depth: int = 1,
     ):
         """
@@ -324,12 +322,12 @@ class ListConstraint(Constraint):
             if not isinstance(val, list):
                 return ValidationResult(False, f"Value must be a list at depth {depth}")
 
-            if self.minLength is not None and len(val) < self.minLength:
+            if self.minLength > 0 and len(val) < self.minLength:
                 return ValidationResult(
                     False,
                     f"List at depth {depth} must have at least {self.minLength} items",
                 )
-            if self.maxLength is not None and len(val) > self.maxLength:
+            if self.maxLength > 0 and len(val) > self.maxLength:
                 return ValidationResult(
                     False,
                     f"List at depth {depth} must have at most {self.maxLength} items",
@@ -361,9 +359,9 @@ class ListConstraint(Constraint):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
-            "itemConstraint": self.itemConstraint.toDict()
-            if self.itemConstraint
-            else None,
+            "itemConstraint": (
+                self.itemConstraint.toDict() if self.itemConstraint else None
+            ),
             "minLength": self.minLength,
             "maxLength": self.maxLength,
             "depth": self.depth,

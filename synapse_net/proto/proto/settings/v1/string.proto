@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "google/protobuf/wrappers.proto";
+
+message StringConstraintProto {
+  google.protobuf.Int32Value min_length = 1;
+  google.protobuf.Int32Value max_length = 2;
+  google.protobuf.StringValue pattern = 3;
+}

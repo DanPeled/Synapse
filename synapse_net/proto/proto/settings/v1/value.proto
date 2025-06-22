@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+message SettingValueProto {
+  oneof scalar_value {
+    int32 int_value = 1;
+    string string_value = 2;
+    bool bool_value = 3;
+    float float_value = 4;
+    bytes bytes_value = 5;
+  }
+  repeated int32 int_array_value = 6;
+  repeated string string_array_value = 7;
+  repeated bool bool_array_value = 8;
+  repeated float float_array_value = 9;
+  repeated bytes bytes_array_value = 10;
+}

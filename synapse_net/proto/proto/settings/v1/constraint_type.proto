@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "proto/settings/v1/color.proto";
+import "proto/settings/v1/list_options.proto";
+import "proto/settings/v1/range.proto";
+
+message ConstraintConfigProto {
+  oneof config {
+    RangeConstraintProto range = 1;
+    ListOptionsConstraintProto list_options = 2;
+    ColorConstraintProto color = 3;
+  }
+}
+
+enum ConstraintTypeProto {
+  CONSTRAINT_TYPE_PROTO_UNSPECIFIED = 0;
+  CONSTRAINT_TYPE_PROTO_RANGE = 1;
+  CONSTRAINT_TYPE_PROTO_LIST = 2;
+  CONSTRAINT_TYPE_PROTO_STRING = 3;
+  CONSTRAINT_TYPE_PROTO_COLOR = 4;
+  CONSTRAINT_TYPE_PROTO_BOOLEAN = 5; // Doesn't have a config message
+  CONSTRAINT_TYPE_PROTO_LIST_OPTIONS = 8;
+}

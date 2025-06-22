@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+enum ColorFormatProto {
+  COLOR_FORMAT_PROTO_UNSPECIFIED = 0;
+  COLOR_FORMAT_PROTO_HEX = 1;
+  COLOR_FORMAT_PROTO_RGB = 2;
+  COLOR_FORMAT_PROTO_HSV = 3;
+}
+
+message ColorConstraintProto {
+  ColorFormatProto format = 1;
+  bool range_mode = 2;
+}

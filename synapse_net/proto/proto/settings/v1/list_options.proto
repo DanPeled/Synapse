@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "proto/settings/v1/value.proto";
+
+message ListOptionsConstraintProto {
+  repeated SettingValueProto options = 1;
+  /* If true, the user can select multiple options from the list.
+     If false, the user can only select one option. */
+  bool allow_multiple = 2;
+}
