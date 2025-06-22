@@ -28,8 +28,6 @@ Install the runtime pip package via
 pip install git+https://github.com/DanPeled/Synapse
 ```
 
-```
-```
 
 # Development
 ## Getting Started
