@@ -5,6 +5,8 @@ clean:
 	rm -rf dist/
 	rm -rf .pytest_cache/
 	rm -rf synapse_ui/out/
+	rm -rf synapse_net/src/synapse_net/proto/
+	rm -rf synapse_ui/src/proto/
 
 install_buf:
 	@if ! command -v buf > /dev/null; then \
