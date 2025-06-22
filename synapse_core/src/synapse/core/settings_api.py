@@ -2,17 +2,15 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import (Any, Dict, Generic, List, Optional, Type, TypeVar, Union,
-                    overload)
+from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
 
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse.bcolors import bcolors
-from synapse.core.camera_factory import SynapseCamera
 from synapse.log import err
 
-PipelineSettingsMapValue = Any
+SettingsMapValue = Any
 
-PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
+SettingsMap = Dict[str, SettingsMapValue]
 
 
 class ConstraintType(Enum):
@@ -26,7 +24,6 @@ class ConstraintType(Enum):
     kBoolean = "boolean"
     kInteger = "integer"
     kFloat = "float"
-    kClass = "class"
 
 
 @dataclass
@@ -114,35 +111,6 @@ class RangeConstraint(Constraint):
             "minValue": self.minValue,
             "maxValue": self.maxValue,
             "step": self.step,
-        }
-
-
-class ClassValueConstraint(Constraint):
-    """Constraint for values of a specific class"""
-
-    def __init__(self, expectedClass: Type):
-        """
-        Initialize a ClassValueConstraint instance.
-
-        Args:
-            expectedClass (Type): The expected class type that values must be an instance of.
-
-        """
-        super().__init__(ConstraintType.kClass)
-        self.expectedClass = expectedClass
-
-    def validate(self, value: Any) -> ValidationResult:
-        if isinstance(value, self.expectedClass):
-            return ValidationResult(True, None, value)
-        else:
-            return ValidationResult(
-                False, f"Value {value} is not of type {self.expectedClass.__name__}"
-            )
-
-    def toDict(self) -> Dict[str, Any]:
-        return {
-            "type": self.constraintType.value,
-            "className": f"{self.expectedClass.__module__}.{self.expectedClass.__name__}",
         }
 
 
@@ -632,50 +600,8 @@ def settingField(
     return Setting[TConstraintType]("", constraint, default, description, category)
 
 
-class PipelineSettings:
-    """Base class for creating pipeline settings collections.
-
-    Attributes:
-        brightness (Setting): Brightness setting (0–100).
-        exposure (Setting): Exposure setting (0–100).
-        saturation (Setting): Saturation setting (0–100).
-        orientation (Setting): Orientation setting (0, 90, 180, 270).
-        width (Setting): Width setting (e.g., 1280).
-        height (Setting): Height setting (e.g., 720).
-    """
-
-    kCameraPropsCategory = "Camera Properties"
-
-    brightness = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    exposure = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    saturation = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    sharpness = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    gain = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    orientation = settingField(
-        RangeConstraint(0, 270, 90), default=0, category=kCameraPropsCategory
-    )
-    width = settingField(
-        RangeConstraint(minValue=0, maxValue=None),
-        default=1280,
-        category=kCameraPropsCategory,
-    )
-    height = settingField(
-        RangeConstraint(minValue=0, maxValue=None),
-        default=720,
-        category=kCameraPropsCategory,
-    )
-
-    def __init__(self, settings: Optional[PipelineSettingsMap] = None):
+class SettingsCollection:
+    def __init__(self, settings: Optional[SettingsMap] = None):
         """
         Initialize the PipelineSettings instance.
 
@@ -689,11 +615,7 @@ class PipelineSettings:
         if settings:
             self.generateSettingsFromMap(settings)
 
-    def assignCamera(
-        self, camera: SynapseCamera
-    ) -> None: ...  # TODO: set defaults and ranges according to camera props
-
-    def generateSettingsFromMap(self, settingsMap: PipelineSettingsMap) -> None:
+    def generateSettingsFromMap(self, settingsMap: SettingsMap) -> None:
         """
         Populate the settings from a given map, generating constraints dynamically if necessary.
 
@@ -748,15 +670,13 @@ class PipelineSettings:
             nt_table (NetworkTable): The table to send settings to.
         """
         for key, value in self._settingsApi.values.items():
-            PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
+            setEntryValue(nt_table.getEntry(key), value)
 
-    def __getitem__(
-        self, key: Union[str, Setting]
-    ) -> Optional[PipelineSettingsMapValue]:
+    def __getitem__(self, key: Union[str, Setting]) -> Optional[SettingsMapValue]:
         """Access a setting's value using dictionary-style indexing."""
         return self.getSetting(key)
 
-    def __setitem__(self, key: Union[str, Setting], value: PipelineSettingsMapValue):
+    def __setitem__(self, key: Union[str, Setting], value: SettingsMapValue):
         """Set a setting's value using dictionary-style indexing."""
         self.setSetting(key, value)
 
@@ -790,40 +710,6 @@ class PipelineSettings:
             map (Dict[str, Any]): The settings map to set.
         """
         self.__settings = map
-
-    @staticmethod
-    def setEntryValue(entry: NetworkTableEntry, value):
-        """
-        Set a NetworkTable entry's value according to its Python type.
-
-        Args:
-            entry (NetworkTableEntry): Entry to set.
-            value (Any): Value to write to the entry.
-
-        Raises:
-            ValueError: If the value type is unsupported.
-        """
-        if isinstance(value, int):
-            entry.setInteger(value)
-        elif isinstance(value, float):
-            entry.setFloat(value)
-        elif isinstance(value, bool):
-            entry.setBoolean(value)
-        elif isinstance(value, str):
-            entry.setString(value)
-        elif isinstance(value, list):
-            if all(isinstance(i, int) for i in value):
-                entry.setIntegerArray(value)
-            elif all(isinstance(i, float) for i in value):
-                entry.setFloatArray(value)
-            elif all(isinstance(i, bool) for i in value):
-                entry.setBooleanArray(value)
-            elif all(isinstance(i, str) for i in value):
-                entry.setStringArray(value)
-            else:
-                raise ValueError("Unsupported list type")
-        else:
-            raise ValueError("Unsupported type")
 
     def _initializeSettings(self):
         """Initialize declared settings by inspecting class-level attributes."""
@@ -964,3 +850,81 @@ class PipelineSettings:
         """
         values = {name: self.getSetting(name) for name in self._fieldNames}
         return f"{self.__class__.__name__}({', '.join(f'{k}={v!r}' for k, v in values.items())})"
+
+
+def setEntryValue(entry: NetworkTableEntry, value):
+    """
+    Set a NetworkTable entry's value according to its Python type.
+
+    Args:
+        entry (NetworkTableEntry): Entry to set.
+        value (Any): Value to write to the entry.
+
+    Raises:
+        ValueError: If the value type is unsupported.
+    """
+    if isinstance(value, int):
+        entry.setInteger(value)
+    elif isinstance(value, float):
+        entry.setFloat(value)
+    elif isinstance(value, bool):
+        entry.setBoolean(value)
+    elif isinstance(value, str):
+        entry.setString(value)
+    elif isinstance(value, list):
+        if all(isinstance(i, int) for i in value):
+            entry.setIntegerArray(value)
+        elif all(isinstance(i, float) for i in value):
+            entry.setFloatArray(value)
+        elif all(isinstance(i, bool) for i in value):
+            entry.setBooleanArray(value)
+        elif all(isinstance(i, str) for i in value):
+            entry.setStringArray(value)
+        else:
+            raise ValueError("Unsupported list type")
+    else:
+        raise ValueError("Unsupported type")
+
+
+class PipelineSettings(SettingsCollection):
+    """Base class for creating pipeline settings collections.
+
+    Attributes:
+        brightness (Setting): Brightness setting (0–100).
+        exposure (Setting): Exposure setting (0–100).
+        saturation (Setting): Saturation setting (0–100).
+        orientation (Setting): Orientation setting (0, 90, 180, 270).
+        width (Setting): Width setting (e.g., 1280).
+        height (Setting): Height setting (e.g., 720).
+    """
+
+    kCameraPropsCategory = "Camera Properties"
+
+    brightness = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    exposure = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    saturation = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    sharpness = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    gain = settingField(
+        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
+    )
+    orientation = settingField(
+        RangeConstraint(0, 270, 90), default=0, category=kCameraPropsCategory
+    )
+    width = settingField(
+        RangeConstraint(minValue=0, maxValue=None),
+        default=1280,
+        category=kCameraPropsCategory,
+    )
+    height = settingField(
+        RangeConstraint(minValue=0, maxValue=None),
+        default=720,
+        category=kCameraPropsCategory,
+    )

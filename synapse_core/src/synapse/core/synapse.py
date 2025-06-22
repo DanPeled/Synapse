@@ -9,10 +9,9 @@ from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import DeviceInfoProto, MessageTypeProto
-from synapse_net.socketServer import (SocketEvent, WebSocketServer,
-                                      createMessage)
+from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
 
-from .pipeline import GlobalSettings
+from .global_settings import GlobalSettings
 from .runtime_handler import RuntimeManager
 
 

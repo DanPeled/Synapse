@@ -14,10 +14,16 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse.bcolors import bcolors
-from synapse.core.config import yaml
+from .config import yaml
+from .global_settings import GlobalSettings
 from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
@@ -25,13 +31,22 @@ from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    CameraConfig,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
-from .settings_api import PipelineSettingsMap
+from .pipeline import (
+    FrameResult,
+    Pipeline,
+    PipelineSettings,
+)
+from .settings_api import SettingsMap
 
 
 class NTKeys(Enum):
@@ -183,7 +198,7 @@ class PipelineLoader:
         self,
         pipelineType: Type[Pipeline],
         pipelineIndex: PipelineID,
-        settings: PipelineSettingsMap,
+        settings: SettingsMap,
     ) -> None:
         """Creates and stores the settings object for a given pipeline.
 
@@ -1034,7 +1049,7 @@ class RuntimeManager:
 
         return frame
 
-    def toDict(self) -> dict:
+    def toDict(self) -> Dict:
         return {
             "global": {
                 "camera_configs": {

@@ -1,8 +1,7 @@
 import unittest
 from unittest.mock import mock_open, patch
 
-from synapse.hardware.metrics import (LinuxCmds, PiCmds, Platform, RK3588Cmds,
-                                      ShellExec)
+from synapse.hardware.metrics import LinuxCmds, PiCmds, Platform, RK3588Cmds, ShellExec
 
 
 class TestPlatformDetection(unittest.TestCase):
