@@ -40,3 +40,7 @@ jobs:
       - name: Generate protobuf code
         working-directory: synapse_net/proto
         run: buf generate
+
+      - name: Verify generated files are up to date
+        run: |
+          git diff --exit-code
