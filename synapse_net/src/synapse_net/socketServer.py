@@ -1,8 +1,9 @@
 import asyncio
-import json
 import websockets
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Callable, Dict, Optional, Set
+from synapse_net.proto.v1 import message_pb2
+from google.protobuf.any_pb2 import Any as AnyProto
 
 
 class SocketEvent(Enum):
@@ -16,8 +17,16 @@ class Messages(Enum):
     kSendDeviceInfo = "send_device_info"
 
 
-def createMessageFromDict(type: str, data: Any) -> str:
-    return json.dumps({"type": type, "message": data})
+def createMessage(type: str, data: AnyProto) -> bytes:
+    message = message_pb2.MessageProto()  # pyright: ignore
+    message.type = type
+
+    # Pack the message into the Any field
+    packed = AnyProto()
+    packed.Pack(data)
+    message.payload.CopyFrom(packed)
+
+    return message.SerializeToString()
 
 
 class WebSocketServer:
@@ -56,17 +65,17 @@ class WebSocketServer:
             self.clients.remove(websocket)
             await self._emit(SocketEvent.kDisconnect, websocket)
 
-    async def sendToAll(self, message: str):
+    async def sendToAll(self, message: websockets.Data):
         if self.clients:
             await asyncio.gather(
                 *(client.send(message) for client in self.clients if client.open)
             )
 
-    def sendToAllSync(self, message: str):
+    def sendToAllSync(self, message: websockets.Data):
         asyncio.run(self.sendToAll(message))
 
     async def sendToClient(
-        self, client: websockets.WebSocketServerProtocol, message: str
+        self, client: websockets.WebSocketServerProtocol, message: websockets.Data
     ):
         if client in self.clients and client.open:
             await client.send(message)

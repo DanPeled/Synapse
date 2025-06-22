@@ -11,7 +11,7 @@ from synapse_net.socketServer import (
     WebSocketServer,
     SocketEvent,
     Messages,
-    createMessageFromDict,
+    createMessage,
 )
 import asyncio
 import threading
@@ -45,8 +45,6 @@ class Synapse:
             bool: True if initialization was successful, False otherwise.
         """
 
-        self.setupWebsocket()
-
         log(
             bcolors.OKGREEN
             + bcolors.BOLD
@@ -56,8 +54,9 @@ class Synapse:
             + "=" * 20
             + bcolors.ENDC
         )
-
         self.runtime_handler = runtime_handler
+
+        self.setupWebsocket()
 
         if config_path.exists():
             try:
@@ -152,29 +151,24 @@ class Synapse:
         async def on_connect(ws):
             import socket
             import synapse.hardware.metrics as metrics
+            from synapse_net.proto.v1 import device_pb2
 
-            addre = socket.gethostbyname(socket.gethostname())
+            deviceInfo: device_pb2.DeviceInfoProto = device_pb2.DeviceInfoProto()  # pyright: ignore
+            deviceInfo.ip = socket.gethostbyname(socket.gethostname())
+            deviceInfo.platform = (
+                metrics.Platform.getCurrentPlatform().getOSType().value
+            )
+            deviceInfo.hostname = socket.gethostname()
+            deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
+
             await self.websocket.sendToClient(
                 ws,
-                createMessageFromDict(
-                    Messages.kSendDeviceInfo.value,
-                    {
-                        "ip": addre,
-                        "platform": metrics.Platform.getCurrentPlatform()
-                        .getOSType()
-                        .value,
-                        "hostname": socket.gethostname(),
-                        "networkInterfaces": list(psutil.net_if_addrs().keys()),
-                    },
-                ),
+                createMessage(Messages.kSendDeviceInfo.value, deviceInfo),
             )
 
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):
             print(f"Message from {ws.remote_address}: {msg}")
-
-        @self.websocket.on(SocketEvent.kDisconnect)
-        async def on_disconnect(ws): ...
 
         @self.websocket.on(SocketEvent.kError)
         async def on_error(ws, error_msg):
@@ -195,7 +189,8 @@ class Synapse:
         asyncio.run_coroutine_threadsafe(run_server(), new_loop)
 
         atexit.register(self.closeWebsocket)
-        print(
+
+        log(
             "WebSocket server started on ws://localhost:8765 (running in a separate thread)"
         )
 

@@ -8,28 +8,28 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import WebSocketWrapper, { Message } from "../websocket";
 import {
   BackendStateSystem,
-  DeviceInfo,
-  HardwareMetrics,
 } from "./dataStractures";
 import { PipelineManagement } from "./pipelineContext";
+import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
+import { MessageProto } from "@/proto/v1/message";
+import { WebSocketWrapper } from "../websocket";
 
 const initialState: BackendStateSystem.State = {
   deviceinfo: {
-    hostname: null,
-    ip: null,
+    hostname: "Unknown",
+    ip: "127.0.0.1",
     platform: "Unknown",
     networkInterfaces: ["eth0"],
   },
   hardwaremetrics: {
-    cpu_temp: 0,
-    cpu_usage: 0,
-    disk_usage: 0,
-    ram_usage: 0,
+    cpuTemp: 0,
+    cpuUsage: 0,
+    diskUsage: 0,
+    ramUsage: 0,
     uptime: 0,
-    last_fetched: new Date().toLocaleTimeString(),
+    lastFetched: undefined,
   },
   pipelines: [],
   connection: {
@@ -124,42 +124,46 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           payload: { ...state.connection, backend: false },
         });
       },
-      onMessage: (message) => {
-        const jsonArr = splitConcatenatedJSON(message);
-        jsonArr.forEach((val) => {
-          const messageObj = val as Message;
+      onMessage: (message: ArrayBufferLike) => {
+        const uint8Array = new Uint8Array(message);
+        const messageObj = MessageProto.decode(uint8Array);
+        console.log(messageObj)
+        if (messageObj.payload !== undefined) {
           switch (messageObj.type) {
             case "send_device_info":
-              const deviceInfo: DeviceInfo = messageObj.message as DeviceInfo;
+              const deviceInfo: DeviceInfoProto = DeviceInfoProto.decode(messageObj.payload.value);
               setters.setDeviceinfo({
                 ...state.deviceinfo,
-                ip: deviceInfo.ip,
-                platform: deviceInfo.platform,
-                hostname: deviceInfo.hostname ?? "Unknown",
-                networkInterfaces: deviceInfo.networkInterfaces,
+                ...deviceInfo
               });
               break;
             case "hardware_metrics":
-              const hardwareMetrics: HardwareMetrics =
-                messageObj.message as HardwareMetrics;
+              const hardwareMetrics: HardwareMetricsProto =
+                HardwareMetricsProto.decode(messageObj.payload.value);
+              console.log(hardwareMetrics);
+              console.log(messageObj.payload);
               setters.setHardwaremetrics({
                 ...state.hardwaremetrics,
                 ...hardwareMetrics,
-                last_fetched: formatHHMMSSLocal(new Date()),
+                lastFetched: formatHHMMSSLocal(new Date()),
               });
               break;
             case "log":
               // Handle logs if needed
               break;
           }
-        });
+        }
       },
     });
 
     socket.current = ws;
     ws.connect();
     setters.setSocket?.(ws);
-  }, [setters, state]);
+
+    return () => {
+      socket.current?.close(); // Close connection on unmount
+    };
+  }, []);
 
   return (
     <BackendContextContext.Provider

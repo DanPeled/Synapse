@@ -6,7 +6,7 @@ from typing import Optional
 
 from synapse.bcolors import bcolors
 
-from synapse_net.socketServer import WebSocketServer, createMessageFromDict
+from synapse_net.socketServer import WebSocketServer
 
 # Flag to control printing to the console
 PRINTS = True
@@ -35,10 +35,11 @@ class LogMessageType(Enum):
 def socketLog(
     text: str, msgType: LogMessageType, socket: Optional[WebSocketServer]
 ) -> None:
-    if socket:
-        socket.sendToAllSync(
-            createMessageFromDict("log", {"message": text, "type": msgType.value})
-        )
+    ...
+    # if socket:
+    #     socket.sendToAllSync(
+    #         createMessageFromDict("log", {"message": text, "type": msgType.value})
+    #     )
 
 
 def logInternal(text: str):

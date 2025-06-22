@@ -1,0 +1,40 @@
+name: Synapse Networking
+
+on:
+  push:
+    paths:
+      - '**/*.proto'
+      - 'synapse_net/proto/buf.yaml'
+      - 'synapse_net/proto/buf.gen.yaml'
+  pull_request:
+    paths:
+      - '**/*.proto'
+      - 'synapse_net/proto/buf.yaml'
+      - 'synapse_net/proto/buf.gen.yaml'
+
+jobs:
+  protobuf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Buf
+        run: |
+          make install_buf
+
+      - name: Check protobuf format
+        working-directory: synapse_net/proto
+        run: buf format --diff
+
+      - name: Lint protobuf files
+        working-directory: synapse_net/proto
+        run: buf lint
+
+      - name: Build protobuf files
+        working-directory: synapse_net/proto
+        run: buf build
+
+      - name: Generate protobuf code
+        working-directory: synapse_net/proto
+        run: buf generate

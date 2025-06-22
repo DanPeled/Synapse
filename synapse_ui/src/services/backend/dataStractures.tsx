@@ -1,17 +1,13 @@
-import WebSocketWrapper from "../websocket";
+import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { PipelineManagement } from "./pipelineContext";
+import { PipelineProto } from "@/proto/v1/pipeline";
+import { WebSocketWrapper } from "../websocket";
 
 export namespace BackendStateSystem {
-  export interface Pipeline {
-    name: string;
-    type: string;
-    index: number;
-  }
-
   export interface State {
-    deviceinfo: DeviceInfo;
-    hardwaremetrics: HardwareMetrics;
-    pipelines: Pipeline[];
+    deviceinfo: DeviceInfoProto;
+    hardwaremetrics: HardwareMetricsProto;
+    pipelines: PipelineProto[];
     connection: ConnectionState;
     networktable: string;
     pipelineContext: PipelineManagement.PipelineContext;
@@ -44,20 +40,4 @@ export namespace BackendStateSystem {
 export interface ConnectionState {
   backend: boolean;
   networktables: boolean;
-}
-
-export interface DeviceInfo {
-  hostname: string | null;
-  ip: string | null;
-  platform: string;
-  networkInterfaces: string[];
-}
-
-export interface HardwareMetrics {
-  cpu_temp: number;
-  cpu_usage: number;
-  disk_usage: number;
-  ram_usage: number;
-  uptime: number;
-  last_fetched: string;
 }

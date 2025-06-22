@@ -9,7 +9,8 @@ from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
-from synapse_net.socketServer import WebSocketServer, createMessageFromDict
+from synapse_net.proto.v1 import device_pb2
+from synapse_net.socketServer import WebSocketServer, createMessage
 import cscore as cs
 import cv2
 import numpy as np
@@ -654,24 +655,19 @@ class RuntimeManager:
                 f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
             )
             while True:
-                try:
-                    metrics = queue.get(timeout=2)
-                    if WebSocketServer.kInstance is not None:
-                        WebSocketServer.kInstance.sendToAllSync(
-                            createMessageFromDict(
-                                "hardware_metrics",
-                                {
-                                    "cpu_temp": metrics[0],
-                                    "cpu_usage": metrics[1],
-                                    "ram_usage": metrics[5],
-                                    "uptime": metrics[3],
-                                    "disk_usage": metrics[-2],
-                                },
-                            )
-                        )
-                    entry.setDoubleArray(metrics)
-                except Exception:
-                    continue
+                metrics = queue.get(timeout=2)
+                if WebSocketServer.kInstance is not None:
+                    metricsMessage = device_pb2.HardwareMetricsProto()  # pyright: ignore
+                    metricsMessage.cpu_temp = metrics[0]
+                    metricsMessage.cpu_usage = metrics[1]
+                    metricsMessage.uptime = metrics[3]
+                    metricsMessage.ram_usage = metrics[5]
+                    metricsMessage.disk_usage = metrics[-2]
+
+                    WebSocketServer.kInstance.sendToAllSync(
+                        createMessage("hardware_metrics", metricsMessage)
+                    )
+                entry.setDoubleArray(metrics)
                 time.sleep(1)
 
         metricsQueue = Queue()

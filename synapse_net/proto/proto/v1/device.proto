@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package proto.v1;
+
+message DeviceInfoProto {
+  string hostname = 1;
+  string ip = 2;
+  string platform = 3;
+  repeated string network_interfaces = 4;
+}
+
+message HardwareMetricsProto {
+  float cpu_temp = 1;
+  float cpu_usage = 2;
+  float disk_usage = 3;
+  float ram_usage = 4;
+  float uptime = 5;
+  optional string last_fetched = 6;
+}

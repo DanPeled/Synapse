@@ -10,13 +10,23 @@ import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.pipeline import GlobalSettings, Pipeline
-from synapse.core.settings_api import (BooleanConstraint,
-                                       ListOptionsConstraint, PipelineSettings,
-                                       RangeConstraint, settingField)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ListOptionsConstraint,
+    PipelineSettings,
+    RangeConstraint,
+    settingField,
+)
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
-                              Transform3d, Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation3d,
+    Transform3d,
+    Translation3d,
+)
 
 
 @dataclass

@@ -33,6 +33,7 @@ setup(
         "pytest",
         "build",
         "psutil",
+        "protobuf",
     ],
     include_package_data=True,
 )

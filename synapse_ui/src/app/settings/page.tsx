@@ -17,7 +17,6 @@ import {
   iconSize,
   teamColor,
 } from "@/services/style";
-import { createMessage } from "@/services/websocket";
 import { AlertDialog } from "@/widgets/alertDialog";
 import { Button, DangerButton } from "@/widgets/button";
 import { Column, Row } from "@/widgets/containers";
@@ -46,7 +45,7 @@ enum IPMode {
   dhcp = "DHCP",
 }
 
-function NetworkSettings({}) {
+function NetworkSettings({ }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
     deviceinfo,
@@ -190,15 +189,15 @@ function NetworkSettings({}) {
           />
           <Button
             onClickAction={() => {
-              socket?.send(
-                createMessage("set_network_config", {
-                  ip: ipMode == IPMode.static ? staticIPAddr : null,
-                  networkInterface: networkInterface,
-                  hostname: hostname,
-                  networkTable: networktable ?? "Synapse",
-                  networkTablesServer: networkTablesServer,
-                }),
-              );
+              // socket?.send(
+              //   createMessage("set_network_config", {
+              //     ip: ipMode == IPMode.static ? staticIPAddr : null,
+              //     networkInterface: networkInterface,
+              //     hostname: hostname,
+              //     networkTable: networktable ?? "Synapse",
+              //     networkTablesServer: networkTablesServer,
+              //   }),
+              // );
             }}
             disabled={!connection.backend || !manageDeviceNetworking}
           >
@@ -210,7 +209,7 @@ function NetworkSettings({}) {
   );
 }
 
-function DeviceInfo({}) {
+function DeviceInfo({ }) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
 
   return (
@@ -227,7 +226,7 @@ function DeviceInfo({}) {
           <Row gap="gap-2" className="items-center">
             <Badge variant="secondary" className="bg-gray-400">
               <Clock className="w-3 h-3 mr-1" /> {""}
-              Last Fetched: {hardwaremetrics.last_fetched}
+              Last Fetched: {hardwaremetrics.lastFetched}
             </Badge>
           </Row>
         </Row>
@@ -269,28 +268,28 @@ function DeviceInfo({}) {
             <TableBody>
               <TableRow className="hover:bg-transparent">
                 <TableCell className="text-center">
-                  {hardwaremetrics.cpu_temp > 0
-                    ? `${hardwaremetrics.cpu_temp}°`
+                  {hardwaremetrics.cpuTemp > 0
+                    ? `${hardwaremetrics.cpuTemp.toFixed(2)}°`
                     : "---"}
                 </TableCell>
                 <TableCell className="text-center">
-                  {hardwaremetrics.cpu_usage > 0
-                    ? `${hardwaremetrics.cpu_usage}%`
+                  {hardwaremetrics.cpuUsage > 0
+                    ? `${hardwaremetrics.cpuUsage.toFixed(2)}%`
                     : "---"}
                 </TableCell>
                 <TableCell className="text-center">
-                  {hardwaremetrics.ram_usage > 0
-                    ? `${hardwaremetrics.ram_usage}%`
+                  {hardwaremetrics.ramUsage > 0
+                    ? `${hardwaremetrics.ramUsage.toFixed(2)}%`
                     : "---"}
                 </TableCell>
                 <TableCell className="text-center">
                   {hardwaremetrics.uptime > 0
-                    ? `${hardwaremetrics.uptime}s`
+                    ? `${Math.floor(hardwaremetrics.uptime)}s`
                     : "---"}
                 </TableCell>
                 <TableCell className="text-center">
-                  {hardwaremetrics.disk_usage > 0
-                    ? `${hardwaremetrics.disk_usage}%`
+                  {hardwaremetrics.diskUsage > 0
+                    ? `${hardwaremetrics.diskUsage.toFixed(2)}%`
                     : "---"}
                 </TableCell>
               </TableRow>
@@ -342,7 +341,7 @@ function DangerZone() {
   );
 }
 
-function DeviceControls({}) {
+function DeviceControls({ }) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
 
   return (
@@ -414,7 +413,7 @@ function DeviceControls({}) {
   );
 }
 
-export default function Settings({}) {
+export default function Settings({ }) {
   return (
     <div
       className="w-full min-h-screen text-pink-600"

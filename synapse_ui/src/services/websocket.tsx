@@ -1,12 +1,12 @@
 type WebSocketWrapperOptions = {
   onOpen?: (event: Event) => void;
   onClose?: (event: CloseEvent) => void;
-  onMessage?: (message: string) => void;
+  onMessage?: (message: ArrayBufferLike) => void;
   onError?: (event: Event) => void;
   reconnectInterval?: number;
 };
 
-export default class WebSocketWrapper {
+export class WebSocketWrapper {
   private url: string;
   private ws: WebSocket | null = null;
   private forcedClose = false;
@@ -14,20 +14,21 @@ export default class WebSocketWrapper {
 
   private onOpen: (event: Event) => void;
   private onClose: (event: CloseEvent) => void;
-  private onMessage: (message: string) => void;
+  private onMessage: (message: ArrayBufferLike) => void;
   private onError: (event: Event) => void;
 
   constructor(url: string, options: WebSocketWrapperOptions = {}) {
     this.url = url;
-    this.onOpen = options.onOpen || (() => {});
-    this.onClose = options.onClose || (() => {});
-    this.onMessage = options.onMessage || (() => {});
-    this.onError = options.onError || (() => {});
+    this.onOpen = options.onOpen || (() => { });
+    this.onClose = options.onClose || (() => { });
+    this.onMessage = options.onMessage || (() => { });
+    this.onError = options.onError || (() => { });
     this.reconnectInterval = options.reconnectInterval ?? 200;
   }
 
   public connect() {
     this.ws = new WebSocket(this.url);
+    this.ws.binaryType = "arraybuffer";  // <--- Important!
 
     this.ws.onopen = (event: Event) => {
       this.onOpen(event);
@@ -41,7 +42,16 @@ export default class WebSocketWrapper {
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
-      this.onMessage(event.data);
+      if (
+        event.data instanceof ArrayBuffer ||
+        event.data instanceof SharedArrayBuffer
+      ) {
+        this.onMessage(event.data);
+      } else if (typeof event.data === "string") {
+        this.onMessage(new TextEncoder().encode(event.data).buffer);
+      } else {
+        console.warn("Unsupported message type", event.data);
+      }
     };
 
     this.ws.onerror = (event: Event) => {
@@ -49,6 +59,16 @@ export default class WebSocketWrapper {
     };
   }
 
+  // Send binary data (protobuf serialized bytes)
+  public sendBinary(data: Uint8Array | ArrayBuffer) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(data);
+    } else {
+      console.warn("WebSocket is not open. Cannot send binary message.");
+    }
+  }
+
+  // Optional: keep string send for JSON or other text
   public send(data: string) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(data);
@@ -67,18 +87,4 @@ export default class WebSocketWrapper {
   public isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
-}
-
-export class Message {
-  constructor(
-    public type: string,
-    public message: unknown,
-  ) {}
-}
-
-export function createMessage(type: string, message: unknown): string {
-  return JSON.stringify({
-    type: type,
-    message: message,
-  });
 }

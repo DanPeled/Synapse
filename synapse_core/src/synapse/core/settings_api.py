@@ -2,8 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import (Any, Dict, Generic, List, Optional, Type, TypeVar, Union,
-                    overload)
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union, overload
 
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse.bcolors import bcolors
