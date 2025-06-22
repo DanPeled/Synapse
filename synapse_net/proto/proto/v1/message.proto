@@ -2,11 +2,18 @@ syntax = "proto3";
 
 package proto.v1;
 
-import "google/protobuf/any.proto";
+import "proto/v1/camera.proto";
+import "proto/v1/device.proto";
+import "proto/v1/pipeline.proto";
 
 message MessageProto {
   MessageTypeProto type = 1;
-  google.protobuf.Any payload = 2;
+  oneof payload {
+    DeviceInfoProto device_info = 2;
+    HardwareMetricsProto hardware_metrics = 3;
+    CameraProto camera_info = 4;
+    PipelineProto pipeline_info = 5;
+  }
 }
 
 enum MessageTypeProto {

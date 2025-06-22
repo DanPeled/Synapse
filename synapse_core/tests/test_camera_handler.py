@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from synapse.core.runtime_handler import CameraHandler  # adjust import if needed
+from synapse.core.runtime_handler import \
+    CameraHandler  # adjust import if needed
 
 
 class TestCameraHandler(unittest.TestCase):

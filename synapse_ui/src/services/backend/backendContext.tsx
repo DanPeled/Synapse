@@ -127,31 +127,26 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         const uint8Array = new Uint8Array(message);
         const messageObj = MessageProto.decode(uint8Array);
         console.log(messageObj);
-        if (messageObj.payload !== undefined) {
-          switch (messageObj.type) {
-            case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO:
-              const deviceInfo: DeviceInfoProto = DeviceInfoProto.decode(
-                messageObj.payload.value,
-              );
-              setters.setDeviceinfo({
-                ...state.deviceinfo,
-                ...deviceInfo,
-              });
-              break;
-            case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
-              const hardwareMetrics: HardwareMetricsProto =
-                HardwareMetricsProto.decode(messageObj.payload.value);
-              console.log(hardwareMetrics);
-              console.log(messageObj.payload);
-              setters.setHardwaremetrics({
-                ...state.hardwaremetrics,
-                ...hardwareMetrics,
-                lastFetched: formatHHMMSSLocal(new Date()),
-              });
-              break;
-            default:
-              break;
-          }
+        switch (messageObj.type) {
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO:
+            const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
+            setters.setDeviceinfo({
+              ...state.deviceinfo,
+              ...deviceInfo,
+            });
+
+            break;
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
+            const hardwareMetrics: HardwareMetricsProto = messageObj.hardwareMetrics!;
+            setters.setHardwaremetrics({
+              ...state.hardwaremetrics,
+              ...hardwareMetrics,
+              lastFetched: formatHHMMSSLocal(new Date()),
+            });
+
+            break;
+          default:
+            break;
         }
       },
     });

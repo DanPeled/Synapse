@@ -52,11 +52,7 @@ generate_buf:
 	cd synapse_net/proto && \
 		buf lint && \
 		buf format -w && \
-		buf generate && \
-		python3 -m grpc_tools.protoc \
-			-I . \
-			--python_out=../src/synapse_net \
-			$$(find . -name '*.proto')
+		buf generate
 
 build:
 	python3 -m build .

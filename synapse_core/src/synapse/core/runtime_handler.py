@@ -9,43 +9,28 @@ from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, Type
-from synapse_net.proto.v1 import device_pb2  # pyright: ignore
-from synapse_net.proto.v1 import message_pb2  # pyright: ignore
-from synapse_net.socketServer import WebSocketServer, createMessage
+
 import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse.bcolors import bcolors
 from synapse.core.config import yaml
 from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
+from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
+from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (
-    CSCORE_TO_CV_PROPS,
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config
-from .pipeline import (
-    CameraConfig,
-    FrameResult,
-    GlobalSettings,
-    Pipeline,
-    PipelineSettings,
-)
+from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
+                       PipelineSettings)
 from .settings_api import PipelineSettingsMap
 
 
@@ -658,7 +643,7 @@ class RuntimeManager:
             while True:
                 metrics = queue.get(timeout=2)
                 if WebSocketServer.kInstance is not None:
-                    metricsMessage = device_pb2.HardwareMetricsProto()  # pyright: ignore
+                    metricsMessage = HardwareMetricsProto()
                     metricsMessage.cpu_temp = metrics[0]
                     metricsMessage.cpu_usage = metrics[1]
                     metricsMessage.uptime = metrics[3]
@@ -667,7 +652,8 @@ class RuntimeManager:
 
                     WebSocketServer.kInstance.sendToAllSync(
                         createMessage(
-                            message_pb2.MESSAGE_TYPE_PROTO_SEND_METRICS, metricsMessage
+                            MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS,
+                            metricsMessage,
                         )
                     )
                 entry.setDoubleArray(metrics)

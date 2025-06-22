@@ -5,7 +5,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final, Optional
 
-
 # Referenced from  https://github.com/PhotonVision/photonvision/
 
 

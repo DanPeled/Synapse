@@ -1,19 +1,17 @@
+import asyncio
 import atexit
 import os
+import threading
 from pathlib import Path
 
 from synapse.bcolors import bcolors
 from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
-
 from synapse_net.nt_client import NtClient
-from synapse_net.socketServer import (
-    WebSocketServer,
-    SocketEvent,
-    createMessage,
-)
-import asyncio
-import threading
+from synapse_net.proto.v1 import DeviceInfoProto, MessageTypeProto
+from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+                                      createMessage)
+
 from .pipeline import GlobalSettings
 from .runtime_handler import RuntimeManager
 
@@ -149,11 +147,10 @@ class Synapse:
         @self.websocket.on(SocketEvent.kConnect)
         async def on_connect(ws):
             import socket
-            import synapse.hardware.metrics as metrics
-            from synapse_net.proto.v1 import device_pb2  # pyright: ignore
-            from synapse_net.proto.v1 import message_pb2  # pyright: ignore
 
-            deviceInfo: device_pb2.DeviceInfoProto = device_pb2.DeviceInfoProto()  # pyright: ignore
+            import synapse.hardware.metrics as metrics
+
+            deviceInfo: DeviceInfoProto = DeviceInfoProto()
             deviceInfo.ip = socket.gethostbyname(socket.gethostname())
             deviceInfo.platform = (
                 metrics.Platform.getCurrentPlatform().getOSType().value
@@ -164,7 +161,8 @@ class Synapse:
             await self.websocket.sendToClient(
                 ws,
                 createMessage(
-                    message_pb2.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO, deviceInfo
+                    MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO,
+                    deviceInfo,
                 ),
             )
 

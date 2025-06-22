@@ -1,11 +1,10 @@
 import datetime
-from enum import Enum
 import os
 import sys
+from enum import Enum
 from typing import Optional
 
 from synapse.bcolors import bcolors
-
 from synapse_net.socketServer import WebSocketServer
 
 # Flag to control printing to the console

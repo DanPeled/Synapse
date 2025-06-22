@@ -1,9 +1,12 @@
 import asyncio
-import websockets
 from enum import Enum
+from re import sub
 from typing import Callable, Dict, Optional, Set
-from synapse_net.proto.v1 import message_pb2  # pyright: ignore
-from google.protobuf.any_pb2 import Any as AnyProto
+
+import betterproto
+import websockets
+
+from .proto.v1 import MessageProto, MessageTypeProto
 
 
 class SocketEvent(Enum):
@@ -13,14 +16,40 @@ class SocketEvent(Enum):
     kError = "error"
 
 
-def createMessage(type: str, data: AnyProto) -> bytes:
-    message = message_pb2.MessageProto()  # pyright: ignore
-    message.type = type
+def createMessage(
+    messageType: MessageTypeProto,
+    data: betterproto.Message,
+) -> bytes:
+    """
+    While this is very clearly not a safe solution or a good one,
+    it is good enough for now, and should be refactored later on
+    in a more typesafe way
+    """
+    message = MessageProto()
+    message.type = messageType
 
-    # Pack the message into the Any field
-    packed = AnyProto()
-    packed.Pack(data)
-    message.payload.CopyFrom(packed)
+    def camelToSnake(name):
+        # Converts 'PipelineProto' -> 'pipeline_proto'
+        s1 = sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+        return sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+    datatypeName = type(data).__name__  # e.g. PipelineProto
+    snakeName = camelToSnake(datatypeName)  # e.g. pipeline_proto
+
+    possibleFieldNames = [
+        snakeName.replace("_proto", ""),
+        snakeName.replace("_proto", "") + "_info",
+        snakeName.replace("_proto", "") + "_metrics",
+    ]
+
+    for field_name in possibleFieldNames:
+        if hasattr(message, field_name):
+            setattr(message, field_name, data)
+            break
+    else:
+        raise ValueError(
+            f"Cannot find matching field in MessageProto for {datatypeName}"
+        )
 
     return message.SerializeToString()
 
