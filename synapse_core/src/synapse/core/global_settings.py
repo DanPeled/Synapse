@@ -1,4 +1,5 @@
 from typing import Dict, Optional, Union, overload
+
 from synapse.core.settings_api import (
     Setting,
     SettingsCollection,
@@ -7,9 +8,9 @@ from synapse.core.settings_api import (
 )
 from synapse.log import err
 from synapse.stypes import CameraID
+from synapse.util import listToTransform3d
 
 from .camera_factory import CameraConfig, CameraConfigKey
-from synapse.util import listToTransform3d
 
 
 class GlobalSettingsMeta(type):
@@ -101,7 +102,7 @@ class GlobalSettingsMeta(type):
             setting (Union[Setting, str]): The setting key or object.
 
         Returns:
-            Optional[PipelineSettingsMapValue]: The current value, or None if not found.
+            Optional[MapValue]: The current value, or None if not found.
         """
         if cls.__settings is not None:
             return cls.__settings.getSetting(setting)
@@ -112,7 +113,7 @@ class GlobalSettingsMeta(type):
 
         Args:
             setting (Union[Setting, str]): The setting key or object.
-            value (PipelineSettingsMapValue): The new value to assign.
+            value (MapValue): The new value to assign.
         """
         if cls.__settings is not None:
             cls.__settings.setSetting(setting, value)
@@ -124,7 +125,7 @@ class GlobalSettingsMeta(type):
             setting (Union[str, Setting]): The setting key or object.
 
         Returns:
-            Optional[PipelineSettingsMapValue]: The setting value, or None if not found.
+            Optional[MapValue]: The setting value, or None if not found.
         """
         return cls.getSetting(setting)
 
@@ -133,7 +134,7 @@ class GlobalSettingsMeta(type):
 
         Args:
             setting (Union[str, Setting]): The setting key or object.
-            value (PipelineSettingsMapValue): The new value to assign.
+            value (MapValue): The new value to assign.
         """
         cls.setSetting(setting, value)
 

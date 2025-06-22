@@ -2,22 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, Iterable, Optional, TypeVar, Union, overload
 
 from ntcore import NetworkTable
-from synapse.log import err
 from synapse.stypes import Frame
-from typing_extensions import Dict
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
 from ..stypes import CameraID
-from ..util import listToTransform3d
-from .camera_factory import CameraConfig, CameraConfigKey
-from .settings_api import (
-    PipelineSettings,
-    SettingsCollection,
-    SettingsMap,
-    SettingsMapValue,
-    Setting,
-)
+from .settings_api import PipelineSettings, Setting
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 

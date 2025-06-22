@@ -22,8 +22,6 @@ from ntcore import (
     NetworkTableType,
 )
 from synapse.bcolors import bcolors
-from .config import yaml
-from .global_settings import GlobalSettings
 from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
@@ -33,19 +31,16 @@ from wpimath.units import seconds
 
 from .camera_factory import (
     CSCORE_TO_CV_PROPS,
+    CameraConfig,
     CameraFactory,
     CameraSettingsKeys,
     SynapseCamera,
-    CameraConfig,
     getCameraTable,
     getCameraTableName,
 )
-from .config import Config
-from .pipeline import (
-    FrameResult,
-    Pipeline,
-    PipelineSettings,
-)
+from .config import Config, yaml
+from .global_settings import GlobalSettings
+from .pipeline import FrameResult, Pipeline, PipelineSettings
 from .settings_api import SettingsMap
 
 
