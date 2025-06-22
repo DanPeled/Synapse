@@ -45,14 +45,13 @@ enum IPMode {
   dhcp = "DHCP",
 }
 
-function NetworkSettings({ }) {
+function NetworkSettings({}) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
     deviceinfo,
     networktable,
     setNetworktable,
     connection,
-    socket,
     networkTablesServer,
     setNetworkTablesServer,
   } = useBackendContext();
@@ -98,6 +97,7 @@ function NetworkSettings({ }) {
           <TextInput
             label="Team Number / NetworkTables Server Address"
             pattern={teamNumberOrIPRegex}
+            initialValue={networkTablesServer ?? ""}
             errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
             onChange={(val) => {
               setNetworkTablesServer(val);
@@ -209,7 +209,7 @@ function NetworkSettings({ }) {
   );
 }
 
-function DeviceInfo({ }) {
+function DeviceInfo({}) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
 
   return (
@@ -341,7 +341,7 @@ function DangerZone() {
   );
 }
 
-function DeviceControls({ }) {
+function DeviceControls({}) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
 
   return (
@@ -413,7 +413,7 @@ function DeviceControls({ }) {
   );
 }
 
-export default function Settings({ }) {
+export default function Settings({}) {
   return (
     <div
       className="w-full min-h-screen text-pink-600"

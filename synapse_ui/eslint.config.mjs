@@ -13,10 +13,9 @@ const eslintConfig = [
   ...compat.config({
     extends: ["next/core-web-vitals", "next/typescript"],
     rules: {
-      "@typescript-eslint/no-namespace": "off"
-    }
+      "@typescript-eslint/no-namespace": "off",
+    },
   }),
-
 ];
 
 export default eslintConfig;

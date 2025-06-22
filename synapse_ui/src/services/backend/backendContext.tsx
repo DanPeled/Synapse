@@ -8,9 +8,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import {
-  BackendStateSystem,
-} from "./dataStractures";
+import { BackendStateSystem } from "./dataStractures";
 import { PipelineManagement } from "./pipelineContext";
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { MessageProto } from "@/proto/v1/message";
@@ -127,14 +125,16 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
       onMessage: (message: ArrayBufferLike) => {
         const uint8Array = new Uint8Array(message);
         const messageObj = MessageProto.decode(uint8Array);
-        console.log(messageObj)
+        console.log(messageObj);
         if (messageObj.payload !== undefined) {
           switch (messageObj.type) {
             case "send_device_info":
-              const deviceInfo: DeviceInfoProto = DeviceInfoProto.decode(messageObj.payload.value);
+              const deviceInfo: DeviceInfoProto = DeviceInfoProto.decode(
+                messageObj.payload.value,
+              );
               setters.setDeviceinfo({
                 ...state.deviceinfo,
-                ...deviceInfo
+                ...deviceInfo,
               });
               break;
             case "hardware_metrics":
@@ -183,50 +183,6 @@ export const useBackendContext = (): BackendStateSystem.BackendContextType => {
   }
   return context;
 };
-
-function splitConcatenatedJSON(input: string): unknown[] {
-  const values: unknown[] = [];
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  let start = 0;
-
-  for (let i = 0; i < input.length; i++) {
-    const char = input[i];
-
-    if (inString) {
-      if (escape) {
-        escape = false;
-      } else if (char === "\\") {
-        escape = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-    } else {
-      if (char === '"') {
-        inString = true;
-      } else if (char === "{" || char === "[") {
-        depth++;
-      } else if (char === "}" || char === "]") {
-        depth--;
-      }
-    }
-
-    if (depth === 0 && !inString && i >= start) {
-      const chunk = input.slice(start, i + 1).trim();
-      if (chunk) {
-        try {
-          values.push(JSON.parse(chunk));
-        } catch (e) {
-          console.error(`Failed to parse: ${chunk} due to ${e}`);
-        }
-      }
-      start = i + 1;
-    }
-  }
-
-  return values;
-}
 
 function formatHHMMSSLocal(date: Date): string {
   const pad = (n: number): string => n.toString().padStart(2, "0");

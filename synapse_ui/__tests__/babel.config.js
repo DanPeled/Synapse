@@ -4,9 +4,9 @@ module.exports = {
       "next/babel",
       {
         "preset-react": {
-          runtime: "automatic"
-        }
-      }
-    ]
+          runtime: "automatic",
+        },
+      },
+    ],
   ],
 };

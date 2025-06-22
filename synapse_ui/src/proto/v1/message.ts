@@ -20,7 +20,10 @@ function createBaseMessageProto(): MessageProto {
 }
 
 export const MessageProto: MessageFns<MessageProto> = {
-  encode(message: MessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: MessageProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.type !== "") {
       writer.uint32(10).string(message.type);
     }
@@ -31,7 +34,8 @@ export const MessageProto: MessageFns<MessageProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MessageProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMessageProto();
     while (reader.pos < end) {
@@ -80,30 +84,49 @@ export const MessageProto: MessageFns<MessageProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<MessageProto>, I>>(base?: I): MessageProto {
+  create<I extends Exact<DeepPartial<MessageProto>, I>>(
+    base?: I,
+  ): MessageProto {
     return MessageProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(object: I): MessageProto {
+  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(
+    object: I,
+  ): MessageProto {
     const message = createBaseMessageProto();
     message.type = object.type ?? "";
-    message.payload = (object.payload !== undefined && object.payload !== null)
-      ? Any.fromPartial(object.payload)
-      : undefined;
+    message.payload =
+      object.payload !== undefined && object.payload !== null
+        ? Any.fromPartial(object.payload)
+        : undefined;
     return message;
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

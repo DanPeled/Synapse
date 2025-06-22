@@ -19,16 +19,16 @@ export class WebSocketWrapper {
 
   constructor(url: string, options: WebSocketWrapperOptions = {}) {
     this.url = url;
-    this.onOpen = options.onOpen || (() => { });
-    this.onClose = options.onClose || (() => { });
-    this.onMessage = options.onMessage || (() => { });
-    this.onError = options.onError || (() => { });
+    this.onOpen = options.onOpen || (() => {});
+    this.onClose = options.onClose || (() => {});
+    this.onMessage = options.onMessage || (() => {});
+    this.onError = options.onError || (() => {});
     this.reconnectInterval = options.reconnectInterval ?? 200;
   }
 
   public connect() {
     this.ws = new WebSocket(this.url);
-    this.ws.binaryType = "arraybuffer";  // <--- Important!
+    this.ws.binaryType = "arraybuffer"; // <--- Important!
 
     this.ws.onopen = (event: Event) => {
       this.onOpen(event);
