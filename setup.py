@@ -34,6 +34,7 @@ setup(
         "build",
         "psutil",
         "protobuf",
+        "betterproto==2.0.0b7",
     ],
     include_package_data=True,
 )

@@ -2,8 +2,15 @@ syntax = "proto3";
 
 package proto.v1;
 
+import "proto/settings/v1/settings.proto";
+
+message PipelineTypeProto {
+  string type = 1;
+  repeated proto.settings.v1.SettingProto settings = 2;
+}
+
 message PipelineProto {
   string name = 1;
-  string type = 2;
-  uint32 index = 3;
+  uint32 index = 2;
+  PipelineTypeProto type = 3;
 }

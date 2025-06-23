@@ -662,7 +662,7 @@ class RuntimeManager:
 
                     WebSocketServer.kInstance.sendToAllSync(
                         createMessage(
-                            MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS,
+                            MessageTypeProto.SEND_METRICS,
                             metricsMessage,
                         )
                     )

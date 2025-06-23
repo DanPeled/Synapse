@@ -16,6 +16,11 @@ export interface CameraProto {
   index: number;
 }
 
+export interface LatencyStatusProto {
+  latencyCapture: number;
+  latencyProcess: number;
+}
+
 function createBaseCameraProto(): CameraProto {
   return { name: "", streamPath: "", physicalConnection: "", index: 0 };
 }
@@ -124,6 +129,82 @@ export const CameraProto: MessageFns<CameraProto> = {
   },
 };
 
+function createBaseLatencyStatusProto(): LatencyStatusProto {
+  return { latencyCapture: 0, latencyProcess: 0 };
+}
+
+export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
+  encode(message: LatencyStatusProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.latencyCapture !== 0) {
+      writer.uint32(8).int64(message.latencyCapture);
+    }
+    if (message.latencyProcess !== 0) {
+      writer.uint32(16).int64(message.latencyProcess);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LatencyStatusProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLatencyStatusProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.latencyCapture = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.latencyProcess = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LatencyStatusProto {
+    return {
+      latencyCapture: isSet(object.latencyCapture) ? globalThis.Number(object.latencyCapture) : 0,
+      latencyProcess: isSet(object.latencyProcess) ? globalThis.Number(object.latencyProcess) : 0,
+    };
+  },
+
+  toJSON(message: LatencyStatusProto): unknown {
+    const obj: any = {};
+    if (message.latencyCapture !== 0) {
+      obj.latencyCapture = Math.round(message.latencyCapture);
+    }
+    if (message.latencyProcess !== 0) {
+      obj.latencyProcess = Math.round(message.latencyProcess);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(base?: I): LatencyStatusProto {
+    return LatencyStatusProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(object: I): LatencyStatusProto {
+    const message = createBaseLatencyStatusProto();
+    message.latencyCapture = object.latencyCapture ?? 0;
+    message.latencyProcess = object.latencyProcess ?? 0;
+    return message;
+  },
+};
+
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
 export type DeepPartial<T> = T extends Builtin ? T
@@ -135,6 +216,17 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(int64: { toString(): string }): number {
+  const num = globalThis.Number(int64.toString());
+  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return num;
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

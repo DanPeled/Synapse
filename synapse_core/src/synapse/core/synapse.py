@@ -160,7 +160,7 @@ class Synapse:
             await self.websocket.sendToClient(
                 ws,
                 createMessage(
-                    MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO,
+                    MessageTypeProto.SEND_DEVICE_INFO,
                     deviceInfo,
                 ),
             )

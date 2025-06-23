@@ -6,17 +6,101 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SettingProto } from "../settings/v1/settings";
 
 export const protobufPackage = "proto.v1";
 
-export interface PipelineProto {
-  name: string;
+export interface PipelineTypeProto {
   type: string;
-  index: number;
+  settings: SettingProto[];
 }
 
+export interface PipelineProto {
+  name: string;
+  index: number;
+  type: PipelineTypeProto | undefined;
+}
+
+function createBasePipelineTypeProto(): PipelineTypeProto {
+  return { type: "", settings: [] };
+}
+
+export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
+  encode(message: PipelineTypeProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.type !== "") {
+      writer.uint32(10).string(message.type);
+    }
+    for (const v of message.settings) {
+      SettingProto.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PipelineTypeProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePipelineTypeProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.type = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.settings.push(SettingProto.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PipelineTypeProto {
+    return {
+      type: isSet(object.type) ? globalThis.String(object.type) : "",
+      settings: globalThis.Array.isArray(object?.settings)
+        ? object.settings.map((e: any) => SettingProto.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: PipelineTypeProto): unknown {
+    const obj: any = {};
+    if (message.type !== "") {
+      obj.type = message.type;
+    }
+    if (message.settings?.length) {
+      obj.settings = message.settings.map((e) => SettingProto.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(base?: I): PipelineTypeProto {
+    return PipelineTypeProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(object: I): PipelineTypeProto {
+    const message = createBasePipelineTypeProto();
+    message.type = object.type ?? "";
+    message.settings = object.settings?.map((e) => SettingProto.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBasePipelineProto(): PipelineProto {
-  return { name: "", type: "", index: 0 };
+  return { name: "", index: 0, type: undefined };
 }
 
 export const PipelineProto: MessageFns<PipelineProto> = {
@@ -24,11 +108,11 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.type !== "") {
-      writer.uint32(18).string(message.type);
-    }
     if (message.index !== 0) {
-      writer.uint32(24).uint32(message.index);
+      writer.uint32(16).uint32(message.index);
+    }
+    if (message.type !== undefined) {
+      PipelineTypeProto.encode(message.type, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -49,19 +133,19 @@ export const PipelineProto: MessageFns<PipelineProto> = {
           continue;
         }
         case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.type = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
+          if (tag !== 16) {
             break;
           }
 
           message.index = reader.uint32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.type = PipelineTypeProto.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -76,8 +160,8 @@ export const PipelineProto: MessageFns<PipelineProto> = {
   fromJSON(object: any): PipelineProto {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      type: isSet(object.type) ? globalThis.String(object.type) : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
+      type: isSet(object.type) ? PipelineTypeProto.fromJSON(object.type) : undefined,
     };
   },
 
@@ -86,11 +170,11 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     if (message.name !== "") {
       obj.name = message.name;
     }
-    if (message.type !== "") {
-      obj.type = message.type;
-    }
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
+    }
+    if (message.type !== undefined) {
+      obj.type = PipelineTypeProto.toJSON(message.type);
     }
     return obj;
   },
@@ -101,8 +185,10 @@ export const PipelineProto: MessageFns<PipelineProto> = {
   fromPartial<I extends Exact<DeepPartial<PipelineProto>, I>>(object: I): PipelineProto {
     const message = createBasePipelineProto();
     message.name = object.name ?? "";
-    message.type = object.type ?? "";
     message.index = object.index ?? 0;
+    message.type = (object.type !== undefined && object.type !== null)
+      ? PipelineTypeProto.fromPartial(object.type)
+      : undefined;
     return message;
   },
 };
