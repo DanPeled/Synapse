@@ -1,4 +1,3 @@
-import atexit
 import time
 from functools import lru_cache
 from typing import Optional
@@ -89,7 +88,6 @@ class NtClient:
                 log("Trying to establish connection with server...")
             time.sleep(1)
 
-        atexit.register(self.cleanup)
         return True
 
     def cleanup(self) -> None:

@@ -1,6 +1,6 @@
 import asyncio
+from dataclasses import fields
 from enum import Enum
-from re import sub
 from typing import Callable, Dict, Optional, Set
 
 import betterproto
@@ -28,28 +28,23 @@ def createMessage(
     message = MessageProto()
     message.type = messageType
 
-    def camelToSnake(name):
-        # Converts 'PipelineProto' -> 'pipeline_proto'
-        s1 = sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-        return sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
     datatypeName = type(data).__name__  # e.g. PipelineProto
-    snakeName = camelToSnake(datatypeName)  # e.g. pipeline_proto
 
-    possibleFieldNames = [
-        snakeName.replace("_proto", ""),
-        snakeName.replace("_proto", "") + "_info",
-        snakeName.replace("_proto", "") + "_metrics",
-    ]
-
-    for field_name in possibleFieldNames:
-        if hasattr(message, field_name):
-            setattr(message, field_name, data)
+    field_name = None
+    for f in fields(type(message)):
+        if f.type == datatypeName:
+            field_name = f.name
             break
     else:
-        raise ValueError(
-            f"Cannot find matching field in MessageProto for {datatypeName}"
-        )
+        raise ValueError(f"No matching field for type {datatypeName}")
+
+    if field_name:
+        if field_name in {f.name for f in fields(message)}:
+            setattr(message, field_name, data)
+        else:
+            raise ValueError(
+                f"Cannot find matching field in MessageProto for {field_name} (typeof={type(data).__name__})"
+            )
 
     return message.SerializeToString()
 
@@ -63,6 +58,7 @@ class WebSocketServer:
         self.callbacks: Dict[SocketEvent, Callable] = {}
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
         self._server = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable):

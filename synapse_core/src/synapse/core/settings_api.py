@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
 
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse.bcolors import bcolors
+from synapse.bcolors import MarkupColors
 from synapse.log import err
 
 SettingsMapValue = Any
@@ -655,8 +655,8 @@ class SettingsCollection:
                     self._settingsApi.setValue(field, value)
                 else:
                     err(
-                        f"Error validating {bcolors.BOLD}{field}{bcolors.ENDC}"
-                        + f"\n\t\t{bcolors.FAIL}{validation.errorMessage}"
+                        f"Error validating {MarkupColors.bold(field)}"
+                        + f"\n\t\t{validation.errorMessage}"
                         + f"\n\tSetting {field} as default: {setting.defaultValue}"
                     )
 

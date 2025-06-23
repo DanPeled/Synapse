@@ -223,14 +223,25 @@ class ShellExec:
         self.error: str = ""
         self.exit_code: int = 0
 
-    def executeBashCommand(self, command: str) -> None:
+    def executeBashCommand(self, command: str, timeout: int = 5) -> None:
         try:
             result = subprocess.run(
-                command, shell=self.shell, capture_output=self.capture_output, text=True
+                command,
+                shell=self.shell,
+                capture_output=self.capture_output,
+                text=True,
+                timeout=timeout,  # <-- add timeout here
             )
             self.output = result.stdout.strip()
             self.error = result.stderr.strip()
             self.exit_code = result.returncode
+        except subprocess.TimeoutExpired:
+            self.error = f"Command timed out after {timeout} seconds"
+            self.exit_code = -1
+        except KeyboardInterrupt:
+            # Optional: clean up or log before re-raising
+            print("KeyboardInterrupt: terminating command execution")
+            raise
         except Exception as e:
             self.error = str(e)
             self.exit_code = -1
@@ -324,7 +335,18 @@ class MetricsManager:
 
     def execute(self, command: str) -> str:
         try:
-            self.runCommand.executeBashCommand(command)
+            # Add timeout (e.g., 5 seconds) inside executeBashCommand
+            self.runCommand.executeBashCommand(command, timeout=5)
             return self.runCommand.getOutput()
-        except Exception as _:
+        except subprocess.TimeoutExpired:
+            # Timeout: optionally log or handle gracefully
+            print(f"Command timed out: {command}")
+            return ""
+        except KeyboardInterrupt:
+            # Re-raise to allow clean exit on Ctrl+C
+            print("KeyboardInterrupt received, stopping command execution.")
+            raise
+        except Exception as e:
+            # Catch-all for other exceptions
+            print(f"Exception during command execution: {e}")
             return ""

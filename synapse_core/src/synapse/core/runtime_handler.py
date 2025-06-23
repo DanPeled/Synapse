@@ -21,13 +21,14 @@ from ntcore import (
     NetworkTableInstance,
     NetworkTableType,
 )
-from synapse.bcolors import bcolors
+from ..bcolors import MarkupColors
 from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds
+
 
 from .camera_factory import (
     CSCORE_TO_CV_PROPS,
@@ -556,6 +557,8 @@ class RuntimeManager:
         self.pipelineLoader: PipelineLoader = PipelineLoader(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
+        self.cameraManagementThreads: List[threading.Thread] = []
+        self.isRunning: bool = True
 
     def setup(self, directory: Path):
         """
@@ -573,14 +576,9 @@ class RuntimeManager:
         import atexit
 
         log.log(
-            bcolors.OKGREEN
-            + bcolors.BOLD
-            + "\n"
-            + "=" * 20
-            + " Loading Pipelines & Camera Configs... "
-            + "=" * 20
-            + bcolors.ENDC
-            + "\n"
+            MarkupColors.header(
+                "\n" + "=" * 20 + " Loading Pipelines & Camera Configs... " + "=" * 20
+            )
         )
 
         self.pipelineLoader.setup(directory)
@@ -622,7 +620,7 @@ class RuntimeManager:
             metricsManager: Final[MetricsManager] = MetricsManager()
             metricsManager.setConfig(None)  # Pass config if you have one
 
-            while True:
+            while self.isRunning:
                 metrics_str: List[str] = [
                     metricsManager.getTemp(),
                     metricsManager.getUtilization(),
@@ -650,7 +648,7 @@ class RuntimeManager:
             entry = NetworkTableInstance.getDefault().getEntry(
                 f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
             )
-            while True:
+            while self.isRunning:
                 metrics = queue.get(timeout=2)
                 if WebSocketServer.kInstance is not None:
                     metricsMessage = HardwareMetricsProto()
@@ -870,7 +868,7 @@ class RuntimeManager:
 
             log.log(f"Started Camera #{cameraIndex} loop")
 
-            while True:
+            while self.isRunning:
                 maxFps = camera.getMaxFPS()
                 frame_time = 1.0 / float(maxFps)
                 loop_start = Timer.getFPGATimestamp()
@@ -928,20 +926,17 @@ class RuntimeManager:
                 thread = threading.Thread(target=processCamera, args=(cameraIndex,))
                 thread.daemon = True
                 thread.start()
+                self.cameraManagementThreads.append(thread)
 
         initThreads()
 
         log.log(
-            bcolors.OKGREEN
-            + bcolors.BOLD
-            + "\n"
-            + "=" * 20
-            + " Synapse Runtime Starting... "
-            + "=" * 20
-            + bcolors.ENDC
+            MarkupColors.header(
+                "\n" + "=" * 20 + " Synapse Runtime Starting... " + "=" * 20
+            )
         )
 
-        while True:
+        while self.isRunning:
             if NtClient.INSTANCE:
                 NtClient.INSTANCE.nt_inst.flush()
                 if NtClient.INSTANCE.server:
@@ -1077,4 +1072,5 @@ class RuntimeManager:
         cv2.destroyAllWindows()
 
         self.cameraHandler.cleanup()
+        self.isRunning = False
         log.log("Cleaned up all resources.")

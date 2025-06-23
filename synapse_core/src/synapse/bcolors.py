@@ -1,20 +1,67 @@
-from typing import Final
+from enum import Enum
+import re
 
 
-class bcolors:
+class TextTarget(Enum):
+    kTerminal = "terminal"
+    kHTML = "html"
+
+
+class MarkupColors:
     """
-    ANSI escape sequences for coloring terminal text output.
-
-    These constants can be used to format strings with different colors and styles
-    when printed to a terminal that supports ANSI escape codes.
+    Markup-style wrappers for text formatting using custom tags,
+    to be parsed for either terminal (via rich) or HTML.
     """
 
-    HEADER: Final[str] = "\033[95m"  # Light magenta
-    OKBLUE: Final[str] = "\033[94m"  # Light blue
-    OKCYAN: Final[str] = "\033[96m"  # Light cyan
-    OKGREEN: Final[str] = "\033[92m"  # Light green
-    WARNING: Final[str] = "\033[93m"  # Yellow (typically used for warnings)
-    FAIL: Final[str] = "\033[91m"  # Light red (typically used for errors)
-    ENDC: Final[str] = "\033[0m"  # Reset to default color
-    BOLD: Final[str] = "\033[1m"  # Bold text
-    UNDERLINE: Final[str] = "\033[4m"  # Underlined text
+    @staticmethod
+    def header(text: str) -> str:
+        return MarkupColors.okgreen(MarkupColors.bold(text))
+
+    @staticmethod
+    def okblue(text: str) -> str:
+        return f"[blue]{text}[/blue]"
+
+    @staticmethod
+    def okcyan(text: str) -> str:
+        return f"[cyan]{text}[/cyan]"
+
+    @staticmethod
+    def okgreen(text: str) -> str:
+        return f"[green]{text}[/green]"
+
+    @staticmethod
+    def warning(text: str) -> str:
+        return f"[yellow]{text}[/yellow]"
+
+    @staticmethod
+    def fail(text: str) -> str:
+        return f"[red]{text}[/red]"
+
+    @staticmethod
+    def bold(text: str) -> str:
+        return f"[bold]{text}[/bold]"
+
+    @staticmethod
+    def underline(text: str) -> str:
+        return f"[underline]{text}[/underline]"
+
+
+def parseTextStyle(text: str, target: TextTarget = TextTarget.kTerminal) -> str:
+    def repl(match):
+        tags = match.group(1).strip().split()
+        content = match.group(2)
+
+        if target == TextTarget.kTerminal:
+            tag_str = " ".join(tags)
+            return f"[{tag_str}]{content}[/{tag_str}]"
+        elif target == TextTarget.kHTML:
+            styles = []
+            for tag in tags:
+                if tag == "bold":
+                    styles.append("font-weight: bold")
+                else:
+                    styles.append(f"color: {tag}")
+            return f'<span style="{"; ".join(styles)}">{content}</span>'
+
+    pattern = re.compile(r"\[([a-zA-Z0-9\s]+)\](.*?)\[/\1\]", re.DOTALL)
+    return re.sub(pattern, repl, text)

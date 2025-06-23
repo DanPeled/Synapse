@@ -1,10 +1,9 @@
 import asyncio
-import atexit
 import os
 import threading
 from pathlib import Path
 
-from synapse.bcolors import bcolors
+from ..bcolors import MarkupColors
 from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
 from synapse_net.nt_client import NtClient
@@ -25,6 +24,11 @@ class Synapse:
             nt_client (NtClient): The instance of NtClient used to manage the NetworkTables connection.
     """
 
+    kInstance: "Synapse"
+
+    def __init__(self) -> None:
+        self.isRunning: bool = False
+
     def init(
         self,
         runtime_handler: RuntimeManager,
@@ -40,16 +44,17 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
+        self.isRunning = True
+        Synapse.kInstance = self
 
         log(
-            bcolors.OKGREEN
-            + bcolors.BOLD
-            + "\n"
-            + "=" * 20
-            + " Synapse Initialize Starting... "
-            + "=" * 20
-            + bcolors.ENDC
+            MarkupColors.bold(
+                MarkupColors.okgreen(
+                    "\n" + "=" * 20 + " Synapse Initialize Starting... " + "=" * 20
+                )
+            )
         )
+
         self.runtime_handler = runtime_handler
 
         self.setupWebsocket()
@@ -143,6 +148,9 @@ class Synapse:
 
         self.websocket = WebSocketServer("localhost", 8765)
 
+        new_loop = asyncio.new_event_loop()
+        self.websocket.loop = new_loop  # <-- store it for future shutdown
+
         @self.websocket.on(SocketEvent.kConnect)
         async def on_connect(ws):
             import socket
@@ -187,15 +195,25 @@ class Synapse:
 
         asyncio.run_coroutine_threadsafe(run_server(), new_loop)
 
-        atexit.register(self.closeWebsocket)
-
         log(
             "WebSocket server started on ws://localhost:8765 (running in a separate thread)"
         )
 
-    def closeWebsocket(self):
-        asyncio.run(self.websocket.close())
-        self.websocketThread.join()
+    def cleanup(self):
+        if NtClient.INSTANCE is not None:
+            NtClient.INSTANCE.cleanup()
+
+        if self.websocket.loop is not None:
+            future = asyncio.run_coroutine_threadsafe(
+                self.websocket.close(), self.websocket.loop
+            )
+            try:
+                future.result(timeout=5)
+            except Exception as e:
+                err(f"Error while closing websocket: {e}")
+
+            self.websocket.loop.call_soon_threadsafe(self.websocket.loop.stop)
+            self.websocketThread.join(timeout=5)
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:
@@ -203,3 +221,5 @@ class Synapse:
         s = Synapse()
         if s.init(handler, root / "config" / "settings.yml"):
             s.run()
+        s.cleanup()
+        handler.cleanup()
