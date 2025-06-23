@@ -606,22 +606,24 @@ class RuntimeManager:
             log.log(f"Setup default pipeline (#{pipeline}) for camera ({cameraIndex})")
 
     def startMetricsThread(self):
-        from multiprocessing import Process, Queue
-
         """
         Starts a multiprocessing process and thread to:
         - Collect system metrics from a background process.
         - Publish metrics as a double array to NetworkTables from the main process.
         """
 
-        def metricsProcess(queue: Queue):
+        def metricsWorker() -> None:
             from synapse.hardware.metrics import MetricsManager
 
             metricsManager: Final[MetricsManager] = MetricsManager()
             metricsManager.setConfig(None)  # Pass config if you have one
 
+            entry = NetworkTableInstance.getDefault().getEntry(
+                f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
+            )
+
             while self.isRunning:
-                metrics_str: List[str] = [
+                metrics_str = [
                     metricsManager.getTemp(),
                     metricsManager.getUtilization(),
                     metricsManager.getMemory(),
@@ -633,7 +635,6 @@ class RuntimeManager:
                     metricsManager.getNpuUsage(),
                 ]
 
-                # Convert strings to floats safely
                 metrics = []
                 for s in metrics_str:
                     try:
@@ -641,15 +642,6 @@ class RuntimeManager:
                     except (ValueError, TypeError):
                         metrics.append(0.0)
 
-                queue.put(metrics)
-                time.sleep(1)
-
-        def publishLoop(queue: Queue):
-            entry = NetworkTableInstance.getDefault().getEntry(
-                f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
-            )
-            while self.isRunning:
-                metrics = queue.get(timeout=2)
                 if WebSocketServer.kInstance is not None:
                     metricsMessage = HardwareMetricsProto()
                     metricsMessage.cpu_temp = metrics[0]
@@ -664,18 +656,15 @@ class RuntimeManager:
                             metricsMessage,
                         )
                     )
+
                 entry.setDoubleArray(metrics)
-                time.sleep(1)
+                try:
+                    time.sleep(1)
+                except Exception:
+                    continue
 
-        metricsQueue = Queue()
-
-        p = Process(target=metricsProcess, args=(metricsQueue,), daemon=True)
-        p.start()
-
-        publisher_thread = threading.Thread(
-            target=publishLoop, args=(metricsQueue,), daemon=True
-        )
-        publisher_thread.start()
+        self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
+        self.metricsThread.start()
 
     def __setupPipelineForCamera(
         self,
@@ -941,6 +930,10 @@ class RuntimeManager:
                 NtClient.INSTANCE.nt_inst.flush()
                 if NtClient.INSTANCE.server:
                     NtClient.INSTANCE.server.flush()
+            try:
+                time.sleep(0.05)
+            except Exception:
+                continue
 
     def handleResults(
         self, frames: FrameResult, cameraIndex: CameraID

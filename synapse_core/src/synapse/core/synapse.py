@@ -145,16 +145,17 @@ class Synapse:
 
     def setupWebsocket(self) -> None:
         import psutil
+        import asyncio
 
         self.websocket = WebSocketServer("localhost", 8765)
 
+        # Create a new asyncio event loop for the websocket thread
         new_loop = asyncio.new_event_loop()
-        self.websocket.loop = new_loop  # <-- store it for future shutdown
+        self.websocket.loop = new_loop  # store for shutdown
 
         @self.websocket.on(SocketEvent.kConnect)
         async def on_connect(ws):
             import socket
-
             import synapse.hardware.metrics as metrics
 
             deviceInfo: DeviceInfoProto = DeviceInfoProto()
@@ -181,18 +182,20 @@ class Synapse:
         async def on_error(ws, error_msg):
             err(f"Socket: {ws.remote_address}: {error_msg}")
 
-        # Create and start a new event loop in a separate thread
         def start_loop(loop):
             asyncio.set_event_loop(loop)
             loop.run_forever()
 
-        new_loop = asyncio.new_event_loop()
-        self.websocketThread = threading.Thread(target=start_loop, args=(new_loop,))
+        # Create daemon thread so it won't block process exit
+        self.websocketThread = threading.Thread(
+            target=start_loop, args=(new_loop,), daemon=True
+        )
         self.websocketThread.start()
 
         async def run_server():
             await self.websocket.start()
 
+        # Schedule the websocket server start coroutine in the new event loop
         asyncio.run_coroutine_threadsafe(run_server(), new_loop)
 
         log(
