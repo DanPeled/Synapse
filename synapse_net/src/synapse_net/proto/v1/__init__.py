@@ -47,8 +47,9 @@ class HardwareMetricsProto(betterproto.Message):
     cpu_usage: float = betterproto.float_field(2)
     disk_usage: float = betterproto.float_field(3)
     ram_usage: float = betterproto.float_field(4)
-    uptime: float = betterproto.float_field(5)
-    last_fetched: str = betterproto.string_field(6)
+    memory: float = betterproto.float_field(5)
+    uptime: float = betterproto.float_field(6)
+    last_fetched: str = betterproto.string_field(7)
 
 
 @dataclass(eq=False, repr=False)

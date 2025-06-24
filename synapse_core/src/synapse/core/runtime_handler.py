@@ -616,39 +616,40 @@ class RuntimeManager:
             from synapse.hardware.metrics import MetricsManager
 
             metricsManager: Final[MetricsManager] = MetricsManager()
-            metricsManager.setConfig(None)  # Pass config if you have one
 
             entry = NetworkTableInstance.getDefault().getEntry(
                 f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
             )
 
             while self.isRunning:
-                metrics_str = [
-                    metricsManager.getTemp(),
-                    metricsManager.getUtilization(),
-                    metricsManager.getMemory(),
-                    metricsManager.getUptime(),
-                    metricsManager.getGPUMemorySplit(),
-                    metricsManager.getUsedRam(),
-                    metricsManager.getMallocedMemory(),
-                    metricsManager.getUsedDiskPct(),
-                    metricsManager.getNpuUsage(),
-                ]
+                cpuTemp = metricsManager.getCpuTemp()
+                cpuUsage = metricsManager.getCpuUtilization()
+                memory = metricsManager.getMemory()
+                uptime = metricsManager.getUptime()
+                gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                usedRam = metricsManager.getUsedRam()
+                usedDiskPct = metricsManager.getUsedDiskPct()
+                npuUsage = metricsManager.getNpuUsage()
 
-                metrics = []
-                for s in metrics_str:
-                    try:
-                        metrics.append(float(s))
-                    except (ValueError, TypeError):
-                        metrics.append(0.0)
+                metrics = [
+                    cpuTemp,
+                    cpuUsage,
+                    memory,
+                    uptime,
+                    gpuMemorySplit,
+                    usedRam,
+                    usedDiskPct,
+                    npuUsage,
+                ]
 
                 if WebSocketServer.kInstance is not None:
                     metricsMessage = HardwareMetricsProto()
-                    metricsMessage.cpu_temp = metrics[0]
-                    metricsMessage.cpu_usage = metrics[1]
-                    metricsMessage.uptime = metrics[3]
-                    metricsMessage.ram_usage = metrics[5]
-                    metricsMessage.disk_usage = metrics[-2]
+                    metricsMessage.cpu_temp = cpuTemp
+                    metricsMessage.cpu_usage = cpuUsage
+                    metricsMessage.uptime = uptime
+                    metricsMessage.memory = memory
+                    metricsMessage.ram_usage = usedRam
+                    metricsMessage.disk_usage = usedDiskPct
 
                     WebSocketServer.kInstance.sendToAllSync(
                         createMessage(
@@ -658,6 +659,7 @@ class RuntimeManager:
                     )
 
                 entry.setDoubleArray(metrics)
+
                 try:
                     time.sleep(1)
                 except Exception:

@@ -40,8 +40,8 @@ def test_err_logs_error_with_formatting(cleanupLogs) -> None:
         assert test_error in contents
 
         print(contents)
-        assert "\x1b[91m" in contents
-        assert "\x1b[0m\n" in contents
+        assert "[red]" in contents
+        assert "[/red]" in contents
 
 
 def test_stderr_redirection() -> None:

@@ -137,7 +137,8 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             break;
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
-            const hardwareMetrics: HardwareMetricsProto = messageObj.hardwareMetrics!;
+            const hardwareMetrics: HardwareMetricsProto =
+              messageObj.hardwareMetrics!;
             setters.setHardwaremetrics({
               ...state.hardwaremetrics,
               ...hardwareMetrics,

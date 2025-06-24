@@ -21,6 +21,7 @@ export interface HardwareMetricsProto {
   cpuUsage: number;
   diskUsage: number;
   ramUsage: number;
+  memory: number;
   uptime: number;
   lastFetched: string;
 }
@@ -136,7 +137,7 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
 };
 
 function createBaseHardwareMetricsProto(): HardwareMetricsProto {
-  return { cpuTemp: 0, cpuUsage: 0, diskUsage: 0, ramUsage: 0, uptime: 0, lastFetched: "" };
+  return { cpuTemp: 0, cpuUsage: 0, diskUsage: 0, ramUsage: 0, memory: 0, uptime: 0, lastFetched: "" };
 }
 
 export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
@@ -153,11 +154,14 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     if (message.ramUsage !== 0) {
       writer.uint32(37).float(message.ramUsage);
     }
+    if (message.memory !== 0) {
+      writer.uint32(45).float(message.memory);
+    }
     if (message.uptime !== 0) {
-      writer.uint32(45).float(message.uptime);
+      writer.uint32(53).float(message.uptime);
     }
     if (message.lastFetched !== "") {
-      writer.uint32(50).string(message.lastFetched);
+      writer.uint32(58).string(message.lastFetched);
     }
     return writer;
   },
@@ -206,11 +210,19 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
             break;
           }
 
-          message.uptime = reader.float();
+          message.memory = reader.float();
           continue;
         }
         case 6: {
-          if (tag !== 50) {
+          if (tag !== 53) {
+            break;
+          }
+
+          message.uptime = reader.float();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
@@ -232,6 +244,7 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
       cpuUsage: isSet(object.cpuUsage) ? globalThis.Number(object.cpuUsage) : 0,
       diskUsage: isSet(object.diskUsage) ? globalThis.Number(object.diskUsage) : 0,
       ramUsage: isSet(object.ramUsage) ? globalThis.Number(object.ramUsage) : 0,
+      memory: isSet(object.memory) ? globalThis.Number(object.memory) : 0,
       uptime: isSet(object.uptime) ? globalThis.Number(object.uptime) : 0,
       lastFetched: isSet(object.lastFetched) ? globalThis.String(object.lastFetched) : "",
     };
@@ -251,6 +264,9 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     if (message.ramUsage !== 0) {
       obj.ramUsage = message.ramUsage;
     }
+    if (message.memory !== 0) {
+      obj.memory = message.memory;
+    }
     if (message.uptime !== 0) {
       obj.uptime = message.uptime;
     }
@@ -269,6 +285,7 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     message.cpuUsage = object.cpuUsage ?? 0;
     message.diskUsage = object.diskUsage ?? 0;
     message.ramUsage = object.ramUsage ?? 0;
+    message.memory = object.memory ?? 0;
     message.uptime = object.uptime ?? 0;
     message.lastFetched = object.lastFetched ?? "";
     return message;
