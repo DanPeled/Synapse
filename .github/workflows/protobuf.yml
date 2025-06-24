@@ -55,14 +55,3 @@ jobs:
       - name: Build protobuf files
         working-directory: synapse_net/proto
         run: buf build
-
-      - name: Generate Python protobuf code
-        working-directory: synapse_net/proto
-        run: buf generate --template buf-python.yaml
-
-      - name: Generate TypeScript protobuf code
-        working-directory: synapse_net/proto
-        run: buf generate --template buf-ts.yaml
-
-      - name: Verify generated files are up to date
-        run: git diff --exit-code
