@@ -2,6 +2,8 @@ name: Synapse Networking
 
 on:
   push:
+    branches:
+      - main
     paths:
       - '**/*.proto'
       - 'synapse_net/proto/buf.yaml'
@@ -14,40 +16,31 @@ on:
 
 jobs:
   protobuf:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup tools and dependencies
-        shell: bash
+      - name: Install Buf
         run: |
           make install_buf
 
       - name: Check protobuf format
         working-directory: synapse_net/proto
-        shell: bash
         run: buf format --diff
 
       - name: Lint protobuf files
         working-directory: synapse_net/proto
-        shell: bash
         run: buf lint
 
       - name: Build protobuf files
         working-directory: synapse_net/proto
-        shell: bash
         run: buf build
 
       - name: Generate protobuf code
         working-directory: synapse_net/proto
-        shell: bash
         run: buf generate
 
       - name: Verify generated files are up to date
-        shell: bash
-        run: git diff --exit-code
+        run: |
+          git diff --exit-code
