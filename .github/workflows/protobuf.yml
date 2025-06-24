@@ -31,20 +31,35 @@ jobs:
         with:
           python-version: '3.10.7'
 
-      - name: Setup buf CLI
-        uses: bufbuild/buf-action@v1
-
       - name: Check protobuf format
-        working-directory: synapse_net/proto
         uses: bufbuild/buf-action@v1
-        run: buf format --diff
+        with:
+          args: format --diff
+        working-directory: synapse_net/proto
 
       - name: Lint protobuf files
-        working-directory: synapse_net/proto
         uses: bufbuild/buf-action@v1
-        run: buf lint
+        with:
+          args: lint
+        working-directory: synapse_net/proto
 
       - name: Build protobuf files
-        working-directory: synapse_net/proto
         uses: bufbuild/buf-action@v1
-        run: buf build
+        with:
+          args: build
+        working-directory: synapse_net/proto
+
+      - name: Generate protobuf code (Python)
+        uses: bufbuild/buf-action@v1
+        with:
+          args: generate --template buf-python.yaml
+        working-directory: synapse_net/proto
+
+      - name: Generate protobuf code (TypeScript)
+        uses: bufbuild/buf-action@v1
+        with:
+          args: generate --template buf-ts.yaml
+        working-directory: synapse_net/proto
+
+      - name: Verify generated files are up to date
+        run: git diff --exit-code
