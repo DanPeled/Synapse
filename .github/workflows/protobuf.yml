@@ -2,18 +2,17 @@ name: Synapse Networking
 
 on:
   push:
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - '**/*.proto'
-  #     - 'synapse_net/proto/buf.yaml'
-  #     - 'synapse_net/proto/buf.gen.yaml'
-  # pull_request:
-  #   paths:
-  #     - '**/*.proto'
-  #     - 'synapse_net/proto/buf.yaml'
-  #     - 'synapse_net/proto/buf.gen.yaml'
+    branches:
+      - main
+    paths:
+      - '**/*.proto'
+      - 'synapse_net/proto/buf.yaml'
+      - 'synapse_net/proto/buf.gen.yaml'
+  pull_request:
+    paths:
+      - '**/*.proto'
+      - 'synapse_net/proto/buf.yaml'
+      - 'synapse_net/proto/buf.gen.yaml'
 
 jobs:
   protobuf:
