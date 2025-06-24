@@ -32,7 +32,7 @@ jobs:
           python-version: '3.10.7'
 
       - name: Setup buf CLI
-        uses: bufbuild/setup-buf@v0.5.0
+        uses: bufbuild/buf-action@v1
 
       - name: Check protobuf format
         working-directory: synapse_net/proto
