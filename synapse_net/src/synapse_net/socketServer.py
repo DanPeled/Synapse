@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import fields
 from enum import Enum
 from typing import Callable, Dict, Optional, Set
-
+from functools import lru_cache
 import betterproto
 import websockets
 
@@ -14,6 +14,18 @@ class SocketEvent(Enum):
     kMessage = "message"
     kDisconnect = "disconnect"
     kError = "error"
+
+
+@lru_cache
+def getMessageDataFieldName(datatypeName: str) -> str:
+    field_name = None
+    for f in fields(MessageProto):
+        if f.type == datatypeName:
+            field_name = f.name
+            break
+    else:
+        raise ValueError(f"No matching field for type {datatypeName}")
+    return field_name
 
 
 def createMessage(
@@ -28,15 +40,7 @@ def createMessage(
     message = MessageProto()
     message.type = messageType
 
-    datatypeName = type(data).__name__  # e.g. PipelineProto
-
-    field_name = None
-    for f in fields(type(message)):
-        if f.type == datatypeName:
-            field_name = f.name
-            break
-    else:
-        raise ValueError(f"No matching field for type {datatypeName}")
+    field_name = getMessageDataFieldName(type(data).__name__)
 
     if field_name:
         if field_name in {f.name for f in fields(message)}:

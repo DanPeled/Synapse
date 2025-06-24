@@ -9,43 +9,40 @@ clean:
 	rm -rf synapse_ui/src/proto/
 
 install_buf:
-	@if ! command -v buf > /dev/null; then \
-		echo "Installing buf..."; \
-		sudo curl -sSL "https://github.com/bufbuild/buf/releases/latest/download/buf-$(shell uname -s)-$(shell uname -m)" -o /usr/local/bin/buf; \
-		sudo chmod +x /usr/local/bin/buf; \
+	@echo "Detecting OS..."
+	@OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	ARCH=$$(uname -m); \
+	if [ "$$OS" = "mingw64_nt-10.0" ] || [ "$$OS" = "msys_nt-10.0" ]; then \
+		OS="windows"; EXT=".exe"; \
+	else \
+		EXT=""; \
+	fi; \
+	\
+	if ! command -v buf >/dev/null 2>&1; then \
+		echo "Installing buf for $$OS..."; \
+		URL="https://github.com/bufbuild/buf/releases/latest/download/buf-$$OS-$$ARCH$$EXT"; \
+		echo "Downloading: $$URL"; \
+		curl -sSL "$$URL" -o ./buf$$EXT || (echo "Failed to download buf"; exit 1); \
+		chmod +x ./buf$$EXT; \
+		if [ "$$OS" = "windows" ]; then \
+			mkdir -p "$$USERPROFILE/bin"; \
+			mv ./buf$$EXT "$$USERPROFILE/bin/buf.exe"; \
+			echo "Add $$USERPROFILE/bin to your PATH if it's not already."; \
+		else \
+			sudo mv ./buf$$EXT /usr/local/bin/buf; \
+		fi; \
 	else \
 		echo "buf is already installed."; \
 	fi
 
-	@if ! command -v protoc-gen-ts > /dev/null; then \
-		echo "Installing protoc-gen-typescript..."; \
-		npm install -g protoc-gen-typescript; \
-	else \
-		echo "protoc-gen-typescript is already installed."; \
-	fi
+	@echo "Checking for protoc-gen-typescript..."
+	@command -v protoc-gen-ts >/dev/null 2>&1 || npm install -g protoc-gen-typescript
 
-	@if ! python3 -c "import google.protobuf" > /dev/null 2>&1; then \
-		echo "Installing protobuf python package..."; \
-		pip install protobuf; \
-	else \
-		echo "protobuf python package is already installed."; \
-	fi
+	@echo "Checking for protoc-gen-ts_proto..."
+	@command -v protoc-gen-ts_proto >/dev/null 2>&1 || npm install -g ts-proto
 
-	@if ! command -v protoc-gen-python > /dev/null; then \
-		echo "protoc-gen-python not found, creating shim script..."; \
-		echo '#!/bin/bash' | sudo tee /usr/local/bin/protoc-gen-python > /dev/null; \
-		echo 'python3 -m grpc_tools.protoc "$$@"' | sudo tee -a /usr/local/bin/protoc-gen-python > /dev/null; \
-		sudo chmod +x /usr/local/bin/protoc-gen-python; \
-	else \
-		echo "protoc-gen-python already exists."; \
-	fi
-
-	@if ! command -v protoc-gen-ts_proto > /dev/null; then \
-		echo "Installing protoc-gen-ts_proto..."; \
-		npm install -g ts-proto; \
-	else \
-		echo "protoc-gen-ts_proto is already installed."; \
-	fi
+	@echo "Checking for Python protobuf module..."
+	@python3 -c "import google.protobuf" >/dev/null 2>&1 || pip install protobuf
 
 install:  # installs the synapse runtime pip package locally
 	pip install .
