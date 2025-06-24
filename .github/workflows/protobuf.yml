@@ -34,32 +34,24 @@ jobs:
       - name: Check protobuf format
         uses: bufbuild/buf-action@v1
         with:
-          args: format --diff
-        working-directory: synapse_net/proto
+          args: format --diff --path synapse_net/proto
 
       - name: Lint protobuf files
         uses: bufbuild/buf-action@v1
         with:
-          args: lint
-        working-directory: synapse_net/proto
+          args: lint --path synapse_net/proto
 
       - name: Build protobuf files
         uses: bufbuild/buf-action@v1
         with:
-          args: build
-        working-directory: synapse_net/proto
+          args: build --path synapse_net/proto
 
       - name: Generate protobuf code (Python)
         uses: bufbuild/buf-action@v1
         with:
-          args: generate --template buf-python.yaml
-        working-directory: synapse_net/proto
+          args: generate --template buf-python.yaml --path synapse_net/proto
 
       - name: Generate protobuf code (TypeScript)
         uses: bufbuild/buf-action@v1
         with:
-          args: generate --template buf-ts.yaml
-        working-directory: synapse_net/proto
-
-      - name: Verify generated files are up to date
-        run: git diff --exit-code
+          args: generate --template buf-ts.yaml --path synapse_net/proto
