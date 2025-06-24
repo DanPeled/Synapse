@@ -36,12 +36,15 @@ jobs:
 
       - name: Check protobuf format
         working-directory: synapse_net/proto
+        uses: bufbuild/buf-action@v1
         run: buf format --diff
 
       - name: Lint protobuf files
         working-directory: synapse_net/proto
+        uses: bufbuild/buf-action@v1
         run: buf lint
 
       - name: Build protobuf files
         working-directory: synapse_net/proto
+        uses: bufbuild/buf-action@v1
         run: buf build
