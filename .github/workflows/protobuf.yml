@@ -31,18 +31,8 @@ jobs:
         with:
           python-version: '3.10.7'
 
-      - name: Install Buf and dependencies on Unix (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          pip install .
-          chmod +x scripts/install_buf_unix.sh
-          ./scripts/install_buf_unix.sh
-
-      - name: Install Buf and dependencies on Windows
-        if: runner.os == 'Windows'
-        run: |
-          pip install .
-          powershell -ExecutionPolicy Bypass -File scripts\install_buf_win.ps1
+      - name: Setup buf CLI
+        uses: bufbuild/setup-buf@v1
 
       - name: Check protobuf format
         working-directory: synapse_net/proto
