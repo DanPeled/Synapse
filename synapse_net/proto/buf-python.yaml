@@ -1,7 +1,5 @@
 version: v1
 plugins:
-  - name: ts_proto
-    out: ../../synapse_ui/src/
   - name: python_betterproto
     out: ../src/synapse_net
     opt: paths=source_relative
