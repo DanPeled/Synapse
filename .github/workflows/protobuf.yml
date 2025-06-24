@@ -23,35 +23,38 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10.7'
 
-      - name: Check protobuf format
+      - name: Format protobuf files
         uses: bufbuild/buf-action@v1
         with:
-          args: format --diff --path synapse_net/proto
+          format: true
+          paths: synapse_net/proto
 
       - name: Lint protobuf files
         uses: bufbuild/buf-action@v1
         with:
-          args: lint --path synapse_net/proto
+          lint: true
+          paths: synapse_net/proto
 
       - name: Build protobuf files
         uses: bufbuild/buf-action@v1
         with:
-          args: build --path synapse_net/proto
+          build: true
+          paths: synapse_net/proto
 
       - name: Generate protobuf code (Python)
-        uses: bufbuild/buf-action@v1
-        with:
-          args: generate --template buf-python.yaml --path synapse_net/proto
+        run: pip install . && buf generate --template buf-python.yaml
+        working-directory: synapse_net/proto
 
       - name: Generate protobuf code (TypeScript)
-        uses: bufbuild/buf-action@v1
-        with:
-          args: generate --template buf-ts.yaml --path synapse_net/proto
+        run: buf generate --template buf-ts.yaml
+        working-directory: synapse_net/proto
+
+      - name: Verify generated files are up to date
+        run: git diff --exit-code
