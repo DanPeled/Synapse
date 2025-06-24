@@ -30,26 +30,28 @@ jobs:
         with:
           python-version: '3.10.7'
 
+      # Run formatting, linting, and build via buf-action, using module name input
       - name: Format protobuf files
         uses: bufbuild/buf-action@v1
         with:
           format: true
-          paths: synapse_net/proto
+          paths: github.com/DanPeled/Synapse  # e.g. proto or synapse_net/proto
 
       - name: Lint protobuf files
         uses: bufbuild/buf-action@v1
         with:
           lint: true
-          paths: synapse_net/proto
+          paths: github.com/DanPeled/Synapse
 
       - name: Build protobuf files
         uses: bufbuild/buf-action@v1
         with:
           build: true
-          paths: synapse_net/proto
+          paths: github.com/DanPeled/Synapse
 
+      # Generate code using run commands (action does not support generate yet)
       - name: Generate protobuf code (Python)
-        run: pip install . && buf generate --template buf-python.yaml
+        run: buf generate --template buf-python.yaml
         working-directory: synapse_net/proto
 
       - name: Generate protobuf code (TypeScript)
