@@ -51,7 +51,7 @@ jobs:
       - name: Generate Python protobuf code
         run: |
           pip install ../..
-          buf generate --template buf-python.yaml
+          buf generate --template buf-python.yaml --verbose
         working-directory: synapse_net/proto
 
       - name: Generate TypeScript protobuf code
