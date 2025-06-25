@@ -4,10 +4,7 @@
 # This file has been @generated
 
 from dataclasses import dataclass
-from typing import (
-    List,
-    Optional,
-)
+from typing import List, Optional
 
 import betterproto
 
@@ -101,9 +98,10 @@ class ConstraintProto(betterproto.Message):
 @dataclass(eq=False, repr=False)
 class SettingProto(betterproto.Message):
     name: str = betterproto.string_field(1)
-    description: str = betterproto.string_field(2)
-    value: "SettingValueProto" = betterproto.message_field(3)
-    constraint: "ConstraintProto" = betterproto.message_field(4)
+    category: str = betterproto.string_field(2)
+    description: str = betterproto.string_field(3)
+    value: "SettingValueProto" = betterproto.message_field(4)
+    constraint: "ConstraintProto" = betterproto.message_field(5)
 
 
 @dataclass(eq=False, repr=False)

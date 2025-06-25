@@ -23,6 +23,7 @@ export interface ConstraintProto {
 
 export interface SettingProto {
   name: string;
+  category: string;
   description: string;
   value: SettingValueProto | undefined;
   constraint: ConstraintProto | undefined;
@@ -107,7 +108,7 @@ export const ConstraintProto: MessageFns<ConstraintProto> = {
 };
 
 function createBaseSettingProto(): SettingProto {
-  return { name: "", description: "", value: undefined, constraint: undefined };
+  return { name: "", category: "", description: "", value: undefined, constraint: undefined };
 }
 
 export const SettingProto: MessageFns<SettingProto> = {
@@ -115,14 +116,17 @@ export const SettingProto: MessageFns<SettingProto> = {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
+    if (message.category !== "") {
+      writer.uint32(18).string(message.category);
+    }
     if (message.description !== "") {
-      writer.uint32(18).string(message.description);
+      writer.uint32(26).string(message.description);
     }
     if (message.value !== undefined) {
-      SettingValueProto.encode(message.value, writer.uint32(26).fork()).join();
+      SettingValueProto.encode(message.value, writer.uint32(34).fork()).join();
     }
     if (message.constraint !== undefined) {
-      ConstraintProto.encode(message.constraint, writer.uint32(34).fork()).join();
+      ConstraintProto.encode(message.constraint, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -147,7 +151,7 @@ export const SettingProto: MessageFns<SettingProto> = {
             break;
           }
 
-          message.description = reader.string();
+          message.category = reader.string();
           continue;
         }
         case 3: {
@@ -155,11 +159,19 @@ export const SettingProto: MessageFns<SettingProto> = {
             break;
           }
 
-          message.value = SettingValueProto.decode(reader, reader.uint32());
+          message.description = reader.string();
           continue;
         }
         case 4: {
           if (tag !== 34) {
+            break;
+          }
+
+          message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
@@ -178,6 +190,7 @@ export const SettingProto: MessageFns<SettingProto> = {
   fromJSON(object: any): SettingProto {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
+      category: isSet(object.category) ? globalThis.String(object.category) : "",
       description: isSet(object.description) ? globalThis.String(object.description) : "",
       value: isSet(object.value) ? SettingValueProto.fromJSON(object.value) : undefined,
       constraint: isSet(object.constraint) ? ConstraintProto.fromJSON(object.constraint) : undefined,
@@ -188,6 +201,9 @@ export const SettingProto: MessageFns<SettingProto> = {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
+    }
+    if (message.category !== "") {
+      obj.category = message.category;
     }
     if (message.description !== "") {
       obj.description = message.description;
@@ -207,6 +223,7 @@ export const SettingProto: MessageFns<SettingProto> = {
   fromPartial<I extends Exact<DeepPartial<SettingProto>, I>>(object: I): SettingProto {
     const message = createBaseSettingProto();
     message.name = object.name ?? "";
+    message.category = object.category ?? "";
     message.description = object.description ?? "";
     message.value = (object.value !== undefined && object.value !== null)
       ? SettingValueProto.fromPartial(object.value)

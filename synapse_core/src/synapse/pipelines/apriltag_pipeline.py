@@ -11,23 +11,13 @@ import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.pipeline import Pipeline
-from synapse.core.settings_api import (
-    BooleanConstraint,
-    ListOptionsConstraint,
-    PipelineSettings,
-    RangeConstraint,
-    settingField,
-)
+from synapse.core.settings_api import (BooleanConstraint,
+                                       ListOptionsConstraint, PipelineSettings,
+                                       RangeConstraint, settingField)
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
-from wpimath.geometry import (
-    Pose2d,
-    Pose3d,
-    Quaternion,
-    Rotation3d,
-    Transform3d,
-    Translation3d,
-)
+from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
+                              Transform3d, Translation3d)
 
 
 @dataclass
@@ -93,7 +83,7 @@ class ApriltagPipelineSettings(PipelineSettings):
     fieldpose = settingField(BooleanConstraint(), default=True)
     verbosity = settingField(
         ListOptionsConstraint(options=[ver.value for ver in ApriltagVerbosity]),
-        default=ApriltagVerbosity.kPoseOnly,
+        default=ApriltagVerbosity.kPoseOnly.value,
     )
     num_threads = settingField(RangeConstraint(minValue=1, maxValue=6), default=1)
 

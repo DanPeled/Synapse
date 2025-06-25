@@ -45,7 +45,7 @@ enum IPMode {
   dhcp = "DHCP",
 }
 
-function NetworkSettings({ }) {
+function NetworkSettings({}) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
     deviceinfo,
@@ -209,7 +209,7 @@ function NetworkSettings({ }) {
   );
 }
 
-function DeviceInfo({ }) {
+function DeviceInfo({}) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
 
   return (
@@ -341,7 +341,7 @@ function DangerZone() {
   );
 }
 
-function DeviceControls({ }) {
+function DeviceControls({}) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
 
   return (
@@ -413,7 +413,7 @@ function DeviceControls({ }) {
   );
 }
 
-export default function Settings({ }) {
+export default function Settings({}) {
   return (
     <div
       className="w-full min-h-screen text-pink-600"

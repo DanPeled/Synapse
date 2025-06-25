@@ -1,16 +1,11 @@
 from typing import Dict, Optional, Union, overload
 
-from synapse.core.settings_api import (
-    Setting,
-    SettingsCollection,
-    SettingsMap,
-    SettingsMapValue,
-)
-from synapse.log import err
-from synapse.stypes import CameraID
-from synapse.util import listToTransform3d
-
+from ..log import err
+from ..stypes import CameraID
+from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
+from .settings_api import (Setting, SettingsCollection, SettingsMap,
+                           SettingsValue)
 
 
 class GlobalSettingsMeta(type):
@@ -91,11 +86,11 @@ class GlobalSettingsMeta(type):
         return cls.__cameraConfigs
 
     @overload
-    def getSetting(cls, setting: str) -> Optional[SettingsMapValue]: ...
+    def getSetting(cls, setting: str) -> Optional[SettingsValue]: ...
     @overload
-    def getSetting(cls, setting: Setting) -> SettingsMapValue: ...
+    def getSetting(cls, setting: Setting) -> SettingsValue: ...
 
-    def getSetting(cls, setting: Union[Setting, str]) -> Optional[SettingsMapValue]:
+    def getSetting(cls, setting: Union[Setting, str]) -> Optional[SettingsValue]:
         """Retrieves the value of a setting by key or Setting object.
 
         Args:
@@ -108,7 +103,7 @@ class GlobalSettingsMeta(type):
             return cls.__settings.getSetting(setting)
         return None if isinstance(setting, str) else setting.defaultValue
 
-    def setSetting(cls, setting: Union[Setting, str], value: SettingsMapValue) -> None:
+    def setSetting(cls, setting: Union[Setting, str], value: SettingsValue) -> None:
         """Sets the value for a setting in the global settings map.
 
         Args:
@@ -118,7 +113,7 @@ class GlobalSettingsMeta(type):
         if cls.__settings is not None:
             cls.__settings.setSetting(setting, value)
 
-    def __getitem__(cls, setting: Union[str, Setting]) -> Optional[SettingsMapValue]:
+    def __getitem__(cls, setting: Union[str, Setting]) -> Optional[SettingsValue]:
         """Enables dictionary-style access for getting setting values.
 
         Args:
@@ -129,7 +124,7 @@ class GlobalSettingsMeta(type):
         """
         return cls.getSetting(setting)
 
-    def __setitem__(cls, setting: Union[str, Setting], value: SettingsMapValue):
+    def __setitem__(cls, setting: Union[str, Setting], value: SettingsValue):
         """Enables dictionary-style access for setting values.
 
         Args:

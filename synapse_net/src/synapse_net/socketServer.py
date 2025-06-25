@@ -1,8 +1,9 @@
 import asyncio
 from dataclasses import fields
 from enum import Enum
-from typing import Callable, Dict, Optional, Set
 from functools import lru_cache
+from typing import Callable, Dict, Optional, Set
+
 import betterproto
 import websockets
 

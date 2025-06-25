@@ -16,6 +16,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_UNSPECIFIED = 0,
   MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1,
   MESSAGE_TYPE_PROTO_SEND_METRICS = 2,
+  MESSAGE_TYPE_PROTO_ADD_PIPELINE = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -30,6 +31,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 2:
     case "MESSAGE_TYPE_PROTO_SEND_METRICS":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS;
+    case 3:
+    case "MESSAGE_TYPE_PROTO_ADD_PIPELINE":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -45,6 +49,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
       return "MESSAGE_TYPE_PROTO_SEND_METRICS";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE:
+      return "MESSAGE_TYPE_PROTO_ADD_PIPELINE";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

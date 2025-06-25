@@ -2,12 +2,13 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, Iterable, Optional, TypeVar, Union, overload
 
 from ntcore import NetworkTable
-from synapse.stypes import Frame
+from synapse_net.proto.v1 import PipelineProto, PipelineTypeProto
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
-from ..stypes import CameraID
-from .settings_api import PipelineSettings, Setting
+from ..log import log
+from ..stypes import CameraID, Frame
+from .settings_api import PipelineSettings, Setting, settingsToProto
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
@@ -32,6 +33,7 @@ class Pipeline(ABC, Generic[TSettingsType]):
         """
         self.settings = settings
         self.cameraIndex = -1
+        self.name: str = "new pipeline"
 
     def bind(self, cameraIndex: CameraID):
         """Binds a camera index to this pipeline instance.
@@ -101,9 +103,23 @@ class Pipeline(ABC, Generic[TSettingsType]):
         return self.builder_cache[key]
 
     def toDict(self, type: str) -> dict:
-        return {"type": type, "settings": self.settings.toDict()}
+        return {"type": type, "settings": self.settings.toDict(), "name": self.name}
 
 
 def disabled(cls):
     cls.__is_enabled__ = False
     return cls
+
+
+def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
+    settings = settingsToProto(inst.settings, type(inst).__name__)
+
+    msg = PipelineProto(
+        name=inst.name,
+        index=index,
+        type=PipelineTypeProto(type=type(inst).__name__, settings=settings),
+    )
+
+    log(str(msg))
+
+    return msg

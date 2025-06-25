@@ -3,14 +3,15 @@ import os
 import threading
 from pathlib import Path
 
-from ..bcolors import MarkupColors
 from synapse.core.config import Config, NetworkConfig
 from synapse.log import err, log
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import DeviceInfoProto, MessageTypeProto
 from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
 
+from ..bcolors import MarkupColors
 from .global_settings import GlobalSettings
+from .pipeline import pipelineToProto
 from .runtime_handler import RuntimeManager
 
 
@@ -56,6 +57,7 @@ class Synapse:
         )
 
         self.runtime_handler = runtime_handler
+        self.setupRuntimeCallbacks()
 
         self.setupWebsocket()
 
@@ -93,7 +95,7 @@ class Synapse:
                 log(
                     f"Something went wrong while reading settings config file. {repr(e)}"
                 )
-                return False
+                raise e
         else:
             return False
         return True
@@ -144,8 +146,9 @@ class Synapse:
         self.runtime_handler.run()
 
     def setupWebsocket(self) -> None:
-        import psutil
         import asyncio
+
+        import psutil
 
         self.websocket = WebSocketServer("localhost", 8765)
 
@@ -156,6 +159,7 @@ class Synapse:
         @self.websocket.on(SocketEvent.kConnect)
         async def on_connect(ws):
             import socket
+
             import synapse.hardware.metrics as metrics
 
             deviceInfo: DeviceInfoProto = DeviceInfoProto()
@@ -217,6 +221,16 @@ class Synapse:
 
             self.websocket.loop.call_soon_threadsafe(self.websocket.loop.stop)
             self.websocketThread.join(timeout=5)
+
+    def setupRuntimeCallbacks(self):
+        def onAddPipeline(id, inst) -> None:
+            msg = pipelineToProto(inst, id)
+
+            self.websocket.sendToAllSync(
+                createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+            )
+
+        self.runtime_handler.pipelineLoader.onAddPipeline.append(onAddPipeline)
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

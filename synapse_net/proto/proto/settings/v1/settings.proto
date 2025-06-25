@@ -12,7 +12,8 @@ message ConstraintProto {
 
 message SettingProto {
   string name = 1;
-  string description = 2;
-  SettingValueProto value = 3;
-  ConstraintProto constraint = 4;
+  string category = 2;
+  string description = 3;
+  SettingValueProto value = 4;
+  ConstraintProto constraint = 5;
 }

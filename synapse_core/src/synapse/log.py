@@ -1,13 +1,13 @@
 import datetime
 import os
-
 # import sys
 from enum import Enum
 from typing import Any, Optional
+
 from rich import print
+from synapse_net.socketServer import WebSocketServer
 
 from .bcolors import MarkupColors, TextTarget, parseTextStyle
-from synapse_net.socketServer import WebSocketServer
 
 # Flag to control printing to the console
 PRINTS = True

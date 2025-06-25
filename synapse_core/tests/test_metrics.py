@@ -1,14 +1,8 @@
 import unittest
-from unittest.mock import mock_open, patch, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
 
-from synapse.hardware.metrics import (
-    LinuxCmds,
-    PiCmds,
-    Platform,
-    RK3588Cmds,
-    ShellExec,
-    MetricsManager,
-)
+from synapse.hardware.metrics import (LinuxCmds, MetricsManager, PiCmds,
+                                      Platform, RK3588Cmds, ShellExec)
 
 
 class TestPlatformDetection(unittest.TestCase):

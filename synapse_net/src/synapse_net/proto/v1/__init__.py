@@ -4,9 +4,7 @@
 # This file has been @generated
 
 from dataclasses import dataclass
-from typing import (
-    List,
-)
+from typing import List
 
 import betterproto
 
@@ -17,6 +15,7 @@ class MessageTypeProto(betterproto.Enum):
     UNSPECIFIED = 0
     SEND_DEVICE_INFO = 1
     SEND_METRICS = 2
+    ADD_PIPELINE = 3
 
 
 @dataclass(eq=False, repr=False)

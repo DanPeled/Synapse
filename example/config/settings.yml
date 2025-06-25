@@ -28,6 +28,7 @@ global:
 pipelines:
   0: 
     type: ApriltagPipeline
+    name: FieldPose
     settings:
       target_tag: 7
       brightness: 100
@@ -44,6 +45,7 @@ pipelines:
       tag_size: 0.1651 
   1:
     type: ColorPipeline
+    name: Cheese
     settings:
       brightness: 100
       exposure: 20

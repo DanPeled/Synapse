@@ -3,7 +3,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from synapse.core.pipeline import FrameResult
-from synapse.core.runtime_handler import Pipeline, PipelineLoader, PipelineSettings
+from synapse.core.runtime_handler import (Pipeline, PipelineLoader,
+                                          PipelineSettings)
 
 
 class DummyPipeline(Pipeline[PipelineSettings]):

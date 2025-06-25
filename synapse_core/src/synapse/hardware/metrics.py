@@ -1,11 +1,12 @@
 import os
 import subprocess
+import time
 from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
 from typing import Any, Final, Optional
+
 import psutil
-import time
 
 # Referenced from  https://github.com/PhotonVision/photonvision/
 

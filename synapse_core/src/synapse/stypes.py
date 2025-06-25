@@ -18,3 +18,5 @@ PipelineID = int
 
 #: A string name used to identify a pipeline.
 PipelineName = str
+
+PipelineTypeName = str

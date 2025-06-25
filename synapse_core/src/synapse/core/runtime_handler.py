@@ -8,37 +8,26 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type
 
 import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
-from ..bcolors import MarkupColors
-from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds
 
-
-from .camera_factory import (
-    CSCORE_TO_CV_PROPS,
-    CameraConfig,
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from ..bcolors import MarkupColors
+from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
+                      PipelineTypeName)
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -74,18 +63,24 @@ def resolveGenericArgument(cls) -> Optional[Type]:
 class PipelineLoader:
     """Loads, manages, and binds pipeline configurations and instances."""
 
+    kPipelineTypeKey: Final[str] = "type"
+    kPipelineNameKey: Final[str] = "name"
+    kPipelinesArrayKey: Final[str] = "pipelines"
+
     def __init__(self, pipelineDirectory: Path):
         """Initializes the PipelineLoader with the specified directory.
 
         Args:
             pipelineDirectory (Path): Path to the directory containing pipeline files.
         """
-        self.pipelineTypeNames: Dict[PipelineID, PipelineName] = {}
+        self.pipelineTypeNames: Dict[PipelineID, PipelineTypeName] = {}
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
         self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
-        self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
+        self.pipelineInstanceBindings: List[Pipeline] = []
+        self.pipelineNames: Dict[PipelineID, PipelineName] = {}
         self.pipelineDirectory: Path = pipelineDirectory
+        self.onAddPipeline: List[Callable[[PipelineID, Pipeline], None]] = []
 
     def setup(self, directory: Path):
         """Initializes the pipeline system by loading pipeline classes and their settings.
@@ -93,18 +88,30 @@ class PipelineLoader:
         Args:
             directory (Path): The directory containing pipeline implementations.
         """
-        self.pipelineTypes = self.loadPipelines(directory)
+        self.pipelineTypes = self.loadPipelineTypes(directory)
         self.loadPipelineSettings()
         self.loadPipelineInstances()
 
     def loadPipelineInstances(self):
-        for pipelineIndex, settings in self.pipelineSettings.items():
+        for pipelineIndex in self.pipelineSettings.keys():
             pipelineType = self.getPipelineTypeByIndex(pipelineIndex)
-            currPipeline = pipelineType(settings=settings)
+            self.addPipeline(self.pipelineNames[pipelineIndex], pipelineType.__name__)
 
-            self.setPipelineInstance(pipelineIndex, currPipeline)
+    def addPipeline(
+        self, name: str, typename: str, settings: Optional[SettingsMap] = None
+    ):
+        pipelineType: Optional[Type[Pipeline]] = self.pipelineTypes.get(typename, None)
+        if pipelineType is not None:
+            settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
+            settingsInst = settingsType(settings or {})
+            currPipeline = pipelineType(settings=settingsInst)
+            currPipeline.name = name
+            self.pipelineInstanceBindings.append(currPipeline)
 
-    def loadPipelines(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
+            for callback in self.onAddPipeline:
+                callback(len(self.pipelineInstanceBindings) - 1, currPipeline)
+
+    def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
         """Loads all classes that extend Pipeline from Python files in the directory.
 
         Args:
@@ -173,14 +180,17 @@ class PipelineLoader:
                 cameraIndex
             ].defaultPipeline
 
-        pipelines: dict = settings["pipelines"]
+        pipelines: dict = settings[self.kPipelinesArrayKey]
 
         for pipeIndex, _ in enumerate(pipelines):
             pipeline = pipelines[pipeIndex]
 
-            log.log(f"Loaded pipeline #{pipeIndex} with type {pipeline['type']}")
+            log.log(
+                f"Loaded pipeline #{pipeIndex} with type {pipeline[self.kPipelineTypeKey]}"
+            )
 
-            self.pipelineTypeNames[pipeIndex] = pipeline["type"]
+            self.pipelineTypeNames[pipeIndex] = pipeline[self.kPipelineTypeKey]
+            self.pipelineNames[pipeIndex] = pipeline[self.kPipelineNameKey]
 
             self.createPipelineSettings(
                 self.pipelineTypes[self.pipelineTypeNames[pipeIndex]],
@@ -237,7 +247,9 @@ class PipelineLoader:
         Returns:
             Optional[Pipeline]: The pipeline instance, or None if not bound.
         """
-        return self.pipelineInstanceBindings.get(pipelineIndex, None)
+        if pipelineIndex < len(self.pipelineInstanceBindings):
+            return self.pipelineInstanceBindings[pipelineIndex]
+        return None
 
     def setPipelineInstance(
         self, pipelineIndex: PipelineID, pipeline: Pipeline
@@ -1044,7 +1056,9 @@ class RuntimeManager:
             },
             "pipelines": {
                 key: pipeline.toDict(self.pipelineLoader.pipelineTypeNames[key])
-                for key, pipeline in self.pipelineLoader.pipelineInstanceBindings.items()
+                for key, pipeline in enumerate(
+                    self.pipelineLoader.pipelineInstanceBindings
+                )
             },
         }
 
