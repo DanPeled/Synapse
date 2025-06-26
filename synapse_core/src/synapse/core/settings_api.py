@@ -240,7 +240,7 @@ class ColorConstraint(Constraint):
         return self._validate_single(value)
 
     def _validate_single(self, value: SettingsValue) -> ValidationResult:
-        if self.formatType == ColorFormat.kHex.value:
+        if self.formatType == ColorFormat.kHex:
             if isinstance(value, int):
                 hex_str = f"#{value:06X}"
                 return ValidationResult(True, None, hex_str)
@@ -266,7 +266,7 @@ class ColorConstraint(Constraint):
             except ValueError:
                 return ValidationResult(False, "Invalid hex digits")
 
-        elif self.formatType == ColorFormat.kRGB.value:
+        elif self.formatType == ColorFormat.kRGB:
             if isinstance(value, tuple):
                 if len(value) != 3 or not all(isinstance(v, int) for v in value):
                     return ValidationResult(False, "RGB must be tuple of 3 ints")
@@ -284,7 +284,7 @@ class ColorConstraint(Constraint):
 
             return ValidationResult(False, "Invalid RGB format")
 
-        elif self.formatType == ColorFormat.kHSV.value:
+        elif self.formatType == ColorFormat.kHSV:
             if isinstance(value, tuple):
                 if len(value) != 3 or not all(isinstance(v, int) for v in value):
                     return ValidationResult(False, "HSV must be tuple of 3 ints")

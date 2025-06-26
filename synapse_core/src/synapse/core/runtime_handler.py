@@ -14,8 +14,13 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
@@ -23,11 +28,23 @@ from wpilib import Timer
 from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
-from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
-                      PipelineTypeName)
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from ..stypes import (
+    CameraID,
+    DataValue,
+    Frame,
+    PipelineID,
+    PipelineName,
+    PipelineTypeName,
+)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraConfig,
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -1047,6 +1064,7 @@ class RuntimeManager:
         return frame
 
     def toDict(self) -> Dict:
+        print(self.pipelineLoader.pipelineInstanceBindings)
         return {
             "global": {
                 "camera_configs": {

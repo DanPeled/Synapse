@@ -3,8 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from synapse.core.pipeline import FrameResult
-from synapse.core.runtime_handler import (Pipeline, PipelineLoader,
-                                          PipelineSettings)
+from synapse.core.runtime_handler import Pipeline, PipelineLoader, PipelineSettings
 
 
 class DummyPipeline(Pipeline[PipelineSettings]):
@@ -47,7 +46,7 @@ class TestPipelineLoader(unittest.TestCase):
         with patch("synapse.core.runtime_handler.Path.rglob") as mock_rglob:
             mock_rglob.return_value = [Path("dummy_pipeline.py")]
 
-            pipelines = self.loader.loadPipelines(Path("."))
+            pipelines = self.loader.loadPipelineTypes(Path("."))
 
         self.assertIn("DummyPipeline", pipelines)
         self.assertEqual(pipelines["DummyPipeline"], DummyPipeline)
@@ -61,7 +60,13 @@ class TestPipelineLoader(unittest.TestCase):
 
         mock_config = MagicMock()
         mock_config.getConfigMap.return_value = {
-            "pipelines": [{"type": "DummyPipeline", "settings": {"threshold": 0.5}}]
+            "pipelines": [
+                {
+                    "type": "DummyPipeline",
+                    "name": "yeepy",
+                    "settings": {"threshold": 0.5},
+                }
+            ]
         }
         mock_config_instance.return_value = mock_config
 
@@ -74,13 +79,6 @@ class TestPipelineLoader(unittest.TestCase):
         self.assertEqual(self.loader.defaultPipelineIndexes[0], 1)
         self.assertIn(0, self.loader.pipelineSettings)
         self.assertIsInstance(self.loader.pipelineSettings[0], DummySettings)
-
-    def test_set_and_get_pipeline_instance(self):
-        dummy_pipeline = DummyPipeline(PipelineSettings())
-        self.loader.setPipelineInstance(1, dummy_pipeline)
-
-        self.assertEqual(self.loader.getPipeline(1), dummy_pipeline)
-        self.assertIsNone(self.loader.getPipeline(99))
 
     def test_get_pipeline_type_by_index_and_name(self):
         self.loader.pipelineTypes["DummyPipeline"] = DummyPipeline

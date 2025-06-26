@@ -6,7 +6,6 @@ from synapse_net.proto.v1 import PipelineProto, PipelineTypeProto
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
-from ..log import log
 from ..stypes import CameraID, Frame
 from .settings_api import PipelineSettings, Setting, settingsToProto
 
