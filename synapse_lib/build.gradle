@@ -12,7 +12,7 @@ plugins {
 }
 
 // WPILib Version
-ext.wpilibVersion = "2025.+"
+ext.wpilibVersion = "2025.3.1"
 
 repositories {
     mavenCentral()
@@ -28,6 +28,8 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 var javaVersion = "17"
+
+apply from: 'config.gradle'
 
 // Apply Java configuration
 dependencies {
@@ -68,6 +70,8 @@ tasks.withType(JavaCompile) {
 
 // Setup Javadocs to link back to WPILib docs
 javadoc {
+    destinationDir = file("vendordep/docs")
+    title = "Synapse"
     options {
         links "https://docs.oracle.com/en/java/javase/$javaVersion/docs/api/", 'https://github.wpilib.org/allwpilib/docs/release/java/'
     }
@@ -119,6 +123,8 @@ spotless {
         endWithNewline()
     }
 }
+
+apply from: 'publish.gradle'
 
 wrapper {
     gradleVersion '8.11'
