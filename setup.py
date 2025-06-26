@@ -31,6 +31,7 @@ setup(
         "scp>=0.15.0",
         "numpy==1.23.3",
         "pytest",
+        "pytest-asyncio",
         "build",
         "psutil",
         "protobuf",
