@@ -4,7 +4,10 @@
 # This file has been @generated
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import (
+    List,
+    Optional,
+)
 
 import betterproto
 
@@ -33,6 +36,12 @@ class ColorConstraintProto(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class ListConstraintProto(betterproto.Message):
+    min_length: int = betterproto.int32_field(2)
+    max_length: int = betterproto.int32_field(3)
+
+
+@dataclass(eq=False, repr=False)
 class SettingValueProto(betterproto.Message):
     int_value: int = betterproto.int32_field(1, group="scalar_value")
     string_value: str = betterproto.string_field(2, group="scalar_value")
@@ -58,26 +67,20 @@ class ListOptionsConstraintProto(betterproto.Message):
 
 @dataclass(eq=False, repr=False)
 class RangeConstraintProto(betterproto.Message):
-    int_range: "RangeConstraintProtoIntRange" = betterproto.message_field(
-        1, group="value_type"
-    )
-    float_range: "RangeConstraintProtoFloatRange" = betterproto.message_field(
-        2, group="value_type"
-    )
-
-
-@dataclass(eq=False, repr=False)
-class RangeConstraintProtoIntRange(betterproto.Message):
-    min: Optional[int] = betterproto.message_field(1, wraps=betterproto.TYPE_INT32)
-    max: Optional[int] = betterproto.message_field(2, wraps=betterproto.TYPE_INT32)
-    step: Optional[int] = betterproto.message_field(3, wraps=betterproto.TYPE_INT32)
-
-
-@dataclass(eq=False, repr=False)
-class RangeConstraintProtoFloatRange(betterproto.Message):
     min: Optional[float] = betterproto.message_field(1, wraps=betterproto.TYPE_FLOAT)
     max: Optional[float] = betterproto.message_field(2, wraps=betterproto.TYPE_FLOAT)
     step: Optional[float] = betterproto.message_field(3, wraps=betterproto.TYPE_FLOAT)
+
+
+@dataclass(eq=False, repr=False)
+class StringConstraintProto(betterproto.Message):
+    min_length: Optional[int] = betterproto.message_field(
+        1, wraps=betterproto.TYPE_INT32
+    )
+    max_length: Optional[int] = betterproto.message_field(
+        2, wraps=betterproto.TYPE_INT32
+    )
+    pattern: Optional[str] = betterproto.message_field(3, wraps=betterproto.TYPE_STRING)
 
 
 @dataclass(eq=False, repr=False)
@@ -87,6 +90,8 @@ class ConstraintConfigProto(betterproto.Message):
         2, group="config"
     )
     color: "ColorConstraintProto" = betterproto.message_field(3, group="config")
+    string: "StringConstraintProto" = betterproto.message_field(4, group="config")
+    list: "ListConstraintProto" = betterproto.message_field(5, group="config")
 
 
 @dataclass(eq=False, repr=False)
@@ -102,21 +107,3 @@ class SettingProto(betterproto.Message):
     description: str = betterproto.string_field(3)
     value: "SettingValueProto" = betterproto.message_field(4)
     constraint: "ConstraintProto" = betterproto.message_field(5)
-
-
-@dataclass(eq=False, repr=False)
-class ListConsraintProto(betterproto.Message):
-    item_constraint: "ConstraintProto" = betterproto.message_field(1)
-    min_length: int = betterproto.int32_field(2)
-    max_length: int = betterproto.int32_field(3)
-
-
-@dataclass(eq=False, repr=False)
-class StringConstraintProto(betterproto.Message):
-    min_length: Optional[int] = betterproto.message_field(
-        1, wraps=betterproto.TYPE_INT32
-    )
-    max_length: Optional[int] = betterproto.message_field(
-        2, wraps=betterproto.TYPE_INT32
-    )
-    pattern: Optional[str] = betterproto.message_field(3, wraps=betterproto.TYPE_STRING)

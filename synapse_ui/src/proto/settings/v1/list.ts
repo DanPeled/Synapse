@@ -6,25 +6,20 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { ConstraintProto } from "./settings";
 
 export const protobufPackage = "proto.settings.v1";
 
-export interface ListConsraintProto {
-  itemConstraint: ConstraintProto | undefined;
+export interface ListConstraintProto {
   minLength: number;
   maxLength: number;
 }
 
-function createBaseListConsraintProto(): ListConsraintProto {
-  return { itemConstraint: undefined, minLength: 0, maxLength: 0 };
+function createBaseListConstraintProto(): ListConstraintProto {
+  return { minLength: 0, maxLength: 0 };
 }
 
-export const ListConsraintProto: MessageFns<ListConsraintProto> = {
-  encode(message: ListConsraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.itemConstraint !== undefined) {
-      ConstraintProto.encode(message.itemConstraint, writer.uint32(10).fork()).join();
-    }
+export const ListConstraintProto: MessageFns<ListConstraintProto> = {
+  encode(message: ListConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.minLength !== 0) {
       writer.uint32(16).int32(message.minLength);
     }
@@ -34,21 +29,13 @@ export const ListConsraintProto: MessageFns<ListConsraintProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ListConsraintProto {
+  decode(input: BinaryReader | Uint8Array, length?: number): ListConstraintProto {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListConsraintProto();
+    const message = createBaseListConstraintProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.itemConstraint = ConstraintProto.decode(reader, reader.uint32());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -74,19 +61,15 @@ export const ListConsraintProto: MessageFns<ListConsraintProto> = {
     return message;
   },
 
-  fromJSON(object: any): ListConsraintProto {
+  fromJSON(object: any): ListConstraintProto {
     return {
-      itemConstraint: isSet(object.itemConstraint) ? ConstraintProto.fromJSON(object.itemConstraint) : undefined,
       minLength: isSet(object.minLength) ? globalThis.Number(object.minLength) : 0,
       maxLength: isSet(object.maxLength) ? globalThis.Number(object.maxLength) : 0,
     };
   },
 
-  toJSON(message: ListConsraintProto): unknown {
+  toJSON(message: ListConstraintProto): unknown {
     const obj: any = {};
-    if (message.itemConstraint !== undefined) {
-      obj.itemConstraint = ConstraintProto.toJSON(message.itemConstraint);
-    }
     if (message.minLength !== 0) {
       obj.minLength = Math.round(message.minLength);
     }
@@ -96,14 +79,11 @@ export const ListConsraintProto: MessageFns<ListConsraintProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ListConsraintProto>, I>>(base?: I): ListConsraintProto {
-    return ListConsraintProto.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<ListConstraintProto>, I>>(base?: I): ListConstraintProto {
+    return ListConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ListConsraintProto>, I>>(object: I): ListConsraintProto {
-    const message = createBaseListConsraintProto();
-    message.itemConstraint = (object.itemConstraint !== undefined && object.itemConstraint !== null)
-      ? ConstraintProto.fromPartial(object.itemConstraint)
-      : undefined;
+  fromPartial<I extends Exact<DeepPartial<ListConstraintProto>, I>>(object: I): ListConstraintProto {
+    const message = createBaseListConstraintProto();
     message.minLength = object.minLength ?? 0;
     message.maxLength = object.maxLength ?? 0;
     return message;

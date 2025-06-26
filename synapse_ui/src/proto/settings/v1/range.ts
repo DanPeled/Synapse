@@ -6,207 +6,22 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { FloatValue, Int32Value } from "../../../google/protobuf/wrappers";
+import { FloatValue } from "../../../google/protobuf/wrappers";
 
 export const protobufPackage = "proto.settings.v1";
 
 export interface RangeConstraintProto {
-  intRange?: RangeConstraintProto_IntRange | undefined;
-  floatRange?: RangeConstraintProto_FloatRange | undefined;
-}
-
-export interface RangeConstraintProto_IntRange {
-  min: number | undefined;
-  max: number | undefined;
-  step: number | undefined;
-}
-
-export interface RangeConstraintProto_FloatRange {
   min: number | undefined;
   max: number | undefined;
   step: number | undefined;
 }
 
 function createBaseRangeConstraintProto(): RangeConstraintProto {
-  return { intRange: undefined, floatRange: undefined };
+  return { min: undefined, max: undefined, step: undefined };
 }
 
 export const RangeConstraintProto: MessageFns<RangeConstraintProto> = {
   encode(message: RangeConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.intRange !== undefined) {
-      RangeConstraintProto_IntRange.encode(message.intRange, writer.uint32(10).fork()).join();
-    }
-    if (message.floatRange !== undefined) {
-      RangeConstraintProto_FloatRange.encode(message.floatRange, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RangeConstraintProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRangeConstraintProto();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.intRange = RangeConstraintProto_IntRange.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.floatRange = RangeConstraintProto_FloatRange.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RangeConstraintProto {
-    return {
-      intRange: isSet(object.intRange) ? RangeConstraintProto_IntRange.fromJSON(object.intRange) : undefined,
-      floatRange: isSet(object.floatRange) ? RangeConstraintProto_FloatRange.fromJSON(object.floatRange) : undefined,
-    };
-  },
-
-  toJSON(message: RangeConstraintProto): unknown {
-    const obj: any = {};
-    if (message.intRange !== undefined) {
-      obj.intRange = RangeConstraintProto_IntRange.toJSON(message.intRange);
-    }
-    if (message.floatRange !== undefined) {
-      obj.floatRange = RangeConstraintProto_FloatRange.toJSON(message.floatRange);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RangeConstraintProto>, I>>(base?: I): RangeConstraintProto {
-    return RangeConstraintProto.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RangeConstraintProto>, I>>(object: I): RangeConstraintProto {
-    const message = createBaseRangeConstraintProto();
-    message.intRange = (object.intRange !== undefined && object.intRange !== null)
-      ? RangeConstraintProto_IntRange.fromPartial(object.intRange)
-      : undefined;
-    message.floatRange = (object.floatRange !== undefined && object.floatRange !== null)
-      ? RangeConstraintProto_FloatRange.fromPartial(object.floatRange)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseRangeConstraintProto_IntRange(): RangeConstraintProto_IntRange {
-  return { min: undefined, max: undefined, step: undefined };
-}
-
-export const RangeConstraintProto_IntRange: MessageFns<RangeConstraintProto_IntRange> = {
-  encode(message: RangeConstraintProto_IntRange, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.min !== undefined) {
-      Int32Value.encode({ value: message.min! }, writer.uint32(10).fork()).join();
-    }
-    if (message.max !== undefined) {
-      Int32Value.encode({ value: message.max! }, writer.uint32(18).fork()).join();
-    }
-    if (message.step !== undefined) {
-      Int32Value.encode({ value: message.step! }, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RangeConstraintProto_IntRange {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRangeConstraintProto_IntRange();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.min = Int32Value.decode(reader, reader.uint32()).value;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.max = Int32Value.decode(reader, reader.uint32()).value;
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.step = Int32Value.decode(reader, reader.uint32()).value;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RangeConstraintProto_IntRange {
-    return {
-      min: isSet(object.min) ? Number(object.min) : undefined,
-      max: isSet(object.max) ? Number(object.max) : undefined,
-      step: isSet(object.step) ? Number(object.step) : undefined,
-    };
-  },
-
-  toJSON(message: RangeConstraintProto_IntRange): unknown {
-    const obj: any = {};
-    if (message.min !== undefined) {
-      obj.min = message.min;
-    }
-    if (message.max !== undefined) {
-      obj.max = message.max;
-    }
-    if (message.step !== undefined) {
-      obj.step = message.step;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RangeConstraintProto_IntRange>, I>>(base?: I): RangeConstraintProto_IntRange {
-    return RangeConstraintProto_IntRange.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RangeConstraintProto_IntRange>, I>>(
-    object: I,
-  ): RangeConstraintProto_IntRange {
-    const message = createBaseRangeConstraintProto_IntRange();
-    message.min = object.min ?? undefined;
-    message.max = object.max ?? undefined;
-    message.step = object.step ?? undefined;
-    return message;
-  },
-};
-
-function createBaseRangeConstraintProto_FloatRange(): RangeConstraintProto_FloatRange {
-  return { min: undefined, max: undefined, step: undefined };
-}
-
-export const RangeConstraintProto_FloatRange: MessageFns<RangeConstraintProto_FloatRange> = {
-  encode(message: RangeConstraintProto_FloatRange, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.min !== undefined) {
       FloatValue.encode({ value: message.min! }, writer.uint32(10).fork()).join();
     }
@@ -219,10 +34,10 @@ export const RangeConstraintProto_FloatRange: MessageFns<RangeConstraintProto_Fl
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RangeConstraintProto_FloatRange {
+  decode(input: BinaryReader | Uint8Array, length?: number): RangeConstraintProto {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRangeConstraintProto_FloatRange();
+    const message = createBaseRangeConstraintProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -259,7 +74,7 @@ export const RangeConstraintProto_FloatRange: MessageFns<RangeConstraintProto_Fl
     return message;
   },
 
-  fromJSON(object: any): RangeConstraintProto_FloatRange {
+  fromJSON(object: any): RangeConstraintProto {
     return {
       min: isSet(object.min) ? Number(object.min) : undefined,
       max: isSet(object.max) ? Number(object.max) : undefined,
@@ -267,7 +82,7 @@ export const RangeConstraintProto_FloatRange: MessageFns<RangeConstraintProto_Fl
     };
   },
 
-  toJSON(message: RangeConstraintProto_FloatRange): unknown {
+  toJSON(message: RangeConstraintProto): unknown {
     const obj: any = {};
     if (message.min !== undefined) {
       obj.min = message.min;
@@ -281,13 +96,11 @@ export const RangeConstraintProto_FloatRange: MessageFns<RangeConstraintProto_Fl
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RangeConstraintProto_FloatRange>, I>>(base?: I): RangeConstraintProto_FloatRange {
-    return RangeConstraintProto_FloatRange.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<RangeConstraintProto>, I>>(base?: I): RangeConstraintProto {
+    return RangeConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RangeConstraintProto_FloatRange>, I>>(
-    object: I,
-  ): RangeConstraintProto_FloatRange {
-    const message = createBaseRangeConstraintProto_FloatRange();
+  fromPartial<I extends Exact<DeepPartial<RangeConstraintProto>, I>>(object: I): RangeConstraintProto {
+    const message = createBaseRangeConstraintProto();
     message.min = object.min ?? undefined;
     message.max = object.max ?? undefined;
     message.step = object.step ?? undefined;

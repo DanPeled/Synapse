@@ -7,8 +7,10 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ColorConstraintProto } from "./color";
+import { ListConstraintProto } from "./list";
 import { ListOptionsConstraintProto } from "./list_options";
 import { RangeConstraintProto } from "./range";
+import { StringConstraintProto } from "./string";
 
 export const protobufPackage = "proto.settings.v1";
 
@@ -80,10 +82,12 @@ export interface ConstraintConfigProto {
   range?: RangeConstraintProto | undefined;
   listOptions?: ListOptionsConstraintProto | undefined;
   color?: ColorConstraintProto | undefined;
+  string?: StringConstraintProto | undefined;
+  list?: ListConstraintProto | undefined;
 }
 
 function createBaseConstraintConfigProto(): ConstraintConfigProto {
-  return { range: undefined, listOptions: undefined, color: undefined };
+  return { range: undefined, listOptions: undefined, color: undefined, string: undefined, list: undefined };
 }
 
 export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
@@ -96,6 +100,12 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     }
     if (message.color !== undefined) {
       ColorConstraintProto.encode(message.color, writer.uint32(26).fork()).join();
+    }
+    if (message.string !== undefined) {
+      StringConstraintProto.encode(message.string, writer.uint32(34).fork()).join();
+    }
+    if (message.list !== undefined) {
+      ListConstraintProto.encode(message.list, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -131,6 +141,22 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
           message.color = ColorConstraintProto.decode(reader, reader.uint32());
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.string = StringConstraintProto.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.list = ListConstraintProto.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -145,6 +171,8 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
       range: isSet(object.range) ? RangeConstraintProto.fromJSON(object.range) : undefined,
       listOptions: isSet(object.listOptions) ? ListOptionsConstraintProto.fromJSON(object.listOptions) : undefined,
       color: isSet(object.color) ? ColorConstraintProto.fromJSON(object.color) : undefined,
+      string: isSet(object.string) ? StringConstraintProto.fromJSON(object.string) : undefined,
+      list: isSet(object.list) ? ListConstraintProto.fromJSON(object.list) : undefined,
     };
   },
 
@@ -158,6 +186,12 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     }
     if (message.color !== undefined) {
       obj.color = ColorConstraintProto.toJSON(message.color);
+    }
+    if (message.string !== undefined) {
+      obj.string = StringConstraintProto.toJSON(message.string);
+    }
+    if (message.list !== undefined) {
+      obj.list = ListConstraintProto.toJSON(message.list);
     }
     return obj;
   },
@@ -175,6 +209,12 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
       : undefined;
     message.color = (object.color !== undefined && object.color !== null)
       ? ColorConstraintProto.fromPartial(object.color)
+      : undefined;
+    message.string = (object.string !== undefined && object.string !== null)
+      ? StringConstraintProto.fromPartial(object.string)
+      : undefined;
+    message.list = (object.list !== undefined && object.list !== null)
+      ? ListConstraintProto.fromPartial(object.list)
       : undefined;
     return message;
   },

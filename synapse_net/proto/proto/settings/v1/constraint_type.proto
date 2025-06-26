@@ -3,14 +3,18 @@ syntax = "proto3";
 package proto.settings.v1;
 
 import "proto/settings/v1/color.proto";
+import "proto/settings/v1/list.proto";
 import "proto/settings/v1/list_options.proto";
 import "proto/settings/v1/range.proto";
+import "proto/settings/v1/string.proto";
 
 message ConstraintConfigProto {
   oneof config {
     RangeConstraintProto range = 1;
     ListOptionsConstraintProto list_options = 2;
     ColorConstraintProto color = 3;
+    StringConstraintProto string = 4;
+    ListConstraintProto list = 5;
   }
 }
 

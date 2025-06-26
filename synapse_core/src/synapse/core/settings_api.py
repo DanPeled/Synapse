@@ -3,10 +3,20 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
-
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse_net.proto.settings.v1 import (ConstraintProto, SettingProto,
-                                           SettingValueProto)
+from synapse_net.proto.settings.v1 import (
+    ColorConstraintProto,
+    ColorFormatProto,
+    ConstraintConfigProto,
+    ConstraintProto,
+    ConstraintTypeProto,
+    ListOptionsConstraintProto,
+    RangeConstraintProto,
+    SettingProto,
+    ListConstraintProto,
+    SettingValueProto,
+    StringConstraintProto,
+)
 
 from ..bcolors import MarkupColors
 from ..log import err
@@ -14,17 +24,6 @@ from ..log import err
 SettingsValue = Any
 
 SettingsMap = Dict[str, SettingsValue]
-
-
-class ConstraintType(Enum):
-    """Enum for different constraint types"""
-
-    kRange = "range"
-    kListOptions = "list_options"
-    kColor = "color"
-    kList = "list"
-    kString = "string"
-    kBoolean = "boolean"
 
 
 @dataclass
@@ -39,7 +38,7 @@ class ValidationResult:
 class Constraint(ABC):
     """Base class for all constraints"""
 
-    def __init__(self, constraintType: ConstraintType):
+    def __init__(self, constraintType: ConstraintTypeProto):
         self.constraintType = constraintType
 
     @abstractmethod
@@ -52,6 +51,10 @@ class Constraint(ABC):
         """Serialize constraint to dictionary"""
         pass
 
+    @abstractmethod
+    def configToProto(self) -> ConstraintConfigProto:
+        pass
+
 
 TConstraintType = TypeVar("TConstraintType", bound=Constraint)
 
@@ -61,9 +64,9 @@ class RangeConstraint(Constraint):
 
     def __init__(
         self,
-        minValue: Optional[Union[int, float]] = None,
-        maxValue: Optional[Union[int, float]] = None,
-        step: Optional[Union[int, float]] = None,
+        minValue: Optional[float] = None,
+        maxValue: Optional[float] = None,
+        step: Optional[float] = None,
     ):
         """
         Initialize a RangeConstraint instance.
@@ -77,7 +80,7 @@ class RangeConstraint(Constraint):
                 If None, any value within the range is allowed.
 
         """
-        super().__init__(ConstraintType.kRange)
+        super().__init__(ConstraintTypeProto.RANGE)
         self.minValue = minValue
         self.maxValue = maxValue
         self.step = step
@@ -114,6 +117,13 @@ class RangeConstraint(Constraint):
             "step": self.step,
         }
 
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            range=RangeConstraintProto(
+                min=self.minValue, max=self.maxValue, step=self.step
+            )
+        )
+
 
 class ListOptionsConstraint(Constraint):
     """Constraint for selecting from predefined options"""
@@ -128,7 +138,7 @@ class ListOptionsConstraint(Constraint):
                 Defaults to False.
 
         """
-        super().__init__(ConstraintType.kListOptions)
+        super().__init__(ConstraintTypeProto.LIST_OPTIONS)
         self.options = options
         self.allowMultiple = allowMultiple
 
@@ -158,11 +168,27 @@ class ListOptionsConstraint(Constraint):
             "allowMultiple": self.allowMultiple,
         }
 
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            list_options=ListOptionsConstraintProto(
+                options=list(map(lambda op: settingValueToProto(op), self.options)),
+                allow_multiple=self.allowMultiple,
+            )
+        )
+
 
 class ColorFormat(Enum):
     kHex = "hex"
     kRGB = "rgb"
     kHSV = "hsv"
+
+    def toProtoType(self) -> ColorFormatProto:
+        if self == ColorFormat.kHSV:
+            return ColorFormatProto.HSV
+        elif self == ColorFormat.kHex:
+            return ColorFormatProto.HEX
+        else:
+            return ColorFormatProto.RGB
 
 
 class ColorConstraint(Constraint):
@@ -177,9 +203,7 @@ class ColorConstraint(Constraint):
         r"^hsv\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
     )
 
-    def __init__(
-        self, formatType: str = ColorFormat.kHex.value, rangeMode: bool = False
-    ):
+    def __init__(self, formatType=ColorFormat.kHex, rangeMode: bool = False):
         """
         Initialize a ColorConstraint instance.
 
@@ -187,7 +211,7 @@ class ColorConstraint(Constraint):
             formatType (str): Color format ("hex", "rgb", "hsv").
             rangeMode (bool): If True, expects a range (e.g., tuple of two colors).
         """
-        super().__init__(ConstraintType.kColor)
+        super().__init__(ConstraintTypeProto.COLOR)
         self.formatType = formatType
         self.rangeMode = rangeMode
 
@@ -285,9 +309,16 @@ class ColorConstraint(Constraint):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
-            "formatType": self.formatType,
+            "formatType": self.formatType.value,
             "rangeMode": self.rangeMode,
         }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            color=ColorConstraintProto(
+                format=self.formatType.toProtoType(), range_mode=self.rangeMode
+            )
+        )
 
 
 class ListConstraint(Constraint):
@@ -295,7 +326,6 @@ class ListConstraint(Constraint):
 
     def __init__(
         self,
-        itemConstraint: Optional[Constraint] = None,
         minLength: int = 0,
         maxLength: int = 0,
         depth: int = 1,
@@ -314,8 +344,7 @@ class ListConstraint(Constraint):
                 Defaults to 1.
 
         """
-        super().__init__(ConstraintType.kList)
-        self.itemConstraint = itemConstraint
+        super().__init__(ConstraintTypeProto.LIST)
         self.minLength = minLength
         self.maxLength = maxLength
         self.depth = depth
@@ -340,8 +369,6 @@ class ListConstraint(Constraint):
             for i, item in enumerate(val):
                 if depth > 1:
                     result = _validate_list(item, depth - 1)
-                elif self.itemConstraint:
-                    result = self.itemConstraint.validate(item)
                 else:
                     result = ValidationResult(True, None, item)
 
@@ -362,13 +389,18 @@ class ListConstraint(Constraint):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
-            "itemConstraint": (
-                self.itemConstraint.toDict() if self.itemConstraint else None
-            ),
             "minLength": self.minLength,
             "maxLength": self.maxLength,
             "depth": self.depth,
         }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            list=ListConstraintProto(
+                min_length=self.minLength,
+                max_length=self.maxLength,
+            )
+        )
 
 
 class StringConstraint(Constraint):
@@ -392,7 +424,7 @@ class StringConstraint(Constraint):
                 If None, no pattern constraint is applied.
 
         """
-        super().__init__(ConstraintType.kString)
+        super().__init__(ConstraintTypeProto.STRING)
         self.minLength = minLength
         self.maxLength = maxLength
         self.pattern = pattern
@@ -431,6 +463,15 @@ class StringConstraint(Constraint):
     def fromDict(cls, data: Dict[str, Any]) -> "StringConstraint":
         return cls(data.get("minLength"), data.get("maxLength"), data.get("pattern"))
 
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            string=StringConstraintProto(
+                min_length=self.minLength,
+                max_length=self.maxLength,
+                pattern=self.pattern,
+            )
+        )
+
 
 class BooleanConstraint(Constraint):
     """Constraint for boolean values"""
@@ -441,7 +482,7 @@ class BooleanConstraint(Constraint):
 
         This constraint restricts values to boolean types (True or False).
         """
-        super().__init__(ConstraintType.kBoolean)
+        super().__init__(ConstraintTypeProto.BOOLEAN)
 
     def validate(self, value: SettingsValue) -> ValidationResult:
         if isinstance(value, bool):
@@ -466,6 +507,9 @@ class BooleanConstraint(Constraint):
     @classmethod
     def fromDict(cls, data: Dict[str, Any]) -> "BooleanConstraint":
         return cls()
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto()
 
 
 @dataclass
@@ -928,10 +972,6 @@ class PipelineSettings(SettingsCollection):
     )
 
 
-def constraintToProto(constarint: Constraint) -> ConstraintProto:
-    return ConstraintProto()
-
-
 def settingValueToProto(val: SettingsValue) -> SettingValueProto:
     proto = SettingValueProto()
 
@@ -962,6 +1002,12 @@ def settingValueToProto(val: SettingsValue) -> SettingValueProto:
         raise TypeError(f"Unsupported type: {type(val)}")
 
     return proto
+
+
+def constraintToProto(constraint: Constraint) -> ConstraintProto:
+    return ConstraintProto(
+        type=constraint.constraintType, constraint=constraint.configToProto()
+    )
 
 
 def settingToProto(

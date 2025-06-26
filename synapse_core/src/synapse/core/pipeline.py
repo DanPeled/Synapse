@@ -120,6 +120,4 @@ def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
         type=PipelineTypeProto(type=type(inst).__name__, settings=settings),
     )
 
-    log(str(msg))
-
     return msg

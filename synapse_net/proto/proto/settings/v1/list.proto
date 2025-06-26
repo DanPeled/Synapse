@@ -2,10 +2,7 @@ syntax = "proto3";
 
 package proto.settings.v1;
 
-import "proto/settings/v1/settings.proto";
-
-message ListConsraintProto {
-  ConstraintProto item_constraint = 1;
+message ListConstraintProto {
   int32 min_length = 2;
   int32 max_length = 3;
 }

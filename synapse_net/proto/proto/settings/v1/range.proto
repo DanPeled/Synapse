@@ -5,20 +5,7 @@ package proto.settings.v1;
 import "google/protobuf/wrappers.proto";
 
 message RangeConstraintProto {
-  oneof value_type {
-    IntRange int_range = 1;
-    FloatRange float_range = 2;
-  }
-
-  message IntRange {
-    google.protobuf.Int32Value min = 1;
-    google.protobuf.Int32Value max = 2;
-    google.protobuf.Int32Value step = 3;
-  }
-
-  message FloatRange {
-    google.protobuf.FloatValue min = 1;
-    google.protobuf.FloatValue max = 2;
-    google.protobuf.FloatValue step = 3;
-  }
+  google.protobuf.FloatValue min = 1;
+  google.protobuf.FloatValue max = 2;
+  google.protobuf.FloatValue step = 3;
 }
