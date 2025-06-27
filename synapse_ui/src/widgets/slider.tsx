@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { baseCardColor, teamColor } from "@/services/style";
@@ -7,7 +7,7 @@ interface SliderProps {
   min?: number;
   max?: number;
   step?: number;
-  initial?: number;
+  value: number;
   label?: string;
   labelGap?: string;
   className?: string;
@@ -18,53 +18,60 @@ export function Slider({
   min = 0,
   max = 100,
   step = 1,
-  initial = 50,
+  value,
   label = "Value",
   labelGap = "0px",
   className = "",
   onChange,
 }: SliderProps) {
-  const [value, setValue] = useState<number | "">(initial);
-  const valuePercent =
-    (((typeof value === "number" ? value : min) - min) / (max - min)) * 100;
+  const [internalValue, setInternalValue] = useState<number | "">(value);
+
+  useEffect(() => {
+    if (typeof internalValue === "number" && internalValue !== value) {
+      setInternalValue(value);
+    }
+  }, [value]);
 
   const clampValue = (val: number) => Math.min(max, Math.max(min, val));
+  const valuePercent =
+    (((typeof internalValue === "number" ? internalValue : min) - min) / (max - min)) * 100;
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = clampValue(Number(e.target.value));
-    setValue(val);
+    setInternalValue(val);
     onChange?.(val);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (val === "") {
-      setValue("");
+      setInternalValue("");
       return;
     }
     const num = Number(val);
     if (!isNaN(num)) {
       const clamped = clampValue(num);
-      setValue(clamped);
+      setInternalValue(clamped);
       onChange?.(clamped);
     }
   };
 
   const handleInputBlur = () => {
-    if (value === "" || isNaN(Number(value))) {
-      setValue(min);
+    if (internalValue === "" || isNaN(Number(internalValue))) {
+      setInternalValue(min);
+      onChange?.(min);
     }
   };
 
   const increment = () => {
     const clamped = clampValue(Number(value) + step);
-    setValue(clamped);
+    setInternalValue(clamped);
     onChange?.(clamped);
   };
 
   const decrement = () => {
     const clamped = clampValue(Number(value) - step);
-    setValue(clamped);
+    setInternalValue(clamped);
     onChange?.(clamped);
   };
 
@@ -89,8 +96,8 @@ export function Slider({
           variant="outline"
           size="sm"
           onClick={decrement}
-          disabled={typeof value === "number" && value <= min}
-          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center transition-colors select-none cursor-pointer"
+          disabled={typeof internalValue === "number" && internalValue <= min}
+          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center"
           style={{
             borderColor: "rgba(255,255,255,0.2)",
             backgroundColor: "rgba(255,255,255,0.1)",
@@ -105,7 +112,7 @@ export function Slider({
           min={min}
           max={max}
           step={step}
-          value={value === "" ? min : value}
+          value={internalValue === "" ? min : internalValue}
           onChange={handleSliderChange}
           className="flex-grow h-1 rounded-md cursor-pointer appearance-none"
           style={{
@@ -118,8 +125,8 @@ export function Slider({
           variant="outline"
           size="sm"
           onClick={increment}
-          disabled={typeof value === "number" && value >= max}
-          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center transition-colors select-none cursor-pointer"
+          disabled={typeof internalValue === "number" && internalValue >= max}
+          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center"
           style={{
             borderColor: "rgba(255,255,255,0.2)",
             backgroundColor: "rgba(255,255,255,0.1)",
@@ -131,7 +138,7 @@ export function Slider({
 
         <input
           type="number"
-          value={value}
+          value={internalValue}
           min={min}
           max={max}
           step={step}

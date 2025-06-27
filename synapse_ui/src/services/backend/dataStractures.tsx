@@ -27,7 +27,7 @@ export namespace BackendStateSystem {
   // Type for the setters dynamically created
   export type StateSetter = {
     [K in keyof State as `set${Capitalize<string & K>}`]: (
-      value: State[K],
+      value: State[K] | ((prev: State[K]) => State[K])
     ) => void;
   };
 

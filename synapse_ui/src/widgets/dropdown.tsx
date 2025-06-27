@@ -43,7 +43,6 @@ export function Dropdown<T>({
       className="flex items-center gap-3 px-3 py-2 relative transition-colors w-full"
       style={{
         color: teamColor,
-        fontFamily: '"Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
         fontWeight: 500,
         opacity: disabled ? 0.5 : 1,
       }}
@@ -80,7 +79,7 @@ export function Dropdown<T>({
                 <SelectItem
                   key={strKey}
                   value={strKey}
-                  className="px-4 py-2 transition-colors font-normal cursor-pointer"
+                  className="px-4 py-2 transition-colors cursor-pointer"
                   style={{
                     color: teamColor,
                     backgroundColor:

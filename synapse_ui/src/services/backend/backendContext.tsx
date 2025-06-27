@@ -101,14 +101,23 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const setters = Object.keys(initialState).reduce((acc, key) => {
-    const functionName =
-      `set${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof BackendStateSystem.StateSetter;
-    acc[functionName] = (value: unknown) => {
-      dispatch({ type: `SET_${key.toUpperCase()}`, payload: value });
-    };
-    return acc;
-  }, {} as BackendStateSystem.StateSetter);
+  const setters = React.useMemo(() => {
+    return Object.keys(initialState).reduce((acc, key) => {
+      const functionName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof BackendStateSystem.StateSetter;
+      acc[functionName] = (value: unknown | ((prev: any) => any)) => {
+        if (typeof value === "function") {
+          const keyLower = key.toLowerCase() as keyof BackendStateSystem.State;
+          const currentSlice = state[keyLower];
+          const newValue = (value as Function)(currentSlice);
+          dispatch({ type: `SET_${key.toUpperCase()}`, payload: newValue });
+        } else {
+          // Direct value update
+          dispatch({ type: `SET_${key.toUpperCase()}`, payload: value });
+        }
+      };
+      return acc;
+    }, {} as BackendStateSystem.StateSetter);
+  }, [dispatch, state]);
 
   const socket = useRef<WebSocketWrapper | null>(null);
 

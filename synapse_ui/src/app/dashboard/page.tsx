@@ -230,18 +230,23 @@ function CameraView() {
 }
 
 function PipelineConfigControl({
+  pipelinecontext,
   selectedPipeline,
   selectedPipelineType,
+  setpipelinecontext,
+  backendConnected,
 }: {
-  pipelinecontext: PipelineManagement.PipelineContext,
-  selectedPipeline?: PipelineProto,
-  selectedPipelineType?: PipelineTypeProto,
+  pipelinecontext: PipelineManagement.PipelineContext;
+  setpipelinecontext: (context: PipelineManagement.PipelineContext) => void;
+  selectedPipeline?: PipelineProto;
+  selectedPipelineType?: PipelineTypeProto;
+  backendConnected: boolean | undefined;
 }) {
   const [cameraControls, setCameraControls] = useState<(JSX.Element | undefined)[]>([]);
   const [pipelineControls, setPipelineControls] = useState<(JSX.Element | undefined)[]>([]);
 
   useEffect(() => {
-    if (!selectedPipelineType) {
+    if (!selectedPipelineType || !backendConnected) {
       setCameraControls([]);
       setPipelineControls([]);
       return;
@@ -256,8 +261,26 @@ function PipelineConfigControl({
           key={toTitleCase(setting.name)}
           setting={setting}
           setValue={(val) => {
-            if (selectedPipeline) {
-              selectedPipeline.settingsValues[setting.name] = val;
+            if (selectedPipeline && pipelinecontext) {
+              const oldPipelines = pipelinecontext.pipelines;
+
+              const newSettingsValues = {
+                ...selectedPipeline.settingsValues,
+                [setting.name]: val,
+              };
+
+              const updatedPipeline = {
+                ...selectedPipeline,
+                settingsValues: newSettingsValues,
+              };
+
+              const newPipelines = new Map(oldPipelines);
+              newPipelines.set(selectedPipeline.index, updatedPipeline);
+
+              setpipelinecontext({
+                ...pipelinecontext,
+                pipelines: newPipelines,
+              });
             }
           }}
           value={selectedPipeline!.settingsValues[setting.name]}
@@ -274,10 +297,7 @@ function PipelineConfigControl({
 
     setCameraControls(cameraItems);
     setPipelineControls(pipelineItems);
-  }, [selectedPipelineType, selectedPipeline]);
-
-
-  // TODO: retain state (doesnt affect pipeline context currently)
+  }, [selectedPipelineType, selectedPipeline, backendConnected]);
 
   return (
     <Card
@@ -311,25 +331,33 @@ function PipelineConfigControl({
           </TabsList>
 
           <TabsContent value="input" className="p-6 space-y-6">
-            <div>
-              {...cameraControls}
+            <div style={{ color: teamColor }}>
+              {cameraControls.length > 0 ? (
+                <div className="space-y-2">{cameraControls}</div>
+              ) : (
+                <div className="text-center" style={{ color: teamColor }}>
+                  <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                  <p className="select-none">Camera Settings</p>
+                  <p className="text-sm select-none">
+                    Configure camera parameters
+                  </p>
+                </div>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="pipeline" className="p-6 space-y-6">
             <div style={{ color: teamColor }}>
               {pipelineControls.length > 0 ? (
-                <div className="space-y-4">
-                  {pipelineControls}
-                </div>
+                <div className="space-y-2">{pipelineControls}</div>
               ) : (
-                <>
+                <div className="text-center" style={{ color: teamColor }}>
                   <Settings className="w-16 h-16 mx-auto mb-2 opacity-50" />
                   <p className="select-none">Pipeline Settings</p>
                   <p className="text-sm select-none">
                     Configure pipeline-specific parameters
                   </p>
-                </>
+                </div>
               )}
             </div>
           </TabsContent>
@@ -371,7 +399,8 @@ function ResultsView() {
 }
 
 export default function Dashboard() {
-  const { pipelinecontext: pipelinecontext, connection } = useBackendContext();
+  const { pipelinecontext, setPipelinecontext, connection
+  } = useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(
     pipelinecontext.pipelines.get(0),
   );
@@ -386,7 +415,16 @@ export default function Dashboard() {
         Array.from(pipelinecontext.pipelineTypes.values()).at(0),
       );
     }
-  }, [connection.backend, pipelinecontext]);
+  }, [connection.backend]);
+
+  useEffect(() => {
+    if (selectedPipeline) {
+      const updated = pipelinecontext.pipelines.get(selectedPipeline.index);
+      if (updated) {
+        setSelectedPipeline(updated);
+      }
+    }
+  }, [pipelinecontext]);
 
   return (
     <div
@@ -408,7 +446,10 @@ export default function Dashboard() {
             <PipelineConfigControl
               pipelinecontext={pipelinecontext}
               selectedPipeline={selectedPipeline}
-              selectedPipelineType={selectedPipelineType} />
+              selectedPipelineType={selectedPipelineType}
+              setpipelinecontext={setPipelinecontext}
+              backendConnected={connection.backend}
+            />
           </Column>
 
           <Column className="flex-[1.2] space-y-2 h-full">

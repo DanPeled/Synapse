@@ -75,6 +75,7 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
       return (
         <ToggleButton
           label={setting.name}
+          value={protoToSettingValue(value) as boolean}
           onToggleAction={(val) => setValue(settingValueToProto(val))}
         />
       );
@@ -82,7 +83,6 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
       return (
         <TextInput
           label={setting.name}
-          initialValue={setting.default?.stringValue}
           pattern={setting.constraint.constraint?.string?.pattern}
           maxLength={setting.constraint.constraint?.string?.maxLength}
           onChange={(val) => setValue(settingValueToProto(val))}
@@ -95,7 +95,7 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
           min={setting.constraint.constraint?.range?.min}
           max={setting.constraint.constraint?.range?.max}
           step={setting.constraint.constraint?.range?.step}
-          initial={toNumber(value)}
+          value={toNumber(protoToSettingValue(value)) ?? toNumber(protoToSettingValue(value)) ?? 0}
           onChange={(val) => setValue(settingValueToProto(val))}
         />
       );
@@ -112,7 +112,7 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
                 value: protoToSettingValue(op),
               })) as DropdownOption<SettingValueProto>[] ?? []
             }
-            value={value}
+            value={protoToSettingValue(value)}
             onValueChange={(val) => setValue(settingValueToProto(val))}
           />
         );
