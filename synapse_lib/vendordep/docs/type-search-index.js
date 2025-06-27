@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"synapse","l":"ApriltagPoseEstimate"},{"p":"synapse","l":"ApriltagResult"},{"p":"synapse","l":"ApriltagResult.ApriltagVerbosity"},{"p":"synapse","l":"SynapseCamera.CameraSettings"},{"p":"synapse","l":"RegisterSynapseResult"},{"p":"synapse","l":"SynapseCamera"}];updateSearchResults();

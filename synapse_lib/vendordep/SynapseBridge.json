@@ -1,25 +1,25 @@
 {
     "fileName": "SynapseBridge.json",
     "name": "SynapseBridge",
-    "version": "${version}",
+    "version": "0.0.1",
     "frcYear": "2025",
     "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
     "mavenUrls": [
         "https://danpeled.github.io/synapse/synapse_lib/vendordep/maven/"
     ],
-    "jsonUrl": "https://danpeled.github.io/synapse/synapse_lib/vendordep/synapse-${version}.json",
+    "jsonUrl": "https://danpeled.github.io/synapse/synapse_lib/vendordep/synapse-0.0.1.json",
     "javaDependencies": [
         {
-            "groupId": "${groupId}",
-            "artifactId": "${artifactId}-java",
-            "version": "${version}"
+            "groupId": "synapse",
+            "artifactId": "Synapse-java",
+            "version": "0.0.1"
         }
     ],
     "jniDependencies": [
         {
-            "groupId": "${groupId}",
-            "artifactId": "${artifactId}-driver",
-            "version": "${version}",
+            "groupId": "synapse",
+            "artifactId": "Synapse-driver",
+            "version": "0.0.1",
             "skipInvalidPlatforms": true,
             "isJar": false,
             "validPlatforms": [
@@ -34,9 +34,9 @@
     ],
     "cppDependencies": [
         {
-            "groupId": "${groupId}",
-            "artifactId": "${artifactId}-cpp",
-            "version": "${version}",
+            "groupId": "synapse",
+            "artifactId": "Synapse-cpp",
+            "version": "0.0.1",
             "libName": "Vendor",
             "headerClassifier": "headers",
             "sharedLibrary": false,
@@ -51,9 +51,9 @@
             ]
         },
         {
-            "groupId": "${groupId}",
-            "artifactId": "${artifactId}-driver",
-            "version": "${version}",
+            "groupId": "synapse",
+            "artifactId": "Synapse-driver",
+            "version": "0.0.1",
             "libName": "VendorDriver",
             "headerClassifier": "headers",
             "sharedLibrary": false,
