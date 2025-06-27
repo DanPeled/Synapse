@@ -1,5 +1,0 @@
-{
-  "exclude": [
-    "synapse_net/src/proto",
-  ]
-}

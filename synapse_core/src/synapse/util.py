@@ -1,6 +1,8 @@
-from typing import List
+from typing import List, Optional, Type
 
 from wpimath import geometry
+import typing
+from .core.pipeline import Pipeline
 
 from .log import err
 
@@ -60,3 +62,13 @@ def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:
             rotation.Z(),  # Yaw
         ],
     ]
+
+
+def resolveGenericArgument(cls) -> Optional[Type]:
+    orig_bases = getattr(cls, "__orig_bases__", ())
+    for base in orig_bases:
+        if typing.get_origin(base) is Pipeline:
+            args = typing.get_args(base)
+            if args:
+                return args[0]
+    return None

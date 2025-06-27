@@ -8,7 +8,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { CameraProto } from "./camera";
 import { DeviceInfoProto, HardwareMetricsProto } from "./device";
-import { PipelineProto } from "./pipeline";
+import { PipelineProto, PipelineTypeProto } from "./pipeline";
 
 export const protobufPackage = "proto.v1";
 
@@ -17,6 +17,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1,
   MESSAGE_TYPE_PROTO_SEND_METRICS = 2,
   MESSAGE_TYPE_PROTO_ADD_PIPELINE = 3,
+  MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -34,6 +35,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 3:
     case "MESSAGE_TYPE_PROTO_ADD_PIPELINE":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE;
+    case 4:
+    case "MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -51,6 +55,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SEND_METRICS";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE:
       return "MESSAGE_TYPE_PROTO_ADD_PIPELINE";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES:
+      return "MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -63,34 +69,58 @@ export interface MessageProto {
   hardwareMetrics?: HardwareMetricsProto | undefined;
   cameraInfo?: CameraProto | undefined;
   pipelineInfo?: PipelineProto | undefined;
+  pipelineTypeInfo: PipelineTypeProto[];
 }
 
 function createBaseMessageProto(): MessageProto {
-  return { type: 0, deviceInfo: undefined, hardwareMetrics: undefined, cameraInfo: undefined, pipelineInfo: undefined };
+  return {
+    type: 0,
+    deviceInfo: undefined,
+    hardwareMetrics: undefined,
+    cameraInfo: undefined,
+    pipelineInfo: undefined,
+    pipelineTypeInfo: [],
+  };
 }
 
 export const MessageProto: MessageFns<MessageProto> = {
-  encode(message: MessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: MessageProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
     if (message.deviceInfo !== undefined) {
-      DeviceInfoProto.encode(message.deviceInfo, writer.uint32(18).fork()).join();
+      DeviceInfoProto.encode(
+        message.deviceInfo,
+        writer.uint32(18).fork(),
+      ).join();
     }
     if (message.hardwareMetrics !== undefined) {
-      HardwareMetricsProto.encode(message.hardwareMetrics, writer.uint32(26).fork()).join();
+      HardwareMetricsProto.encode(
+        message.hardwareMetrics,
+        writer.uint32(26).fork(),
+      ).join();
     }
     if (message.cameraInfo !== undefined) {
       CameraProto.encode(message.cameraInfo, writer.uint32(34).fork()).join();
     }
     if (message.pipelineInfo !== undefined) {
-      PipelineProto.encode(message.pipelineInfo, writer.uint32(42).fork()).join();
+      PipelineProto.encode(
+        message.pipelineInfo,
+        writer.uint32(42).fork(),
+      ).join();
+    }
+    for (const v of message.pipelineTypeInfo) {
+      PipelineTypeProto.encode(v!, writer.uint32(50).fork()).join();
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MessageProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMessageProto();
     while (reader.pos < end) {
@@ -117,7 +147,10 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.hardwareMetrics = HardwareMetricsProto.decode(reader, reader.uint32());
+          message.hardwareMetrics = HardwareMetricsProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 4: {
@@ -136,6 +169,16 @@ export const MessageProto: MessageFns<MessageProto> = {
           message.pipelineInfo = PipelineProto.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.pipelineTypeInfo.push(
+            PipelineTypeProto.decode(reader, reader.uint32()),
+          );
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -148,12 +191,21 @@ export const MessageProto: MessageFns<MessageProto> = {
   fromJSON(object: any): MessageProto {
     return {
       type: isSet(object.type) ? messageTypeProtoFromJSON(object.type) : 0,
-      deviceInfo: isSet(object.deviceInfo) ? DeviceInfoProto.fromJSON(object.deviceInfo) : undefined,
+      deviceInfo: isSet(object.deviceInfo)
+        ? DeviceInfoProto.fromJSON(object.deviceInfo)
+        : undefined,
       hardwareMetrics: isSet(object.hardwareMetrics)
         ? HardwareMetricsProto.fromJSON(object.hardwareMetrics)
         : undefined,
-      cameraInfo: isSet(object.cameraInfo) ? CameraProto.fromJSON(object.cameraInfo) : undefined,
-      pipelineInfo: isSet(object.pipelineInfo) ? PipelineProto.fromJSON(object.pipelineInfo) : undefined,
+      cameraInfo: isSet(object.cameraInfo)
+        ? CameraProto.fromJSON(object.cameraInfo)
+        : undefined,
+      pipelineInfo: isSet(object.pipelineInfo)
+        ? PipelineProto.fromJSON(object.pipelineInfo)
+        : undefined,
+      pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
+        ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
+        : [],
     };
   },
 
@@ -166,7 +218,9 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.deviceInfo = DeviceInfoProto.toJSON(message.deviceInfo);
     }
     if (message.hardwareMetrics !== undefined) {
-      obj.hardwareMetrics = HardwareMetricsProto.toJSON(message.hardwareMetrics);
+      obj.hardwareMetrics = HardwareMetricsProto.toJSON(
+        message.hardwareMetrics,
+      );
     }
     if (message.cameraInfo !== undefined) {
       obj.cameraInfo = CameraProto.toJSON(message.cameraInfo);
@@ -174,42 +228,72 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.pipelineInfo !== undefined) {
       obj.pipelineInfo = PipelineProto.toJSON(message.pipelineInfo);
     }
+    if (message.pipelineTypeInfo?.length) {
+      obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
+        PipelineTypeProto.toJSON(e),
+      );
+    }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<MessageProto>, I>>(base?: I): MessageProto {
+  create<I extends Exact<DeepPartial<MessageProto>, I>>(
+    base?: I,
+  ): MessageProto {
     return MessageProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(object: I): MessageProto {
+  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(
+    object: I,
+  ): MessageProto {
     const message = createBaseMessageProto();
     message.type = object.type ?? 0;
-    message.deviceInfo = (object.deviceInfo !== undefined && object.deviceInfo !== null)
-      ? DeviceInfoProto.fromPartial(object.deviceInfo)
-      : undefined;
-    message.hardwareMetrics = (object.hardwareMetrics !== undefined && object.hardwareMetrics !== null)
-      ? HardwareMetricsProto.fromPartial(object.hardwareMetrics)
-      : undefined;
-    message.cameraInfo = (object.cameraInfo !== undefined && object.cameraInfo !== null)
-      ? CameraProto.fromPartial(object.cameraInfo)
-      : undefined;
-    message.pipelineInfo = (object.pipelineInfo !== undefined && object.pipelineInfo !== null)
-      ? PipelineProto.fromPartial(object.pipelineInfo)
-      : undefined;
+    message.deviceInfo =
+      object.deviceInfo !== undefined && object.deviceInfo !== null
+        ? DeviceInfoProto.fromPartial(object.deviceInfo)
+        : undefined;
+    message.hardwareMetrics =
+      object.hardwareMetrics !== undefined && object.hardwareMetrics !== null
+        ? HardwareMetricsProto.fromPartial(object.hardwareMetrics)
+        : undefined;
+    message.cameraInfo =
+      object.cameraInfo !== undefined && object.cameraInfo !== null
+        ? CameraProto.fromPartial(object.cameraInfo)
+        : undefined;
+    message.pipelineInfo =
+      object.pipelineInfo !== undefined && object.pipelineInfo !== null
+        ? PipelineProto.fromPartial(object.pipelineInfo)
+        : undefined;
+    message.pipelineTypeInfo =
+      object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||
+      [];
     return message;
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

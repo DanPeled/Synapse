@@ -14,6 +14,7 @@ message MessageProto {
     CameraProto camera_info = 4;
     PipelineProto pipeline_info = 5;
   }
+  repeated PipelineTypeProto pipeline_type_info = 6;
 }
 
 enum MessageTypeProto {
@@ -21,4 +22,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1;
   MESSAGE_TYPE_PROTO_SEND_METRICS = 2;
   MESSAGE_TYPE_PROTO_ADD_PIPELINE = 3;
+  MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES = 4;
 }

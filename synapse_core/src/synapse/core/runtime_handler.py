@@ -3,13 +3,12 @@ import os
 import threading
 import time
 import traceback
-import typing
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type
-
+from ..util import resolveGenericArgument
 import cscore as cs
 import cv2
 import numpy as np
@@ -65,16 +64,6 @@ class FPSView:
     thickness = 2
     color = (0, 256, 0)
     position = (10, 30)
-
-
-def resolveGenericArgument(cls) -> Optional[Type]:
-    orig_bases = getattr(cls, "__orig_bases__", ())
-    for base in orig_bases:
-        if typing.get_origin(base) is Pipeline:
-            args = typing.get_args(base)
-            if args:
-                return args[0]
-    return None
 
 
 class PipelineLoader:

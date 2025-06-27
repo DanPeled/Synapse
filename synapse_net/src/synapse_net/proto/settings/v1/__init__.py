@@ -101,9 +101,9 @@ class ConstraintProto(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
-class SettingProto(betterproto.Message):
+class SettingMetaProto(betterproto.Message):
     name: str = betterproto.string_field(1)
     category: str = betterproto.string_field(2)
     description: str = betterproto.string_field(3)
-    value: "SettingValueProto" = betterproto.message_field(4)
+    default: "SettingValueProto" = betterproto.message_field(4)
     constraint: "ConstraintProto" = betterproto.message_field(5)

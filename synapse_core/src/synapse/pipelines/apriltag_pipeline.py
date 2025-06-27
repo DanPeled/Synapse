@@ -11,13 +11,23 @@ import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.pipeline import Pipeline
-from synapse.core.settings_api import (BooleanConstraint,
-                                       ListOptionsConstraint, PipelineSettings,
-                                       RangeConstraint, settingField)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ListOptionsConstraint,
+    PipelineSettings,
+    RangeConstraint,
+    settingField,
+)
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
-from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
-                              Transform3d, Translation3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Quaternion,
+    Rotation3d,
+    Transform3d,
+    Translation3d,
+)
 
 
 @dataclass
@@ -318,10 +328,12 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if camConfig:
             measured_res = camConfig.measuredRes
-            current_res = [
-                self.getSetting(PipelineSettings.height),
-                self.getSetting(PipelineSettings.width),
-            ]
+            current_res = list(
+                map(
+                    lambda x: int(x),
+                    str(self.getSetting(PipelineSettings.resolution)).split("x"),
+                )
+            )
 
             if measured_res != current_res:
                 scale_x = current_res[0] / measured_res[0]  # pyright: ignore

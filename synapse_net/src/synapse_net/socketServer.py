@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import fields
 from enum import Enum
 from functools import lru_cache
-from typing import Callable, Dict, Optional, Set
+from typing import Callable, Dict, List, Optional, Set, Union
 
 import betterproto
 import websockets
@@ -31,7 +31,7 @@ def getMessageDataFieldName(datatypeName: str) -> str:
 
 def createMessage(
     messageType: MessageTypeProto,
-    data: betterproto.Message,
+    data: Union[betterproto.Message, List[betterproto.Message]],
 ) -> bytes:
     """
     While this is very clearly not a safe solution or a good one,

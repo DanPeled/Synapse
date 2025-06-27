@@ -12,7 +12,7 @@ from synapse_net.proto.settings.v1 import (
     ConstraintTypeProto,
     ListOptionsConstraintProto,
     RangeConstraintProto,
-    SettingProto,
+    SettingMetaProto,
     ListConstraintProto,
     SettingValueProto,
     StringConstraintProto,
@@ -953,22 +953,16 @@ class PipelineSettings(SettingsCollection):
         description="Amplifies the signal brightness.",
     )
     orientation = settingField(
-        RangeConstraint(0, 270, 90),
+        ListOptionsConstraint(allowMultiple=False, options=[0, 90, 180, 270]),
         default=0,
         category=kCameraPropsCategory,
         description="Rotates the image orientation (0, 90, 180, 270 degrees).",
     )
-    width = settingField(
-        RangeConstraint(minValue=0, maxValue=None),
-        default=1280,
+    resolution = settingField(
+        ListOptionsConstraint(allowMultiple=False, options=["1080x1920"]),
+        default="1080x1920",
         category=kCameraPropsCategory,
-        description="Sets the width resolution of the image.",
-    )
-    height = settingField(
-        RangeConstraint(minValue=0, maxValue=None),
-        default=720,
-        category=kCameraPropsCategory,
-        description="Sets the height resolution of the image.",
+        description="Camera Resolution",
     )
 
 
@@ -1010,24 +1004,24 @@ def constraintToProto(constraint: Constraint) -> ConstraintProto:
     )
 
 
-def settingToProto(
-    setting: Setting, val: SettingsValue, defaultCategory: str
-) -> SettingProto:
-    return SettingProto(
+def settingToProto(setting: Setting, defaultCategory: str) -> SettingMetaProto:
+    return SettingMetaProto(
         name=setting.key,
         description=setting.description or "",
         category=setting.category or defaultCategory,
-        value=settingValueToProto(val),
         constraint=constraintToProto(setting.constraint),
+        default=settingValueToProto(setting.defaultValue),
     )
 
 
-def settingsToProto(settings: SettingsCollection, typename: str) -> List[SettingProto]:
+def settingsToProto(
+    settings: SettingsCollection, typename: str
+) -> List[SettingMetaProto]:
     result = []
     api = settings.getAPI()
 
     for schema in api.settings.values():
         if schema is not None:
-            result.append(settingToProto(schema, api.getValue(schema.key), typename))
+            result.append(settingToProto(schema, typename))
 
     return result

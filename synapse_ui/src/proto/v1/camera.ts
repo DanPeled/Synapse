@@ -26,7 +26,10 @@ function createBaseCameraProto(): CameraProto {
 }
 
 export const CameraProto: MessageFns<CameraProto> = {
-  encode(message: CameraProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CameraProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
@@ -43,7 +46,8 @@ export const CameraProto: MessageFns<CameraProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CameraProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCameraProto();
     while (reader.pos < end) {
@@ -93,8 +97,12 @@ export const CameraProto: MessageFns<CameraProto> = {
   fromJSON(object: any): CameraProto {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      streamPath: isSet(object.streamPath) ? globalThis.String(object.streamPath) : "",
-      physicalConnection: isSet(object.physicalConnection) ? globalThis.String(object.physicalConnection) : "",
+      streamPath: isSet(object.streamPath)
+        ? globalThis.String(object.streamPath)
+        : "",
+      physicalConnection: isSet(object.physicalConnection)
+        ? globalThis.String(object.physicalConnection)
+        : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
     };
   },
@@ -119,7 +127,9 @@ export const CameraProto: MessageFns<CameraProto> = {
   create<I extends Exact<DeepPartial<CameraProto>, I>>(base?: I): CameraProto {
     return CameraProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CameraProto>, I>>(object: I): CameraProto {
+  fromPartial<I extends Exact<DeepPartial<CameraProto>, I>>(
+    object: I,
+  ): CameraProto {
     const message = createBaseCameraProto();
     message.name = object.name ?? "";
     message.streamPath = object.streamPath ?? "";
@@ -134,7 +144,10 @@ function createBaseLatencyStatusProto(): LatencyStatusProto {
 }
 
 export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
-  encode(message: LatencyStatusProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: LatencyStatusProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.latencyCapture !== 0) {
       writer.uint32(8).int64(message.latencyCapture);
     }
@@ -144,8 +157,12 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): LatencyStatusProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): LatencyStatusProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseLatencyStatusProto();
     while (reader.pos < end) {
@@ -178,8 +195,12 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
 
   fromJSON(object: any): LatencyStatusProto {
     return {
-      latencyCapture: isSet(object.latencyCapture) ? globalThis.Number(object.latencyCapture) : 0,
-      latencyProcess: isSet(object.latencyProcess) ? globalThis.Number(object.latencyProcess) : 0,
+      latencyCapture: isSet(object.latencyCapture)
+        ? globalThis.Number(object.latencyCapture)
+        : 0,
+      latencyProcess: isSet(object.latencyProcess)
+        ? globalThis.Number(object.latencyProcess)
+        : 0,
     };
   },
 
@@ -194,10 +215,14 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(base?: I): LatencyStatusProto {
+  create<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(
+    base?: I,
+  ): LatencyStatusProto {
     return LatencyStatusProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(object: I): LatencyStatusProto {
+  fromPartial<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(
+    object: I,
+  ): LatencyStatusProto {
     const message = createBaseLatencyStatusProto();
     message.latencyCapture = object.latencyCapture ?? 0;
     message.latencyProcess = object.latencyProcess ?? 0;
@@ -205,17 +230,31 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());

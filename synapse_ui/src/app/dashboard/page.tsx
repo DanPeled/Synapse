@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { JSX, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,22 +29,19 @@ import {
   borderColor,
 } from "@/services/style";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
-import { Slider } from "@/widgets/slider";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
+import { useBackendContext } from "@/services/backend/backendContext";
+import { PipelineManagement } from "@/services/backend/pipelineContext";
+import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import { GenerateControl } from "@/services/controls_generator";
+import { toTitleCase } from "@/services/stringUtil";
 
-// Mock data
 const mockData = {
   cameras: [
     { label: "Monochrome (#0)", value: 0 },
     { label: "Colored (#1)", value: 1 },
   ],
-  pipelines: [
-    { label: "AprilTag Detection", type: "Detection" },
-    { label: "Color Tracking", type: "Tracking" },
-    { label: "Shape Recognition", type: "Classification" },
-  ],
-  pipelineTypes: ["Detection", "Tracking", "Classification", "Custom"],
   resolutions: [
     { label: "1920x1080 @ 100FPS", value: "1920x1080" },
     { label: "1280x720 @ 100FPS", value: "1280x720" },
@@ -58,13 +55,23 @@ const mockData = {
   ],
 };
 
-function CameraAndPipelineControls() {
+function CameraAndPipelineControls({
+  pipelinecontext,
+  setSelectedPipeline,
+  selectedPipeline,
+  selectedPipelineType,
+  setSelectedPipelineType
+}: {
+  pipelinecontext: PipelineManagement.PipelineContext,
+  setSelectedPipeline: (val?: PipelineProto) => void,
+  selectedPipeline?: PipelineProto,
+  selectedPipelineType?: PipelineTypeProto,
+  setSelectedPipelineType: (val?: PipelineTypeProto) => void
+}) {
   const [selectedCamera, setSelectedCamera] = useState(
     mockData.cameras[0].value,
   );
-  const [selectedPipeline, setSelectedPipeline] =
-    useState("AprilTag Detection");
-  const [selectedPipelineType, setSelectedPipelineType] = useState("Detection");
+
 
   return (
     <Card
@@ -81,25 +88,21 @@ function CameraAndPipelineControls() {
             }}
             label="Camera"
             options={mockData.cameras as DropdownOption<number>[]}
-            serialize={(val) => val.toString()}
-            deserialize={(val) => Number.parseInt(val)}
           />
         </div>
 
         {/* Pipeline Selection */}
         <Row gap="gap-2" className="items-center">
           <Dropdown
-            options={mockData.pipelines.map((pipe) => ({
-              label: pipe.label,
-              value: pipe.label,
-            }))}
             label="Pipeline"
             value={selectedPipeline}
-            onValueChange={(val) => {
-              setSelectedPipeline(val);
-            }}
-            serialize={(val) => val}
-            deserialize={(val) => val}
+            onValueChange={(val) => setSelectedPipeline(val)}
+            options={Array.from(pipelinecontext.pipelines.entries()).map(
+              ([index, pipeline]) => ({
+                label: pipeline.name,
+                value: pipeline,
+              }),
+            )}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -181,15 +184,13 @@ function CameraAndPipelineControls() {
           <Dropdown
             label="Pipeline Type"
             value={selectedPipelineType}
-            onValueChange={(val) => {
-              setSelectedPipelineType(val);
-            }}
-            options={mockData.pipelineTypes.map((type) => ({
-              label: type,
-              value: type,
-            }))}
-            serialize={(val) => val}
-            deserialize={(val) => val}
+            onValueChange={(val) => setSelectedPipelineType(val)}
+            options={Array.from(pipelinecontext.pipelineTypes.entries()).map(
+              ([_, type]) => ({
+                label: type.type,
+                value: type,
+              }),
+            )}
           />
         </div>
       </CardContent>
@@ -228,13 +229,55 @@ function CameraView() {
   );
 }
 
-function PipelineConfigControl() {
-  const [brightness, setBrightness] = useState(50);
-  const [exposure, setExposure] = useState(30);
-  const [cameraGain, setCameraGain] = useState(25);
-  const [saturation, setSaturation] = useState(75);
-  const [orientation, setOrientation] = useState("0");
-  const [resolution, setResolution] = useState("1920x1080");
+function PipelineConfigControl({
+  selectedPipeline,
+  selectedPipelineType,
+}: {
+  pipelinecontext: PipelineManagement.PipelineContext,
+  selectedPipeline?: PipelineProto,
+  selectedPipelineType?: PipelineTypeProto,
+}) {
+  const [cameraControls, setCameraControls] = useState<(JSX.Element | undefined)[]>([]);
+  const [pipelineControls, setPipelineControls] = useState<(JSX.Element | undefined)[]>([]);
+
+  useEffect(() => {
+    if (!selectedPipelineType) {
+      setCameraControls([]);
+      setPipelineControls([]);
+      return;
+    }
+
+    const cameraItems: (JSX.Element | undefined)[] = [];
+    const pipelineItems: (JSX.Element | undefined)[] = [];
+
+    selectedPipelineType.settings.forEach((setting) => {
+      const control = (
+        <GenerateControl
+          key={toTitleCase(setting.name)}
+          setting={setting}
+          setValue={(val) => {
+            if (selectedPipeline) {
+              selectedPipeline.settingsValues[setting.name] = val;
+            }
+          }}
+          value={selectedPipeline!.settingsValues[setting.name]}
+          defaultValue={setting.default}
+        />
+      );
+
+      if (setting.category === "Camera Properties") {
+        cameraItems.push(control);
+      } else {
+        pipelineItems.push(control);
+      }
+    });
+
+    setCameraControls(cameraItems);
+    setPipelineControls(pipelineItems);
+  }, [selectedPipelineType, selectedPipeline]);
+
+
+  // TODO: retain state (doesnt affect pipeline context currently)
 
   return (
     <Card
@@ -249,19 +292,19 @@ function PipelineConfigControl() {
           >
             <TabsTrigger
               value="input"
-              className="data-[state=active]:bg-zinc-700 cursor-pointer"
+              className="data-[state=active]:bg-pink-800 cursor-pointer"
             >
               Input
             </TabsTrigger>
             <TabsTrigger
               value="pipeline"
-              className="data-[state=active]:bg-zinc-700 cursor-pointer"
+              className="data-[state=active]:bg-pink-800 cursor-pointer"
             >
               Pipeline
             </TabsTrigger>
             <TabsTrigger
               value="output"
-              className="data-[state=active]:bg-zinc-700 cursor-pointer"
+              className="data-[state=active]:bg-pink-800 cursor-pointer"
             >
               Output
             </TabsTrigger>
@@ -269,71 +312,25 @@ function PipelineConfigControl() {
 
           <TabsContent value="input" className="p-6 space-y-6">
             <div>
-              <Slider
-                label="Brightness"
-                min={0}
-                max={100}
-                initial={brightness}
-                onChange={(val) => {
-                  setBrightness(val);
-                }}
-              />
-              <Slider
-                label="Exposure"
-                min={0}
-                max={100}
-                initial={exposure}
-                onChange={(val) => {
-                  setExposure(val);
-                }}
-              />
-              <Slider
-                label="Saturation"
-                min={0}
-                max={100}
-                initial={saturation}
-                onChange={(val) => {
-                  setSaturation(val);
-                }}
-              />
-              <Slider
-                label="Gain"
-                min={0}
-                max={100}
-                initial={cameraGain}
-                onChange={(val) => {
-                  setCameraGain(val);
-                }}
-              />
-              <Dropdown<string>
-                label="Orientation"
-                value={orientation}
-                onValueChange={setOrientation}
-                options={mockData.orientations.map((o) => ({
-                  value: o.value.toString(),
-                  label: o.label,
-                }))}
-                serialize={(val) => val}
-                deserialize={(val) => val}
-              />
-              <Dropdown<string>
-                label="Resolution"
-                value={resolution}
-                onValueChange={setResolution}
-                options={mockData.resolutions}
-                serialize={(val) => val}
-                deserialize={(val) => val}
-              />
+              {...cameraControls}
             </div>
           </TabsContent>
 
-          <TabsContent value="pipeline" className="p-6">
-            <div className="text-center" style={{ color: teamColor }}>
-              <Settings className="w-16 h-16 mx-auto mb-2 opacity-50" />
-              <p className="select-none">Pipeline Settings</p>
-              <p className="text-sm select-none">
-                Configure pipeline-specific parameters
-              </p>
+          <TabsContent value="pipeline" className="p-6 space-y-6">
+            <div style={{ color: teamColor }}>
+              {pipelineControls.length > 0 ? (
+                <div className="space-y-4">
+                  {pipelineControls}
+                </div>
+              ) : (
+                <>
+                  <Settings className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                  <p className="select-none">Pipeline Settings</p>
+                  <p className="text-sm select-none">
+                    Configure pipeline-specific parameters
+                  </p>
+                </>
+              )}
             </div>
           </TabsContent>
 
@@ -374,6 +371,23 @@ function ResultsView() {
 }
 
 export default function Dashboard() {
+  const { pipelinecontext: pipelinecontext, connection } = useBackendContext();
+  const [selectedPipeline, setSelectedPipeline] = useState(
+    pipelinecontext.pipelines.get(0),
+  );
+  const [selectedPipelineType, setSelectedPipelineType] = useState(
+    Array.from(pipelinecontext.pipelineTypes.values()).at(0),
+  );
+
+  useEffect(() => {
+    if (connection.backend) {
+      setSelectedPipeline(pipelinecontext.pipelines.get(0));
+      setSelectedPipelineType(
+        Array.from(pipelinecontext.pipelineTypes.values()).at(0),
+      );
+    }
+  }, [connection.backend, pipelinecontext]);
+
   return (
     <div
       className="w-full min-h-screen text-pink-600"
@@ -391,11 +405,18 @@ export default function Dashboard() {
         <Row gap="gap-2" className="h-full">
           <Column className="flex-[2] space-y-2 h-full">
             <CameraView />
-            <PipelineConfigControl />
+            <PipelineConfigControl
+              pipelinecontext={pipelinecontext}
+              selectedPipeline={selectedPipeline}
+              selectedPipelineType={selectedPipelineType} />
           </Column>
 
           <Column className="flex-[1.2] space-y-2 h-full">
-            <CameraAndPipelineControls />
+            <CameraAndPipelineControls pipelinecontext={pipelinecontext}
+              setSelectedPipeline={setSelectedPipeline}
+              selectedPipeline={selectedPipeline}
+              setSelectedPipelineType={setSelectedPipelineType}
+              selectedPipelineType={selectedPipelineType} />
             <ResultsView />
           </Column>
         </Row>

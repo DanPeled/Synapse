@@ -10,10 +10,10 @@ message ConstraintProto {
   ConstraintConfigProto constraint = 5;
 }
 
-message SettingProto {
+message SettingMetaProto {
   string name = 1;
   string category = 2;
   string description = 3;
-  SettingValueProto value = 4;
+  SettingValueProto default = 4;
   ConstraintProto constraint = 5;
 }

@@ -52,15 +52,15 @@ function NetworkSettings({}) {
     networktable,
     setNetworktable,
     connection,
-    networkTablesServer,
-    setNetworkTablesServer,
+    networktablesserver: networkTablesServer,
+    setNetworktablesserver,
   } = useBackendContext();
   const [networkInterface, setNetworkInterface] = useState(
     deviceinfo.networkInterfaces[0],
   );
   const [hostname, setPropHostname] = useState(deviceinfo.hostname);
   const [ipMode, setIpMode] = useState(IPMode.dhcp.valueOf());
-  const [staticIPAddr, setStaticIPAddr] = useState(deviceinfo.ip);
+  const [_, setStaticIPAddr] = useState(deviceinfo.ip);
 
   const teamNumberRegex = "\\d+(\\.\\d+)?";
   const ipAddressRegex =
@@ -70,16 +70,12 @@ function NetworkSettings({}) {
   );
 
   useEffect(() => {
-    if (hostname == null) {
+    if (connection.backend) {
       setPropHostname(deviceinfo.hostname);
-    }
-  }, [deviceinfo.hostname, hostname]);
-
-  useEffect(() => {
-    if (ipMode === IPMode.static && staticIPAddr == null) {
       setStaticIPAddr(deviceinfo.ip);
+      setNetworkInterface(deviceinfo.networkInterfaces.at(0) ?? "");
     }
-  }, [ipMode, deviceinfo.ip, staticIPAddr]);
+  }, [deviceinfo, hostname, connection]);
 
   return (
     <Card
@@ -100,7 +96,7 @@ function NetworkSettings({}) {
             initialValue={networkTablesServer ?? ""}
             errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
             onChange={(val) => {
-              setNetworkTablesServer(val);
+              setNetworktablesserver(val);
             }}
           />
           <TextInput
@@ -269,7 +265,7 @@ function DeviceInfo({}) {
               <TableRow className="hover:bg-transparent">
                 <TableCell className="text-center">
                   {hardwaremetrics.cpuTemp > 0
-                    ? `${hardwaremetrics.cpuTemp.toFixed(2)}°`
+                    ? `${hardwaremetrics.cpuTemp.toFixed(2)}°c`
                     : "---"}
                 </TableCell>
                 <TableCell className="text-center">

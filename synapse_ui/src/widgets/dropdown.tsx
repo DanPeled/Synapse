@@ -18,8 +18,6 @@ interface DropdownProps<T> {
   onValueChange: (value: T) => void;
   options: DropdownOption<T>[];
   disabled?: boolean;
-  serialize: (value: T) => string; // Convert T to string for Select
-  deserialize: (value: string) => T; // Convert string back to T
 }
 
 export function Dropdown<T>({
@@ -28,12 +26,17 @@ export function Dropdown<T>({
   onValueChange,
   options,
   disabled = false,
-  serialize,
-  deserialize,
 }: DropdownProps<T>) {
-  const baseBg = "rgb(20, 20, 20)";
-  const hoverBg = "rgb(30, 30, 30)";
-  const selectedBg = "#333333";
+  const stringToValue = new Map<string, T>();
+  const valueToString = new Map<T, string>();
+
+  options.forEach((opt, idx) => {
+    const str = String(idx); // simple unique string ID
+    stringToValue.set(str, opt.value);
+    valueToString.set(opt.value, str);
+  });
+
+  const selectedKey = valueToString.get(value);
 
   return (
     <div
@@ -53,51 +56,42 @@ export function Dropdown<T>({
       </label>
       <div className="flex-1 relative">
         <Select
-          value={serialize(value)}
-          onValueChange={(val) => {
-            onValueChange(deserialize(val));
+          value={selectedKey}
+          onValueChange={(strVal) => {
+            const newVal = stringToValue.get(strVal);
+            if (newVal !== undefined) onValueChange(newVal);
           }}
           disabled={disabled}
         >
-          <SelectTrigger
-            className="w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none"
+          <SelectTrigger className="w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none"
             style={{
-              backgroundColor: baseBg,
+              backgroundColor: "rgb(20, 20, 20)",
               borderColor: "#3a3a3a",
               color: teamColor,
               cursor: disabled ? "not-allowed" : "pointer",
-            }}
-          >
+            }}>
             <SelectValue className="select-none" />
           </SelectTrigger>
-          <SelectContent
-            className="rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto"
-            style={{
-              backgroundColor: "#2b2b2b",
-              borderColor: "#444",
-              zIndex: 9999,
-            }}
-          >
-            {options.map((opt) => {
-              const stringValue = serialize(opt.value);
+          <SelectContent className="rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto"
+            style={{ backgroundColor: "#2b2b2b", borderColor: "#444", zIndex: 9999 }}>
+            {options.map((opt, idx) => {
+              const strKey = String(idx);
               return (
                 <SelectItem
-                  key={stringValue}
-                  value={stringValue}
+                  key={strKey}
+                  value={strKey}
                   className="px-4 py-2 transition-colors font-normal cursor-pointer"
                   style={{
                     color: teamColor,
                     backgroundColor:
-                      serialize(value) === stringValue
-                        ? selectedBg
-                        : "transparent",
-                    fontWeight: serialize(value) === stringValue ? 600 : 400,
+                      selectedKey === strKey ? "#333333" : "transparent",
+                    fontWeight: selectedKey === strKey ? 600 : 400,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = hoverBg;
+                    e.currentTarget.style.backgroundColor = "rgb(30, 30, 30)";
                   }}
                   onMouseLeave={(e) => {
-                    if (serialize(value) !== stringValue) {
+                    if (selectedKey !== strKey) {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }
                   }}

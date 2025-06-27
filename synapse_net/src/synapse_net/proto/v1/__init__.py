@@ -5,6 +5,7 @@
 
 from dataclasses import dataclass
 from typing import (
+    Dict,
     List,
 )
 
@@ -18,6 +19,7 @@ class MessageTypeProto(betterproto.Enum):
     SEND_DEVICE_INFO = 1
     SEND_METRICS = 2
     ADD_PIPELINE = 3
+    SEND_PIPELINE_TYPES = 4
 
 
 @dataclass(eq=False, repr=False)
@@ -56,14 +58,17 @@ class HardwareMetricsProto(betterproto.Message):
 @dataclass(eq=False, repr=False)
 class PipelineTypeProto(betterproto.Message):
     type: str = betterproto.string_field(1)
-    settings: List["_settings_v1__.SettingProto"] = betterproto.message_field(2)
+    settings: List["_settings_v1__.SettingMetaProto"] = betterproto.message_field(2)
 
 
 @dataclass(eq=False, repr=False)
 class PipelineProto(betterproto.Message):
     name: str = betterproto.string_field(1)
     index: int = betterproto.uint32_field(2)
-    type: "PipelineTypeProto" = betterproto.message_field(3)
+    type: str = betterproto.string_field(3)
+    settings_values: Dict[str, "_settings_v1__.SettingValueProto"] = (
+        betterproto.map_field(4, betterproto.TYPE_STRING, betterproto.TYPE_MESSAGE)
+    )
 
 
 @dataclass(eq=False, repr=False)
@@ -75,3 +80,4 @@ class MessageProto(betterproto.Message):
     )
     camera_info: "CameraProto" = betterproto.message_field(4, group="payload")
     pipeline_info: "PipelineProto" = betterproto.message_field(5, group="payload")
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(6)

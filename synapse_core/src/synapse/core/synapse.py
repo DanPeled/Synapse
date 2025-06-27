@@ -2,12 +2,22 @@ import asyncio
 import os
 import threading
 from pathlib import Path
+from typing import List
 
 from synapse.core.config import Config, NetworkConfig
+from synapse.hardware.metrics import Platform
 from synapse.log import err, log
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import DeviceInfoProto, MessageTypeProto
+from synapse_net.proto.v1 import (
+    DeviceInfoProto,
+    MessageProto,
+    MessageTypeProto,
+    PipelineTypeProto,
+)
 from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
+
+from .settings_api import settingsToProto
+from ..util import resolveGenericArgument
 
 from ..bcolors import MarkupColors
 from .global_settings import GlobalSettings
@@ -47,6 +57,13 @@ class Synapse:
         """
         self.isRunning = True
         Synapse.kInstance = self
+
+        platform = Platform.getCurrentPlatform()
+
+        if platform.isWindows():
+            os.system("cls")
+        else:
+            os.system("clear")
 
         log(
             MarkupColors.bold(
@@ -178,6 +195,35 @@ class Synapse:
                 ),
             )
 
+            for id, pipeline in enumerate(
+                self.runtime_handler.pipelineLoader.pipelineInstanceBindings
+            ):
+                msg = pipelineToProto(pipeline, id)
+
+                await self.websocket.sendToAll(
+                    createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+                )
+
+            typeMessages: List[PipelineTypeProto] = []
+            for (
+                typename,
+                type,
+            ) in self.runtime_handler.pipelineLoader.pipelineTypes.items():
+                settingType = resolveGenericArgument(type)
+                if settingType:
+                    settings = settingType({})
+                    settingsProto = settingsToProto(settings, typename)
+                    typeMessages.append(
+                        PipelineTypeProto(type=typename, settings=settingsProto)
+                    )
+
+            await self.websocket.sendToAll(
+                MessageProto(
+                    MessageTypeProto.SEND_PIPELINE_TYPES,
+                    pipeline_type_info=typeMessages,
+                ).SerializeToString()
+            )
+
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):
             print(f"Message from {ws.remote_address}: {msg}")
@@ -202,9 +248,7 @@ class Synapse:
         # Schedule the websocket server start coroutine in the new event loop
         asyncio.run_coroutine_threadsafe(run_server(), new_loop)
 
-        log(
-            "WebSocket server started on ws://localhost:8765 (running in a separate thread)"
-        )
+        log("WebSocket server started on ws://localhost:8765")
 
     def cleanup(self):
         if NtClient.INSTANCE is not None:

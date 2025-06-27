@@ -6,19 +6,26 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { SettingProto } from "../settings/v1/settings";
+import { SettingMetaProto } from "../settings/v1/settings";
+import { SettingValueProto } from "../settings/v1/value";
 
 export const protobufPackage = "proto.v1";
 
 export interface PipelineTypeProto {
   type: string;
-  settings: SettingProto[];
+  settings: SettingMetaProto[];
 }
 
 export interface PipelineProto {
   name: string;
   index: number;
-  type: PipelineTypeProto | undefined;
+  type: string;
+  settingsValues: { [key: string]: SettingValueProto };
+}
+
+export interface PipelineProto_SettingsValuesEntry {
+  key: string;
+  value: SettingValueProto | undefined;
 }
 
 function createBasePipelineTypeProto(): PipelineTypeProto {
@@ -26,18 +33,22 @@ function createBasePipelineTypeProto(): PipelineTypeProto {
 }
 
 export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
-  encode(message: PipelineTypeProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: PipelineTypeProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.type !== "") {
       writer.uint32(10).string(message.type);
     }
     for (const v of message.settings) {
-      SettingProto.encode(v!, writer.uint32(18).fork()).join();
+      SettingMetaProto.encode(v!, writer.uint32(18).fork()).join();
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): PipelineTypeProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePipelineTypeProto();
     while (reader.pos < end) {
@@ -56,7 +67,9 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
             break;
           }
 
-          message.settings.push(SettingProto.decode(reader, reader.uint32()));
+          message.settings.push(
+            SettingMetaProto.decode(reader, reader.uint32()),
+          );
           continue;
         }
       }
@@ -72,7 +85,7 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
     return {
       type: isSet(object.type) ? globalThis.String(object.type) : "",
       settings: globalThis.Array.isArray(object?.settings)
-        ? object.settings.map((e: any) => SettingProto.fromJSON(e))
+        ? object.settings.map((e: any) => SettingMetaProto.fromJSON(e))
         : [],
     };
   },
@@ -83,42 +96,57 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
       obj.type = message.type;
     }
     if (message.settings?.length) {
-      obj.settings = message.settings.map((e) => SettingProto.toJSON(e));
+      obj.settings = message.settings.map((e) => SettingMetaProto.toJSON(e));
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(base?: I): PipelineTypeProto {
+  create<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(
+    base?: I,
+  ): PipelineTypeProto {
     return PipelineTypeProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(object: I): PipelineTypeProto {
+  fromPartial<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(
+    object: I,
+  ): PipelineTypeProto {
     const message = createBasePipelineTypeProto();
     message.type = object.type ?? "";
-    message.settings = object.settings?.map((e) => SettingProto.fromPartial(e)) || [];
+    message.settings =
+      object.settings?.map((e) => SettingMetaProto.fromPartial(e)) || [];
     return message;
   },
 };
 
 function createBasePipelineProto(): PipelineProto {
-  return { name: "", index: 0, type: undefined };
+  return { name: "", index: 0, type: "", settingsValues: {} };
 }
 
 export const PipelineProto: MessageFns<PipelineProto> = {
-  encode(message: PipelineProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: PipelineProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
     if (message.index !== 0) {
       writer.uint32(16).uint32(message.index);
     }
-    if (message.type !== undefined) {
-      PipelineTypeProto.encode(message.type, writer.uint32(26).fork()).join();
+    if (message.type !== "") {
+      writer.uint32(26).string(message.type);
     }
+    Object.entries(message.settingsValues).forEach(([key, value]) => {
+      PipelineProto_SettingsValuesEntry.encode(
+        { key: key as any, value },
+        writer.uint32(34).fork(),
+      ).join();
+    });
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): PipelineProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePipelineProto();
     while (reader.pos < end) {
@@ -145,7 +173,21 @@ export const PipelineProto: MessageFns<PipelineProto> = {
             break;
           }
 
-          message.type = PipelineTypeProto.decode(reader, reader.uint32());
+          message.type = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = PipelineProto_SettingsValuesEntry.decode(
+            reader,
+            reader.uint32(),
+          );
+          if (entry4.value !== undefined) {
+            message.settingsValues[entry4.key] = entry4.value;
+          }
           continue;
         }
       }
@@ -161,7 +203,15 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
-      type: isSet(object.type) ? PipelineTypeProto.fromJSON(object.type) : undefined,
+      type: isSet(object.type) ? globalThis.String(object.type) : "",
+      settingsValues: isObject(object.settingsValues)
+        ? Object.entries(object.settingsValues).reduce<{
+            [key: string]: SettingValueProto;
+          }>((acc, [key, value]) => {
+            acc[key] = SettingValueProto.fromJSON(value);
+            return acc;
+          }, {})
+        : {},
     };
   },
 
@@ -173,37 +223,170 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
     }
-    if (message.type !== undefined) {
-      obj.type = PipelineTypeProto.toJSON(message.type);
+    if (message.type !== "") {
+      obj.type = message.type;
+    }
+    if (message.settingsValues) {
+      const entries = Object.entries(message.settingsValues);
+      if (entries.length > 0) {
+        obj.settingsValues = {};
+        entries.forEach(([k, v]) => {
+          obj.settingsValues[k] = SettingValueProto.toJSON(v);
+        });
+      }
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<PipelineProto>, I>>(base?: I): PipelineProto {
+  create<I extends Exact<DeepPartial<PipelineProto>, I>>(
+    base?: I,
+  ): PipelineProto {
     return PipelineProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<PipelineProto>, I>>(object: I): PipelineProto {
+  fromPartial<I extends Exact<DeepPartial<PipelineProto>, I>>(
+    object: I,
+  ): PipelineProto {
     const message = createBasePipelineProto();
     message.name = object.name ?? "";
     message.index = object.index ?? 0;
-    message.type = (object.type !== undefined && object.type !== null)
-      ? PipelineTypeProto.fromPartial(object.type)
-      : undefined;
+    message.type = object.type ?? "";
+    message.settingsValues = Object.entries(
+      object.settingsValues ?? {},
+    ).reduce<{ [key: string]: SettingValueProto }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = SettingValueProto.fromPartial(value);
+      }
+      return acc;
+    }, {});
     return message;
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+function createBasePipelineProto_SettingsValuesEntry(): PipelineProto_SettingsValuesEntry {
+  return { key: "", value: undefined };
+}
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export const PipelineProto_SettingsValuesEntry: MessageFns<PipelineProto_SettingsValuesEntry> =
+  {
+    encode(
+      message: PipelineProto_SettingsValuesEntry,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.key !== "") {
+        writer.uint32(10).string(message.key);
+      }
+      if (message.value !== undefined) {
+        SettingValueProto.encode(
+          message.value,
+          writer.uint32(18).fork(),
+        ).join();
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): PipelineProto_SettingsValuesEntry {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePipelineProto_SettingsValuesEntry();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.key = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.value = SettingValueProto.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): PipelineProto_SettingsValuesEntry {
+      return {
+        key: isSet(object.key) ? globalThis.String(object.key) : "",
+        value: isSet(object.value)
+          ? SettingValueProto.fromJSON(object.value)
+          : undefined,
+      };
+    },
+
+    toJSON(message: PipelineProto_SettingsValuesEntry): unknown {
+      const obj: any = {};
+      if (message.key !== "") {
+        obj.key = message.key;
+      }
+      if (message.value !== undefined) {
+        obj.value = SettingValueProto.toJSON(message.value);
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<PipelineProto_SettingsValuesEntry>, I>>(
+      base?: I,
+    ): PipelineProto_SettingsValuesEntry {
+      return PipelineProto_SettingsValuesEntry.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<
+      I extends Exact<DeepPartial<PipelineProto_SettingsValuesEntry>, I>,
+    >(object: I): PipelineProto_SettingsValuesEntry {
+      const message = createBasePipelineProto_SettingsValuesEntry();
+      message.key = object.key ?? "";
+      message.value =
+        object.value !== undefined && object.value !== null
+          ? SettingValueProto.fromPartial(object.value)
+          : undefined;
+      return message;
+    },
+  };
+
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
+
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
+
+function isObject(value: any): boolean {
+  return typeof value === "object" && value !== null;
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

@@ -14,6 +14,7 @@ import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
+import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 
 const initialState: BackendStateSystem.State = {
   deviceinfo: {
@@ -28,31 +29,33 @@ const initialState: BackendStateSystem.State = {
     diskUsage: 0,
     ramUsage: 0,
     uptime: 0,
+    memory: 1,
     lastFetched: "---",
   },
-  pipelines: [],
   connection: {
     backend: false,
     networktables: false,
   },
   networktable: "Synapse",
-  pipelineContext: new PipelineManagement.PipelineContext(
-    [
-      new PipelineManagement.Pipeline(
-        "Sample Pipeline",
-        "ApriltagPipeline",
-        new Map(),
-      ),
-      new PipelineManagement.Pipeline(
-        "Another Pipeline",
-        "ApriltagPipeline",
-        new Map(),
-      ),
-    ],
-    ["ApriltagPipeline"],
+  pipelinecontext: new PipelineManagement.PipelineContext(
+    new Map<number, PipelineProto>([
+      [
+        0,
+        PipelineProto.create({
+          name: "Placeholder",
+          type: "PlaceholderPipeline",
+        }),
+      ],
+    ]),
+    new Map<string, PipelineTypeProto>([
+      [
+        "PlaceholderPipeline",
+        PipelineTypeProto.create({ type: "PlaceholderPipeline" }),
+      ],
+    ]),
   ),
   logs: [] as BackendStateSystem.Log[],
-  networkTablesServer: null,
+  networktablesserver: null,
 };
 
 export const BackendStateKeys = Object.keys(initialState).reduce(
@@ -126,7 +129,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
       onMessage: (message: ArrayBufferLike) => {
         const uint8Array = new Uint8Array(message);
         const messageObj = MessageProto.decode(uint8Array);
-        console.log(messageObj);
+        // console.log(messageObj);
         switch (messageObj.type) {
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO:
             const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
@@ -144,8 +147,24 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               ...hardwareMetrics,
               lastFetched: formatHHMMSSLocal(new Date()),
             });
-
             break;
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE:
+            const pipeline: PipelineProto = messageObj.pipelineInfo!;
+            const pipelines = state.pipelinecontext.pipelines;
+            pipelines.set(pipeline.index, pipeline);
+            setters.setPipelinecontext({
+              ...state.pipelinecontext,
+              pipelines: pipelines,
+            });
+            break;
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES: {
+            const types: PipelineTypeProto[] = messageObj.pipelineTypeInfo;
+            const newMap = new Map(types.map((type) => [type.type, type]));
+            setters.setPipelinecontext({
+              ...state.pipelinecontext,
+              pipelineTypes: newMap,
+            });
+          }
           default:
             break;
         }
