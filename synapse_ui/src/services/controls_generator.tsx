@@ -5,6 +5,7 @@ import { Dropdown, DropdownOption } from "@/widgets/dropdown";
 import { Slider } from "@/widgets/slider";
 import TextInput from "@/widgets/textInput";
 import ToggleButton from "@/widgets/toggleButtons";
+import { toTitleCase } from "./stringUtil";
 
 interface ControlGeneratorProps {
   setting: SettingMetaProto;
@@ -19,7 +20,11 @@ export function toNumber(val: unknown | undefined): number | undefined {
   const num = Number(val);
   return isNaN(num) ? undefined : num;
 }
+
 export function protoToSettingValue(proto: SettingValueProto): unknown {
+  if (proto === undefined) {
+    throw new TypeError("Unsupported or empty SettingsValueProto");
+  }
   if (proto.intValue !== undefined) return proto.intValue;
   if (proto.stringValue !== undefined) return proto.stringValue;
   if (proto.boolValue !== undefined) return proto.boolValue;
@@ -68,13 +73,12 @@ export function settingValueToProto(val: unknown): SettingValueProto {
   return proto;
 }
 
-
 export function GenerateControl({ setting, setValue, value, defaultValue }: ControlGeneratorProps) {
   switch (setting.constraint?.type) {
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN:
       return (
         <ToggleButton
-          label={setting.name}
+          label={toTitleCase(setting.name)}
           value={protoToSettingValue(value) as boolean}
           onToggleAction={(val) => setValue(settingValueToProto(val))}
         />
@@ -82,7 +86,7 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING:
       return (
         <TextInput
-          label={setting.name}
+          label={toTitleCase(setting.name)}
           pattern={setting.constraint.constraint?.string?.pattern}
           maxLength={setting.constraint.constraint?.string?.maxLength}
           onChange={(val) => setValue(settingValueToProto(val))}
@@ -91,7 +95,7 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
       return (
         <Slider
-          label={setting.name}
+          label={toTitleCase(setting.name)}
           min={setting.constraint.constraint?.range?.min}
           max={setting.constraint.constraint?.range?.max}
           step={setting.constraint.constraint?.range?.step}
@@ -105,7 +109,7 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
       } else {
         return (
           <Dropdown
-            label={setting.name}
+            label={toTitleCase(setting.name)}
             options={
               setting.constraint.constraint?.listOptions?.options.map((op) => ({
                 label: protoToSettingValue(op),

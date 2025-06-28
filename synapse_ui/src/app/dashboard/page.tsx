@@ -35,7 +35,6 @@ import { useBackendContext } from "@/services/backend/backendContext";
 import { PipelineManagement } from "@/services/backend/pipelineContext";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { GenerateControl } from "@/services/controls_generator";
-import { toTitleCase } from "@/services/stringUtil";
 
 const mockData = {
   cameras: [
@@ -258,30 +257,31 @@ function PipelineConfigControl({
     selectedPipelineType.settings.forEach((setting) => {
       const control = (
         <GenerateControl
-          key={toTitleCase(setting.name)}
           setting={setting}
           setValue={(val) => {
-            if (selectedPipeline && pipelinecontext) {
-              const oldPipelines = pipelinecontext.pipelines;
+            setTimeout(() => {
+              if (selectedPipeline && pipelinecontext) {
+                const oldPipelines = pipelinecontext.pipelines;
 
-              const newSettingsValues = {
-                ...selectedPipeline.settingsValues,
-                [setting.name]: val,
-              };
+                const newSettingsValues = {
+                  ...selectedPipeline.settingsValues,
+                  [setting.name]: val,
+                };
 
-              const updatedPipeline = {
-                ...selectedPipeline,
-                settingsValues: newSettingsValues,
-              };
+                const updatedPipeline = {
+                  ...selectedPipeline,
+                  settingsValues: newSettingsValues,
+                };
 
-              const newPipelines = new Map(oldPipelines);
-              newPipelines.set(selectedPipeline.index, updatedPipeline);
+                const newPipelines = new Map(oldPipelines);
+                newPipelines.set(selectedPipeline.index, updatedPipeline);
 
-              setpipelinecontext({
-                ...pipelinecontext,
-                pipelines: newPipelines,
-              });
-            }
+                setpipelinecontext({
+                  ...pipelinecontext,
+                  pipelines: newPipelines,
+                });
+              }
+            }, 0)
           }}
           value={selectedPipeline!.settingsValues[setting.name]}
           defaultValue={setting.default}
@@ -415,7 +415,7 @@ export default function Dashboard() {
         Array.from(pipelinecontext.pipelineTypes.values()).at(0),
       );
     }
-  }, [connection.backend]);
+  }, [pipelinecontext]);
 
   useEffect(() => {
     if (selectedPipeline) {

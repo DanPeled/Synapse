@@ -123,6 +123,7 @@
   }
   html body {
     color: #ff66c4 !important;
+    font-family: var(--font-mono);
   }
 }
 
