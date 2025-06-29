@@ -87,43 +87,22 @@ export interface ConstraintConfigProto {
 }
 
 function createBaseConstraintConfigProto(): ConstraintConfigProto {
-  return {
-    range: undefined,
-    listOptions: undefined,
-    color: undefined,
-    string: undefined,
-    list: undefined,
-  };
+  return { range: undefined, listOptions: undefined, color: undefined, string: undefined, list: undefined };
 }
 
 export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
-  encode(
-    message: ConstraintConfigProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: ConstraintConfigProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.range !== undefined) {
-      RangeConstraintProto.encode(
-        message.range,
-        writer.uint32(10).fork(),
-      ).join();
+      RangeConstraintProto.encode(message.range, writer.uint32(10).fork()).join();
     }
     if (message.listOptions !== undefined) {
-      ListOptionsConstraintProto.encode(
-        message.listOptions,
-        writer.uint32(18).fork(),
-      ).join();
+      ListOptionsConstraintProto.encode(message.listOptions, writer.uint32(18).fork()).join();
     }
     if (message.color !== undefined) {
-      ColorConstraintProto.encode(
-        message.color,
-        writer.uint32(26).fork(),
-      ).join();
+      ColorConstraintProto.encode(message.color, writer.uint32(26).fork()).join();
     }
     if (message.string !== undefined) {
-      StringConstraintProto.encode(
-        message.string,
-        writer.uint32(34).fork(),
-      ).join();
+      StringConstraintProto.encode(message.string, writer.uint32(34).fork()).join();
     }
     if (message.list !== undefined) {
       ListConstraintProto.encode(message.list, writer.uint32(42).fork()).join();
@@ -131,12 +110,8 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): ConstraintConfigProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): ConstraintConfigProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseConstraintConfigProto();
     while (reader.pos < end) {
@@ -155,10 +130,7 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.listOptions = ListOptionsConstraintProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.listOptions = ListOptionsConstraintProto.decode(reader, reader.uint32());
           continue;
         }
         case 3: {
@@ -174,10 +146,7 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.string = StringConstraintProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.string = StringConstraintProto.decode(reader, reader.uint32());
           continue;
         }
         case 5: {
@@ -199,21 +168,11 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
 
   fromJSON(object: any): ConstraintConfigProto {
     return {
-      range: isSet(object.range)
-        ? RangeConstraintProto.fromJSON(object.range)
-        : undefined,
-      listOptions: isSet(object.listOptions)
-        ? ListOptionsConstraintProto.fromJSON(object.listOptions)
-        : undefined,
-      color: isSet(object.color)
-        ? ColorConstraintProto.fromJSON(object.color)
-        : undefined,
-      string: isSet(object.string)
-        ? StringConstraintProto.fromJSON(object.string)
-        : undefined,
-      list: isSet(object.list)
-        ? ListConstraintProto.fromJSON(object.list)
-        : undefined,
+      range: isSet(object.range) ? RangeConstraintProto.fromJSON(object.range) : undefined,
+      listOptions: isSet(object.listOptions) ? ListOptionsConstraintProto.fromJSON(object.listOptions) : undefined,
+      color: isSet(object.color) ? ColorConstraintProto.fromJSON(object.color) : undefined,
+      string: isSet(object.string) ? StringConstraintProto.fromJSON(object.string) : undefined,
+      list: isSet(object.list) ? ListConstraintProto.fromJSON(object.list) : undefined,
     };
   },
 
@@ -237,64 +196,41 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(
-    base?: I,
-  ): ConstraintConfigProto {
+  create<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(base?: I): ConstraintConfigProto {
     return ConstraintConfigProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(
-    object: I,
-  ): ConstraintConfigProto {
+  fromPartial<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(object: I): ConstraintConfigProto {
     const message = createBaseConstraintConfigProto();
-    message.range =
-      object.range !== undefined && object.range !== null
-        ? RangeConstraintProto.fromPartial(object.range)
-        : undefined;
-    message.listOptions =
-      object.listOptions !== undefined && object.listOptions !== null
-        ? ListOptionsConstraintProto.fromPartial(object.listOptions)
-        : undefined;
-    message.color =
-      object.color !== undefined && object.color !== null
-        ? ColorConstraintProto.fromPartial(object.color)
-        : undefined;
-    message.string =
-      object.string !== undefined && object.string !== null
-        ? StringConstraintProto.fromPartial(object.string)
-        : undefined;
-    message.list =
-      object.list !== undefined && object.list !== null
-        ? ListConstraintProto.fromPartial(object.list)
-        : undefined;
+    message.range = (object.range !== undefined && object.range !== null)
+      ? RangeConstraintProto.fromPartial(object.range)
+      : undefined;
+    message.listOptions = (object.listOptions !== undefined && object.listOptions !== null)
+      ? ListOptionsConstraintProto.fromPartial(object.listOptions)
+      : undefined;
+    message.color = (object.color !== undefined && object.color !== null)
+      ? ColorConstraintProto.fromPartial(object.color)
+      : undefined;
+    message.string = (object.string !== undefined && object.string !== null)
+      ? StringConstraintProto.fromPartial(object.string)
+      : undefined;
+    message.list = (object.list !== undefined && object.list !== null)
+      ? ListConstraintProto.fromPartial(object.list)
+      : undefined;
     return message;
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
