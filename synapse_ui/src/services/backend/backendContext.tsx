@@ -103,8 +103,9 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
   const setters = React.useMemo(() => {
     return Object.keys(initialState).reduce((acc, key) => {
-      const functionName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof BackendStateSystem.StateSetter;
-      acc[functionName] = (value: unknown | ((prev: any) => any)) => {
+      const functionName =
+        `set${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof BackendStateSystem.StateSetter;
+      acc[functionName] = (value: unknown | ((prev: unknown) => unknown)) => {
         if (typeof value === "function") {
           const keyLower = key.toLowerCase() as keyof BackendStateSystem.State;
           const currentSlice = state[keyLower];

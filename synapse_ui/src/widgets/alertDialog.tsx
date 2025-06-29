@@ -18,18 +18,27 @@ export function AlertDialog({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    let timer1: ReturnType<typeof setTimeout>;
+    let timer2: ReturnType<typeof setTimeout>;
+
     if (initialVisible) {
+      // Show dialog: first render it, then trigger visible for animation
       setRendered(true);
-      const timer = setTimeout(() => setVisible(true), 8);
-      return () => clearTimeout(timer);
+      timer1 = setTimeout(() => setVisible(true), 10);
     } else {
+      // Hide dialog: trigger exit animation by hiding visible
       setVisible(false);
-      const timer = setTimeout(() => {
+      // After animation duration, unmount and call onClose
+      timer2 = setTimeout(() => {
         setRendered(false);
         onClose?.();
       }, 300);
-      return () => clearTimeout(timer);
     }
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, [initialVisible, onClose]);
 
   if (!rendered) return null;
@@ -37,7 +46,7 @@ export function AlertDialog({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 transition-opacity duration-300",
+        "fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 transition-opacity duration-300 ease-in-out",
         visible
           ? "opacity-100 pointer-events-auto"
           : "opacity-0 pointer-events-none",
@@ -46,8 +55,8 @@ export function AlertDialog({
     >
       <div
         className={cn(
-          "bg-zinc-900 text-white rounded-lg p-5 min-w-[300px] shadow-xl transform transition-transform duration-300",
-          visible ? "scale-100" : "scale-95",
+          "bg-zinc-900 text-white rounded-lg p-5 min-w-[300px] shadow-xl transform transition-transform duration-300 ease-in-out",
+          visible ? "scale-100" : "scale-90", // scale down more on exit for stronger effect
           className,
         )}
         onClick={(e) => e.stopPropagation()}

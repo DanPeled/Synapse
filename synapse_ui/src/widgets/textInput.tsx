@@ -10,10 +10,11 @@ interface TextInputProps {
   placeholder?: string;
   pattern?: string | RegExp;
   errorMessage?: string;
-  allowedChars?: string | null;
+  allowedChars?: string | null | RegExp;
   disabled?: boolean;
   maxLength?: number | null;
   textColor?: string;
+  labelColor?: string;
 }
 
 export default function TextInput({
@@ -25,7 +26,7 @@ export default function TextInput({
   allowedChars = null,
   disabled = false,
   maxLength = null,
-  textColor = teamColor,
+  labelColor = teamColor,
 }: TextInputProps) {
   const [value, setValue] = useState(initialValue);
   const [invalid, setInvalid] = useState(false);
@@ -76,7 +77,7 @@ export default function TextInput({
         <label
           htmlFor={id}
           className="min-w-0 text font-semibold"
-          style={{ color: textColor }}
+          style={{ color: labelColor }}
         >
           {label}
         </label>
@@ -89,7 +90,7 @@ export default function TextInput({
           disabled={disabled}
           maxLength={maxLength ?? undefined}
           className={cn(
-            "bg-[rgb(30,30,30)] text-white rounded-md text-base flex-1",
+            "bg-[rgb(50,50,50)] text-white rounded-md text-base flex-1",
             invalid ? "text-red-400" : "",
             "focus:outline-none focus:ring-2 focus:ring-[rgba(0,0,0,0.15)] border-none selection:bg-[rgba(0,0,200,0.5)]",
           )}

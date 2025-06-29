@@ -59,18 +59,17 @@ function CameraAndPipelineControls({
   setSelectedPipeline,
   selectedPipeline,
   selectedPipelineType,
-  setSelectedPipelineType
+  setSelectedPipelineType,
 }: {
-  pipelinecontext: PipelineManagement.PipelineContext,
-  setSelectedPipeline: (val?: PipelineProto) => void,
-  selectedPipeline?: PipelineProto,
-  selectedPipelineType?: PipelineTypeProto,
-  setSelectedPipelineType: (val?: PipelineTypeProto) => void
+  pipelinecontext: PipelineManagement.PipelineContext;
+  setSelectedPipeline: (val?: PipelineProto) => void;
+  selectedPipeline?: PipelineProto;
+  selectedPipelineType?: PipelineTypeProto;
+  setSelectedPipelineType: (val?: PipelineTypeProto) => void;
 }) {
   const [selectedCamera, setSelectedCamera] = useState(
     mockData.cameras[0].value,
   );
-
 
   return (
     <Card
@@ -241,8 +240,12 @@ function PipelineConfigControl({
   selectedPipelineType?: PipelineTypeProto;
   backendConnected: boolean | undefined;
 }) {
-  const [cameraControls, setCameraControls] = useState<(JSX.Element | undefined)[]>([]);
-  const [pipelineControls, setPipelineControls] = useState<(JSX.Element | undefined)[]>([]);
+  const [cameraControls, setCameraControls] = useState<
+    (JSX.Element | undefined)[]
+  >([]);
+  const [pipelineControls, setPipelineControls] = useState<
+    (JSX.Element | undefined)[]
+  >([]);
 
   useEffect(() => {
     if (!selectedPipelineType || !backendConnected) {
@@ -258,6 +261,7 @@ function PipelineConfigControl({
       const control = (
         <GenerateControl
           setting={setting}
+          key={setting.name}
           setValue={(val) => {
             setTimeout(() => {
               if (selectedPipeline && pipelinecontext) {
@@ -281,7 +285,7 @@ function PipelineConfigControl({
                   pipelines: newPipelines,
                 });
               }
-            }, 0)
+            }, 0);
           }}
           value={selectedPipeline!.settingsValues[setting.name]}
           defaultValue={setting.default}
@@ -399,8 +403,8 @@ function ResultsView() {
 }
 
 export default function Dashboard() {
-  const { pipelinecontext, setPipelinecontext, connection
-  } = useBackendContext();
+  const { pipelinecontext, setPipelinecontext, connection } =
+    useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(
     pipelinecontext.pipelines.get(0),
   );
@@ -439,7 +443,6 @@ export default function Dashboard() {
           padding: "10px",
         }}
       >
-        {/* Left Column */}
         <Row gap="gap-2" className="h-full">
           <Column className="flex-[2] space-y-2 h-full">
             <CameraView />
@@ -453,11 +456,13 @@ export default function Dashboard() {
           </Column>
 
           <Column className="flex-[1.2] space-y-2 h-full">
-            <CameraAndPipelineControls pipelinecontext={pipelinecontext}
+            <CameraAndPipelineControls
+              pipelinecontext={pipelinecontext}
               setSelectedPipeline={setSelectedPipeline}
               selectedPipeline={selectedPipeline}
               setSelectedPipelineType={setSelectedPipelineType}
-              selectedPipelineType={selectedPipelineType} />
+              selectedPipelineType={selectedPipelineType}
+            />
             <ResultsView />
           </Column>
         </Row>

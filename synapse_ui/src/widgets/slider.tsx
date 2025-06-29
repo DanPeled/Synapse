@@ -34,7 +34,9 @@ export function Slider({
 
   const clampValue = (val: number) => Math.min(max, Math.max(min, val));
   const valuePercent =
-    (((typeof internalValue === "number" ? internalValue : min) - min) / (max - min)) * 100;
+    (((typeof internalValue === "number" ? internalValue : min) - min) /
+      (max - min)) *
+    100;
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = clampValue(Number(e.target.value));

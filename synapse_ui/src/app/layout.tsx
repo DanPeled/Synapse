@@ -9,9 +9,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`font-mono`}
-      >
+      <body className={`font-mono`}>
         <BackendContextProvider>
           <div
             className="flex min-h-screen"

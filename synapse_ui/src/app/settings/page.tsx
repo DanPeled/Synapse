@@ -45,7 +45,7 @@ enum IPMode {
   dhcp = "DHCP",
 }
 
-function NetworkSettings({}) {
+function NetworkSettings({ }) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
     deviceinfo,
@@ -180,8 +180,6 @@ function NetworkSettings({}) {
               setNetworkInterface(val);
             }}
             disabled={!manageDeviceNetworking}
-            serialize={(val) => val}
-            deserialize={(val) => val}
           />
           <Button
             onClickAction={() => {
@@ -205,7 +203,7 @@ function NetworkSettings({}) {
   );
 }
 
-function DeviceInfo({}) {
+function DeviceInfo({ }) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
 
   return (
@@ -337,7 +335,7 @@ function DangerZone() {
   );
 }
 
-function DeviceControls({}) {
+function DeviceControls({ }) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
 
   return (
@@ -387,32 +385,30 @@ function DeviceControls({}) {
           <DangerZone />
         </Column>
 
-        {programLogsVisible && (
-          <AlertDialog
-            visible={programLogsVisible}
-            onClose={() => setProgramLogsVisible(false)}
-            className="w-[80vw] h-[80vh]"
+        <AlertDialog
+          visible={programLogsVisible}
+          onClose={() => setProgramLogsVisible(false)}
+          className="w-[80vw] h-[80vh]"
+        >
+          <Button
+            onClickAction={() => setProgramLogsVisible(false)}
+            className="w-auto"
           >
-            <Button
-              onClickAction={() => setProgramLogsVisible(false)}
-              className="w-auto"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <X />
-                Close
-              </span>
-            </Button>
-          </AlertDialog>
-        )}
+            <span className="flex items-center justify-center gap-2">
+              <X />
+              Close
+            </span>
+          </Button>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
 }
 
-export default function Settings({}) {
+export default function Settings({ }) {
   return (
     <div
-      className="w-full min-h-screen text-pink-600"
+      className="w-full text-pink-600"
       style={{ backgroundColor: background, color: teamColor }}
     >
       <div

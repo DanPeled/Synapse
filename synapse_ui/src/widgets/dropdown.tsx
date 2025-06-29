@@ -62,17 +62,25 @@ export function Dropdown<T>({
           }}
           disabled={disabled}
         >
-          <SelectTrigger className="w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none"
+          <SelectTrigger
+            className="w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none"
             style={{
               backgroundColor: "rgb(20, 20, 20)",
               borderColor: "#3a3a3a",
               color: teamColor,
               cursor: disabled ? "not-allowed" : "pointer",
-            }}>
+            }}
+          >
             <SelectValue className="select-none" />
           </SelectTrigger>
-          <SelectContent className="rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto"
-            style={{ backgroundColor: "#2b2b2b", borderColor: "#444", zIndex: 9999 }}>
+          <SelectContent
+            className="rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto"
+            style={{
+              backgroundColor: "#2b2b2b",
+              borderColor: "#444",
+              zIndex: 9999,
+            }}
+          >
             {options.map((opt, idx) => {
               const strKey = String(idx);
               return (

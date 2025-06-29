@@ -29,7 +29,8 @@ export function protoToSettingValue(proto: SettingValueProto): unknown {
   if (proto.stringValue !== undefined) return proto.stringValue;
   if (proto.boolValue !== undefined) return proto.boolValue;
   if (proto.floatValue !== undefined) return proto.floatValue;
-  if (proto.bytesValue !== undefined && proto.bytesValue.length > 0) return proto.bytesValue;
+  if (proto.bytesValue !== undefined && proto.bytesValue.length > 0)
+    return proto.bytesValue;
   if (proto.intArrayValue.length > 0) return proto.intArrayValue;
   if (proto.stringArrayValue.length > 0) return proto.stringArrayValue;
   if (proto.boolArrayValue.length > 0) return proto.boolArrayValue;
@@ -73,7 +74,12 @@ export function settingValueToProto(val: unknown): SettingValueProto {
   return proto;
 }
 
-export function GenerateControl({ setting, setValue, value, defaultValue }: ControlGeneratorProps) {
+export function GenerateControl({
+  setting,
+  setValue,
+  value,
+  defaultValue,
+}: ControlGeneratorProps) {
   switch (setting.constraint?.type) {
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN:
       return (
@@ -99,7 +105,11 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
           min={setting.constraint.constraint?.range?.min}
           max={setting.constraint.constraint?.range?.max}
           step={setting.constraint.constraint?.range?.step}
-          value={toNumber(protoToSettingValue(value)) ?? toNumber(protoToSettingValue(value)) ?? 0}
+          value={
+            toNumber(protoToSettingValue(value)) ??
+            toNumber(protoToSettingValue(value)) ??
+            0
+          }
           onChange={(val) => setValue(settingValueToProto(val))}
         />
       );
@@ -111,10 +121,12 @@ export function GenerateControl({ setting, setValue, value, defaultValue }: Cont
           <Dropdown
             label={toTitleCase(setting.name)}
             options={
-              setting.constraint.constraint?.listOptions?.options.map((op) => ({
-                label: protoToSettingValue(op),
-                value: protoToSettingValue(op),
-              })) as DropdownOption<SettingValueProto>[] ?? []
+              (setting.constraint.constraint?.listOptions?.options.map(
+                (op) => ({
+                  label: protoToSettingValue(op),
+                  value: protoToSettingValue(op),
+                }),
+              ) as DropdownOption<SettingValueProto>[]) ?? []
             }
             value={protoToSettingValue(value)}
             onValueChange={(val) => setValue(settingValueToProto(val))}
