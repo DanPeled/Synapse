@@ -44,6 +44,9 @@ setup(
         "dev": [
             "pytest",
             "pytest-asyncio",
+            "ruff",
+            "isort",
+            "pyright",
         ]
     },
     include_package_data=True,
