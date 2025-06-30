@@ -7,6 +7,10 @@ def wpilibDep(name: str) -> str:
     return f"{name}=={WPILIB_VERSION}"
 
 
+def synapseNetDep(name: str) -> str:
+    return name
+
+
 setup(
     name="Synapse",
     version="0.1.0",
@@ -22,20 +26,25 @@ setup(
         wpilibDep("robotpy_cscore"),
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
+        "rich",
         "PyYAML",
         "opencv_python",
         "opencv_contrib_python",
-        "typing_extensions",
         "pathspec",
         "paramiko",
         "scp>=0.15.0",
         "numpy==1.23.3",
-        "pytest",
-        "pytest-asyncio",
         "build",
         "psutil",
-        "protobuf",
-        "betterproto==2.0.0b7",
+        synapseNetDep("protobuf"),
+        synapseNetDep("betterproto==2.0.0b7"),
+        synapseNetDep("websockets"),
     ],
+    extras_require={
+        "dev": [
+            "pytest",
+            "pytest-asyncio",
+        ]
+    },
     include_package_data=True,
 )
