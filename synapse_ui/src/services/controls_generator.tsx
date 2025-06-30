@@ -80,11 +80,12 @@ export function GenerateControl({
   value,
   defaultValue,
 }: ControlGeneratorProps) {
+  const settingName = toTitleCase(setting.name.replaceAll("_", " "));
   switch (setting.constraint?.type) {
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN:
       return (
         <ToggleButton
-          label={toTitleCase(setting.name)}
+          label={settingName}
           value={protoToSettingValue(value) as boolean}
           onToggleAction={(val) => setValue(settingValueToProto(val))}
         />
@@ -92,7 +93,7 @@ export function GenerateControl({
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING:
       return (
         <TextInput
-          label={toTitleCase(setting.name)}
+          label={settingName}
           pattern={setting.constraint.constraint?.string?.pattern}
           maxLength={setting.constraint.constraint?.string?.maxLength}
           onChange={(val) => setValue(settingValueToProto(val))}
@@ -101,7 +102,7 @@ export function GenerateControl({
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
       return (
         <Slider
-          label={toTitleCase(setting.name)}
+          label={settingName}
           min={setting.constraint.constraint?.range?.min}
           max={setting.constraint.constraint?.range?.max}
           step={setting.constraint.constraint?.range?.step}
@@ -119,7 +120,7 @@ export function GenerateControl({
       } else {
         return (
           <Dropdown
-            label={toTitleCase(setting.name)}
+            label={settingName}
             options={
               (setting.constraint.constraint?.listOptions?.options.map(
                 (op) => ({

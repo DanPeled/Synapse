@@ -20,6 +20,7 @@ class MessageTypeProto(betterproto.Enum):
     SEND_METRICS = 2
     ADD_PIPELINE = 3
     SEND_PIPELINE_TYPES = 4
+    ADD_CAMERA = 5
 
 
 @dataclass(eq=False, repr=False)

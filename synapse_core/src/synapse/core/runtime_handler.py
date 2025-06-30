@@ -310,6 +310,7 @@ class CameraHandler:
         self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[CameraID, CameraConfig] = {}
+        self.onAddCamera: List[Callable[[CameraID, SynapseCamera], None]] = []
 
     def setup(self) -> None:
         """
@@ -502,6 +503,9 @@ class CameraHandler:
 
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
+
+            for callback in self.onAddCamera:
+                callback(cameraIndex, camera)
             log.log(
                 f"Camera (name={camera_config.name}, path={camera_config.path}, id={cameraIndex}) added successfully."
             )

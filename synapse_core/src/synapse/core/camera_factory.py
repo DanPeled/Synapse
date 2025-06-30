@@ -5,18 +5,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoSource)
+from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
 from synapse.stypes import CameraID, Frame
 from synapse.util import transform3dToList
 from synapse_net.nt_client import NtClient
+from synapse_net.proto.v1 import CameraProto
 from wpimath import geometry
 
 PropertMetaDict = Dict[str, Dict[str, Union[int, float]]]
@@ -125,6 +125,9 @@ def opencvToCscoreProp(prop: int) -> Optional[str]:
 
 
 class SynapseCamera(ABC):
+    def __init__(self, name: str) -> None:
+        self.name: Final[str] = name
+
     @classmethod
     @abstractmethod
     def create(
@@ -290,7 +293,8 @@ class OpenCvCamera(SynapseCamera):
 
 
 class CsCoreCamera(SynapseCamera):
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
         self.camera: VideoCamera
         self.frameBuffer: np.ndarray
         self.sink: CvSink
@@ -313,7 +317,7 @@ class CsCoreCamera(SynapseCamera):
         usbIndex: Optional[int] = None,
         name: str = "",
     ) -> "CsCoreCamera":
-        inst = CsCoreCamera()
+        inst = CsCoreCamera(name)
 
         if usbIndex is not None:
             inst.camera = UsbCamera(devPath or f"USB Camera {usbIndex}", usbIndex)
@@ -468,3 +472,7 @@ class CameraFactory:
         )
         cam.setIndex(cameraIndex)
         return cam
+
+
+def cameraToProto(camid: CameraID, camera: SynapseCamera) -> CameraProto:
+    return CameraProto(name=camera.name, index=camid)

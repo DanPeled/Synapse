@@ -7,6 +7,7 @@ from typing import List
 from synapse.core.config import Config, NetworkConfig
 from synapse.hardware.metrics import Platform
 from synapse.log import err, log
+from synapse.stypes import CameraID, PipelineID
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (
     DeviceInfoProto,
@@ -16,12 +17,14 @@ from synapse_net.proto.v1 import (
 )
 from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
 
+from .camera_factory import SynapseCamera, cameraToProto
+
 from .settings_api import settingsToProto
 from ..util import resolveGenericArgument
 
 from ..bcolors import MarkupColors
 from .global_settings import GlobalSettings
-from .pipeline import pipelineToProto
+from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
 
 
@@ -167,7 +170,7 @@ class Synapse:
 
         import psutil
 
-        self.websocket = WebSocketServer("localhost", 8765)
+        self.websocket = WebSocketServer("0.0.0.0", 8765)
 
         # Create a new asyncio event loop for the websocket thread
         new_loop = asyncio.new_event_loop()
@@ -267,14 +270,22 @@ class Synapse:
             self.websocketThread.join(timeout=5)
 
     def setupRuntimeCallbacks(self):
-        def onAddPipeline(id, inst) -> None:
+        def onAddPipeline(id: PipelineID, inst: Pipeline) -> None:
             msg = pipelineToProto(inst, id)
 
             self.websocket.sendToAllSync(
                 createMessage(MessageTypeProto.ADD_PIPELINE, msg)
             )
 
+        def onAddCamera(id: CameraID, camera: SynapseCamera) -> None:
+            msg = cameraToProto(id, camera)
+
+            self.websocket.sendToAllSync(
+                createMessage(MessageTypeProto.ADD_CAMERA, msg)
+            )
+
         self.runtime_handler.pipelineLoader.onAddPipeline.append(onAddPipeline)
+        self.runtime_handler.cameraHandler.onAddCamera.append(onAddCamera)
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

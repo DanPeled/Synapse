@@ -123,7 +123,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   const socket = useRef<WebSocketWrapper | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocketWrapper("ws://localhost:8765", {
+    const ws = new WebSocketWrapper(`ws://${window.location.hostname}:8765`, {
       onOpen: () => {
         dispatch({
           type: "SET_CONNECTION",

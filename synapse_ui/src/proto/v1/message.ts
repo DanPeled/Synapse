@@ -18,6 +18,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SEND_METRICS = 2,
   MESSAGE_TYPE_PROTO_ADD_PIPELINE = 3,
   MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES = 4,
+  MESSAGE_TYPE_PROTO_ADD_CAMERA = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -38,6 +39,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 4:
     case "MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES;
+    case 5:
+    case "MESSAGE_TYPE_PROTO_ADD_CAMERA":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -57,6 +61,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_ADD_PIPELINE";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES:
       return "MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA:
+      return "MESSAGE_TYPE_PROTO_ADD_CAMERA";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

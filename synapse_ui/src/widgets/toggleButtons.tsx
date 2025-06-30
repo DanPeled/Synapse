@@ -9,19 +9,30 @@ export default function ToggleButton({
   value = false,
   onToggleAction,
   disabled = false,
-  labelGap = 3, // Tailwind spacing scale (12px ≈ gap-3)
+  labelGap = 3,
+  tooltip,
 }: {
   label?: string;
   value?: boolean;
   onToggleAction?: (val: boolean) => void;
   disabled?: boolean;
   labelGap?: number;
+  tooltip?: string;
 }) {
   return (
     <div className={cn("flex items-center mb-3 pl-4", `gap-${labelGap}`)}>
-      <label className="font-bold min-w-[120px]" style={{ color: teamColor }}>
+      <label
+        className="relative group font-bold min-w-[120px]"
+        style={{ color: teamColor }}
+      >
         {label}
+        {tooltip && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-max px-2 py-1 text-xs bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 font-normal">
+            {tooltip}
+          </div>
+        )}
       </label>
+
       <div
         className={cn(
           "relative w-[50px] h-[28px] rounded-full transition-colors cursor-pointer",
