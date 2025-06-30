@@ -3,8 +3,8 @@ from setuptools import find_packages, setup
 WPILIB_VERSION = "2025.2.1.1"
 
 
-def wpilibDep(name: str) -> str:
-    return f"{name}=={WPILIB_VERSION}"
+def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
+    return f"{name}=={version}"
 
 
 def synapseNetDep(name: str) -> str:
