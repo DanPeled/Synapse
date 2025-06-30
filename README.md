@@ -18,9 +18,8 @@ A library for running custom vision code on an FRC coprocessor.
   Designed for intuitive interaction and minimal setup.
 
 ## Installation
-
-### CoProcessor Installation
-...
+### Requirements:
+- [Python 3.10](https://www.python.org/downloads/)
 
 ### Development Computer Installation
 Install the runtime pip package via
@@ -28,6 +27,8 @@ Install the runtime pip package via
 pip install git+https://github.com/DanPeled/Synapse
 ```
 
+### CoProcessor Installation
+Coming soon...
 
 # Development
 ## Getting Started
