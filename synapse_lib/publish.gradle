@@ -47,11 +47,11 @@ ext.addTaskToCopyAllOutputs = { task ->
     copyAllOutputs.from task.archiveFile
 }
 
-def artifactGroupId = 'com.vendor.frc'
-def baseArtifactId = 'Vendor'
-def driverZipBaseName = "_GROUP_com_vendor_frc_ID_${baseArtifactId}-driver_CLS"
-def zipBaseName = "_GROUP_com_vendor_frc_ID_${baseArtifactId}-cpp_CLS"
-def javaBaseName = "_GROUP_com_vendor_frc_ID_${baseArtifactId}-java_CLS"
+def artifactGroupId = 'synapse'
+def baseArtifactId = 'Synapse'
+def driverZipBaseName = "_GROUP_synapse_ID_${baseArtifactId}-driver_CLS"
+def zipBaseName = "_GROUP_synapse_ID_${baseArtifactId}-cpp_CLS"
+def javaBaseName = "_GROUP_synapse_ID_${baseArtifactId}-java_CLS"
 
 task cppHeadersZip(type: Zip) {
     destinationDirectory = outputsFolder
@@ -95,13 +95,14 @@ task cppDriverHeadersZip(type: Zip) {
     }
 }
 
+/* Uncomment me to add C++
 build.dependsOn cppHeadersZip
 addTaskToCopyAllOutputs(cppHeadersZip)
 build.dependsOn cppSourceZip
 addTaskToCopyAllOutputs(cppSourceZip)
 build.dependsOn cppDriverHeadersZip
 addTaskToCopyAllOutputs(cppDriverHeadersZip)
-
+*/
 task sourcesJar(type: Jar, dependsOn: classes) {
     archiveClassifier = 'sources'
     from sourceSets.main.allSource
@@ -141,7 +142,7 @@ task vendordepJson() {
 
     copy {
         from templateVendorFile
-        into "$buildDir/repos/"
+        into "$buildDir/../vendordep/"
         expand(version: pubVersion,
         groupId: artifactGroupId,
         artifactId: baseArtifactId)
@@ -178,7 +179,7 @@ build.dependsOn vendordepJsonZip
 
 libraryBuild.dependsOn build
 
-def releasesRepoUrl = "$buildDir/repos/releases"
+def releasesRepoUrl = "$buildDir/../vendordep/maven/"
 
 publishing {
     repositories {
@@ -202,7 +203,7 @@ model {
         def driverTaskList = createComponentZipTasks($.components, ['VendorDriver'], driverZipBaseName, Zip, project, includeStandardZipFormat)
 
         publications {
-            cpp(MavenPublication) {
+            /*cpp(MavenPublication) {
                 taskList.each {
                     artifact it
                 }
@@ -222,7 +223,7 @@ model {
                 artifactId = "${baseArtifactId}-driver"
                 groupId artifactGroupId
                 version pubVersion
-            }
+            }*/
 
             java(MavenPublication) {
                 artifact jar
