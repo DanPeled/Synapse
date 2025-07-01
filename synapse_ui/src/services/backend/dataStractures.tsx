@@ -1,6 +1,7 @@
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { PipelineManagement } from "./pipelineContext";
 import { WebSocketWrapper } from "../websocket";
+import { CameraProto } from "@/proto/v1/camera";
 
 export namespace BackendStateSystem {
   export interface State {
@@ -12,6 +13,7 @@ export namespace BackendStateSystem {
     logs: Log[];
     socket?: WebSocketWrapper | null;
     networktablesserver: string | null;
+    cameras: CameraProto[];
   }
 
   export interface Log {

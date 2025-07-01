@@ -15,6 +15,7 @@ import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import { CameraProto } from "@/proto/v1/camera";
 
 const initialState: BackendStateSystem.State = {
   deviceinfo: {
@@ -55,6 +56,7 @@ const initialState: BackendStateSystem.State = {
     ]),
   ),
   logs: [] as BackendStateSystem.Log[],
+  cameras: [],
   networktablesserver: null,
 };
 
@@ -175,8 +177,19 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               pipelineTypes: newMap,
             });
           }
-          default:
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA: {
+            const camera = messageObj.cameraInfo!;
+            let newCamerasList = [...state.cameras, camera];
+            newCamerasList = newCamerasList
+              .sort((a, b) =>
+                (a?.index ?? 0) - (b?.index ?? 0));
+            setters.setCameras(
+              newCamerasList
+            );
             break;
+          }
+          default:
+            throw new Error(`Unsupported Message Type: ${messageObj.type}`);
         }
       },
     });

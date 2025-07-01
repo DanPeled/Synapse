@@ -22,13 +22,10 @@ export function AlertDialog({
     let timer2: ReturnType<typeof setTimeout>;
 
     if (initialVisible) {
-      // Show dialog: first render it, then trigger visible for animation
       setRendered(true);
       timer1 = setTimeout(() => setVisible(true), 10);
     } else {
-      // Hide dialog: trigger exit animation by hiding visible
       setVisible(false);
-      // After animation duration, unmount and call onClose
       timer2 = setTimeout(() => {
         setRendered(false);
         onClose?.();

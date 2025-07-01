@@ -474,5 +474,7 @@ class CameraFactory:
         return cam
 
 
-def cameraToProto(camid: CameraID, camera: SynapseCamera) -> CameraProto:
-    return CameraProto(name=camera.name, index=camid)
+def cameraToProto(camid: CameraID, name: str, camera: SynapseCamera) -> CameraProto:
+    return CameraProto(
+        name=name, index=camid, stream_path="", physical_connection="unknown"
+    )

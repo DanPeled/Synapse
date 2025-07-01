@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { PipelineManagement } from "@/services/backend/pipelineContext";
 import { GenerateControl } from "@/services/controls_generator";
@@ -88,27 +88,27 @@ export function PipelineConfigControl({
       style={{ backgroundColor: baseCardColor }}
       className="border-gray-700 flex-grow overflow-auto"
     >
-      <CardContent className="p-0">
-        <Tabs defaultValue="input" className="w-full">
+      <CardHeader>
+        <Tabs defaultValue="input" className="w-full" style={{ color: teamColor }}>
           <TabsList
-            className="grid w-full grid-cols-3 border-gray-600"
+            className="grid w-full grid-cols-3 border-gray-600 rounded-xl"
             style={{ backgroundColor: baseCardColor }}
           >
             <TabsTrigger
               value="input"
-              className="data-[state=active]:bg-pink-800 cursor-pointer"
+              className="rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
             >
               Input
             </TabsTrigger>
             <TabsTrigger
               value="pipeline"
-              className="data-[state=active]:bg-pink-800 cursor-pointer"
+              className="rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
             >
               Pipeline
             </TabsTrigger>
             <TabsTrigger
               value="output"
-              className="data-[state=active]:bg-pink-800 cursor-pointer"
+              className="rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
             >
               Output
             </TabsTrigger>
@@ -156,7 +156,7 @@ export function PipelineConfigControl({
             </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
+      </CardHeader>
     </Card>
   );
 }

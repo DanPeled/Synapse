@@ -227,6 +227,13 @@ class Synapse:
                 ).SerializeToString()
             )
 
+            for id, camera in self.runtime_handler.cameraHandler.cameras.items():
+                msg = cameraToProto(id, camera.name, camera)
+
+                await self.websocket.sendToAll(
+                    createMessage(MessageTypeProto.ADD_CAMERA, msg)
+                )
+
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):
             print(f"Message from {ws.remote_address}: {msg}")
@@ -277,8 +284,8 @@ class Synapse:
                 createMessage(MessageTypeProto.ADD_PIPELINE, msg)
             )
 
-        def onAddCamera(id: CameraID, camera: SynapseCamera) -> None:
-            msg = cameraToProto(id, camera)
+        def onAddCamera(id: CameraID, name: str, camera: SynapseCamera) -> None:
+            msg = cameraToProto(id, name, camera)
 
             self.websocket.sendToAllSync(
                 createMessage(MessageTypeProto.ADD_CAMERA, msg)

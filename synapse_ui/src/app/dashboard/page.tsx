@@ -15,8 +15,14 @@ import { ResultsView } from "./results_view";
 import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
 import { Activity, Camera } from "lucide-react";
+import { CameraStepControl } from "./camera_step_control";
+import { CameraProto } from "@/proto/v1/camera";
 
-function CameraView() {
+interface CameraViewProps {
+  selectedCamera?: CameraProto;
+}
+
+function CameraView({ selectedCamera }: CameraViewProps) {
   return (
     <Card
       style={{ backgroundColor: baseCardColor }}
@@ -41,14 +47,14 @@ function CameraView() {
       </CardHeader>
 
       <CardContent className="flex-grow flex flex-col items-center justify-center">
-        <CameraStream />
+        <CameraStream stream={selectedCamera?.streamPath} />
       </CardContent>
     </Card>
   );
 }
 
 export default function Dashboard() {
-  const { pipelinecontext, setPipelinecontext, connection } =
+  const { pipelinecontext, setPipelinecontext, connection, cameras } =
     useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(
     pipelinecontext.pipelines.get(0),
@@ -56,25 +62,37 @@ export default function Dashboard() {
   const [selectedPipelineType, setSelectedPipelineType] = useState(
     Array.from(pipelinecontext.pipelineTypes.values()).at(0),
   );
+  const [selectedCamera, setSelectedCamera] = useState(
+    cameras.at(0)
+  );
 
   useEffect(() => {
-    if (connection.backend) {
-      setSelectedPipeline(pipelinecontext.pipelines.get(0));
-      setSelectedPipelineType(
-        Array.from(pipelinecontext.pipelineTypes.values()).at(0),
-      );
-    }
-  }, [pipelinecontext]);
+    setSelectedPipeline(pipelinecontext.pipelines.get(0));
+    setSelectedPipelineType(
+      Array.from(pipelinecontext.pipelineTypes.values()).at(0),
+    );
 
-  useEffect(() => {
-    if (selectedPipeline) {
-      const updated = pipelinecontext.pipelines.get(selectedPipeline.index);
-      if (updated) {
-        setSelectedPipeline(updated);
-        setSelectedPipelineType(pipelinecontext.pipelineTypes.get(updated.type));
+    let selectedPipelineIndex: number = -1;
+    if (selectedPipeline === undefined) {
+      selectedPipelineIndex = 0;
+      setSelectedCamera(cameras.at(0));
+    } else {
+      selectedPipelineIndex = selectedPipeline?.index;
+
+      if (selectedPipelineIndex != -1) {
+        const updated = pipelinecontext.pipelines.get(selectedPipelineIndex);
+        if (updated) {
+          setSelectedPipeline(updated);
+          setSelectedPipelineType(pipelinecontext.pipelineTypes.get(updated.type));
+        }
       }
     }
   }, [pipelinecontext]);
+
+  useEffect(() => {
+    setSelectedCamera(cameras.at(0));
+  }, [cameras]);
+
 
   return (
     <div
@@ -91,7 +109,7 @@ export default function Dashboard() {
       >
         <Row gap="gap-2" className="h-full">
           <Column className="flex-[2] space-y-2 h-full">
-            <CameraView />
+            <CameraView selectedCamera={selectedCamera} />
             <PipelineConfigControl
               pipelinecontext={pipelinecontext}
               selectedPipeline={selectedPipeline}
@@ -113,7 +131,11 @@ export default function Dashboard() {
               selectedPipeline={selectedPipeline}
               setSelectedPipelineType={setSelectedPipelineType}
               selectedPipelineType={selectedPipelineType}
+              cameras={cameras}
+              setSelectedCamera={setSelectedCamera}
+              selectedCamera={selectedCamera}
             />
+            <CameraStepControl />
             <ResultsView />
           </Column>
         </Row>
