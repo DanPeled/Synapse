@@ -10,11 +10,16 @@ import { SettingValueProto } from "./value";
 
 export const protobufPackage = "proto.settings.v1";
 
+/**
+ * Constraint that limits a setting to a predefined list of possible values,
+ * with an option to allow single or multiple selections.
+ */
 export interface ListOptionsConstraintProto {
+  /** List of allowed option values for the setting */
   options: SettingValueProto[];
   /**
-   * If true, the user can select multiple options from the list.
-   * If false, the user can only select one option.
+   * If true, multiple options can be selected by the user.
+   * If false, only a single option can be selected.
    */
   allowMultiple: boolean;
 }

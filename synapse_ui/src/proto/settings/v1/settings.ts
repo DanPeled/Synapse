@@ -16,16 +16,27 @@ import { SettingValueProto } from "./value";
 
 export const protobufPackage = "proto.settings.v1";
 
+/** Represents a constraint applied to a setting, specifying its type and configuration. */
 export interface ConstraintProto {
+  /** The type of constraint (e.g., range, list, color) */
   type: ConstraintTypeProto;
+  /** The configuration details for the constraint (oneof different constraint configs) */
   constraint: ConstraintConfigProto | undefined;
 }
 
+/** Metadata describing a setting, including identification, categorization, and constraints. */
 export interface SettingMetaProto {
+  /** The unique name/key of the setting */
   name: string;
+  /** The category or group this setting belongs to (e.g., "display", "audio") */
   category: string;
+  /** A human-readable description explaining the purpose of the setting */
   description: string;
-  default: SettingValueProto | undefined;
+  /** The default value for the setting */
+  default:
+    | SettingValueProto
+    | undefined;
+  /** Optional constraints that restrict or define valid values for the setting */
   constraint: ConstraintProto | undefined;
 }
 

@@ -11,21 +11,49 @@ import { SettingValueProto } from "../settings/v1/value";
 
 export const protobufPackage = "proto.v1";
 
+/** Defines a type of pipeline with its associated settings metadata */
 export interface PipelineTypeProto {
+  /** The pipeline type identifier (e.g., "image-processing") */
   type: string;
+  /** List of metadata for each setting related to this pipeline type */
   settings: SettingMetaProto[];
 }
 
+/** Represents an instance of a pipeline with a name, type, and settings values */
 export interface PipelineProto {
+  /** The human-readable name of the pipeline instance */
   name: string;
+  /** The index or ID of this pipeline instance */
   index: number;
+  /** The pipeline type identifier this instance corresponds to */
   type: string;
+  /** Map of setting keys to their actual configured values for this pipeline instance */
   settingsValues: { [key: string]: SettingValueProto };
 }
 
 export interface PipelineProto_SettingsValuesEntry {
   key: string;
   value: SettingValueProto | undefined;
+}
+
+/** Message to request changing the type of a specific pipeline instance */
+export interface SetPipelineTypeMessageProto {
+  /** The new pipeline type to assign */
+  newType: string;
+  /** The index of the pipeline instance to update */
+  pipelineIndex: number;
+}
+
+/** Message to request updating a single setting of a specific pipeline instance */
+export interface SetPipleineSettingMessageProto {
+  /** The key/name of the setting to update */
+  setting: string;
+  /** The new value to assign to the setting */
+  value:
+    | SettingValueProto
+    | undefined;
+  /** The index of the pipeline instance to update */
+  pipelineIndex: number;
 }
 
 function createBasePipelineTypeProto(): PipelineTypeProto {
@@ -314,6 +342,178 @@ export const PipelineProto_SettingsValuesEntry: MessageFns<PipelineProto_Setting
     message.value = (object.value !== undefined && object.value !== null)
       ? SettingValueProto.fromPartial(object.value)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseSetPipelineTypeMessageProto(): SetPipelineTypeMessageProto {
+  return { newType: "", pipelineIndex: 0 };
+}
+
+export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto> = {
+  encode(message: SetPipelineTypeMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.newType !== "") {
+      writer.uint32(10).string(message.newType);
+    }
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(16).int32(message.pipelineIndex);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPipelineTypeMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPipelineTypeMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.newType = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pipelineIndex = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetPipelineTypeMessageProto {
+    return {
+      newType: isSet(object.newType) ? globalThis.String(object.newType) : "",
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+    };
+  },
+
+  toJSON(message: SetPipelineTypeMessageProto): unknown {
+    const obj: any = {};
+    if (message.newType !== "") {
+      obj.newType = message.newType;
+    }
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPipelineTypeMessageProto>, I>>(base?: I): SetPipelineTypeMessageProto {
+    return SetPipelineTypeMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPipelineTypeMessageProto>, I>>(object: I): SetPipelineTypeMessageProto {
+    const message = createBaseSetPipelineTypeMessageProto();
+    message.newType = object.newType ?? "";
+    message.pipelineIndex = object.pipelineIndex ?? 0;
+    return message;
+  },
+};
+
+function createBaseSetPipleineSettingMessageProto(): SetPipleineSettingMessageProto {
+  return { setting: "", value: undefined, pipelineIndex: 0 };
+}
+
+export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessageProto> = {
+  encode(message: SetPipleineSettingMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.setting !== "") {
+      writer.uint32(10).string(message.setting);
+    }
+    if (message.value !== undefined) {
+      SettingValueProto.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(24).int32(message.pipelineIndex);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPipleineSettingMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPipleineSettingMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.setting = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pipelineIndex = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetPipleineSettingMessageProto {
+    return {
+      setting: isSet(object.setting) ? globalThis.String(object.setting) : "",
+      value: isSet(object.value) ? SettingValueProto.fromJSON(object.value) : undefined,
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+    };
+  },
+
+  toJSON(message: SetPipleineSettingMessageProto): unknown {
+    const obj: any = {};
+    if (message.setting !== "") {
+      obj.setting = message.setting;
+    }
+    if (message.value !== undefined) {
+      obj.value = SettingValueProto.toJSON(message.value);
+    }
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPipleineSettingMessageProto>, I>>(base?: I): SetPipleineSettingMessageProto {
+    return SetPipleineSettingMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPipleineSettingMessageProto>, I>>(
+    object: I,
+  ): SetPipleineSettingMessageProto {
+    const message = createBaseSetPipleineSettingMessageProto();
+    message.setting = object.setting ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? SettingValueProto.fromPartial(object.value)
+      : undefined;
+    message.pipelineIndex = object.pipelineIndex ?? 0;
     return message;
   },
 };

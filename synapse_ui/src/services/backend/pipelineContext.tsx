@@ -5,6 +5,6 @@ export namespace PipelineManagement {
     public constructor(
       public pipelines: Map<number, PipelineProto>,
       public pipelineTypes: Map<string, PipelineTypeProto>,
-    ) { }
+    ) {}
   }
 }

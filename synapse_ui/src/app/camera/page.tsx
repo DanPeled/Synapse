@@ -30,11 +30,16 @@ export default function CameraConfigPage() {
               options={[] as DropdownOption<string>[]}
               label="Camera"
               value={""}
-              onValueChange={(_) => { /* TODO */ }}
+              onValueChange={(_) => {
+                /* TODO */
+              }}
             />
             <CameraStream />
           </Card>
-          <Card style={{ backgroundColor: baseCardColor }} className="border-none h-[300px]">
+          <Card
+            style={{ backgroundColor: baseCardColor }}
+            className="border-none h-[300px]"
+          >
             <Placeholder text="TODO: Camera Pose Visualization" />
           </Card>
         </Column>

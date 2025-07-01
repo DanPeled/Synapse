@@ -89,7 +89,11 @@ export function PipelineConfigControl({
       className="border-gray-700 flex-grow overflow-auto"
     >
       <CardHeader>
-        <Tabs defaultValue="input" className="w-full" style={{ color: teamColor }}>
+        <Tabs
+          defaultValue="input"
+          className="w-full"
+          style={{ color: teamColor }}
+        >
           <TabsList
             className="grid w-full grid-cols-3 border-gray-600 rounded-xl"
             style={{ backgroundColor: baseCardColor }}

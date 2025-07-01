@@ -1,4 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Move3D } from "lucide-react";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Placeholder } from "@/widgets/placeholder";
@@ -6,16 +12,20 @@ import { Column, Row } from "@/widgets/containers";
 import TextInput from "@/widgets/textInput";
 import { Button } from "@/components/ui/button";
 
-export function CameraTransformModule({ }) {
+export function CameraTransformModule({}) {
   return (
-    <Card className="border-none" style={{ backgroundColor: baseCardColor, color: teamColor }}>
+    <Card
+      className="border-none"
+      style={{ backgroundColor: baseCardColor, color: teamColor }}
+    >
       <CardHeader className="pb-0">
         <div className="flex items-center gap-2">
           <Move3D className="w-5 h-5" />
           <CardTitle className="text-lg font-bold">Camera Transform</CardTitle>
         </div>
         <CardDescription>
-          Defines the camera’s position and orientation relative to the robot in 3D space.
+          Defines the camera’s position and orientation relative to the robot in
+          3D space.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -44,6 +54,6 @@ export function CameraTransformModule({ }) {
           </Button>
         </Column>
       </CardContent>
-    </Card >
+    </Card>
   );
 }

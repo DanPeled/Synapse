@@ -14,14 +14,24 @@ import { StringConstraintProto } from "./string";
 
 export const protobufPackage = "proto.settings.v1";
 
+/**
+ * Enumeration of constraint types that can be applied to settings.
+ * Some constraints may not have corresponding config messages.
+ */
 export enum ConstraintTypeProto {
+  /** CONSTRAINT_TYPE_PROTO_UNSPECIFIED - Default unspecified constraint type */
   CONSTRAINT_TYPE_PROTO_UNSPECIFIED = 0,
+  /** CONSTRAINT_TYPE_PROTO_RANGE - Numeric range constraint */
   CONSTRAINT_TYPE_PROTO_RANGE = 1,
+  /** CONSTRAINT_TYPE_PROTO_LIST - Constraint requiring value to be one of a predefined list */
   CONSTRAINT_TYPE_PROTO_LIST = 2,
+  /** CONSTRAINT_TYPE_PROTO_STRING - String-based constraint */
   CONSTRAINT_TYPE_PROTO_STRING = 3,
+  /** CONSTRAINT_TYPE_PROTO_COLOR - Color-related constraint */
   CONSTRAINT_TYPE_PROTO_COLOR = 4,
-  /** CONSTRAINT_TYPE_PROTO_BOOLEAN - Doesn't have a config message */
+  /** CONSTRAINT_TYPE_PROTO_BOOLEAN - Boolean constraint (true/false), no separate config message needed */
   CONSTRAINT_TYPE_PROTO_BOOLEAN = 5,
+  /** CONSTRAINT_TYPE_PROTO_LIST_OPTIONS - List options constraint with additional options (e.g., multi-select) */
   CONSTRAINT_TYPE_PROTO_LIST_OPTIONS = 8,
   UNRECOGNIZED = -1,
 }
@@ -78,11 +88,28 @@ export function constraintTypeProtoToJSON(object: ConstraintTypeProto): string {
   }
 }
 
+/**
+ * Configuration for different types of constraints on settings values.
+ * Uses a oneof to specify exactly one type of constraint configuration.
+ */
 export interface ConstraintConfigProto {
-  range?: RangeConstraintProto | undefined;
-  listOptions?: ListOptionsConstraintProto | undefined;
-  color?: ColorConstraintProto | undefined;
-  string?: StringConstraintProto | undefined;
+  /** Constraint based on a numeric range */
+  range?:
+    | RangeConstraintProto
+    | undefined;
+  /** Constraint based on selectable list options with extra options */
+  listOptions?:
+    | ListOptionsConstraintProto
+    | undefined;
+  /** Constraint based on color formats and modes */
+  color?:
+    | ColorConstraintProto
+    | undefined;
+  /** Constraint based on string properties (e.g., regex, length) */
+  string?:
+    | StringConstraintProto
+    | undefined;
+  /** Constraint for a value list */
   list?: ListConstraintProto | undefined;
 }
 

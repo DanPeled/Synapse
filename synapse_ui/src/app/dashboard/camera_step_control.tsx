@@ -4,7 +4,7 @@ import { Button } from "@/widgets/button";
 import { Row } from "@/widgets/containers";
 import { Camera, ScanEye } from "lucide-react";
 
-export function CameraStepControl({ }) {
+export function CameraStepControl({}) {
   return (
     <Card
       style={{ backgroundColor: baseCardColor, color: teamColor }}

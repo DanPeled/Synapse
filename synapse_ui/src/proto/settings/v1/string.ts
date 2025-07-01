@@ -10,9 +10,17 @@ import { Int32Value, StringValue } from "../../../google/protobuf/wrappers";
 
 export const protobufPackage = "proto.settings.v1";
 
+/** Constraint specifying limitations on string values */
 export interface StringConstraintProto {
-  minLength: number | undefined;
-  maxLength: number | undefined;
+  /** Optional minimum length of the string (inclusive) */
+  minLength:
+    | number
+    | undefined;
+  /** Optional maximum length of the string (inclusive) */
+  maxLength:
+    | number
+    | undefined;
+  /** Optional regex pattern that the string must match */
   pattern: string | undefined;
 }
 

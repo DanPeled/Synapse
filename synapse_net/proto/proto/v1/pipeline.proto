@@ -5,14 +5,47 @@ package proto.v1;
 import "proto/settings/v1/settings.proto";
 import "proto/settings/v1/value.proto";
 
+// Defines a type of pipeline with its associated settings metadata
 message PipelineTypeProto {
+  // The pipeline type identifier (e.g., "image-processing")
   string type = 1;
+
+  // List of metadata for each setting related to this pipeline type
   repeated proto.settings.v1.SettingMetaProto settings = 2;
 }
 
+// Represents an instance of a pipeline with a name, type, and settings values
 message PipelineProto {
+  // The human-readable name of the pipeline instance
   string name = 1;
+
+  // The index or ID of this pipeline instance
   uint32 index = 2;
+
+  // The pipeline type identifier this instance corresponds to
   string type = 3;
+
+  // Map of setting keys to their actual configured values for this pipeline instance
   map<string, proto.settings.v1.SettingValueProto> settings_values = 4;
+}
+
+// Message to request changing the type of a specific pipeline instance
+message SetPipelineTypeMessageProto {
+  // The new pipeline type to assign
+  string new_type = 1;
+
+  // The index of the pipeline instance to update
+  int32 pipeline_index = 2;
+}
+
+// Message to request updating a single setting of a specific pipeline instance
+message SetPipleineSettingMessageProto {
+  // The key/name of the setting to update
+  string setting = 1;
+
+  // The new value to assign to the setting
+  proto.settings.v1.SettingValueProto value = 2;
+
+  // The index of the pipeline instance to update
+  int32 pipeline_index = 3;
 }

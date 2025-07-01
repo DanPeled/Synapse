@@ -9,8 +9,11 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.settings.v1";
 
+/** Constraint defining allowed length boundaries for a list setting */
 export interface ListConstraintProto {
+  /** Minimum number of elements required in the list (inclusive) */
   minLength: number;
+  /** Maximum number of elements allowed in the list (inclusive) */
   maxLength: number;
 }
 

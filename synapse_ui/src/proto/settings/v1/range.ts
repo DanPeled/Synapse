@@ -10,9 +10,17 @@ import { FloatValue } from "../../../google/protobuf/wrappers";
 
 export const protobufPackage = "proto.settings.v1";
 
+/** Defines a numeric range constraint with optional minimum, maximum, and step values. */
 export interface RangeConstraintProto {
-  min: number | undefined;
-  max: number | undefined;
+  /** Optional minimum allowed value (inclusive) */
+  min:
+    | number
+    | undefined;
+  /** Optional maximum allowed value (inclusive) */
+  max:
+    | number
+    | undefined;
+  /** Optional step/increment value for valid values within the range */
   step: number | undefined;
 }
 

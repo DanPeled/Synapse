@@ -9,16 +9,37 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.settings.v1";
 
+/** Represents a flexible value for a setting, supporting multiple scalar types and arrays. */
 export interface SettingValueProto {
-  intValue?: number | undefined;
-  stringValue?: string | undefined;
-  boolValue?: boolean | undefined;
-  floatValue?: number | undefined;
-  bytesValue?: Uint8Array | undefined;
+  /** Integer scalar value */
+  intValue?:
+    | number
+    | undefined;
+  /** String scalar value */
+  stringValue?:
+    | string
+    | undefined;
+  /** Boolean scalar value */
+  boolValue?:
+    | boolean
+    | undefined;
+  /** Float scalar value */
+  floatValue?:
+    | number
+    | undefined;
+  /** Bytes scalar value */
+  bytesValue?:
+    | Uint8Array
+    | undefined;
+  /** Repeated integer values (array) */
   intArrayValue: number[];
+  /** Repeated string values (array) */
   stringArrayValue: string[];
+  /** Repeated boolean values (array) */
   boolArrayValue: boolean[];
+  /** Repeated float values (array) */
   floatArrayValue: number[];
+  /** Repeated bytes values (array) */
   bytesArrayValue: Uint8Array[];
 }
 

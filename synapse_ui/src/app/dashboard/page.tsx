@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  background,
-  teamColor,
-  baseCardColor,
-} from "@/services/style";
+import { background, teamColor, baseCardColor } from "@/services/style";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
 import { useBackendContext } from "@/services/backend/backendContext";
@@ -17,6 +13,8 @@ import { PipelineConfigControl } from "./pipeline_config_control";
 import { Activity, Camera } from "lucide-react";
 import { CameraStepControl } from "./camera_step_control";
 import { CameraProto } from "@/proto/v1/camera";
+import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import { SetPipelineTypeMessageProto } from "@/proto/v1/pipeline";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -54,7 +52,7 @@ function CameraView({ selectedCamera }: CameraViewProps) {
 }
 
 export default function Dashboard() {
-  const { pipelinecontext, setPipelinecontext, connection, cameras } =
+  const { pipelinecontext, setPipelinecontext, connection, cameras, socket } =
     useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(
     pipelinecontext.pipelines.get(0),
@@ -62,9 +60,7 @@ export default function Dashboard() {
   const [selectedPipelineType, setSelectedPipelineType] = useState(
     Array.from(pipelinecontext.pipelineTypes.values()).at(0),
   );
-  const [selectedCamera, setSelectedCamera] = useState(
-    cameras.at(0)
-  );
+  const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
     setSelectedPipeline(pipelinecontext.pipelines.get(0));
@@ -83,7 +79,9 @@ export default function Dashboard() {
         const updated = pipelinecontext.pipelines.get(selectedPipelineIndex);
         if (updated) {
           setSelectedPipeline(updated);
-          setSelectedPipelineType(pipelinecontext.pipelineTypes.get(updated.type));
+          setSelectedPipelineType(
+            pipelinecontext.pipelineTypes.get(updated.type),
+          );
         }
       }
     }
@@ -92,7 +90,6 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedCamera(cameras.at(0));
   }, [cameras]);
-
 
   return (
     <div
@@ -125,11 +122,38 @@ export default function Dashboard() {
               setSelectedPipeline={(val) => {
                 if (val !== undefined) {
                   setSelectedPipeline(val);
-                  setSelectedPipelineType(pipelinecontext.pipelineTypes.get(val.type));
+                  setSelectedPipelineType(
+                    pipelinecontext.pipelineTypes.get(val.type),
+                  );
                 }
               }}
               selectedPipeline={selectedPipeline}
-              setSelectedPipelineType={setSelectedPipelineType}
+              setSelectedPipelineType={(newType) => {
+                setSelectedPipelineType(newType);
+
+                setTimeout(() => {
+                  if (selectedPipeline && newType) {
+                    const payload = MessageProto.create({
+                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE,
+                      setPipelineType: SetPipelineTypeMessageProto.create({
+                        newType: newType.type,
+                        pipelineIndex: selectedPipeline.index,
+                      }),
+                    });
+
+                    const binary = MessageProto.encode(payload).finish();
+                    socket?.sendBinary(binary);
+
+                    selectedPipeline.type = newType.type;
+                    let newPipelines = new Map(pipelinecontext.pipelines);
+                    newPipelines.set(selectedPipeline.index, selectedPipeline);
+                    setPipelinecontext({
+                      ...pipelinecontext,
+                      pipelines: newPipelines,
+                    });
+                  }
+                }, 0);
+              }}
               selectedPipelineType={selectedPipelineType}
               cameras={cameras}
               setSelectedCamera={setSelectedCamera}

@@ -16,13 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  RefreshCw,
-  Download,
-  ChevronUp,
-  ChevronDown,
-  X,
-} from "lucide-react";
+import { RefreshCw, Download, ChevronUp, ChevronDown, X } from "lucide-react";
 import { Row } from "@/widgets/containers";
 import { baseCardColor, teamColor } from "@/services/style";
 import { useBackendContext } from "@/services/backend/backendContext";
@@ -96,8 +90,7 @@ const getStatusColor = (status: string) => {
   }
 };
 
-function CalibrationHeader(
-) {
+function CalibrationHeader() {
   return (
     <div
       className="flex items-center justify-between"
@@ -143,7 +136,8 @@ function ResolutionSelector({
   selected: (typeof calibrationData.resolutionResults)[number];
   onSelect: (res: (typeof calibrationData.resolutionResults)[number]) => void;
 }) {
-  const [calibrateResolutionVisible, setCalibrateResolutionVisible] = useState(false);
+  const [calibrateResolutionVisible, setCalibrateResolutionVisible] =
+    useState(false);
 
   return (
     <Card className="bg-zinc-900 border-gray-700" style={{ color: teamColor }}>
@@ -159,10 +153,11 @@ function ResolutionSelector({
             <Button
               key={index}
               onClick={() => onSelect(result)}
-              className={`${selected.resolution === result.resolution
-                ? "bg-stone-600 hover:bg-stone-500"
-                : "border-gray-600 bg-gray-700 hover:bg-gray-600 hover:border-zinc-700"
-                } cursor-pointer`}
+              className={`${
+                selected.resolution === result.resolution
+                  ? "bg-stone-600 hover:bg-stone-500"
+                  : "border-gray-600 bg-gray-700 hover:bg-gray-600 hover:border-zinc-700"
+              } cursor-pointer`}
             >
               {result.resolution}
               <Badge
@@ -178,7 +173,9 @@ function ResolutionSelector({
             size="sm"
             className="ml-4 border-gray-600 bg-gray-700 hover:bg-gray-600 hover:border-gray-500 cursor-pointer"
             style={{ color: teamColor }}
-            onClick={() => { setCalibrateResolutionVisible(true); }}
+            onClick={() => {
+              setCalibrateResolutionVisible(true);
+            }}
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Calibrate

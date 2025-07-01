@@ -9,20 +9,33 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.v1";
 
+/** Information about a device's network and system identification */
 export interface DeviceInfoProto {
+  /** The device's hostname */
   hostname: string;
+  /** The IP address of the device */
   ip: string;
+  /** The platform or operating system (e.g., "linux", "windows") */
   platform: string;
+  /** List of network interfaces available on the device */
   networkInterfaces: string[];
 }
 
+/** Metrics related to the hardware status of a device */
 export interface HardwareMetricsProto {
+  /** CPU temperature in degrees Celsius */
   cpuTemp: number;
+  /** CPU usage as a percentage (0 to 100) */
   cpuUsage: number;
+  /** Disk usage as a percentage (0 to 100) */
   diskUsage: number;
+  /** RAM usage */
   ramUsage: number;
+  /** Total memory available */
   memory: number;
+  /** Uptime of the device in seconds */
   uptime: number;
+  /** Timestamp when the metrics were last fetched (ISO 8601 or other format) */
   lastFetched: string;
 }
 

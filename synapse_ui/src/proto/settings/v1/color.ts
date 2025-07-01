@@ -9,10 +9,15 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.settings.v1";
 
+/** Enumeration of supported color formats */
 export enum ColorFormatProto {
+  /** COLOR_FORMAT_PROTO_UNSPECIFIED - Default unspecified color format */
   COLOR_FORMAT_PROTO_UNSPECIFIED = 0,
+  /** COLOR_FORMAT_PROTO_HEX - Color represented as a HEX string (e.g., "#FFAABB") */
   COLOR_FORMAT_PROTO_HEX = 1,
+  /** COLOR_FORMAT_PROTO_RGB - Color represented using RGB components */
   COLOR_FORMAT_PROTO_RGB = 2,
+  /** COLOR_FORMAT_PROTO_HSV - Color represented using HSV (Hue, Saturation, Value) components */
   COLOR_FORMAT_PROTO_HSV = 3,
   UNRECOGNIZED = -1,
 }
@@ -54,8 +59,11 @@ export function colorFormatProtoToJSON(object: ColorFormatProto): string {
   }
 }
 
+/** Defines constraints for color settings, specifying format and mode */
 export interface ColorConstraintProto {
+  /** The color format constraint (HEX, RGB, HSV) */
   format: ColorFormatProto;
+  /** If true, enables a range mode for color selection rather than fixed values */
   rangeMode: boolean;
 }
 

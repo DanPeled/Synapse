@@ -178,14 +178,12 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             });
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA: {
-            const camera = messageObj.cameraInfo!;
+            const camera: CameraProto = messageObj.cameraInfo!;
             let newCamerasList = [...state.cameras, camera];
-            newCamerasList = newCamerasList
-              .sort((a, b) =>
-                (a?.index ?? 0) - (b?.index ?? 0));
-            setters.setCameras(
-              newCamerasList
+            newCamerasList = newCamerasList.sort(
+              (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
             );
+            setters.setCameras(newCamerasList);
             break;
           }
           default:

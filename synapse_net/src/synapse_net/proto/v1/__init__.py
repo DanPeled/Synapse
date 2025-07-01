@@ -21,6 +21,7 @@ class MessageTypeProto(betterproto.Enum):
     ADD_PIPELINE = 3
     SEND_PIPELINE_TYPES = 4
     ADD_CAMERA = 5
+    SET_TYPE_FOR_PIPELINE = 6
 
 
 @dataclass(eq=False, repr=False)
@@ -39,37 +40,108 @@ class LatencyStatusProto(betterproto.Message):
 
 @dataclass(eq=False, repr=False)
 class DeviceInfoProto(betterproto.Message):
+    """Information about a device's network and system identification"""
+
     hostname: str = betterproto.string_field(1)
+    """The device's hostname"""
+
     ip: str = betterproto.string_field(2)
+    """The IP address of the device"""
+
     platform: str = betterproto.string_field(3)
+    """The platform or operating system (e.g., "linux", "windows")"""
+
     network_interfaces: List[str] = betterproto.string_field(4)
+    """List of network interfaces available on the device"""
 
 
 @dataclass(eq=False, repr=False)
 class HardwareMetricsProto(betterproto.Message):
+    """Metrics related to the hardware status of a device"""
+
     cpu_temp: float = betterproto.float_field(1)
+    """CPU temperature in degrees Celsius"""
+
     cpu_usage: float = betterproto.float_field(2)
+    """CPU usage as a percentage (0 to 100)"""
+
     disk_usage: float = betterproto.float_field(3)
+    """Disk usage as a percentage (0 to 100)"""
+
     ram_usage: float = betterproto.float_field(4)
+    """RAM usage"""
+
     memory: float = betterproto.float_field(5)
+    """Total memory available"""
+
     uptime: float = betterproto.float_field(6)
+    """Uptime of the device in seconds"""
+
     last_fetched: str = betterproto.string_field(7)
+    """
+    Timestamp when the metrics were last fetched (ISO 8601 or other format)
+    """
 
 
 @dataclass(eq=False, repr=False)
 class PipelineTypeProto(betterproto.Message):
+    """Defines a type of pipeline with its associated settings metadata"""
+
     type: str = betterproto.string_field(1)
+    """The pipeline type identifier (e.g., "image-processing")"""
+
     settings: List["_settings_v1__.SettingMetaProto"] = betterproto.message_field(2)
+    """List of metadata for each setting related to this pipeline type"""
 
 
 @dataclass(eq=False, repr=False)
 class PipelineProto(betterproto.Message):
+    """
+    Represents an instance of a pipeline with a name, type, and settings values
+    """
+
     name: str = betterproto.string_field(1)
+    """The human-readable name of the pipeline instance"""
+
     index: int = betterproto.uint32_field(2)
+    """The index or ID of this pipeline instance"""
+
     type: str = betterproto.string_field(3)
+    """The pipeline type identifier this instance corresponds to"""
+
     settings_values: Dict[str, "_settings_v1__.SettingValueProto"] = (
         betterproto.map_field(4, betterproto.TYPE_STRING, betterproto.TYPE_MESSAGE)
     )
+    """
+    Map of setting keys to their actual configured values for this pipeline instance
+    """
+
+
+@dataclass(eq=False, repr=False)
+class SetPipelineTypeMessageProto(betterproto.Message):
+    """Message to request changing the type of a specific pipeline instance"""
+
+    new_type: str = betterproto.string_field(1)
+    """The new pipeline type to assign"""
+
+    pipeline_index: int = betterproto.int32_field(2)
+    """The index of the pipeline instance to update"""
+
+
+@dataclass(eq=False, repr=False)
+class SetPipleineSettingMessageProto(betterproto.Message):
+    """
+    Message to request updating a single setting of a specific pipeline instance
+    """
+
+    setting: str = betterproto.string_field(1)
+    """The key/name of the setting to update"""
+
+    value: "_settings_v1__.SettingValueProto" = betterproto.message_field(2)
+    """The new value to assign to the setting"""
+
+    pipeline_index: int = betterproto.int32_field(3)
+    """The index of the pipeline instance to update"""
 
 
 @dataclass(eq=False, repr=False)
@@ -81,4 +153,7 @@ class MessageProto(betterproto.Message):
     )
     camera_info: "CameraProto" = betterproto.message_field(4, group="payload")
     pipeline_info: "PipelineProto" = betterproto.message_field(5, group="payload")
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(6)
+    set_pipeline_type: "SetPipelineTypeMessageProto" = betterproto.message_field(
+        6, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(7)

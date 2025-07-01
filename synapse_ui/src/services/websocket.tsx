@@ -1,10 +1,10 @@
-type WebSocketWrapperOptions = {
+interface WebSocketWrapperOptions {
   onOpen?: (event: Event) => void;
   onClose?: (event: CloseEvent) => void;
   onMessage?: (message: ArrayBufferLike) => void;
   onError?: (event: Event) => void;
   reconnectInterval?: number;
-};
+}
 
 export class WebSocketWrapper {
   private url: string;
