@@ -1,7 +1,13 @@
 import { Card, CardHeader } from "@/components/ui/card";
+import { SettingValueProto } from "@/proto/settings/v1/value";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import { hasSettingValue } from "@/services/backend/backendContext";
 import { PipelineManagement } from "@/services/backend/pipelineContext";
-import { GenerateControl } from "@/services/controls_generator";
+import {
+  GenerateControl,
+  protoToSettingValue,
+  settingValueToProto,
+} from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Activity, Camera, Settings } from "lucide-react";
@@ -13,12 +19,18 @@ export function PipelineConfigControl({
   selectedPipelineType,
   setpipelinecontext,
   backendConnected,
+  setSetting,
 }: {
   pipelinecontext: PipelineManagement.PipelineContext;
   setpipelinecontext: (context: PipelineManagement.PipelineContext) => void;
-  selectedPipeline?: PipelineProto;
+  selectedPipeline: PipelineProto;
   selectedPipelineType?: PipelineTypeProto;
   backendConnected: boolean | undefined;
+  setSetting: (
+    val: SettingValueProto,
+    setting: string,
+    pipeline: PipelineProto,
+  ) => void;
 }) {
   const [cameraControls, setCameraControls] = useState<
     (JSX.Element | undefined)[]
@@ -43,31 +55,41 @@ export function PipelineConfigControl({
           key={setting.name + setting.category}
           setting={setting}
           setValue={(val) => {
-            setTimeout(() => {
-              if (selectedPipeline && pipelinecontext) {
-                const oldPipelines = pipelinecontext.pipelines;
+            if (hasSettingValue(val)) {
+              setTimeout(() => {
+                if (selectedPipeline && pipelinecontext) {
+                  const oldPipelines = pipelinecontext.pipelines;
 
-                const newSettingsValues = {
-                  ...selectedPipeline.settingsValues,
-                  [setting.name]: val,
-                };
+                  const newSettingsValues = {
+                    ...selectedPipeline.settingsValues,
+                    [setting.name]: val,
+                  };
 
-                const updatedPipeline = {
-                  ...selectedPipeline,
-                  settingsValues: newSettingsValues,
-                };
+                  const updatedPipeline = {
+                    ...selectedPipeline,
+                    settingsValues: newSettingsValues,
+                  };
 
-                const newPipelines = new Map(oldPipelines);
-                newPipelines.set(selectedPipeline.index, updatedPipeline);
+                  const newPipelines = new Map(oldPipelines);
+                  newPipelines.set(selectedPipeline.index, updatedPipeline);
 
-                setpipelinecontext({
-                  ...pipelinecontext,
-                  pipelines: newPipelines,
-                });
-              }
-            }, 0);
+                  setpipelinecontext({
+                    ...pipelinecontext,
+                    pipelines: newPipelines,
+                  });
+                }
+              }, 0);
+
+              setTimeout(() => {
+                setSetting(val, setting.name, selectedPipeline!);
+              }, 0);
+            }
           }}
-          value={selectedPipeline!.settingsValues[setting.name]}
+          value={
+            selectedPipeline.settingsValues[setting.name] ??
+            setting.default ??
+            ""
+          }
           defaultValue={setting.default}
         />
       );

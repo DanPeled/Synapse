@@ -1,9 +1,9 @@
+import typing
 from typing import List, Optional, Type
 
 from wpimath import geometry
-import typing
-from .core.pipeline import Pipeline
 
+from .core.pipeline import Pipeline
 from .log import err
 
 

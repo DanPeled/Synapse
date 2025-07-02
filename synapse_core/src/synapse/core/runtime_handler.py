@@ -8,18 +8,13 @@ from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type
-from ..util import resolveGenericArgument
+
 import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
@@ -27,23 +22,12 @@ from wpilib import Timer
 from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
-from ..stypes import (
-    CameraID,
-    DataValue,
-    Frame,
-    PipelineID,
-    PipelineName,
-    PipelineTypeName,
-)
-from .camera_factory import (
-    CSCORE_TO_CV_PROPS,
-    CameraConfig,
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
+                      PipelineTypeName)
+from ..util import resolveGenericArgument
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -738,17 +722,7 @@ class RuntimeManager:
             def updateSettingListener(event: Event, cameraIndex=cameraIndex):
                 prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
                 value: Any = self.getEventDataValue(event)
-                self.pipelineLoader.getPipelineSettings(
-                    self.pipelineBindings[cameraIndex]
-                ).setSetting(prop, value)
-
-                if prop in CSCORE_TO_CV_PROPS.keys():
-                    camera = self.cameraHandler.getCamera(cameraIndex)
-                    if camera is not None:
-                        camera.setProperty(
-                            prop=prop,
-                            value=int(value),
-                        )
+                self.updateSetting(prop, cameraIndex, value)
 
             for key in pipeline_config.getMap().keys():
                 nt_table = getCameraTable(cameraIndex)
@@ -759,6 +733,24 @@ class RuntimeManager:
                         NetworkTableInstance.getDefault().addListener(
                             entry, EventFlags.kValueRemote, updateSettingListener
                         )
+
+    def updateSetting(self, prop: str, cameraIndex: CameraID, value: Any) -> None:
+        self.pipelineLoader.getPipelineSettings(
+            self.pipelineBindings[cameraIndex]
+        ).setSetting(prop, value)
+
+        if prop in CSCORE_TO_CV_PROPS.keys():
+            camera = self.cameraHandler.getCamera(cameraIndex)
+            if camera is not None:
+                camera.setProperty(
+                    prop=prop,
+                    value=int(value),
+                )
+
+        nt_table = getCameraTable(cameraIndex)
+        entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
+        if entry is not None and entry.getValue() != value:
+            entry.setValue(value)
 
     @staticmethod
     def getEventDataValue(
@@ -865,9 +857,9 @@ class RuntimeManager:
             self.__pipelineEntryCache = {}
 
         if cameraIndex not in self.__pipelineEntryCache:
-            table = NetworkTableInstance.getDefault().getTable(NtClient.NT_TABLE)
-            entry_path = f"{getCameraTableName(cameraIndex)}/{CameraSettingsKeys.kPipeline.value}"
-            self.__pipelineEntryCache[cameraIndex] = table.getEntry(entry_path)
+            table = getCameraTable(cameraIndex)
+            pipeline_entryPath = f"{CameraSettingsKeys.kPipeline.value}"
+            self.__pipelineEntryCache[cameraIndex] = table.getEntry(pipeline_entryPath)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
 

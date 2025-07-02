@@ -3,20 +3,19 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
+
+from betterproto import which_one_of
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse_net.proto.settings.v1 import (
-    ColorConstraintProto,
-    ColorFormatProto,
-    ConstraintConfigProto,
-    ConstraintProto,
-    ConstraintTypeProto,
-    ListOptionsConstraintProto,
-    RangeConstraintProto,
-    SettingMetaProto,
-    ListConstraintProto,
-    SettingValueProto,
-    StringConstraintProto,
-)
+from synapse_net.proto.settings.v1 import (ColorConstraintProto,
+                                           ColorFormatProto,
+                                           ConstraintConfigProto,
+                                           ConstraintProto,
+                                           ConstraintTypeProto,
+                                           ListConstraintProto,
+                                           ListOptionsConstraintProto,
+                                           RangeConstraintProto,
+                                           SettingMetaProto, SettingValueProto,
+                                           StringConstraintProto)
 
 from ..bcolors import MarkupColors
 from ..log import err
@@ -964,6 +963,25 @@ class PipelineSettings(SettingsCollection):
         category=kCameraPropsCategory,
         description="Camera Resolution",
     )
+
+
+def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
+    scalar_field = which_one_of(proto, "scalar_value")
+
+    if scalar_field is not None:
+        return scalar_field[1]
+    if proto.int_array_value:
+        return list(proto.int_array_value)
+    elif proto.string_array_value:
+        return list(proto.string_array_value)
+    elif proto.bool_array_value:
+        return list(proto.bool_array_value)
+    elif proto.float_array_value:
+        return list(proto.float_array_value)
+    elif proto.bytes_array_value:
+        return list(proto.bytes_array_value)
+
+    raise ValueError("No value set in SettingValueProto")
 
 
 def settingValueToProto(val: SettingsValue) -> SettingValueProto:

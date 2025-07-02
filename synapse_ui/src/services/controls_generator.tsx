@@ -6,6 +6,7 @@ import { Slider } from "@/widgets/slider";
 import TextInput from "@/widgets/textInput";
 import ToggleButton from "@/widgets/toggleButtons";
 import { toTitleCase } from "./stringUtil";
+import { Placeholder } from "@/widgets/placeholder";
 
 interface ControlGeneratorProps {
   setting: SettingMetaProto;
@@ -22,9 +23,8 @@ export function toNumber(val: unknown | undefined): number | undefined {
 }
 
 export function protoToSettingValue(proto: SettingValueProto): unknown {
-  if (proto === undefined) {
-    throw new TypeError("Unsupported or empty SettingsValueProto");
-  }
+  if (proto === undefined) return undefined;
+
   if (proto.intValue !== undefined) return proto.intValue;
   if (proto.stringValue !== undefined) return proto.stringValue;
   if (proto.boolValue !== undefined) return proto.boolValue;
@@ -37,7 +37,7 @@ export function protoToSettingValue(proto: SettingValueProto): unknown {
   if (proto.floatArrayValue.length > 0) return proto.floatArrayValue;
   if (proto.bytesArrayValue.length > 0) return proto.bytesArrayValue;
 
-  throw new TypeError("Unsupported or empty SettingsValueProto");
+  return undefined;
 }
 
 export function settingValueToProto(val: unknown): SettingValueProto {
@@ -106,17 +106,13 @@ export function GenerateControl({
           min={setting.constraint.constraint?.range?.min}
           max={setting.constraint.constraint?.range?.max}
           step={setting.constraint.constraint?.range?.step}
-          value={
-            toNumber(protoToSettingValue(value)) ??
-            toNumber(protoToSettingValue(value)) ??
-            0
-          }
+          value={toNumber(protoToSettingValue(value)) ?? 0}
           onChange={(val) => setValue(settingValueToProto(val))}
         />
       );
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST_OPTIONS:
       if (setting.constraint.constraint?.listOptions?.allowMultiple) {
-        return <div>TODO: multiple options not implemented</div>;
+        return <Placeholder text="TODO: multiple options not implemented" />;
       } else {
         return (
           <Dropdown

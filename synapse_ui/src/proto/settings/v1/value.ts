@@ -12,25 +12,15 @@ export const protobufPackage = "proto.settings.v1";
 /** Represents a flexible value for a setting, supporting multiple scalar types and arrays. */
 export interface SettingValueProto {
   /** Integer scalar value */
-  intValue?:
-    | number
-    | undefined;
+  intValue?: number | undefined;
   /** String scalar value */
-  stringValue?:
-    | string
-    | undefined;
+  stringValue?: string | undefined;
   /** Boolean scalar value */
-  boolValue?:
-    | boolean
-    | undefined;
+  boolValue?: boolean | undefined;
   /** Float scalar value */
-  floatValue?:
-    | number
-    | undefined;
+  floatValue?: number | undefined;
   /** Bytes scalar value */
-  bytesValue?:
-    | Uint8Array
-    | undefined;
+  bytesValue?: Uint8Array | undefined;
   /** Repeated integer values (array) */
   intArrayValue: number[];
   /** Repeated string values (array) */
@@ -59,7 +49,10 @@ function createBaseSettingValueProto(): SettingValueProto {
 }
 
 export const SettingValueProto: MessageFns<SettingValueProto> = {
-  encode(message: SettingValueProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: SettingValueProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.intValue !== undefined) {
       writer.uint32(8).int32(message.intValue);
     }
@@ -100,7 +93,8 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SettingValueProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSettingValueProto();
     while (reader.pos < end) {
@@ -227,11 +221,21 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
 
   fromJSON(object: any): SettingValueProto {
     return {
-      intValue: isSet(object.intValue) ? globalThis.Number(object.intValue) : undefined,
-      stringValue: isSet(object.stringValue) ? globalThis.String(object.stringValue) : undefined,
-      boolValue: isSet(object.boolValue) ? globalThis.Boolean(object.boolValue) : undefined,
-      floatValue: isSet(object.floatValue) ? globalThis.Number(object.floatValue) : undefined,
-      bytesValue: isSet(object.bytesValue) ? bytesFromBase64(object.bytesValue) : undefined,
+      intValue: isSet(object.intValue)
+        ? globalThis.Number(object.intValue)
+        : undefined,
+      stringValue: isSet(object.stringValue)
+        ? globalThis.String(object.stringValue)
+        : undefined,
+      boolValue: isSet(object.boolValue)
+        ? globalThis.Boolean(object.boolValue)
+        : undefined,
+      floatValue: isSet(object.floatValue)
+        ? globalThis.Number(object.floatValue)
+        : undefined,
+      bytesValue: isSet(object.bytesValue)
+        ? bytesFromBase64(object.bytesValue)
+        : undefined,
       intArrayValue: globalThis.Array.isArray(object?.intArrayValue)
         ? object.intArrayValue.map((e: any) => globalThis.Number(e))
         : [],
@@ -280,15 +284,21 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
       obj.floatArrayValue = message.floatArrayValue;
     }
     if (message.bytesArrayValue?.length) {
-      obj.bytesArrayValue = message.bytesArrayValue.map((e) => base64FromBytes(e));
+      obj.bytesArrayValue = message.bytesArrayValue.map((e) =>
+        base64FromBytes(e),
+      );
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<SettingValueProto>, I>>(base?: I): SettingValueProto {
+  create<I extends Exact<DeepPartial<SettingValueProto>, I>>(
+    base?: I,
+  ): SettingValueProto {
     return SettingValueProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SettingValueProto>, I>>(object: I): SettingValueProto {
+  fromPartial<I extends Exact<DeepPartial<SettingValueProto>, I>>(
+    object: I,
+  ): SettingValueProto {
     const message = createBaseSettingValueProto();
     message.intValue = object.intValue ?? undefined;
     message.stringValue = object.stringValue ?? undefined;
@@ -329,17 +339,31 @@ function base64FromBytes(arr: Uint8Array): string {
   }
 }
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

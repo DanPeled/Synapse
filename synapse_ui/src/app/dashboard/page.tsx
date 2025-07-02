@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { background, teamColor, baseCardColor } from "@/services/style";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
-import { useBackendContext } from "@/services/backend/backendContext";
+import {
+  hasSettingValue,
+  useBackendContext,
+} from "@/services/backend/backendContext";
 import { ResultsView } from "./results_view";
 import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
@@ -14,7 +17,10 @@ import { Activity, Camera } from "lucide-react";
 import { CameraStepControl } from "./camera_step_control";
 import { CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
-import { SetPipelineTypeMessageProto } from "@/proto/v1/pipeline";
+import {
+  SetPipelineTypeMessageProto,
+  SetPipleineSettingMessageProto,
+} from "@/proto/v1/pipeline";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -55,17 +61,17 @@ export default function Dashboard() {
   const { pipelinecontext, setPipelinecontext, connection, cameras, socket } =
     useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(
-    pipelinecontext.pipelines.get(0),
+    pipelinecontext.pipelines.get(0)!,
   );
   const [selectedPipelineType, setSelectedPipelineType] = useState(
-    Array.from(pipelinecontext.pipelineTypes.values()).at(0),
+    Array.from(pipelinecontext.pipelineTypes.values()).at(0)!,
   );
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    setSelectedPipeline(pipelinecontext.pipelines.get(0));
+    setSelectedPipeline(pipelinecontext.pipelines.get(0)!);
     setSelectedPipelineType(
-      Array.from(pipelinecontext.pipelineTypes.values()).at(0),
+      Array.from(pipelinecontext.pipelineTypes.values()).at(0)!,
     );
 
     let selectedPipelineIndex: number = -1;
@@ -80,7 +86,7 @@ export default function Dashboard() {
         if (updated) {
           setSelectedPipeline(updated);
           setSelectedPipelineType(
-            pipelinecontext.pipelineTypes.get(updated.type),
+            pipelinecontext.pipelineTypes.get(updated.type)!,
           );
         }
       }
@@ -113,6 +119,21 @@ export default function Dashboard() {
               selectedPipelineType={selectedPipelineType}
               setpipelinecontext={setPipelinecontext}
               backendConnected={connection.backend}
+              setSetting={(val, setting, pipeline) => {
+                if (hasSettingValue(val)) {
+                  const payload = MessageProto.create({
+                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
+                    setPipelineSetting: SetPipleineSettingMessageProto.create({
+                      pipelineIndex: pipeline.index,
+                      value: val,
+                      setting: setting,
+                    }),
+                  });
+
+                  const binary = MessageProto.encode(payload).finish();
+                  socket?.sendBinary(binary);
+                }
+              }}
             />
           </Column>
 
@@ -123,13 +144,13 @@ export default function Dashboard() {
                 if (val !== undefined) {
                   setSelectedPipeline(val);
                   setSelectedPipelineType(
-                    pipelinecontext.pipelineTypes.get(val.type),
+                    pipelinecontext.pipelineTypes.get(val.type)!,
                   );
                 }
               }}
               selectedPipeline={selectedPipeline}
               setSelectedPipelineType={(newType) => {
-                setSelectedPipelineType(newType);
+                setSelectedPipelineType(newType!);
 
                 setTimeout(() => {
                   if (selectedPipeline && newType) {

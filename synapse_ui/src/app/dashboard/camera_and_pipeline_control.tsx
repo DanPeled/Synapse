@@ -21,6 +21,7 @@ import ToggleButton from "@/widgets/toggleButtons";
 import { Card, CardContent } from "@/components/ui/card";
 import { CameraProto } from "@/proto/v1/camera";
 import { AlertDialog } from "@/widgets/alertDialog";
+import { SettingValueProto } from "@/proto/settings/v1/value";
 
 function AddPipelineDialog({
   visible,
@@ -176,7 +177,7 @@ export function CameraAndPipelineControls({
             options={
               (cameras
                 ? cameras.map((cam) => ({
-                    label: `${cam.name}`,
+                    label: `${cam?.name}`,
                     value: cam,
                   }))
                 : []) as DropdownOption<CameraProto>[]
@@ -193,7 +194,7 @@ export function CameraAndPipelineControls({
             onValueChange={(val) => setSelectedPipeline(val)}
             options={Array.from(pipelinecontext.pipelines.entries()).map(
               ([index, pipeline]) => ({
-                label: pipeline.name,
+                label: pipeline?.name,
                 value: pipeline,
               }),
             )}

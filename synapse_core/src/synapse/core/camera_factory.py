@@ -9,7 +9,8 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
+from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
+                    VideoSource)
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
@@ -52,6 +53,7 @@ class CameraSettingsKeys(Enum):
     kViewID = "view_id"
     kRecord = "record"
     kPipeline = "pipeline"
+    kPipelineType = "pipeline_t"
 
 
 def getCameraTableName(cameraIndex: CameraID) -> str:

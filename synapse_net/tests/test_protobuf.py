@@ -2,16 +2,8 @@ import importlib
 import inspect
 import math
 import pkgutil
-from typing import (
-    get_origin,
-    get_args,
-    List,
-    Union,
-    Dict,
-    Any,
-    Callable,
-    Type,
-)
+from typing import Any, Callable, Dict, List, Type, Union, get_args, get_origin
+
 from betterproto import Message
 
 

@@ -2,30 +2,26 @@ import asyncio
 import os
 import threading
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from synapse.core.config import Config, NetworkConfig
-from synapse.hardware.metrics import Platform
-from synapse.log import err, log
-from synapse.stypes import CameraID, PipelineID
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import (
-    DeviceInfoProto,
-    MessageProto,
-    MessageTypeProto,
-    PipelineTypeProto,
-)
-from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
-
-from .camera_factory import SynapseCamera, cameraToProto
-
-from .settings_api import settingsToProto
-from ..util import resolveGenericArgument
+from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
+                                  MessageTypeProto, PipelineTypeProto,
+                                  SetPipleineSettingMessageProto)
+from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+                                      createMessage)
 
 from ..bcolors import MarkupColors
+from ..hardware.metrics import Platform
+from ..log import err, log
+from ..stypes import CameraID, PipelineID
+from ..util import resolveGenericArgument
+from .camera_factory import SynapseCamera, cameraToProto
+from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
+from .settings_api import protoToSettingValue, settingsToProto
 
 
 class Synapse:
@@ -236,7 +232,7 @@ class Synapse:
 
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):
-            print(f"Message from {ws.remote_address}: {msg}")
+            self.onMessage(ws, msg)
 
         @self.websocket.on(SocketEvent.kError)
         async def on_error(ws, error_msg):
@@ -293,6 +289,23 @@ class Synapse:
 
         self.runtime_handler.pipelineLoader.onAddPipeline.append(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.append(onAddCamera)
+
+    def onMessage(self, ws, msg) -> None:
+        msgObj = MessageProto().parse(msg)
+        msgType = msgObj.type
+
+        if msgType == MessageTypeProto.SET_SETTING:
+            setSetting: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
+            pipeline: Optional[Pipeline] = (
+                self.runtime_handler.pipelineLoader.getPipeline(
+                    setSetting.pipeline_index
+                )
+            )
+
+            if pipeline is not None:
+                val = protoToSettingValue(setSetting.value)
+                pipeline.setSetting(setSetting.setting, val)
+                self.runtime_handler.updateSetting(setSetting.setting, 0, val)
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

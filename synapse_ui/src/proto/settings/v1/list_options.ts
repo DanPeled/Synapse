@@ -28,91 +28,122 @@ function createBaseListOptionsConstraintProto(): ListOptionsConstraintProto {
   return { options: [], allowMultiple: false };
 }
 
-export const ListOptionsConstraintProto: MessageFns<ListOptionsConstraintProto> = {
-  encode(message: ListOptionsConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.options) {
-      SettingValueProto.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.allowMultiple !== false) {
-      writer.uint32(16).bool(message.allowMultiple);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListOptionsConstraintProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListOptionsConstraintProto();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.options.push(SettingValueProto.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.allowMultiple = reader.bool();
-          continue;
-        }
+export const ListOptionsConstraintProto: MessageFns<ListOptionsConstraintProto> =
+  {
+    encode(
+      message: ListOptionsConstraintProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      for (const v of message.options) {
+        SettingValueProto.encode(v!, writer.uint32(10).fork()).join();
       }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
+      if (message.allowMultiple !== false) {
+        writer.uint32(16).bool(message.allowMultiple);
       }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+      return writer;
+    },
 
-  fromJSON(object: any): ListOptionsConstraintProto {
-    return {
-      options: globalThis.Array.isArray(object?.options)
-        ? object.options.map((e: any) => SettingValueProto.fromJSON(e))
-        : [],
-      allowMultiple: isSet(object.allowMultiple) ? globalThis.Boolean(object.allowMultiple) : false,
-    };
-  },
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): ListOptionsConstraintProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListOptionsConstraintProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
 
-  toJSON(message: ListOptionsConstraintProto): unknown {
-    const obj: any = {};
-    if (message.options?.length) {
-      obj.options = message.options.map((e) => SettingValueProto.toJSON(e));
-    }
-    if (message.allowMultiple !== false) {
-      obj.allowMultiple = message.allowMultiple;
-    }
-    return obj;
-  },
+            message.options.push(
+              SettingValueProto.decode(reader, reader.uint32()),
+            );
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
 
-  create<I extends Exact<DeepPartial<ListOptionsConstraintProto>, I>>(base?: I): ListOptionsConstraintProto {
-    return ListOptionsConstraintProto.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ListOptionsConstraintProto>, I>>(object: I): ListOptionsConstraintProto {
-    const message = createBaseListOptionsConstraintProto();
-    message.options = object.options?.map((e) => SettingValueProto.fromPartial(e)) || [];
-    message.allowMultiple = object.allowMultiple ?? false;
-    return message;
-  },
-};
+            message.allowMultiple = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+    fromJSON(object: any): ListOptionsConstraintProto {
+      return {
+        options: globalThis.Array.isArray(object?.options)
+          ? object.options.map((e: any) => SettingValueProto.fromJSON(e))
+          : [],
+        allowMultiple: isSet(object.allowMultiple)
+          ? globalThis.Boolean(object.allowMultiple)
+          : false,
+      };
+    },
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+    toJSON(message: ListOptionsConstraintProto): unknown {
+      const obj: any = {};
+      if (message.options?.length) {
+        obj.options = message.options.map((e) => SettingValueProto.toJSON(e));
+      }
+      if (message.allowMultiple !== false) {
+        obj.allowMultiple = message.allowMultiple;
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<ListOptionsConstraintProto>, I>>(
+      base?: I,
+    ): ListOptionsConstraintProto {
+      return ListOptionsConstraintProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<I extends Exact<DeepPartial<ListOptionsConstraintProto>, I>>(
+      object: I,
+    ): ListOptionsConstraintProto {
+      const message = createBaseListOptionsConstraintProto();
+      message.options =
+        object.options?.map((e) => SettingValueProto.fromPartial(e)) || [];
+      message.allowMultiple = object.allowMultiple ?? false;
+      return message;
+    },
+  };
+
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
+
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

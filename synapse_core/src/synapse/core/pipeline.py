@@ -7,11 +7,8 @@ from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
 from ..stypes import CameraID, Frame
-from .settings_api import (
-    PipelineSettings,
-    Setting,
-    settingValueToProto,
-)
+from .settings_api import (PipelineSettings, Setting, SettingsValue,
+                           settingValueToProto)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
@@ -89,6 +86,10 @@ class Pipeline(ABC, Generic[TSettingsType]):
             Optional[Any]: The value of the setting if found, else None.
         """
         return self.settings.getSetting(setting)
+
+    def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
+        if isinstance(setting, str):
+            self.settings.getAPI().setValue(setting, value)
 
     def __getOrCreateBuilder(self, key: str) -> SendableBuilder:
         """

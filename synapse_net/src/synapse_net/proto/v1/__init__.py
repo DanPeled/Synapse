@@ -4,10 +4,7 @@
 # This file has been @generated
 
 from dataclasses import dataclass
-from typing import (
-    Dict,
-    List,
-)
+from typing import Dict, List
 
 import betterproto
 
@@ -22,6 +19,7 @@ class MessageTypeProto(betterproto.Enum):
     SEND_PIPELINE_TYPES = 4
     ADD_CAMERA = 5
     SET_TYPE_FOR_PIPELINE = 6
+    SET_SETTING = 7
 
 
 @dataclass(eq=False, repr=False)
@@ -156,4 +154,7 @@ class MessageProto(betterproto.Message):
     set_pipeline_type: "SetPipelineTypeMessageProto" = betterproto.message_field(
         6, group="payload"
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(7)
+    set_pipeline_setting: "SetPipleineSettingMessageProto" = betterproto.message_field(
+        7, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(8)

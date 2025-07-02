@@ -55,7 +55,7 @@ export function Dropdown<T>({
       </label>
       <div className="flex-1 relative">
         <Select
-          value={selectedKey}
+          value={selectedKey ?? ""}
           onValueChange={(strVal) => {
             const newVal = stringToValue.get(strVal);
             if (newVal !== undefined) onValueChange(newVal);

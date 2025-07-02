@@ -1,11 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock
-from synapse_net.socketServer import (
-    getMessageDataFieldName,
-    SocketEvent,
-    WebSocketServer,
-)
+
+import pytest
 from synapse_net.proto.v1 import MessageProto
+from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+                                      getMessageDataFieldName)
 
 
 def test_getMessageDataFieldName_valid():

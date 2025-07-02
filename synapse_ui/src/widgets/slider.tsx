@@ -27,7 +27,7 @@ export function Slider({
   const [internalValue, setInternalValue] = useState<number | "">(value);
 
   useEffect(() => {
-    if (typeof internalValue === "number" && internalValue !== value) {
+    if (internalValue !== value) {
       setInternalValue(value);
     }
   }, [value]);

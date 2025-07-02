@@ -33,9 +33,7 @@ export interface SettingMetaProto {
   /** A human-readable description explaining the purpose of the setting */
   description: string;
   /** The default value for the setting */
-  default:
-    | SettingValueProto
-    | undefined;
+  default: SettingValueProto | undefined;
   /** Optional constraints that restrict or define valid values for the setting */
   constraint: ConstraintProto | undefined;
 }
@@ -45,18 +43,25 @@ function createBaseConstraintProto(): ConstraintProto {
 }
 
 export const ConstraintProto: MessageFns<ConstraintProto> = {
-  encode(message: ConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: ConstraintProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.type !== 0) {
       writer.uint32(32).int32(message.type);
     }
     if (message.constraint !== undefined) {
-      ConstraintConfigProto.encode(message.constraint, writer.uint32(42).fork()).join();
+      ConstraintConfigProto.encode(
+        message.constraint,
+        writer.uint32(42).fork(),
+      ).join();
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): ConstraintProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseConstraintProto();
     while (reader.pos < end) {
@@ -75,7 +80,10 @@ export const ConstraintProto: MessageFns<ConstraintProto> = {
             break;
           }
 
-          message.constraint = ConstraintConfigProto.decode(reader, reader.uint32());
+          message.constraint = ConstraintConfigProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
       }
@@ -90,7 +98,9 @@ export const ConstraintProto: MessageFns<ConstraintProto> = {
   fromJSON(object: any): ConstraintProto {
     return {
       type: isSet(object.type) ? constraintTypeProtoFromJSON(object.type) : 0,
-      constraint: isSet(object.constraint) ? ConstraintConfigProto.fromJSON(object.constraint) : undefined,
+      constraint: isSet(object.constraint)
+        ? ConstraintConfigProto.fromJSON(object.constraint)
+        : undefined,
     };
   },
 
@@ -105,25 +115,39 @@ export const ConstraintProto: MessageFns<ConstraintProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ConstraintProto>, I>>(base?: I): ConstraintProto {
+  create<I extends Exact<DeepPartial<ConstraintProto>, I>>(
+    base?: I,
+  ): ConstraintProto {
     return ConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ConstraintProto>, I>>(object: I): ConstraintProto {
+  fromPartial<I extends Exact<DeepPartial<ConstraintProto>, I>>(
+    object: I,
+  ): ConstraintProto {
     const message = createBaseConstraintProto();
     message.type = object.type ?? 0;
-    message.constraint = (object.constraint !== undefined && object.constraint !== null)
-      ? ConstraintConfigProto.fromPartial(object.constraint)
-      : undefined;
+    message.constraint =
+      object.constraint !== undefined && object.constraint !== null
+        ? ConstraintConfigProto.fromPartial(object.constraint)
+        : undefined;
     return message;
   },
 };
 
 function createBaseSettingMetaProto(): SettingMetaProto {
-  return { name: "", category: "", description: "", default: undefined, constraint: undefined };
+  return {
+    name: "",
+    category: "",
+    description: "",
+    default: undefined,
+    constraint: undefined,
+  };
 }
 
 export const SettingMetaProto: MessageFns<SettingMetaProto> = {
-  encode(message: SettingMetaProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: SettingMetaProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
@@ -134,16 +158,23 @@ export const SettingMetaProto: MessageFns<SettingMetaProto> = {
       writer.uint32(26).string(message.description);
     }
     if (message.default !== undefined) {
-      SettingValueProto.encode(message.default, writer.uint32(34).fork()).join();
+      SettingValueProto.encode(
+        message.default,
+        writer.uint32(34).fork(),
+      ).join();
     }
     if (message.constraint !== undefined) {
-      ConstraintProto.encode(message.constraint, writer.uint32(42).fork()).join();
+      ConstraintProto.encode(
+        message.constraint,
+        writer.uint32(42).fork(),
+      ).join();
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SettingMetaProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSettingMetaProto();
     while (reader.pos < end) {
@@ -201,10 +232,18 @@ export const SettingMetaProto: MessageFns<SettingMetaProto> = {
   fromJSON(object: any): SettingMetaProto {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      category: isSet(object.category) ? globalThis.String(object.category) : "",
-      description: isSet(object.description) ? globalThis.String(object.description) : "",
-      default: isSet(object.default) ? SettingValueProto.fromJSON(object.default) : undefined,
-      constraint: isSet(object.constraint) ? ConstraintProto.fromJSON(object.constraint) : undefined,
+      category: isSet(object.category)
+        ? globalThis.String(object.category)
+        : "",
+      description: isSet(object.description)
+        ? globalThis.String(object.description)
+        : "",
+      default: isSet(object.default)
+        ? SettingValueProto.fromJSON(object.default)
+        : undefined,
+      constraint: isSet(object.constraint)
+        ? ConstraintProto.fromJSON(object.constraint)
+        : undefined,
     };
   },
 
@@ -228,35 +267,55 @@ export const SettingMetaProto: MessageFns<SettingMetaProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<SettingMetaProto>, I>>(base?: I): SettingMetaProto {
+  create<I extends Exact<DeepPartial<SettingMetaProto>, I>>(
+    base?: I,
+  ): SettingMetaProto {
     return SettingMetaProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SettingMetaProto>, I>>(object: I): SettingMetaProto {
+  fromPartial<I extends Exact<DeepPartial<SettingMetaProto>, I>>(
+    object: I,
+  ): SettingMetaProto {
     const message = createBaseSettingMetaProto();
     message.name = object.name ?? "";
     message.category = object.category ?? "";
     message.description = object.description ?? "";
-    message.default = (object.default !== undefined && object.default !== null)
-      ? SettingValueProto.fromPartial(object.default)
-      : undefined;
-    message.constraint = (object.constraint !== undefined && object.constraint !== null)
-      ? ConstraintProto.fromPartial(object.constraint)
-      : undefined;
+    message.default =
+      object.default !== undefined && object.default !== null
+        ? SettingValueProto.fromPartial(object.default)
+        : undefined;
+    message.constraint =
+      object.constraint !== undefined && object.constraint !== null
+        ? ConstraintProto.fromPartial(object.constraint)
+        : undefined;
     return message;
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

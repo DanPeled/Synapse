@@ -16,6 +16,22 @@ import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { CameraProto } from "@/proto/v1/camera";
+import { SettingValueProto } from "@/proto/settings/v1/value";
+
+export function hasSettingValue(val: SettingValueProto): boolean {
+  return (
+    val.intValue !== undefined ||
+    val.stringValue !== undefined ||
+    val.boolValue !== undefined ||
+    val.floatValue !== undefined ||
+    val.bytesValue !== undefined ||
+    (val.intArrayValue && val.intArrayValue.length > 0) ||
+    (val.stringArrayValue && val.stringArrayValue.length > 0) ||
+    (val.boolArrayValue && val.boolArrayValue.length > 0) ||
+    (val.floatArrayValue && val.floatArrayValue.length > 0) ||
+    (val.bytesArrayValue && val.bytesArrayValue.length > 0)
+  );
+}
 
 const initialState: BackendStateSystem.State = {
   deviceinfo: {
