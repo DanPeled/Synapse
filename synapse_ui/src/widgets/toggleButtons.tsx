@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { teamColor } from "../services/style";
 
 export default function ToggleButton({
-  label = "Toggle",
+  label = "",
   value = false,
   onToggleAction,
   disabled = false,

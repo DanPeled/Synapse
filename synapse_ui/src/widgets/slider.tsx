@@ -20,7 +20,7 @@ export function Slider({
   max = 100,
   step = 1,
   value,
-  label = "Value",
+  label = "",
   labelGap = "0px",
   className = "",
   onChange,
@@ -81,7 +81,7 @@ export function Slider({
   return (
     <div
       className={cn(
-        "w-[97%] p-4 rounded-2xl shadow-md flex items-center gap-4",
+        "w-[97%] p-4 rounded-2xl flex items-center gap-4",
         "text-[rgba(255,255,255,0.85)]",
         className,
       )}
@@ -100,14 +100,13 @@ export function Slider({
           size="sm"
           onClick={decrement}
           disabled={typeof internalValue === "number" && internalValue <= min}
-          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center"
+          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center cursor-pointer hover:bg-stone-900 bg-zinc-800"
           style={{
             borderColor: "rgba(255,255,255,0.2)",
-            backgroundColor: "rgba(255,255,255,0.1)",
             color: teamColor,
           }}
         >
-          &minus;
+          <span className="select-none">&minus;</span>
         </Button>
 
         <input
@@ -131,14 +130,13 @@ export function Slider({
           size="sm"
           onClick={increment}
           disabled={typeof internalValue === "number" && internalValue >= max}
-          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center"
+          className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center cursor-pointer hover:bg-stone-900 bg-zinc-800"
           style={{
             borderColor: "rgba(255,255,255,0.2)",
-            backgroundColor: "rgba(255,255,255,0.1)",
             color: teamColor,
           }}
         >
-          +
+          <span className="select-none">+</span>
         </Button>
 
         <input

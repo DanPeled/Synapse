@@ -5,7 +5,7 @@ import { teamColor } from "../services/style";
 
 interface TextInputProps {
   label?: string;
-  initialValue?: string;
+  value: string;
   onChange?: (value: string) => void;
   placeholder?: string;
   pattern?: string | RegExp;
@@ -18,8 +18,8 @@ interface TextInputProps {
 }
 
 export default function TextInput({
-  label = "Input",
-  initialValue = "",
+  label = "",
+  value,
   onChange,
   placeholder = "",
   pattern = "^.*$",
@@ -28,14 +28,8 @@ export default function TextInput({
   maxLength = null,
   labelColor = teamColor,
 }: TextInputProps) {
-  const [value, setValue] = useState(initialValue);
   const [invalid, setInvalid] = useState(false);
-
   const id = useId();
-
-  useEffect(() => {
-    setValue(initialValue);
-  }, [initialValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value;
@@ -48,8 +42,6 @@ export default function TextInput({
     if (maxLength !== null && val.length > maxLength) {
       val = val.slice(0, maxLength);
     }
-
-    setValue(val);
 
     const patternRegex =
       pattern instanceof RegExp ? pattern : new RegExp(pattern);
@@ -84,7 +76,7 @@ export default function TextInput({
         <Input
           id={id}
           type="text"
-          value={disabled ? initialValue : value}
+          value={value}
           onChange={handleChange}
           placeholder={placeholder}
           disabled={disabled}
