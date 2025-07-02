@@ -117,24 +117,24 @@ export function PipelineConfigControl({
           style={{ color: teamColor }}
         >
           <TabsList
-            className="grid w-full grid-cols-3 border-gray-600 rounded-xl"
+            className="grid w-full grid-cols-3 border-gray-600 rounded-xl gap-2"
             style={{ backgroundColor: baseCardColor }}
           >
             <TabsTrigger
               value="input"
-              className="rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
+              className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer h-8"
             >
               Input
             </TabsTrigger>
             <TabsTrigger
               value="pipeline"
-              className="rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
+              className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
             >
-              Pipeline
+              {selectedPipelineType?.type}
             </TabsTrigger>
             <TabsTrigger
               value="output"
-              className="rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
+              className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
             >
               Output
             </TabsTrigger>

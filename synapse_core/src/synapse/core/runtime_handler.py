@@ -85,7 +85,20 @@ class PipelineLoader:
     def loadPipelineInstances(self):
         for pipelineIndex in self.pipelineSettings.keys():
             pipelineType = self.getPipelineTypeByIndex(pipelineIndex)
-            self.addPipeline(self.pipelineNames[pipelineIndex], pipelineType.__name__)
+            settings = self.pipelineSettings.get(pipelineIndex)
+            settingsMap: Dict = {}
+            if settings:
+                settingsMap = {
+                    key: settings.getAPI().getValue(key)
+                    for key in settings.getSchema().keys()
+                }
+            else:
+                settingsMap = {}
+            self.addPipeline(
+                self.pipelineNames[pipelineIndex],
+                pipelineType.__name__,
+                settingsMap,
+            )
 
     def addPipeline(
         self, name: str, typename: str, settings: Optional[SettingsMap] = None
@@ -99,6 +112,7 @@ class PipelineLoader:
             self.pipelineInstanceBindings.append(currPipeline)
 
             for callback in self.onAddPipeline:
+                log.log(str(settings))
                 callback(len(self.pipelineInstanceBindings) - 1, currPipeline)
 
     def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
@@ -541,6 +555,9 @@ class CameraHandler:
             camera.close()
 
 
+SettingChangedCallback = Callable[[str, Any, CameraID], None]
+
+
 class RuntimeManager:
     """
     Handles the loading, configuration, and runtime execution of vision pipelines
@@ -565,6 +582,8 @@ class RuntimeManager:
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
         self.isRunning: bool = True
+        self.onSettingChanged: List[SettingChangedCallback] = []
+        self.onSettingChangedFromNT: List[SettingChangedCallback] = []
 
     def setup(self, directory: Path):
         """
@@ -724,6 +743,9 @@ class RuntimeManager:
                 value: Any = self.getEventDataValue(event)
                 self.updateSetting(prop, cameraIndex, value)
 
+                for callback in self.onSettingChangedFromNT:
+                    callback(prop, value, cameraIndex)
+
             for key in pipeline_config.getMap().keys():
                 nt_table = getCameraTable(cameraIndex)
                 if nt_table is not None:
@@ -746,6 +768,9 @@ class RuntimeManager:
                     prop=prop,
                     value=int(value),
                 )
+
+        for callback in self.onSettingChanged:
+            callback(prop, value, cameraIndex)
 
         nt_table = getCameraTable(cameraIndex)
         entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)

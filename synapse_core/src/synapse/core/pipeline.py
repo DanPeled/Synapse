@@ -2,13 +2,14 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, Iterable, Optional, TypeVar, Union, overload
 
 from ntcore import NetworkTable
+from synapse.log import log
 from synapse_net.proto.v1 import PipelineProto
 from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
 from ..stypes import CameraID, Frame
-from .settings_api import (PipelineSettings, Setting, SettingsValue,
-                           settingValueToProto)
+from .settings_api import (PipelineSettings, Setting, SettingsAPI,
+                           SettingsValue, settingValueToProto)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
@@ -116,7 +117,8 @@ def disabled(cls):
 
 
 def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
-    api = inst.settings.getAPI()
+    api: SettingsAPI = inst.settings.getAPI()
+    log(f"{[api.getValue(key) for key in api.getSettingsSchema().keys()]}")
 
     msg = PipelineProto(
         name=inst.name,

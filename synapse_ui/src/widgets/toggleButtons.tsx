@@ -36,7 +36,7 @@ export default function ToggleButton({
       <div
         className={cn(
           "relative w-[50px] h-[28px] rounded-full transition-colors cursor-pointer",
-          value ? "bg-teal-500" : "bg-gray-700",
+          value ? "bg-rose-500" : "bg-rose-600",
           disabled && "opacity-50 cursor-not-allowed",
         )}
         onClick={() => {
@@ -45,8 +45,8 @@ export default function ToggleButton({
       >
         <div
           className={cn(
-            "absolute top-[3px] w-[22px] h-[22px] bg-white rounded-full transition-all",
-            value ? "left-[26px]" : "left-[3px]",
+            "absolute top-[3px] w-[22px] h-[22px] rounded-full transition-all",
+            value ? "bg-zinc-800 left-[26px]" : "left-[3px] bg-zinc-800",
           )}
         />
       </div>

@@ -2,7 +2,7 @@ import asyncio
 import os
 import threading
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
@@ -21,7 +21,8 @@ from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import protoToSettingValue, settingsToProto
+from .settings_api import (protoToSettingValue, settingsToProto,
+                           settingValueToProto)
 
 
 class Synapse:
@@ -287,8 +288,25 @@ class Synapse:
                 createMessage(MessageTypeProto.ADD_CAMERA, msg)
             )
 
+        def onSettingChangedInNt(
+            setting: str, value: Any, cameraIndex: CameraID
+        ) -> None:
+            msg = createMessage(
+                MessageTypeProto.SET_SETTING,
+                SetPipleineSettingMessageProto(
+                    setting=setting,
+                    value=settingValueToProto(value),
+                    pipeline_index=Synapse.kInstance.runtime_handler.pipelineBindings[
+                        cameraIndex
+                    ],
+                ),
+            )
+
+            self.websocket.sendToAllSync(msg)
+
         self.runtime_handler.pipelineLoader.onAddPipeline.append(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.append(onAddCamera)
+        self.runtime_handler.onSettingChangedFromNT.append(onSettingChangedInNt)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)

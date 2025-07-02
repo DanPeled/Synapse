@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { baseCardColor, teamColor } from "@/services/style";
+import { darken } from "polished";
 
 interface SliderProps {
   min?: number;
@@ -116,11 +117,13 @@ export function Slider({
           step={step}
           value={internalValue === "" ? min : internalValue}
           onChange={handleSliderChange}
-          className="flex-grow h-1 rounded-md cursor-pointer appearance-none"
-          style={{
-            background: `linear-gradient(to right, ${teamColor} 0%, ${teamColor} ${valuePercent}%, rgba(255,255,255,0.2) ${valuePercent}%, rgba(255,255,255,0.2) 100%)`,
-            outline: "none",
-          }}
+          className="custom-range appearance-none h-1 w-full rounded-md cursor-pointer"
+          style={
+            {
+              "--thumb-color": darken(10, teamColor),
+              background: `linear-gradient(to right, ${teamColor} 0%, ${teamColor} ${valuePercent}%, rgba(255,255,255,0.2) ${valuePercent}%, rgba(255,255,255,0.2) 100%)`,
+            } as React.CSSProperties & Record<string, string>
+          }
         />
 
         <Button

@@ -136,3 +136,53 @@ input[type="range"]:hover::-webkit-slider-thumb {
 input[type="range"]::-moz-range-thumb {
   background: var(--team-color);
 }
+
+@layer utilities {
+  .custom-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .custom-range::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .custom-range::-webkit-slider-thumb {
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 9999px;
+    background-color: var(--thumb-color, #f472b6);
+    cursor: pointer;
+    border: none;
+    margin-top: -6px;
+    transition:
+      background-color 0.2s,
+      transform 0.1s;
+  }
+
+  .custom-range::-webkit-slider-thumb:hover {
+    background-color: var(--thumb-color, #f472b6);
+    transform: scale(1.05);
+  }
+
+  .custom-range::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 9999px;
+    background-color: var(--thumb-color, #f472b6);
+    cursor: pointer;
+    border: none;
+    transition:
+      background-color 0.2s,
+      transform 0.1s;
+  }
+
+  .custom-range::-moz-range-thumb:hover {
+    background-color: var(--thumb-color, #f472b6);
+    transform: scale(1.05);
+  }
+}
