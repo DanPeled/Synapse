@@ -275,32 +275,33 @@ class Synapse:
 
     def setupRuntimeCallbacks(self):
         def onAddPipeline(id: PipelineID, inst: Pipeline) -> None:
-            msg = pipelineToProto(inst, id)
+            pipelineProto = pipelineToProto(inst, id)
 
             self.websocket.sendToAllSync(
-                createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+                createMessage(MessageTypeProto.ADD_PIPELINE, pipelineProto)
             )
 
         def onAddCamera(id: CameraID, name: str, camera: SynapseCamera) -> None:
-            msg = cameraToProto(id, name, camera)
+            cameraProto = cameraToProto(id, name, camera)
 
             self.websocket.sendToAllSync(
-                createMessage(MessageTypeProto.ADD_CAMERA, msg)
+                createMessage(MessageTypeProto.ADD_CAMERA, cameraProto)
             )
 
         def onSettingChangedInNt(
             setting: str, value: Any, cameraIndex: CameraID
         ) -> None:
-            msg = createMessage(
-                MessageTypeProto.SET_SETTING,
+            setSettingProto: SetPipleineSettingMessageProto = (
                 SetPipleineSettingMessageProto(
                     setting=setting,
                     value=settingValueToProto(value),
                     pipeline_index=Synapse.kInstance.runtime_handler.pipelineBindings[
                         cameraIndex
                     ],
-                ),
+                )
             )
+
+            msg = createMessage(MessageTypeProto.SET_SETTING, setSettingProto)
 
             self.websocket.sendToAllSync(msg)
 
