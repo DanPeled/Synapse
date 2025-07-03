@@ -7,13 +7,8 @@ from wpilib import SendableBuilderImpl
 from wpiutil import Sendable, SendableBuilder
 
 from ..stypes import CameraID, Frame
-from .settings_api import (
-    PipelineSettings,
-    Setting,
-    SettingsAPI,
-    SettingsValue,
-    settingValueToProto,
-)
+from .settings_api import (PipelineSettings, Setting, SettingsAPI,
+                           SettingsValue, settingValueToProto)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 

@@ -14,7 +14,9 @@ import { CameraProto } from "@/proto/v1/camera";
 
 export default function CameraConfigPage() {
   const { cameras } = useBackendContext();
-  const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(cameras[0]);
+  const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
+    cameras[0],
+  );
 
   useEffect(() => {
     setSelectedCamera(cameras.at(0));
@@ -40,9 +42,9 @@ export default function CameraConfigPage() {
               options={
                 (cameras
                   ? cameras.map((cam) => ({
-                    label: `${cam?.name}`,
-                    value: cam,
-                  }))
+                      label: `${cam?.name}`,
+                      value: cam,
+                    }))
                   : []) as DropdownOption<CameraProto>[]
               }
               label="Camera"

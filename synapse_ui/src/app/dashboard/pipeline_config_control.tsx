@@ -3,9 +3,7 @@ import { SettingValueProto } from "@/proto/settings/v1/value";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { hasSettingValue } from "@/services/backend/backendContext";
 import { PipelineManagement } from "@/services/backend/pipelineContext";
-import {
-  GenerateControl,
-} from "@/services/controls_generator";
+import { GenerateControl } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Activity, Camera, Settings } from "lucide-react";
