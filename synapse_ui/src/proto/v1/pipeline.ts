@@ -54,6 +54,11 @@ export interface SetPipleineSettingMessageProto {
   pipelineIndex: number;
 }
 
+export interface SetPipelineIndexMessageProto {
+  pipelineIndex: number;
+  cameraIndex: number;
+}
+
 function createBasePipelineTypeProto(): PipelineTypeProto {
   return { type: "", settings: [] };
 }
@@ -584,6 +589,98 @@ export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessag
           ? SettingValueProto.fromPartial(object.value)
           : undefined;
       message.pipelineIndex = object.pipelineIndex ?? 0;
+      return message;
+    },
+  };
+
+function createBaseSetPipelineIndexMessageProto(): SetPipelineIndexMessageProto {
+  return { pipelineIndex: 0, cameraIndex: 0 };
+}
+
+export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessageProto> =
+  {
+    encode(
+      message: SetPipelineIndexMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.pipelineIndex !== 0) {
+        writer.uint32(8).int32(message.pipelineIndex);
+      }
+      if (message.cameraIndex !== 0) {
+        writer.uint32(16).int32(message.cameraIndex);
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): SetPipelineIndexMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetPipelineIndexMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.pipelineIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): SetPipelineIndexMessageProto {
+      return {
+        pipelineIndex: isSet(object.pipelineIndex)
+          ? globalThis.Number(object.pipelineIndex)
+          : 0,
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+      };
+    },
+
+    toJSON(message: SetPipelineIndexMessageProto): unknown {
+      const obj: any = {};
+      if (message.pipelineIndex !== 0) {
+        obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<SetPipelineIndexMessageProto>, I>>(
+      base?: I,
+    ): SetPipelineIndexMessageProto {
+      return SetPipelineIndexMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<I extends Exact<DeepPartial<SetPipelineIndexMessageProto>, I>>(
+      object: I,
+    ): SetPipelineIndexMessageProto {
+      const message = createBaseSetPipelineIndexMessageProto();
+      message.pipelineIndex = object.pipelineIndex ?? 0;
+      message.cameraIndex = object.cameraIndex ?? 0;
       return message;
     },
   };

@@ -15,8 +15,9 @@ message MessageProto {
     PipelineProto pipeline_info = 5;
     SetPipelineTypeMessageProto set_pipeline_type = 6;
     SetPipleineSettingMessageProto set_pipeline_setting = 7;
+    SetPipelineIndexMessageProto set_pipeline_index = 8;
   }
-  repeated PipelineTypeProto pipeline_type_info = 8;
+  repeated PipelineTypeProto pipeline_type_info = 9;
 }
 
 enum MessageTypeProto {
@@ -28,4 +29,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_ADD_CAMERA = 5;
   MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE = 6;
   MESSAGE_TYPE_PROTO_SET_SETTING = 7;
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX = 8;
 }

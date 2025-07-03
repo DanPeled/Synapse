@@ -20,6 +20,7 @@ class MessageTypeProto(betterproto.Enum):
     ADD_CAMERA = 5
     SET_TYPE_FOR_PIPELINE = 6
     SET_SETTING = 7
+    SET_PIPELINE_INDEX = 8
 
 
 @dataclass(eq=False, repr=False)
@@ -143,6 +144,12 @@ class SetPipleineSettingMessageProto(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class SetPipelineIndexMessageProto(betterproto.Message):
+    pipeline_index: int = betterproto.int32_field(1)
+    camera_index: int = betterproto.int32_field(2)
+
+
+@dataclass(eq=False, repr=False)
 class MessageProto(betterproto.Message):
     type: "MessageTypeProto" = betterproto.enum_field(1)
     device_info: "DeviceInfoProto" = betterproto.message_field(2, group="payload")
@@ -157,4 +164,7 @@ class MessageProto(betterproto.Message):
     set_pipeline_setting: "SetPipleineSettingMessageProto" = betterproto.message_field(
         7, group="payload"
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(8)
+    set_pipeline_index: "SetPipelineIndexMessageProto" = betterproto.message_field(
+        8, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(9)

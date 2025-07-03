@@ -7,6 +7,7 @@ from typing import Any, List, Optional
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineTypeProto,
+                                  SetPipelineIndexMessageProto,
                                   SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer,
                                       createMessage)
@@ -314,17 +315,23 @@ class Synapse:
         msgType = msgObj.type
 
         if msgType == MessageTypeProto.SET_SETTING:
-            setSetting: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
+            setSettigMSG: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
             pipeline: Optional[Pipeline] = (
                 self.runtime_handler.pipelineLoader.getPipeline(
-                    setSetting.pipeline_index
+                    setSettigMSG.pipeline_index
                 )
             )
 
             if pipeline is not None:
-                val = protoToSettingValue(setSetting.value)
-                pipeline.setSetting(setSetting.setting, val)
-                self.runtime_handler.updateSetting(setSetting.setting, 0, val)
+                val = protoToSettingValue(setSettigMSG.value)
+                pipeline.setSetting(setSettigMSG.setting, val)
+                self.runtime_handler.updateSetting(setSettigMSG.setting, 0, val)
+        elif msgType == MessageTypeProto.SET_PIPELINE_INDEX:
+            setPipeIndexMSG: SetPipelineIndexMessageProto = msgObj.set_pipeline_index
+            self.runtime_handler.setPipelineByIndex(
+                cameraIndex=setPipeIndexMSG.camera_index,
+                pipelineIndex=setPipeIndexMSG.pipeline_index,
+            )
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

@@ -18,6 +18,7 @@ import { CameraStepControl } from "./camera_step_control";
 import { CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
+  SetPipelineIndexMessageProto,
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
@@ -150,6 +151,22 @@ export default function Dashboard() {
                   setSelectedPipelineType(
                     pipelinecontext.pipelineTypes.get(val.type)!,
                   );
+
+                  if (selectedCamera) {
+                    setTimeout(() => {
+                      console.log(val);
+                      const payload = MessageProto.create({
+                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
+                        setPipelineIndex: SetPipelineIndexMessageProto.create({
+                          cameraIndex: selectedCamera.index,
+                          pipelineIndex: val.index,
+                        }),
+                      });
+
+                      const binary = MessageProto.encode(payload).finish();
+                      socket?.sendBinary(binary);
+                    }, 0);
+                  }
                 }
               }}
               selectedPipeline={selectedPipeline}
