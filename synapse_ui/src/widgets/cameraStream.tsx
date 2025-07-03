@@ -11,7 +11,7 @@ export function CameraStream({ stream }: { stream: string | undefined }) {
 
   return (
     <div
-      className="rounded-lg aspect-[3/2] w-full max-w-[435px] flex flex-col items-center justify-center"
+      className="aspect-[3/2] w-full max-w-[435px] flex flex-col items-center justify-center rounded-lg"
       style={{
         maxHeight: "290px",
         height: "auto",
@@ -40,7 +40,6 @@ export function CameraStream({ stream }: { stream: string | undefined }) {
           display: loaded ? "block" : "none",
           width: "100%",
           height: "auto",
-          borderRadius: "0.5rem",
           objectFit: "cover",
         }}
         // Important for MJPEG streams so browser doesn't cache

@@ -42,7 +42,7 @@ function CameraView({ selectedCamera }: CameraViewProps) {
             Camera Stream
           </CardTitle>
           <Row gap="gap-2" className="items-center">
-            <Badge variant="secondary" className="bg-red-600">
+            <Badge variant="secondary" className="bg-stone-700" style={{ color: teamColor }}>
               <Activity className="w-3 h-3 mr-1" />
               Processing @ 0 FPS – 0ms latency
             </Badge>

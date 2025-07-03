@@ -13,8 +13,13 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
@@ -22,12 +27,24 @@ from wpilib import Timer
 from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
-from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
-                      PipelineTypeName)
+from ..stypes import (
+    CameraID,
+    DataValue,
+    Frame,
+    PipelineID,
+    PipelineName,
+    PipelineTypeName,
+)
 from ..util import resolveGenericArgument
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraConfig,
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -112,7 +129,6 @@ class PipelineLoader:
             self.pipelineInstanceBindings.append(currPipeline)
 
             for callback in self.onAddPipeline:
-                log.log(str(settings))
                 callback(len(self.pipelineInstanceBindings) - 1, currPipeline)
 
     def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
@@ -342,6 +358,31 @@ class CameraHandler:
         """
         return self.cameras.get(cameraIndex, None)
 
+    def getStreamRes(self, cameraIndex: CameraID) -> Tuple[int, int]:
+        """
+        Retrieves the streaming resolution for the given camera index.
+
+        If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
+        returns its configured stream resolution and updates `self.streamSizes`.
+        Otherwise, returns a default resolution.
+
+        Args:
+            cameraIndex (CameraID): The index of the camera.
+
+        Returns:
+            Tuple[int, int]: The width and height of the stream resolution.
+        """
+        cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
+            cameraIndex
+        )
+
+        if cameraConfig is not None:
+            streamRes = cameraConfig.streamRes
+            self.streamSizes[cameraIndex] = streamRes
+            return (streamRes[0], streamRes[1])
+
+        return self.DEFAULT_STREAM_SIZE
+
     def getCameraOutputs(self) -> Dict[CameraID, cs.CvSource]:
         """
         Initializes and returns video output streams for all configured cameras.
@@ -356,40 +397,16 @@ class CameraHandler:
             dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
             to their corresponding video output objects.
         """
-
-        def getStreamRes(cameraIndex: CameraID) -> Tuple[int, int]:
-            """
-            Retrieves the streaming resolution for the given camera index.
-
-            If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
-            returns its configured stream resolution and updates `self.streamSizes`.
-            Otherwise, returns a default resolution.
-
-            Args:
-                cameraIndex (CameraID): The index of the camera.
-
-            Returns:
-                Tuple[int, int]: The width and height of the stream resolution.
-            """
-            cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
-                cameraIndex
-            )
-
-            if cameraConfig is not None:
-                streamRes = cameraConfig.streamRes
-                self.streamSizes[cameraIndex] = streamRes
-                return (streamRes[0], streamRes[1])
-
-            return self.DEFAULT_STREAM_SIZE
-
-        return {
+        binds = {
             cameraIndex: cs.CameraServer.putVideo(
                 f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
-                width=getStreamRes(cameraIndex)[0],
-                height=getStreamRes(cameraIndex)[1],
+                width=self.getStreamRes(cameraIndex)[0],
+                height=self.getStreamRes(cameraIndex)[1],
             )
             for cameraIndex in self.cameras.keys()
         }
+
+        return binds
 
     def generateRecordingOutputs(
         self, cameraIndecies: List[CameraID]

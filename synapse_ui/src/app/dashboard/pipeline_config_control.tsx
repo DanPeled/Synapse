@@ -5,8 +5,6 @@ import { hasSettingValue } from "@/services/backend/backendContext";
 import { PipelineManagement } from "@/services/backend/pipelineContext";
 import {
   GenerateControl,
-  protoToSettingValue,
-  settingValueToProto,
 } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";

@@ -35,7 +35,7 @@ export default function ToggleButton({
 
       <div
         className={cn(
-          "relative w-[50px] h-[28px] rounded-full transition-colors cursor-pointer",
+          "relative w-[50px] h-[28px] rounded-full transition-colors cursor-pointer select-none",
           value ? "bg-rose-500" : "bg-rose-600",
           disabled && "opacity-50 cursor-not-allowed",
         )}
@@ -45,10 +45,12 @@ export default function ToggleButton({
       >
         <div
           className={cn(
-            "absolute top-[3px] w-[22px] h-[22px] rounded-full transition-all",
+            "absolute top-[3px] w-[22px] h-[22px] rounded-full transition-all flex items-center justify-center text-xs font-bold select-none",
             value ? "bg-zinc-800 left-[26px]" : "left-[3px] bg-zinc-800",
           )}
-        />
+        >
+          {value ? "1" : "0"}
+        </div>
       </div>
     </div>
   );

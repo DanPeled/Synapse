@@ -1,4 +1,5 @@
 import queue
+import socket
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -9,8 +10,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoSource)
+from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
@@ -129,6 +129,7 @@ def opencvToCscoreProp(prop: int) -> Optional[str]:
 class SynapseCamera(ABC):
     def __init__(self, name: str) -> None:
         self.name: Final[str] = name
+        self.stream: str = ""
 
     @classmethod
     @abstractmethod
@@ -142,6 +143,8 @@ class SynapseCamera(ABC):
 
     def setIndex(self, cameraIndex: CameraID) -> None:
         self.cameraIndex: CameraID = cameraIndex
+        ip = socket.gethostbyname(socket.gethostname())
+        self.stream = f"http://{ip}:{1181 + cameraIndex}/?action=stream/stream.mjpeg"
 
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
@@ -478,5 +481,5 @@ class CameraFactory:
 
 def cameraToProto(camid: CameraID, name: str, camera: SynapseCamera) -> CameraProto:
     return CameraProto(
-        name=name, index=camid, stream_path="", physical_connection="unknown"
+        name=name, index=camid, stream_path=camera.stream, physical_connection="unknown"
     )

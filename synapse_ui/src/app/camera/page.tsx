@@ -8,8 +8,18 @@ import { Card } from "@/components/ui/card";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
 import { Placeholder } from "@/widgets/placeholder";
 import { CameraTransformModule } from "./camera_transform";
+import { useEffect, useState } from "react";
+import { useBackendContext } from "@/services/backend/backendContext";
+import { CameraProto } from "@/proto/v1/camera";
 
 export default function CameraConfigPage() {
+  const { cameras } = useBackendContext();
+  const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(cameras[0]);
+
+  useEffect(() => {
+    setSelectedCamera(cameras.at(0));
+  }, [cameras]);
+
   return (
     <div
       className="w-full min-h-screen text-pink-600"
@@ -27,14 +37,21 @@ export default function CameraConfigPage() {
             style={{ backgroundColor: baseCardColor }}
           >
             <Dropdown
-              options={[] as DropdownOption<string>[]}
+              options={
+                (cameras
+                  ? cameras.map((cam) => ({
+                    label: `${cam?.name}`,
+                    value: cam,
+                  }))
+                  : []) as DropdownOption<CameraProto>[]
+              }
               label="Camera"
-              value={""}
-              onValueChange={(_) => {
-                /* TODO */
+              value={selectedCamera}
+              onValueChange={(camera) => {
+                setSelectedCamera(camera);
               }}
             />
-            <CameraStream />
+            <CameraStream stream={selectedCamera?.streamPath} />
           </Card>
           <Card
             style={{ backgroundColor: baseCardColor }}
