@@ -3,7 +3,6 @@ import { baseCardColor, teamColor } from "@/services/style";
 import { Eye, Fullscreen } from "lucide-react";
 import { darken } from "polished";
 import { Row } from "./containers";
-import Image from "next/image";
 
 export function CameraStream({ stream }: { stream: string | undefined }) {
   const [loaded, setLoaded] = useState(false);
@@ -66,7 +65,7 @@ export function CameraStream({ stream }: { stream: string | undefined }) {
         </>
       )}
 
-      <Image
+      <img
         ref={imgRef}
         src={stream}
         alt="Camera Stream"
