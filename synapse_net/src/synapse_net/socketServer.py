@@ -2,10 +2,12 @@ import asyncio
 from dataclasses import fields
 from enum import Enum
 from functools import lru_cache
-from typing import Callable, Dict, List, Optional, Set, Union
+from typing import Callable, Coroutine, Dict, List, Optional, Set, Union
 
 import betterproto
-import websockets
+from websockets.exceptions import ConnectionClosed
+from websockets.server import WebSocketServerProtocol, serve
+from websockets.typing import Data
 
 from .proto.v1 import MessageProto, MessageTypeProto
 
@@ -19,37 +21,26 @@ class SocketEvent(Enum):
 
 @lru_cache
 def getMessageDataFieldName(datatypeName: str) -> str:
-    field_name = None
     for f in fields(MessageProto):
         if f.type == datatypeName:
-            field_name = f.name
-            break
-    else:
-        raise ValueError(f"No matching field for type {datatypeName}")
-    return field_name
+            return f.name
+    raise ValueError(f"No matching field for type {datatypeName}")
 
 
 def createMessage(
     messageType: MessageTypeProto,
     data: Union[betterproto.Message, List[betterproto.Message]],
 ) -> bytes:
-    """
-    While this is very clearly not a safe solution or a good one,
-    it is good enough for now, and should be refactored later on
-    in a more typesafe way
-    """
     message = MessageProto()
     message.type = messageType
 
     field_name = getMessageDataFieldName(type(data).__name__)
-
-    if field_name:
-        if field_name in {f.name for f in fields(message)}:
-            setattr(message, field_name, data)
-        else:
-            raise ValueError(
-                f"Cannot find matching field in MessageProto for {field_name} (typeof={type(data).__name__})"
-            )
+    if field_name in {f.name for f in fields(message)}:
+        setattr(message, field_name, data)
+    else:
+        raise ValueError(
+            f"Cannot find matching field in MessageProto for {field_name} (typeof={type(data).__name__})"
+        )
 
     return message.SerializeToString()
 
@@ -60,13 +51,13 @@ class WebSocketServer:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.callbacks: Dict[SocketEvent, Callable] = {}
-        self.clients: Set[websockets.WebSocketServerProtocol] = set()
-        self._server = None
+        self.callbacks: Dict[SocketEvent, Callable[..., Coroutine]] = {}
+        self.clients: Set[WebSocketServerProtocol] = set()
+        self._server: Optional[asyncio.base_events.Server] = None
         self.loop: Optional[asyncio.AbstractEventLoop] = None
 
     def on(self, event: SocketEvent):
-        def decorator(func: Callable):
+        def decorator(func: Callable[..., Coroutine]):
             self.callbacks[event] = func
             return func
 
@@ -76,14 +67,14 @@ class WebSocketServer:
         if event in self.callbacks:
             await self.callbacks[event](*args, **kwargs)
 
-    async def handler(self, websocket, path):
+    async def handler(self, websocket: WebSocketServerProtocol, path: str):
         self.clients.add(websocket)
         await self._emit(SocketEvent.kConnect, websocket)
 
         try:
             async for message in websocket:
                 await self._emit(SocketEvent.kMessage, websocket, message)
-        except websockets.exceptions.ConnectionClosed:
+        except ConnectionClosed:
             pass
         except Exception as e:
             await self._emit(SocketEvent.kError, websocket, str(e))
@@ -91,28 +82,28 @@ class WebSocketServer:
             self.clients.remove(websocket)
             await self._emit(SocketEvent.kDisconnect, websocket)
 
-    async def sendToAll(self, message: websockets.Data):
+    async def sendToAll(self, message: Data):
         if self.clients:
             await asyncio.gather(
                 *(client.send(message) for client in self.clients if client.open)
             )
 
-    def sendToAllSync(self, message: websockets.Data):
+    def sendToAllSync(self, message: Data):
         asyncio.run(self.sendToAll(message))
 
     async def sendToClient(
-        self, client: websockets.WebSocketServerProtocol, message: websockets.Data
+        self,
+        client: WebSocketServerProtocol,
+        message: Data,
     ):
         if client in self.clients and client.open:
             await client.send(message)
 
     def start(self):
         WebSocketServer.kInstance = self
-        self._server = websockets.serve(self.handler, self.host, self.port)
-        return self._server
+        return serve(self.handler, self.host, self.port)
 
     async def close(self):
         if self._server:
-            server = await self._server
-            server.close()
-            await server.wait_closed()
+            self._server.close()
+            await self._server.wait_closed()
