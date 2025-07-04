@@ -189,7 +189,7 @@ export default function Dashboard() {
                     socket?.sendBinary(binary);
 
                     selectedPipeline.type = newType.type;
-                    let newPipelines = new Map(pipelinecontext.pipelines);
+                    const newPipelines = new Map(pipelinecontext.pipelines);
                     newPipelines.set(selectedPipeline.index, selectedPipeline);
                     setPipelinecontext({
                       ...pipelinecontext,

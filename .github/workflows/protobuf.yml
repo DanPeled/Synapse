@@ -31,6 +31,8 @@ jobs:
 
       - name: Install Buf CLI
         uses: bufbuild/buf-setup-action@v1.50.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Buf version
         run: buf --version
