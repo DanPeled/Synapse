@@ -34,20 +34,21 @@ class GlobalSettingsMeta(type):
         cls.__cameraConfigs: Dict[CameraID, CameraConfig] = {}
 
         if cls.kCameraConfigsKey in settings:
-            for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
-                camConfig: CameraConfig = CameraConfig(
-                    name=camData[CameraConfigKey.kName.value],
-                    path=camData[CameraConfigKey.kPath.value],
-                    distCoeff=camData[CameraConfigKey.kDistCoeff.value],
-                    matrix=camData[CameraConfigKey.kMatrix.value],
-                    measuredRes=camData[CameraConfigKey.kMeasuredRes.value],
-                    streamRes=camData[CameraConfigKey.kStreamRes.value],
-                    transform=listToTransform3d(
-                        camData[CameraConfigKey.kTransform.value]
-                    ),
-                    defaultPipeline=camData[CameraConfigKey.kDefaultPipeline.value],
-                )
-                cls.__cameraConfigs[index] = camConfig
+            if settings[cls.kCameraConfigsKey] is not None:
+                for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
+                    camConfig: CameraConfig = CameraConfig(
+                        name=camData[CameraConfigKey.kName.value],
+                        id=camData[CameraConfigKey.kPath.value],
+                        distCoeff=camData[CameraConfigKey.kDistCoeff.value],
+                        matrix=camData[CameraConfigKey.kMatrix.value],
+                        measuredRes=camData[CameraConfigKey.kMeasuredRes.value],
+                        streamRes=camData[CameraConfigKey.kStreamRes.value],
+                        transform=listToTransform3d(
+                            camData[CameraConfigKey.kTransform.value]
+                        ),
+                        defaultPipeline=camData[CameraConfigKey.kDefaultPipeline.value],
+                    )
+                    cls.__cameraConfigs[index] = camConfig
             return True
         else:
             err("No camera configs provided")
@@ -76,6 +77,9 @@ class GlobalSettingsMeta(type):
         if cls.hasCameraData(cameraIndex):
             return cls.__cameraConfigs[cameraIndex]
         return None
+
+    def setCameraConfig(cls, cameraIndex: CameraID, cameraConfig: CameraConfig) -> None:
+        cls.__cameraConfigs[cameraIndex] = cameraConfig
 
     def getCameraConfigMap(cls) -> Dict[CameraID, CameraConfig]:
         """Returns the full map of camera configurations.

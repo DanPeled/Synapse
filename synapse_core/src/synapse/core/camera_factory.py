@@ -14,7 +14,7 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
                     VideoSource)
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
-from synapse.log import err, warn
+from synapse.log import warn
 from synapse.stypes import CameraID, Frame, PipelineID
 from synapse.util import transform3dToList
 from synapse_net.nt_client import NtClient
@@ -63,22 +63,8 @@ def getCameraTableName(cameraIndex: CameraID) -> str:
 
 @dataclass
 class CameraConfig:
-    """
-    Represents the configuration for a single camera.
-
-    Attributes:
-        name (str): The unique name or identifier for the camera.
-        path (Union[str, int]): The path or device index used to access the camera (e.g., '/dev/video0' or 0).
-        transform (geometry.Transform3d): The transformation from the camera to the robot coordinate frame.
-        defaultPipeline (int): The default processing pipeline index to use for the camera.
-        matrix (List[List[float]]): The intrinsic camera matrix (usually 3x3).
-        distCoeff (List[float]): The distortion coefficients for the camera lens.
-        measuredRes (Tuple[int, int]): The resolution (width, height) used for camera calibration.
-        streamRes (Tuple[int, int]): The resolution (width, height) used for video streaming.
-    """
-
     name: str
-    path: str
+    id: str
     transform: geometry.Transform3d
     defaultPipeline: int
     matrix: List[List[float]]
@@ -89,7 +75,7 @@ class CameraConfig:
     def toDict(self) -> Dict[str, Any]:
         return {
             CameraConfigKey.kName.value: self.name,
-            CameraConfigKey.kPath.value: self.path,
+            CameraConfigKey.kPath.value: self.id,
             CameraConfigKey.kTransform.value: transform3dToList(self.transform),
             CameraConfigKey.kDefaultPipeline.value: self.defaultPipeline,
             CameraConfigKey.kMatrix.value: self.matrix,
@@ -101,7 +87,7 @@ class CameraConfig:
 
 class CameraConfigKey(Enum):
     kName = "name"
-    kPath = "path"
+    kPath = "id"
     kDefaultPipeline = "default_pipeline"
     kMatrix = "matrix"
     kDistCoeff = "distCoeffs"
@@ -137,9 +123,9 @@ class SynapseCamera(ABC):
     def create(
         cls,
         *_,
-        devPath: Optional[str] = None,
-        usbIndex: Optional[int] = None,
+        path: Union[str, int],
         name: str = "",
+        index: CameraID,
     ) -> "SynapseCamera": ...
 
     def setIndex(self, cameraIndex: CameraID) -> None:
@@ -239,17 +225,19 @@ class OpenCvCamera(SynapseCamera):
     def create(
         cls,
         *_,
-        devPath: Optional[str] = None,
-        usbIndex: Optional[int] = None,
         name: str = "",
+        path: Union[str, int],
+        index: CameraID,
     ) -> "OpenCvCamera":
         inst = OpenCvCamera(name)
-        if usbIndex is not None:
-            inst.cap = cv2.VideoCapture(usbIndex)
-        elif devPath is not None:
-            inst.cap = cv2.VideoCapture(devPath, cv2.CAP_V4L2)
-        else:
-            err("No USB Index or Dev Path was provided for camera!")
+        assert isinstance(path, int) or isinstance(path, str), (
+            f"No valid path for camera {index}"
+        )
+
+        if isinstance(path, int):
+            inst.cap = cv2.VideoCapture(path)
+        if isinstance(path, str):
+            inst.cap = cv2.VideoCapture(path, cv2.CAP_V4L2)
 
         return inst
 
@@ -320,20 +308,16 @@ class CsCoreCamera(SynapseCamera):
     def create(
         cls,
         *_,
-        devPath: Optional[str] = None,
-        usbIndex: Optional[int] = None,
+        path: Union[str, int],
         name: str = "",
+        index: CameraID,
     ) -> "CsCoreCamera":
         inst = CsCoreCamera(name)
 
-        if usbIndex is not None:
-            inst.camera = UsbCamera(devPath or f"USB Camera {usbIndex}", usbIndex)
-        elif devPath is not None:
-            inst.camera = UsbCamera(name, devPath)
-        else:
-            raise ValueError(
-                "Camera initialization failed: no USB Index or Dev Path provided."
-            )
+        if isinstance(path, int):
+            inst.camera = UsbCamera(f"USB Camera {index}", path)
+        elif isinstance(path, str):
+            inst.camera = UsbCamera(f"USB Camera {index}", path)
 
         inst.sink = CameraServer.getVideo(inst.camera)
 
@@ -468,14 +452,13 @@ class CameraFactory:
         *_,
         cameraType: Type[SynapseCamera] = kDefault,
         cameraIndex: CameraID,
-        devPath: Optional[str] = None,
-        usbIndex: Optional[int] = None,
+        path: Union[str, int],
         name: str = "",
     ) -> "SynapseCamera":
         cam: SynapseCamera = cameraType.create(
-            devPath=devPath,
-            usbIndex=usbIndex,
+            path=path,
             name=name,
+            index=cameraIndex,
         )
         cam.setIndex(cameraIndex)
         return cam
