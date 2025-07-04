@@ -7,7 +7,19 @@ def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
     return f"{name}=={version}"
 
 
+def deployProcessDep(name: str) -> str:
+    return name
+
+
 def synapseNetDep(name: str) -> str:
+    return name
+
+
+def hardwareManagementDep(name: str) -> str:
+    return name
+
+
+def deviceAccessDep(name: str) -> str:
     return name
 
 
@@ -27,15 +39,14 @@ setup(
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
         "rich",
-        "PyYAML",
+        "numpy==1.23.3",
         "opencv_python",
         "opencv_contrib_python",
-        "pathspec",
-        "paramiko",
-        "scp>=0.15.0",
-        "numpy==1.23.3",
-        "build",
-        "psutil",
+        deviceAccessDep("PyYAML"),
+        deviceAccessDep("pathspec"),
+        deployProcessDep("paramiko"),
+        deployProcessDep("scp>=0.15.0"),
+        hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),
         synapseNetDep("websockets"),
@@ -47,6 +58,7 @@ setup(
             "ruff",
             "isort",
             "pyright",
+            "build",
         ]
     },
     include_package_data=True,

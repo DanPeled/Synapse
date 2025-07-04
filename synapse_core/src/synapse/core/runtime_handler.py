@@ -19,6 +19,7 @@ from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
+from wpimath.geometry import Transform3d
 from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
@@ -160,8 +161,9 @@ class PipelineLoader:
                                     log.log(f"Loaded {cls.__name__} pipeline")
                                     pipelineClasses[cls.__name__] = cls
                     except Exception as e:
-                        log.err(f"while loading {file_path}: {e}")
-                        traceback.print_exc()
+                        log.err(
+                            f"while loading {file_path}: {e}\n{traceback.format_exc()}"
+                        )
             return pipelineClasses
 
         pipelines = loadPipelineClasses(directory)
@@ -303,7 +305,8 @@ class CameraHandler:
         stream sizes, recording outputs, and camera configuration bindings.
         """
         self.cameras: Dict[CameraID, SynapseCamera] = {}
-        self.outputs: Dict[CameraID, cs.CvSource] = {}
+        self.usbCameraInfos: Dict[str, cs.UsbCameraInfo] = {}
+        self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
         self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[CameraID, CameraConfig] = {}
@@ -315,8 +318,6 @@ class CameraHandler:
         and initializing recording outputs.
         """
         self.createCameras()
-        self.outputs = self.getCameraOutputs()
-        self.recordingOutputs = self.generateRecordingOutputs(list(self.cameras.keys()))
 
     def createCameras(self) -> None:
         """
@@ -324,10 +325,51 @@ class CameraHandler:
         each configured camera to the handler.
         """
         self.cameraBindings = GlobalSettings.getCameraConfigMap()
+        self.usbCameraInfos = {
+            f"{info.name}_{info.productId}": info
+            for info in cs.UsbCamera.enumerateUsbCameras()
+        }
 
-        for cameraIndex in self.cameraBindings:
-            if not (self.addCamera(cameraIndex)):
-                continue
+        found: List[int] = []
+
+        for cameraIndex, cameraConfig in self.cameraBindings.items():
+            if len(cameraConfig.id):
+                info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
+                    cameraConfig.id, None
+                )
+                if info is not None:
+                    found.append(info.productId)
+                    if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
+                        continue
+                else:
+                    log.warn(
+                        f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped"
+                    )
+                    continue
+
+        for info in self.usbCameraInfos.values():
+            if info.productId not in found:
+                log.log(
+                    f"Found non-registered camera: {info.name} (i={info.dev}), adding automatically"
+                )
+                found.append(info.productId)
+                newIndex = 0
+                if len(self.cameras.keys()) > 0:
+                    newIndex = max(self.cameras.keys()) + 1
+                cameraIndex = newIndex
+                cameraConfig = CameraConfig(
+                    name=info.name,
+                    id=f"{info.name}_{info.productId}",
+                    transform=Transform3d(),
+                    defaultPipeline=0,
+                    matrix=np.eye(3).tolist(),
+                    distCoeff=[0] * 5,
+                    measuredRes=(1920, 1080),
+                    streamRes=self.DEFAULT_STREAM_SIZE,
+                )
+                GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
+                if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
+                    continue
 
     def getCamera(self, cameraIndex: CameraID) -> Optional[SynapseCamera]:
         """
@@ -366,7 +408,7 @@ class CameraHandler:
 
         return self.DEFAULT_STREAM_SIZE
 
-    def getCameraOutputs(self) -> Dict[CameraID, cs.CvSource]:
+    def createStreamOutput(self, cameraIndex: CameraID) -> cs.CvSource:
         """
         Initializes and returns video output streams for all configured cameras.
 
@@ -380,20 +422,13 @@ class CameraHandler:
             dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
             to their corresponding video output objects.
         """
-        binds = {
-            cameraIndex: cs.CameraServer.putVideo(
-                f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
-                width=self.getStreamRes(cameraIndex)[0],
-                height=self.getStreamRes(cameraIndex)[1],
-            )
-            for cameraIndex in self.cameras.keys()
-        }
+        return cs.CameraServer.putVideo(
+            f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
+            width=self.getStreamRes(cameraIndex)[0],
+            height=self.getStreamRes(cameraIndex)[1],
+        )
 
-        return binds
-
-    def generateRecordingOutputs(
-        self, cameraIndecies: List[CameraID]
-    ) -> Dict[CameraID, cv2.VideoWriter]:
+    def createRecordingOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
         """
         Creates recording outputs for the specified camera indices if all cameras exist.
 
@@ -403,18 +438,12 @@ class CameraHandler:
         Returns:
             Dict[CameraID, cv2.VideoWriter]: Mapping from camera ID to the video writer object.
         """
-        if all(i in self.cameras.keys() for i in cameraIndecies):
-            finalDict: Dict[CameraID, cv2.VideoWriter] = {
-                index: cv2.VideoWriter(
-                    log.LOG_FILE + ".avi",
-                    cv2.VideoWriter.fourcc("M", "J", "P", "G"),
-                    30,
-                    self.cameras[index].getResolution(),
-                )
-                for index in cameraIndecies
-            }
-            return finalDict
-        return {}
+        return cv2.VideoWriter(
+            log.LOG_FILE + ".avi",
+            cv2.VideoWriter.fourcc("M", "J", "P", "G"),
+            30,
+            self.cameras[cameraIndex].getResolution(),
+        )
 
     @cache
     def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
@@ -427,7 +456,7 @@ class CameraHandler:
         Returns:
             cs.CvSource: The associated video output stream.
         """
-        return self.outputs[cameraIndex]
+        return self.streamOutputs[cameraIndex]
 
     @cache
     def getRecordOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
@@ -461,7 +490,9 @@ class CameraHandler:
             if camera.getSetting("record", False):
                 self.getRecordOutput(camera.cameraIndex).write(frame)
 
-    def addCamera(self, cameraIndex: CameraID) -> bool:
+    def addCamera(
+        self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
+    ) -> bool:
         """
         Adds a camera to the handler by opening it through OpenCV.
 
@@ -471,19 +502,13 @@ class CameraHandler:
         Returns:
             bool: True if the camera was successfully added, False otherwise.
         """
-        camera_config = self.cameraBindings.get(cameraIndex)
-        if camera_config is None:
-            log.err(f"No camera defined for index {cameraIndex}")
-            return False
-
-        path = camera_config.path
 
         try:
             camera = CameraFactory.create(
                 cameraType=CameraFactory.kCameraServer,
                 cameraIndex=cameraIndex,
-                devPath=path,
-                name=f"{camera_config.name}(#{cameraIndex})",
+                path=dev,
+                name=f"{cameraConfig.name}(#{cameraIndex})",
             )
             camera.setIndex(cameraIndex)
         except Exception as e:
@@ -495,22 +520,33 @@ class CameraHandler:
             if camera.isConnected():
                 break
             log.log(
-                f"Trying to open camera #{cameraIndex} ({path}), attempt {attempt + 1}"
+                f"Trying to open camera #{cameraIndex} ({cameraConfig.id}), attempt {attempt + 1}"
             )
             time.sleep(1)
 
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
+            self.recordingOutputs[cameraIndex] = self.createRecordingOutput(cameraIndex)
+            self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
 
             for callback in self.onAddCamera:
-                callback(cameraIndex, camera_config.name, camera)
+                try:
+                    callback(cameraIndex, cameraConfig.name, camera)
+                except Exception as error:
+                    errString = "".join(
+                        traceback.format_exception(
+                            type(error), error, error.__traceback__
+                        )
+                    )
+                    log.err(errString)
+
             log.log(
-                f"Camera (name={camera_config.name}, path={camera_config.path}, id={cameraIndex}) added successfully."
+                f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
             )
             return True
 
         log.err(
-            f"Failed to open camera #{cameraIndex} ({path}) after {MAX_RETRIES} retries."
+            f"Failed to open camera #{cameraIndex} ({cameraConfig.id}) after {MAX_RETRIES} retries."
         )
         return False
 
@@ -606,9 +642,8 @@ class RuntimeManager:
             )
         )
 
-        self.pipelineLoader.setup(directory)
-
         self.cameraHandler.setup()
+        self.pipelineLoader.setup(directory)
         self.assignDefaultPipelines()
 
         self.setupNetworkTables()

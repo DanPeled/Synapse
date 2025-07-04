@@ -7,7 +7,7 @@ global:
     0:
       default_pipeline: 0
       name: Monochrome
-      path: /dev/video0
+      id:  Integrated Webcam_27152
       matrix:
         - [   940.7360710926395, 0, 615.5884770322365]
         - [  0, 939.9932393907364, 328.53938300868]
