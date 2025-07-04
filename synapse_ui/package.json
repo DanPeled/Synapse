@@ -9,7 +9,7 @@
     "build": "prettier 'src/**/*.{js,ts,tsx}' --write && next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.15",
