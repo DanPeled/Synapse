@@ -148,8 +148,9 @@ async def test_close_calls_close_and_wait_closed(monkeypatch):
     async def dummy_serve(handler, host, port):
         return DummyServer()
 
-    monkeypatch.setattr("websockets.serve", dummy_serve)
-    server._server = dummy_serve(server.handler, server.host, server.port)  # pyright: ignore
+    monkeypatch.setattr("synapse_net.socketServer.serve", dummy_serve)
+
+    server._server = await dummy_serve(server.handler, server.host, server.port)
 
     await server.close()
     assert close_called

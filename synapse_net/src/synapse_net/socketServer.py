@@ -2,11 +2,11 @@ import asyncio
 from dataclasses import fields
 from enum import Enum
 from functools import lru_cache
-from typing import Callable, Coroutine, Dict, List, Optional, Set, Union
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Union
 
 import betterproto
 from websockets.exceptions import ConnectionClosed
-from websockets.server import WebSocketServerProtocol, serve
+from websockets.legacy.server import WebSocketServerProtocol, serve
 from websockets.typing import Data
 
 from .proto.v1 import MessageProto, MessageTypeProto
@@ -53,8 +53,8 @@ class WebSocketServer:
         self.port = port
         self.callbacks: Dict[SocketEvent, Callable[..., Coroutine]] = {}
         self.clients: Set[WebSocketServerProtocol] = set()
-        self._server: Optional[asyncio.base_events.Server] = None
-        self.loop: Optional[asyncio.AbstractEventLoop] = None
+        self._server = None
+        self.loop: Optional[Any] = None
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable[..., Coroutine]):
@@ -105,5 +105,8 @@ class WebSocketServer:
 
     async def close(self):
         if self._server:
+            # If _server is a coroutine, await it first
+            if asyncio.iscoroutine(self._server):
+                self._server = await self._server
             self._server.close()
             await self._server.wait_closed()
