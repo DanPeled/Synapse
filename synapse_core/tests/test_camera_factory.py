@@ -49,14 +49,14 @@ class TestOpenCvCamera(unittest.TestCase):
 
     @patch("cv2.VideoCapture")
     def test_grab_frame(self, mock_vc):
-        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst = synapse.core.camera_factory.OpenCvCamera("mock")
         mock_capture = MagicMock()
         inst.cap = mock_capture
         inst.cap.read.return_value = (True, "frame")
         self.assertEqual(inst.grabFrame(), (True, "frame"))
 
     def test_set_and_get_video_mode(self):
-        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst = synapse.core.camera_factory.OpenCvCamera("mock")
         inst.cap = MagicMock()
         inst.setVideoMode(30, 640, 480)
         inst.cap.set.assert_any_call(cv2.CAP_PROP_FPS, 30)
@@ -64,13 +64,13 @@ class TestOpenCvCamera(unittest.TestCase):
         inst.cap.set.assert_any_call(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
     def test_get_resolution(self):
-        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst = synapse.core.camera_factory.OpenCvCamera("mock")
         inst.cap = MagicMock()
         inst.cap.get.side_effect = [640, 480]
         self.assertEqual(inst.getResolution(), (640, 480))
 
     def test_get_max_fps(self):
-        inst = synapse.core.camera_factory.OpenCvCamera()
+        inst = synapse.core.camera_factory.OpenCvCamera("mock")
         inst.cap = MagicMock()
         inst.cap.get.return_value = 120.0
         self.assertEqual(inst.getMaxFPS(), 120.0)
