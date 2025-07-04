@@ -17,7 +17,7 @@ const eslintConfig = [
       "@typescript-eslint/no-namespace": "off",
       "react-hooks/exhaustive-deps": "off",
       "@typescript-eslint/no-unsafe-function-type": "off",
-      "@next/next/no-img-element": "off"
+      "@next/next/no-img-element": "off",
     },
   }),
 ];
