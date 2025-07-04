@@ -17,6 +17,7 @@ class GlobalSettingsMeta(type):
 
     kCameraConfigsKey: str = "camera_configs"
     __settings: Optional[SettingsCollection] = None
+    __cameraConfigs: Dict[CameraID, CameraConfig] = {}
 
     def setup(cls, settings: SettingsMap) -> bool:
         """Initializes the global settings with the provided settings map.

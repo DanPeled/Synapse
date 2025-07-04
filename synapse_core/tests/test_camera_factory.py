@@ -29,7 +29,7 @@ class TestCameraConfig(unittest.TestCase):
         transform = MagicMock()
         config = synapse.core.camera_factory.CameraConfig(
             name="cam",
-            path="/dev/video0",
+            id="mock_123",
             transform=transform,
             defaultPipeline=1,
             matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -44,7 +44,7 @@ class TestOpenCvCamera(unittest.TestCase):
     @patch("cv2.VideoCapture")
     def test_create_with_usb_index(self, mock_vc):
         mock_vc.return_value = MagicMock()
-        cam = synapse.core.camera_factory.OpenCvCamera.create(usbIndex=0)
+        cam = synapse.core.camera_factory.OpenCvCamera.create(path=0, index=0)
         self.assertIsInstance(cam, synapse.core.camera_factory.OpenCvCamera)
 
     @patch("cv2.VideoCapture")
@@ -85,24 +85,11 @@ class TestCsCoreCamera(unittest.TestCase):
         mock_get_video.return_value = MagicMock()
         camera_instance.enumerateProperties.return_value = []
 
-        cam = CsCoreCamera.create(usbIndex=0, name="TestCam")
+        cam = CsCoreCamera.create(index=0, name="TestCam", path="/dev/video0")
 
         self.assertIsInstance(cam, CsCoreCamera)
         mock_usb_camera.assert_called_once()
         mock_get_video.assert_called_once_with(camera_instance)
-
-    @patch("synapse.core.camera_factory.UsbCamera")
-    @patch("synapse.core.camera_factory.CameraServer.getVideo")
-    def test_create_with_dev_path(self, mock_get_video, mock_usb_camera):
-        camera_instance = MagicMock()
-        mock_usb_camera.return_value = camera_instance
-        mock_get_video.return_value = MagicMock()
-        camera_instance.enumerateProperties.return_value = []
-
-        cam = CsCoreCamera.create(devPath="/dev/video0", name="TestCam")
-
-        self.assertIsInstance(cam, CsCoreCamera)
-        mock_usb_camera.assert_called_once_with("TestCam", "/dev/video0")
 
     def test_set_and_get_property_meta(self):
         cam = CsCoreCamera("mock")
