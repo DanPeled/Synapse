@@ -74,7 +74,9 @@ export default function Dashboard() {
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    setSelectedPipeline(pipelinecontext.pipelines.get(selectedCamera?.pipelineIndex ?? 0)!);
+    setSelectedPipeline(
+      pipelinecontext.pipelines.get(selectedCamera?.pipelineIndex ?? 0)!,
+    );
     setSelectedPipelineType(
       Array.from(pipelinecontext.pipelineTypes.values()).at(0)!,
     );

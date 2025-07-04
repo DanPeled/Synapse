@@ -14,11 +14,7 @@ import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
-import {
-  PipelineProto,
-  PipelineTypeProto,
-  SetPipleineSettingMessageProto,
-} from "@/proto/v1/pipeline";
+import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 
