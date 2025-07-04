@@ -32,16 +32,16 @@ export function CameraTransformModule({}) {
         <Column gap="gap-2">
           <h3>Camera Position</h3>
           <Row>
-            <TextInput label="Forward (m)" labelColor="red" />
-            <TextInput label="Left (m)" labelColor="green" />
-            <TextInput label="Up (m)" labelColor="blue" />
+            <TextInput value={"0"} label="Forward (m)" labelColor="red" />
+            <TextInput value={"0"} label="Left (m)" labelColor="green" />
+            <TextInput value={"0"} label="Up (m)" labelColor="blue" />
           </Row>
           <div className="h-5" />
           <h3>Camera Rotation</h3>
           <Row>
-            <TextInput label="Roll (deg CCW)" labelColor="red" />
-            <TextInput label="Pitch (deg CCW)" labelColor="green" />
-            <TextInput label="Yaw (deg CCW)" labelColor="blue" />
+            <TextInput value="0" label="Roll (deg CCW)" labelColor="red" />
+            <TextInput value="0" label="Pitch (deg CCW)" labelColor="green" />
+            <TextInput value="0" label="Yaw (deg CCW)" labelColor="blue" />
           </Row>
           <div className="h-7" />
           <Button

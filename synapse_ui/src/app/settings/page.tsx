@@ -60,7 +60,7 @@ function NetworkSettings({}) {
   );
   const [hostname, setPropHostname] = useState(deviceinfo.hostname);
   const [ipMode, setIpMode] = useState(IPMode.dhcp.valueOf());
-  const [_, setStaticIPAddr] = useState(deviceinfo.ip);
+  const [staticIPAddr, setStaticIPAddr] = useState(deviceinfo.ip);
 
   const teamNumberRegex = "\\d+(\\.\\d+)?";
   const ipAddressRegex =
@@ -93,7 +93,7 @@ function NetworkSettings({}) {
           <TextInput
             label="Team Number / NetworkTables Server Address"
             pattern={teamNumberOrIPRegex}
-            initialValue={networkTablesServer ?? ""}
+            value={networkTablesServer ?? ""}
             errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
             onChange={(val) => {
               setNetworktablesserver(val);
@@ -101,7 +101,7 @@ function NetworkSettings({}) {
           />
           <TextInput
             label="NetworkTable"
-            initialValue={networktable}
+            value={networktable}
             onChange={(val) => {
               setNetworktable(val);
             }}
@@ -118,7 +118,7 @@ function NetworkSettings({}) {
               label={
                 ipMode === IPMode.static ? "Static IP" : "Current IP (DHCP)"
               }
-              initialValue={deviceinfo.ip?.valueOf() ?? "127.0.0.1"}
+              value={staticIPAddr ?? "127.0.0.1"}
               pattern={ipAddressRegex}
               errorMessage="Invalid IPv4 Address"
               onChange={(val) => {
@@ -133,10 +133,8 @@ function NetworkSettings({}) {
                 placeholder="24"
                 errorMessage="Invalid CIDR"
                 maxLength={2}
-                onChange={(val) => {
-                  return val;
-                }}
-                initialValue="24"
+                onChange={(_) => {}}
+                value="24"
                 disabled={
                   !manageDeviceNetworking || ipMode === IPMode.dhcp.valueOf()
                 }
@@ -167,7 +165,7 @@ function NetworkSettings({}) {
             label="Hostname"
             onChange={setPropHostname}
             disabled={!manageDeviceNetworking}
-            initialValue={deviceinfo.hostname ?? "Unknown"}
+            value={deviceinfo.hostname ?? "Unknown"}
           />
           <Dropdown<string>
             label="NetworkManager Interface"
