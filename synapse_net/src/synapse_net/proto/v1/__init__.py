@@ -29,6 +29,7 @@ class CameraProto(betterproto.Message):
     stream_path: str = betterproto.string_field(2)
     physical_connection: str = betterproto.string_field(3)
     index: int = betterproto.int32_field(4)
+    pipeline_index: int = betterproto.int32_field(5)
 
 
 @dataclass(eq=False, repr=False)

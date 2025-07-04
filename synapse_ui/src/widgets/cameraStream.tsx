@@ -96,7 +96,7 @@ export function CameraStream({ stream }: { stream: string | undefined }) {
           }}
           onClick={handleFullscreen}
         >
-          <Fullscreen /> Fullscreen
+          <Fullscreen /> <span className="select-none">Fullscreen</span>
         </Row>
       )}
     </div>

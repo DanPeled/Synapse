@@ -10,12 +10,11 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoSource)
+from cscore import CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode, VideoSource
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import err, warn
-from synapse.stypes import CameraID, Frame
+from synapse.stypes import CameraID, Frame, PipelineID
 from synapse.util import transform3dToList
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import CameraProto
@@ -481,7 +480,13 @@ class CameraFactory:
         return cam
 
 
-def cameraToProto(camid: CameraID, name: str, camera: SynapseCamera) -> CameraProto:
+def cameraToProto(
+    camid: CameraID, name: str, camera: SynapseCamera, pipelineIndex: PipelineID
+) -> CameraProto:
     return CameraProto(
-        name=name, index=camid, stream_path=camera.stream, physical_connection="unknown"
+        name=name,
+        index=camid,
+        stream_path=camera.stream,
+        physical_connection="unknown",
+        pipeline_index=pipelineIndex,
     )

@@ -14,6 +14,7 @@ export interface CameraProto {
   streamPath: string;
   physicalConnection: string;
   index: number;
+  pipelineIndex: number;
 }
 
 export interface LatencyStatusProto {
@@ -22,7 +23,13 @@ export interface LatencyStatusProto {
 }
 
 function createBaseCameraProto(): CameraProto {
-  return { name: "", streamPath: "", physicalConnection: "", index: 0 };
+  return {
+    name: "",
+    streamPath: "",
+    physicalConnection: "",
+    index: 0,
+    pipelineIndex: 0,
+  };
 }
 
 export const CameraProto: MessageFns<CameraProto> = {
@@ -41,6 +48,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.index !== 0) {
       writer.uint32(32).int32(message.index);
+    }
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(40).int32(message.pipelineIndex);
     }
     return writer;
   },
@@ -85,6 +95,14 @@ export const CameraProto: MessageFns<CameraProto> = {
           message.index = reader.int32();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.pipelineIndex = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -104,6 +122,9 @@ export const CameraProto: MessageFns<CameraProto> = {
         ? globalThis.String(object.physicalConnection)
         : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
+      pipelineIndex: isSet(object.pipelineIndex)
+        ? globalThis.Number(object.pipelineIndex)
+        : 0,
     };
   },
 
@@ -121,6 +142,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
     }
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
     return obj;
   },
 
@@ -135,6 +159,7 @@ export const CameraProto: MessageFns<CameraProto> = {
     message.streamPath = object.streamPath ?? "";
     message.physicalConnection = object.physicalConnection ?? "";
     message.index = object.index ?? 0;
+    message.pipelineIndex = object.pipelineIndex ?? 0;
     return message;
   },
 };

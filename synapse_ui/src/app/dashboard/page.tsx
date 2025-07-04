@@ -74,14 +74,14 @@ export default function Dashboard() {
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    setSelectedPipeline(pipelinecontext.pipelines.get(0)!);
+    setSelectedPipeline(pipelinecontext.pipelines.get(selectedCamera?.pipelineIndex ?? 0)!);
     setSelectedPipelineType(
       Array.from(pipelinecontext.pipelineTypes.values()).at(0)!,
     );
 
     let selectedPipelineIndex: number = -1;
     if (selectedPipeline === undefined) {
-      selectedPipelineIndex = 0;
+      selectedPipelineIndex = cameras.at(0)?.pipelineIndex ?? 0;
       setSelectedCamera(cameras.at(0));
     } else {
       selectedPipelineIndex = selectedPipeline?.index;

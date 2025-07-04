@@ -7,6 +7,7 @@ message CameraProto {
   string stream_path = 2;
   string physical_connection = 3;
   int32 index = 4;
+  int32 pipeline_index = 5;
 }
 
 message LatencyStatusProto {
