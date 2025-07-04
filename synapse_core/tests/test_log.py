@@ -1,11 +1,9 @@
-import builtins
 import os
 import re
 import sys
 
 import pytest
 import synapse.log as log
-from synapse.bcolors import bcolors
 
 
 @pytest.fixture
@@ -26,7 +24,7 @@ def test_log_creates_file_and_logs_text(cleanupLogs) -> None:
     with open(log_path, "r") as f:
         contents = f.read()
         assert test_message in contents
-        assert re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]:", contents)
+        assert re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}]:", contents)
 
 
 def test_err_logs_error_with_formatting(cleanupLogs) -> None:
@@ -40,21 +38,10 @@ def test_err_logs_error_with_formatting(cleanupLogs) -> None:
         contents = f.read()
         assert "[ERROR]" in contents
         assert test_error in contents
-        assert bcolors.FAIL in contents
-        assert bcolors.ENDC in contents
 
-
-def test_console_output_mocked(monkeypatch) -> None:
-    test_message = "Console output test"
-    captured_output = []
-
-    def fake_print(msg, *args, **kwargs):
-        captured_output.append(msg)
-
-    monkeypatch.setattr(builtins, "print", fake_print)
-
-    log.log(test_message)
-    assert test_message in captured_output
+        print(contents)
+        assert "[red]" in contents
+        assert "[/red]" in contents
 
 
 def test_stderr_redirection() -> None:

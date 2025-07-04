@@ -3,8 +3,12 @@ from setuptools import find_packages, setup
 WPILIB_VERSION = "2025.2.1.1"
 
 
-def wpilibDep(name: str) -> str:
-    return f"{name}=={WPILIB_VERSION}"
+def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
+    return f"{name}=={version}"
+
+
+def synapseNetDep(name: str) -> str:
+    return name
 
 
 setup(
@@ -22,16 +26,28 @@ setup(
         wpilibDep("robotpy_cscore"),
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
+        "rich",
         "PyYAML",
         "opencv_python",
         "opencv_contrib_python",
-        "typing_extensions",
         "pathspec",
         "paramiko",
         "scp>=0.15.0",
         "numpy==1.23.3",
-        "pytest",
         "build",
+        "psutil",
+        synapseNetDep("protobuf"),
+        synapseNetDep("betterproto==2.0.0b7"),
+        synapseNetDep("websockets"),
     ],
+    extras_require={
+        "dev": [
+            "pytest",
+            "pytest-asyncio",
+            "ruff",
+            "isort",
+            "pyright",
+        ]
+    },
     include_package_data=True,
 )

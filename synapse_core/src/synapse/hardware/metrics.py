@@ -1,11 +1,12 @@
 import os
 import subprocess
+import time
 from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
 from typing import Any, Final, Optional
 
-from synapse.log import err
+import psutil
 
 # Referenced from  https://github.com/PhotonVision/photonvision/
 
@@ -225,14 +226,25 @@ class ShellExec:
         self.error: str = ""
         self.exit_code: int = 0
 
-    def executeBashCommand(self, command: str) -> None:
+    def executeBashCommand(self, command: str, timeout: int = 5) -> None:
         try:
             result = subprocess.run(
-                command, shell=self.shell, capture_output=self.capture_output, text=True
+                command,
+                shell=self.shell,
+                capture_output=self.capture_output,
+                text=True,
+                timeout=timeout,  # <-- add timeout here
             )
             self.output = result.stdout.strip()
             self.error = result.stderr.strip()
             self.exit_code = result.returncode
+        except subprocess.TimeoutExpired:
+            self.error = f"Command timed out after {timeout} seconds"
+            self.exit_code = -1
+        except KeyboardInterrupt:
+            # Optional: clean up or log before re-raising
+            print("KeyboardInterrupt: terminating command execution")
+            raise
         except Exception as e:
             self.error = str(e)
             self.exit_code = -1
@@ -255,87 +267,74 @@ class ShellExec:
 
 class MetricsManager:
     def __init__(self):
-        self.cmds: Optional[CmdBase] = None
-        self.runCommand = ShellExec()
+        self.cpuMemSave: Optional[int] = None
+        self.gpuMemSave: Optional[int] = None
 
-        self.cpuMemSave: Optional[str] = None
-        self.gpuMemSave: Optional[str] = None
-
-    def setConfig(self, config) -> None:
-        if Platform.isRaspberryPi():
-            self.cmds = PiCmds()
-        elif Platform.isRK3588():
-            self.cmds = RK3588Cmds()
-        elif Platform.isLinux():
-            self.cmds = LinuxCmds()
-        else:
-            self.cmds = CmdBase()
-
-        self.cmds.initCmds(config)
-
-    def safeExecute(self, command: str) -> str:
-        if not command:
-            return ""
-        try:
-            return self.execute(command)
-        except Exception:
-            return "****"
-
-    def getMemory(self) -> str:
-        if not self.cmds or not self.cmds.cpuMemoryCommand:
-            return "0.0"
+    def getMemory(self) -> int:
         if self.cpuMemSave is None:
-            self.cpuMemSave = self.execute(self.cmds.cpuMemoryCommand)
+            self.cpuMemSave = psutil.virtual_memory().total // (1024 * 1024)
         return self.cpuMemSave
 
-    def getTemp(self) -> str:
-        return self.safeExecute(self.cmds.cpuTemperatureCommand) if self.cmds else "0.0"
+    def getUsedRam(self) -> int:
+        return psutil.virtual_memory().used // (1024 * 1024)
 
-    def getUtilization(self) -> str:
-        return self.safeExecute(self.cmds.cpuUtilizationCommand) if self.cmds else "0.0"
+    def getCpuUtilization(self) -> float:
+        return psutil.cpu_percent(interval=0.5)
 
-    def getUptime(self) -> str:
-        return self.safeExecute(self.cmds.cpuUptimeCommand) if self.cmds else "0.0"
+    def getUptime(self) -> float:
+        return time.time() - psutil.boot_time()
 
-    def getThrottleReason(self) -> str:
-        return self.safeExecute(self.cmds.cpuThrottleReasonCmd) if self.cmds else "0.0"
+    def getUsedDiskPct(self) -> float:
+        return psutil.disk_usage(".").percent
 
-    def getNpuUsage(self) -> str:
-        return self.safeExecute(self.cmds.npuUsageCommand) if self.cmds else "0.0"
+    def getCpuTemp(self) -> float:
+        if not Platform.isLinux():
+            return 0.0
 
-    def getGPUMemorySplit(self) -> str:
-        if self.gpuMemSave is None and self.cmds:
-            self.gpuMemSave = self.safeExecute(self.cmds.gpuMemoryCommand)
-        return self.gpuMemSave or "0.0"
-
-    def getMallocedMemory(self) -> str:
-        return self.safeExecute(self.cmds.gpuMemUsageCommand) if self.cmds else "0.0"
-
-    def getUsedDiskPct(self) -> str:
-        if self.cmds:
-            return (
-                self.safeExecute(self.cmds.diskUsageCommand)[:-1]
-                if self.safeExecute(self.cmds.diskUsageCommand).endswith("%")
-                else self.safeExecute(self.cmds.diskUsageCommand)
-            )
-        else:
-            return "0.0"
-
-    def getUsedRam(self) -> str:
-        return self.safeExecute(self.cmds.ramUsageCommand) if self.cmds else "0.0"
-
-    def execute(self, command: str) -> str:
         try:
-            self.runCommand.executeBashCommand(command)
-            return self.runCommand.getOutput()
-        except Exception as e:
-            err(
-                f'Command: "{command}" returned an error!\n'
-                f"Output Received: {self.runCommand.getOutput()}\n"
-                f"Standard Error: {self.runCommand.getError()}\n"
-                f"Command completed: {self.runCommand.isOutputCompleted()}\n"
-                f"Error completed: {self.runCommand.isErrorCompleted()}\n"
-                f"Exit code: {self.runCommand.getExitCode()}\n"
-                f"Exception: {e}"
-            )
-            return ""
+            temps = psutil.sensors_temperatures()
+            for label in ("cpu-thermal", "thermal_zone0", "coretemp"):
+                if label in temps and temps[label]:
+                    return float(temps[label][0].current)
+        except Exception:
+            pass
+
+        # Fallback for Pi/RK platforms
+        if Platform.isRaspberryPi():
+            return self._read_temp_sys("/sys/class/thermal/thermal_zone0/temp")
+        if Platform.isRK3588():
+            return self._read_temp_sys("/sys/class/thermal/thermal_zone1/temp")
+
+        return 0.0
+
+    def getNpuUsage(self) -> float:
+        if Platform.isRK3588():
+            path = "/sys/kernel/debug/rknpu/load"
+            if os.path.exists(path):
+                try:
+                    with open(path) as f:
+                        value = f.read().strip().replace("NPU load:", "").strip()
+                        return float(value)
+                except Exception:
+                    return -1.0
+        return 0.0
+
+    def getGPUMemorySplit(self) -> int:
+        if Platform.isRaspberryPi():
+            config = "/boot/config.txt"
+            if os.path.exists(config):
+                try:
+                    with open(config) as f:
+                        for line in f:
+                            if line.startswith("gpu_mem"):
+                                return int(line.split("=")[1].strip())
+                except Exception:
+                    return -1
+        return 0
+
+    def _read_temp_sys(self, path: str) -> float:
+        try:
+            with open(path) as f:
+                return int(f.read().strip()) / 1000.0
+        except Exception:
+            return 0.0

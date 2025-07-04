@@ -64,21 +64,6 @@ class TestRuntimeManager(unittest.TestCase):
             result = self.handler.getEventDataValue(mock_event)
             self.assertTrue(result)
 
-    def test_set_nt_pipeline_index(self):
-        mock_entry = MagicMock()
-
-        with patch(
-            "synapse.core.runtime_handler.NetworkTableInstance.getDefault"
-        ) as mock_nt:
-            mock_table = MagicMock()
-            mock_nt.return_value.getTable.return_value = mock_table
-            mock_table.getEntry.return_value = mock_entry
-
-            self.handler.setNTPipelineIndex(cameraIndex=0, pipelineIndex=42)
-
-            mock_table.getEntry.assert_called_once()
-            mock_entry.setInteger.assert_called_with(42)
-
     def test_setup_calls_all_components(self):
         with (
             patch.object(self.handler.pipelineLoader, "setup") as setup_loader,
@@ -107,11 +92,12 @@ class TestRuntimeManager(unittest.TestCase):
             "synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap"
         ) as mock_camera_map:
             mock_camera_map.return_value = {0: fake_config}
-            self.mock_loader.pipelineInstanceBindings = {"pipe1": fake_pipeline}
+            self.mock_loader.pipelineInstanceBindings = [fake_pipeline]
+            self.mock_loader.pipelineTypeNames = {0: "mock"}
 
             expected_dict = {
                 "global": {"camera_configs": {0: {"mock": "camera_config"}}},
-                "pipelines": {"pipe1": {"mock": "pipeline_config"}},
+                "pipelines": {0: {"mock": "pipeline_config"}},
             }
 
             # Test toDict

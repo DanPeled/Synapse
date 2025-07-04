@@ -10,9 +10,8 @@ def test_teamNumberToIP() -> None:
 
 
 @patch("synapse_net.nt_client.NetworkTableInstance")
-@patch("synapse_net.nt_client.atexit.register")
 @patch("synapse_net.nt_client.time.sleep", return_value=None)
-def test_setup_client_success(mock_sleep, mock_atexit, mock_nt_instance) -> None:
+def test_setup_client_success(mock_sleep, mock_nt_instance) -> None:
     mock_instance = MagicMock()
     mock_instance.isConnected.side_effect = [
         False,
@@ -29,13 +28,11 @@ def test_setup_client_success(mock_sleep, mock_atexit, mock_nt_instance) -> None
     assert result is True
     mock_instance.setServer.assert_called_with("127.0.0.1")
     mock_instance.startClient4.assert_called_with("testClient")
-    mock_atexit.assert_called_once()
 
 
 @patch("synapse_net.nt_client.NetworkTableInstance")
-@patch("synapse_net.nt_client.atexit.register")
 @patch("synapse_net.nt_client.time.sleep", return_value=None)
-def test_setup_client_timeout(mock_sleep, mock_atexit, mock_nt_instance) -> None:
+def test_setup_client_timeout(mock_sleep, mock_nt_instance) -> None:
     mock_instance = MagicMock()
     mock_instance.isConnected.return_value = False
     mock_nt_instance.getDefault.return_value = mock_instance

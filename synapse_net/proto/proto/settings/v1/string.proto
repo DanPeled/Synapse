@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "google/protobuf/wrappers.proto";
+
+// Constraint specifying limitations on string values
+message StringConstraintProto {
+  // Optional minimum length of the string (inclusive)
+  google.protobuf.Int32Value min_length = 1;
+
+  // Optional maximum length of the string (inclusive)
+  google.protobuf.Int32Value max_length = 2;
+
+  // Optional regex pattern that the string must match
+  google.protobuf.StringValue pattern = 3;
+}

@@ -2,31 +2,27 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import (Any, Dict, Generic, List, Optional, Type, TypeVar, Union,
-                    overload)
+from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
 
+from betterproto import which_one_of
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse.bcolors import bcolors
-from synapse.core.camera_factory import SynapseCamera
-from synapse.log import err
+from synapse_net.proto.settings.v1 import (ColorConstraintProto,
+                                           ColorFormatProto,
+                                           ConstraintConfigProto,
+                                           ConstraintProto,
+                                           ConstraintTypeProto,
+                                           ListConstraintProto,
+                                           ListOptionsConstraintProto,
+                                           RangeConstraintProto,
+                                           SettingMetaProto, SettingValueProto,
+                                           StringConstraintProto)
 
-PipelineSettingsMapValue = Any
+from ..bcolors import MarkupColors
+from ..log import err
 
-PipelineSettingsMap = Dict[str, PipelineSettingsMapValue]
+SettingsValue = Any
 
-
-class ConstraintType(Enum):
-    """Enum for different constraint types"""
-
-    kRange = "range"
-    kListOptions = "list_options"
-    kColor = "color"
-    kList = "list"
-    kString = "string"
-    kBoolean = "boolean"
-    kInteger = "integer"
-    kFloat = "float"
-    kClass = "class"
+SettingsMap = Dict[str, SettingsValue]
 
 
 @dataclass
@@ -35,23 +31,27 @@ class ValidationResult:
 
     isValid: bool
     errorMessage: Optional[str] = None
-    normalizedValue: Any = None
+    normalizedValue: SettingsValue = None
 
 
 class Constraint(ABC):
     """Base class for all constraints"""
 
-    def __init__(self, constraintType: ConstraintType):
+    def __init__(self, constraintType: ConstraintTypeProto):
         self.constraintType = constraintType
 
     @abstractmethod
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         """Validate a value against this constraint"""
         pass
 
     @abstractmethod
     def toDict(self) -> Dict[str, Any]:
         """Serialize constraint to dictionary"""
+        pass
+
+    @abstractmethod
+    def configToProto(self) -> ConstraintConfigProto:
         pass
 
 
@@ -63,9 +63,9 @@ class RangeConstraint(Constraint):
 
     def __init__(
         self,
-        minValue: Optional[Union[int, float]] = None,
-        maxValue: Optional[Union[int, float]] = None,
-        step: Optional[Union[int, float]] = None,
+        minValue: Optional[float] = None,
+        maxValue: Optional[float] = None,
+        step: Optional[float] = None,
     ):
         """
         Initialize a RangeConstraint instance.
@@ -79,12 +79,12 @@ class RangeConstraint(Constraint):
                 If None, any value within the range is allowed.
 
         """
-        super().__init__(ConstraintType.kRange)
+        super().__init__(ConstraintTypeProto.RANGE)
         self.minValue = minValue
         self.maxValue = maxValue
         self.step = step
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         try:
             numValue = float(value)
             if self.minValue is not None and numValue < self.minValue:
@@ -116,34 +116,12 @@ class RangeConstraint(Constraint):
             "step": self.step,
         }
 
-
-class ClassValueConstraint(Constraint):
-    """Constraint for values of a specific class"""
-
-    def __init__(self, expectedClass: Type):
-        """
-        Initialize a ClassValueConstraint instance.
-
-        Args:
-            expectedClass (Type): The expected class type that values must be an instance of.
-
-        """
-        super().__init__(ConstraintType.kClass)
-        self.expectedClass = expectedClass
-
-    def validate(self, value: Any) -> ValidationResult:
-        if isinstance(value, self.expectedClass):
-            return ValidationResult(True, None, value)
-        else:
-            return ValidationResult(
-                False, f"Value {value} is not of type {self.expectedClass.__name__}"
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            range=RangeConstraintProto(
+                min=self.minValue, max=self.maxValue, step=self.step
             )
-
-    def toDict(self) -> Dict[str, Any]:
-        return {
-            "type": self.constraintType.value,
-            "className": f"{self.expectedClass.__module__}.{self.expectedClass.__name__}",
-        }
+        )
 
 
 class ListOptionsConstraint(Constraint):
@@ -159,11 +137,11 @@ class ListOptionsConstraint(Constraint):
                 Defaults to False.
 
         """
-        super().__init__(ConstraintType.kListOptions)
+        super().__init__(ConstraintTypeProto.LIST_OPTIONS)
         self.options = options
         self.allowMultiple = allowMultiple
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         if self.allowMultiple:
             if not isinstance(value, list):
                 return ValidationResult(
@@ -189,11 +167,27 @@ class ListOptionsConstraint(Constraint):
             "allowMultiple": self.allowMultiple,
         }
 
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            list_options=ListOptionsConstraintProto(
+                options=list(map(lambda op: settingValueToProto(op), self.options)),
+                allow_multiple=self.allowMultiple,
+            )
+        )
+
 
 class ColorFormat(Enum):
     kHex = "hex"
     kRGB = "rgb"
     kHSV = "hsv"
+
+    def toProtoType(self) -> ColorFormatProto:
+        if self == ColorFormat.kHSV:
+            return ColorFormatProto.HSV
+        elif self == ColorFormat.kHex:
+            return ColorFormatProto.HEX
+        else:
+            return ColorFormatProto.RGB
 
 
 class ColorConstraint(Constraint):
@@ -208,9 +202,7 @@ class ColorConstraint(Constraint):
         r"^hsv\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE
     )
 
-    def __init__(
-        self, formatType: str = ColorFormat.kHex.value, rangeMode: bool = False
-    ):
+    def __init__(self, formatType=ColorFormat.kHex, rangeMode: bool = False):
         """
         Initialize a ColorConstraint instance.
 
@@ -218,11 +210,11 @@ class ColorConstraint(Constraint):
             formatType (str): Color format ("hex", "rgb", "hsv").
             rangeMode (bool): If True, expects a range (e.g., tuple of two colors).
         """
-        super().__init__(ConstraintType.kColor)
+        super().__init__(ConstraintTypeProto.COLOR)
         self.formatType = formatType
         self.rangeMode = rangeMode
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         if self.rangeMode:
             if not (isinstance(value, (tuple, list)) and len(value) == 2):
                 return ValidationResult(False, "Range must be a (lower, upper) tuple")
@@ -246,8 +238,8 @@ class ColorConstraint(Constraint):
         # Single value mode
         return self._validate_single(value)
 
-    def _validate_single(self, value: Any) -> ValidationResult:
-        if self.formatType == ColorFormat.kHex.value:
+    def _validate_single(self, value: SettingsValue) -> ValidationResult:
+        if self.formatType == ColorFormat.kHex:
             if isinstance(value, int):
                 hex_str = f"#{value:06X}"
                 return ValidationResult(True, None, hex_str)
@@ -273,7 +265,7 @@ class ColorConstraint(Constraint):
             except ValueError:
                 return ValidationResult(False, "Invalid hex digits")
 
-        elif self.formatType == ColorFormat.kRGB.value:
+        elif self.formatType == ColorFormat.kRGB:
             if isinstance(value, tuple):
                 if len(value) != 3 or not all(isinstance(v, int) for v in value):
                     return ValidationResult(False, "RGB must be tuple of 3 ints")
@@ -291,7 +283,7 @@ class ColorConstraint(Constraint):
 
             return ValidationResult(False, "Invalid RGB format")
 
-        elif self.formatType == ColorFormat.kHSV.value:
+        elif self.formatType == ColorFormat.kHSV:
             if isinstance(value, tuple):
                 if len(value) != 3 or not all(isinstance(v, int) for v in value):
                     return ValidationResult(False, "HSV must be tuple of 3 ints")
@@ -316,9 +308,16 @@ class ColorConstraint(Constraint):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
-            "formatType": self.formatType,
+            "formatType": self.formatType.value,
             "rangeMode": self.rangeMode,
         }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            color=ColorConstraintProto(
+                format=self.formatType.toProtoType(), range_mode=self.rangeMode
+            )
+        )
 
 
 class ListConstraint(Constraint):
@@ -326,9 +325,8 @@ class ListConstraint(Constraint):
 
     def __init__(
         self,
-        itemConstraint: Optional[Constraint] = None,
-        minLength: Optional[int] = None,
-        maxLength: Optional[int] = None,
+        minLength: int = 0,
+        maxLength: int = 0,
         depth: int = 1,
     ):
         """
@@ -345,23 +343,22 @@ class ListConstraint(Constraint):
                 Defaults to 1.
 
         """
-        super().__init__(ConstraintType.kList)
-        self.itemConstraint = itemConstraint
+        super().__init__(ConstraintTypeProto.LIST)
         self.minLength = minLength
         self.maxLength = maxLength
         self.depth = depth
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         def _validate_list(val, depth) -> ValidationResult:
             if not isinstance(val, list):
                 return ValidationResult(False, f"Value must be a list at depth {depth}")
 
-            if self.minLength is not None and len(val) < self.minLength:
+            if self.minLength > 0 and len(val) < self.minLength:
                 return ValidationResult(
                     False,
                     f"List at depth {depth} must have at least {self.minLength} items",
                 )
-            if self.maxLength is not None and len(val) > self.maxLength:
+            if self.maxLength > 0 and len(val) > self.maxLength:
                 return ValidationResult(
                     False,
                     f"List at depth {depth} must have at most {self.maxLength} items",
@@ -371,8 +368,6 @@ class ListConstraint(Constraint):
             for i, item in enumerate(val):
                 if depth > 1:
                     result = _validate_list(item, depth - 1)
-                elif self.itemConstraint:
-                    result = self.itemConstraint.validate(item)
                 else:
                     result = ValidationResult(True, None, item)
 
@@ -393,13 +388,18 @@ class ListConstraint(Constraint):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
-            "itemConstraint": self.itemConstraint.toDict()
-            if self.itemConstraint
-            else None,
             "minLength": self.minLength,
             "maxLength": self.maxLength,
             "depth": self.depth,
         }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            list=ListConstraintProto(
+                min_length=self.minLength,
+                max_length=self.maxLength,
+            )
+        )
 
 
 class StringConstraint(Constraint):
@@ -423,12 +423,12 @@ class StringConstraint(Constraint):
                 If None, no pattern constraint is applied.
 
         """
-        super().__init__(ConstraintType.kString)
+        super().__init__(ConstraintTypeProto.STRING)
         self.minLength = minLength
         self.maxLength = maxLength
         self.pattern = pattern
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         if not isinstance(value, str):
             return ValidationResult(False, "Value must be a string")
 
@@ -462,6 +462,15 @@ class StringConstraint(Constraint):
     def fromDict(cls, data: Dict[str, Any]) -> "StringConstraint":
         return cls(data.get("minLength"), data.get("maxLength"), data.get("pattern"))
 
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            string=StringConstraintProto(
+                min_length=self.minLength,
+                max_length=self.maxLength,
+                pattern=self.pattern,
+            )
+        )
+
 
 class BooleanConstraint(Constraint):
     """Constraint for boolean values"""
@@ -472,9 +481,9 @@ class BooleanConstraint(Constraint):
 
         This constraint restricts values to boolean types (True or False).
         """
-        super().__init__(ConstraintType.kBoolean)
+        super().__init__(ConstraintTypeProto.BOOLEAN)
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         if isinstance(value, bool):
             return ValidationResult(True, None, value)
 
@@ -498,6 +507,9 @@ class BooleanConstraint(Constraint):
     def fromDict(cls, data: Dict[str, Any]) -> "BooleanConstraint":
         return cls()
 
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto()
+
 
 @dataclass
 class Setting(Generic[TConstraintType]):
@@ -517,7 +529,7 @@ class Setting(Generic[TConstraintType]):
     description: Optional[str] = None
     category: Optional[str] = None
 
-    def validate(self, value: Any) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult:
         return self.constraint.validate(value)
 
     def toDict(self) -> Dict[str, Any]:
@@ -555,12 +567,12 @@ class SettingsAPI:
         if setting.key not in self.values:
             self.values[setting.key] = setting.defaultValue
 
-    def setValue(self, key: str, value: Any) -> ValidationResult:
+    def setValue(self, key: str, value: SettingsValue) -> ValidationResult:
         """Sets the value of a setting with validation.
 
         Args:
             key (str): The key of the setting to update.
-            value (Any): The value to assign to the setting.
+            value (SettingsValue): The value to assign to the setting.
 
         Returns:
             ValidationResult: The result of the validation process, including
@@ -632,50 +644,8 @@ def settingField(
     return Setting[TConstraintType]("", constraint, default, description, category)
 
 
-class PipelineSettings:
-    """Base class for creating pipeline settings collections.
-
-    Attributes:
-        brightness (Setting): Brightness setting (0–100).
-        exposure (Setting): Exposure setting (0–100).
-        saturation (Setting): Saturation setting (0–100).
-        orientation (Setting): Orientation setting (0, 90, 180, 270).
-        width (Setting): Width setting (e.g., 1280).
-        height (Setting): Height setting (e.g., 720).
-    """
-
-    kCameraPropsCategory = "Camera Properties"
-
-    brightness = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    exposure = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    saturation = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    sharpness = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    gain = settingField(
-        RangeConstraint(0, 100), default=50, category=kCameraPropsCategory
-    )
-    orientation = settingField(
-        RangeConstraint(0, 270, 90), default=0, category=kCameraPropsCategory
-    )
-    width = settingField(
-        RangeConstraint(minValue=0, maxValue=None),
-        default=1280,
-        category=kCameraPropsCategory,
-    )
-    height = settingField(
-        RangeConstraint(minValue=0, maxValue=None),
-        default=720,
-        category=kCameraPropsCategory,
-    )
-
-    def __init__(self, settings: Optional[PipelineSettingsMap] = None):
+class SettingsCollection:
+    def __init__(self, settings: Optional[SettingsMap] = None):
         """
         Initialize the PipelineSettings instance.
 
@@ -689,11 +659,7 @@ class PipelineSettings:
         if settings:
             self.generateSettingsFromMap(settings)
 
-    def assignCamera(
-        self, camera: SynapseCamera
-    ) -> None: ...  # TODO: set defaults and ranges according to camera props
-
-    def generateSettingsFromMap(self, settingsMap: PipelineSettingsMap) -> None:
+    def generateSettingsFromMap(self, settingsMap: SettingsMap) -> None:
         """
         Populate the settings from a given map, generating constraints dynamically if necessary.
 
@@ -735,8 +701,8 @@ class PipelineSettings:
                     self._settingsApi.setValue(field, value)
                 else:
                     err(
-                        f"Error validating {bcolors.BOLD}{field}{bcolors.ENDC}"
-                        + f"\n\t\t{bcolors.FAIL}{validation.errorMessage}"
+                        f"Error validating {MarkupColors.bold(field)}"
+                        + f"\n\t\t{validation.errorMessage}"
                         + f"\n\tSetting {field} as default: {setting.defaultValue}"
                     )
 
@@ -748,30 +714,20 @@ class PipelineSettings:
             nt_table (NetworkTable): The table to send settings to.
         """
         for key, value in self._settingsApi.values.items():
-            PipelineSettings.setEntryValue(nt_table.getEntry(key), value)
+            setEntryValue(nt_table.getEntry(key), value)
 
-    def __getitem__(
-        self, key: Union[str, Setting]
-    ) -> Optional[PipelineSettingsMapValue]:
+    def __getitem__(self, key: Union[str, Setting]) -> Optional[SettingsValue]:
         """Access a setting's value using dictionary-style indexing."""
         return self.getSetting(key)
 
-    def __setitem__(self, key: Union[str, Setting], value: PipelineSettingsMapValue):
+    def __setitem__(self, key: Union[str, Setting], value: SettingsValue):
         """Set a setting's value using dictionary-style indexing."""
         self.setSetting(key, value)
-
-    def __delitem__(self, key: str):
-        """Delete a setting by key."""
-        del self.__settings[key]
-
-    def __str__(self) -> str:
-        """Return a string representation of the settings dictionary."""
-        return str(self.__settings)
 
     def __contains__(self, setting: Union[str, Setting]) -> bool:
         """Check if a key is in the settings."""
         key = setting if isinstance(setting, str) else setting.key
-        return key in self.__settings.keys()
+        return key in self._settingsApi.settings.keys()
 
     def getMap(self) -> Dict[str, Setting]:
         """
@@ -781,49 +737,6 @@ class PipelineSettings:
             Dict[str, Setting]: Map of key to Setting objects.
         """
         return self._settingsApi.settings
-
-    def setMap(self, map: Dict[str, Any]) -> None:
-        """
-        Set the internal raw settings map (unsafe).
-
-        Args:
-            map (Dict[str, Any]): The settings map to set.
-        """
-        self.__settings = map
-
-    @staticmethod
-    def setEntryValue(entry: NetworkTableEntry, value):
-        """
-        Set a NetworkTable entry's value according to its Python type.
-
-        Args:
-            entry (NetworkTableEntry): Entry to set.
-            value (Any): Value to write to the entry.
-
-        Raises:
-            ValueError: If the value type is unsupported.
-        """
-        if isinstance(value, int):
-            entry.setInteger(value)
-        elif isinstance(value, float):
-            entry.setFloat(value)
-        elif isinstance(value, bool):
-            entry.setBoolean(value)
-        elif isinstance(value, str):
-            entry.setString(value)
-        elif isinstance(value, list):
-            if all(isinstance(i, int) for i in value):
-                entry.setIntegerArray(value)
-            elif all(isinstance(i, float) for i in value):
-                entry.setFloatArray(value)
-            elif all(isinstance(i, bool) for i in value):
-                entry.setBooleanArray(value)
-            elif all(isinstance(i, str) for i in value):
-                entry.setStringArray(value)
-            else:
-                raise ValueError("Unsupported list type")
-        else:
-            raise ValueError("Unsupported type")
 
     def _initializeSettings(self):
         """Initialize declared settings by inspecting class-level attributes."""
@@ -858,13 +771,13 @@ class PipelineSettings:
         err(f"'{self.__class__.__name__}' object has no setting '{key}'")
         return None if isinstance(setting, str) else setting.defaultValue
 
-    def setSetting(self, setting: Union[Setting, str], value: Any) -> None:
+    def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
         """
         Set a setting’s value with validation.
 
         Args:
             setting (Union[str, Setting]): Setting key or object.
-            value (Any): Value to assign.
+            value (SettingsValue): Value to assign.
         """
         key = setting if isinstance(setting, str) else setting.key
         if key in self._settingsApi.settings.keys():
@@ -964,3 +877,169 @@ class PipelineSettings:
         """
         values = {name: self.getSetting(name) for name in self._fieldNames}
         return f"{self.__class__.__name__}({', '.join(f'{k}={v!r}' for k, v in values.items())})"
+
+    def getAPI(self) -> SettingsAPI:
+        return self._settingsApi
+
+
+def setEntryValue(entry: NetworkTableEntry, value):
+    """
+    Set a NetworkTable entry's value according to its Python type.
+
+    Args:
+        entry (NetworkTableEntry): Entry to set.
+        value (SettingsValue): Value to write to the entry.
+
+    Raises:
+        ValueError: If the value type is unsupported.
+    """
+    if isinstance(value, int):
+        entry.setInteger(value)
+    elif isinstance(value, float):
+        entry.setFloat(value)
+    elif isinstance(value, bool):
+        entry.setBoolean(value)
+    elif isinstance(value, str):
+        entry.setString(value)
+    elif isinstance(value, list):
+        if all(isinstance(i, int) for i in value):
+            entry.setIntegerArray(value)
+        elif all(isinstance(i, float) for i in value):
+            entry.setFloatArray(value)
+        elif all(isinstance(i, bool) for i in value):
+            entry.setBooleanArray(value)
+        elif all(isinstance(i, str) for i in value):
+            entry.setStringArray(value)
+        else:
+            raise ValueError("Unsupported list type")
+    else:
+        raise ValueError("Unsupported type")
+
+
+class PipelineSettings(SettingsCollection):
+    """Base class for creating pipeline settings collections."""
+
+    kCameraPropsCategory = "Camera Properties"
+
+    brightness = settingField(
+        RangeConstraint(0, 100),
+        default=50,
+        category=kCameraPropsCategory,
+        description="Adjusts the brightness level of the image.",
+    )
+    exposure = settingField(
+        RangeConstraint(0, 100),
+        default=50,
+        category=kCameraPropsCategory,
+        description="Controls the exposure level.",
+    )
+    saturation = settingField(
+        RangeConstraint(0, 100),
+        default=50,
+        category=kCameraPropsCategory,
+        description="Changes the intensity of color saturation.",
+    )
+    sharpness = settingField(
+        RangeConstraint(0, 100),
+        default=50,
+        category=kCameraPropsCategory,
+        description="Determines the sharpness of the image.",
+    )
+    gain = settingField(
+        RangeConstraint(0, 100),
+        default=50,
+        category=kCameraPropsCategory,
+        description="Amplifies the signal brightness.",
+    )
+    orientation = settingField(
+        ListOptionsConstraint(allowMultiple=False, options=[0, 90, 180, 270]),
+        default=0,
+        category=kCameraPropsCategory,
+        description="Rotates the image orientation (0, 90, 180, 270 degrees).",
+    )
+    resolution = settingField(
+        ListOptionsConstraint(allowMultiple=False, options=["1080x1920"]),
+        default="1080x1920",
+        category=kCameraPropsCategory,
+        description="Camera Resolution",
+    )
+
+
+def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
+    scalar_field = which_one_of(proto, "scalar_value")
+
+    if scalar_field is not None:
+        return scalar_field[1]
+    if proto.int_array_value:
+        return list(proto.int_array_value)
+    elif proto.string_array_value:
+        return list(proto.string_array_value)
+    elif proto.bool_array_value:
+        return list(proto.bool_array_value)
+    elif proto.float_array_value:
+        return list(proto.float_array_value)
+    elif proto.bytes_array_value:
+        return list(proto.bytes_array_value)
+
+    raise ValueError("No value set in SettingValueProto")
+
+
+def settingValueToProto(val: SettingsValue) -> SettingValueProto:
+    proto = SettingValueProto()
+
+    if isinstance(val, int):
+        proto.int_value = val
+    elif isinstance(val, str):
+        proto.string_value = val
+    elif isinstance(val, bool):
+        proto.bool_value = val
+    elif isinstance(val, float):
+        proto.float_value = val
+    elif isinstance(val, bytes):
+        proto.bytes_value = val
+    elif isinstance(val, list):
+        if all(isinstance(v, int) for v in val):
+            proto.int_array_value = val
+        elif all(isinstance(v, str) for v in val):
+            proto.string_array_value = val
+        elif all(isinstance(v, bool) for v in val):
+            proto.bool_array_value = val
+        elif all(isinstance(v, float) for v in val):
+            proto.float_array_value = val
+        elif all(isinstance(v, bytes) for v in val):
+            proto.bytes_array_value = val
+        else:
+            raise TypeError("Unsupported list element type")
+    else:
+        raise TypeError(f"Unsupported type: {type(val)}")
+
+    return proto
+
+
+def constraintToProto(constraint: Constraint) -> ConstraintProto:
+    return ConstraintProto(
+        type=constraint.constraintType, constraint=constraint.configToProto()
+    )
+
+
+def settingToProto(setting: Setting, defaultCategory: str) -> SettingMetaProto:
+    return SettingMetaProto(
+        name=setting.key,
+        description=setting.description or "",
+        category=setting.category or defaultCategory,
+        constraint=constraintToProto(setting.constraint),
+        default=settingValueToProto(setting.defaultValue),
+    )
+
+
+def settingsToProto(
+    settings: SettingsCollection, typename: str
+) -> List[SettingMetaProto]:
+    result = []
+    api = settings.getAPI()
+
+    for schema in api.settings.values():
+        if schema is not None:
+            result.append(settingToProto(schema, typename))
+
+    return result

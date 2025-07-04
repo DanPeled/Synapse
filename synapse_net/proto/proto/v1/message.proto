@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package proto.v1;
+
+import "proto/v1/camera.proto";
+import "proto/v1/device.proto";
+import "proto/v1/pipeline.proto";
+
+message MessageProto {
+  MessageTypeProto type = 1;
+  oneof payload {
+    DeviceInfoProto device_info = 2;
+    HardwareMetricsProto hardware_metrics = 3;
+    CameraProto camera_info = 4;
+    PipelineProto pipeline_info = 5;
+    SetPipelineTypeMessageProto set_pipeline_type = 6;
+    SetPipleineSettingMessageProto set_pipeline_setting = 7;
+    SetPipelineIndexMessageProto set_pipeline_index = 8;
+  }
+  repeated PipelineTypeProto pipeline_type_info = 9;
+}
+
+enum MessageTypeProto {
+  MESSAGE_TYPE_PROTO_UNSPECIFIED = 0;
+  MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1;
+  MESSAGE_TYPE_PROTO_SEND_METRICS = 2;
+  MESSAGE_TYPE_PROTO_ADD_PIPELINE = 3;
+  MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES = 4;
+  MESSAGE_TYPE_PROTO_ADD_CAMERA = 5;
+  MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE = 6;
+  MESSAGE_TYPE_PROTO_SET_SETTING = 7;
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX = 8;
+}

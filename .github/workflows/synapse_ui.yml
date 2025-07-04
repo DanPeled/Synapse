@@ -1,0 +1,41 @@
+name: Synapse UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'synapse_ui/**'
+  pull_request:
+    paths:
+      - 'synapse_ui/**'
+
+jobs:
+  build-test-format:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: synapse_ui
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.9.0'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Prettier check
+        run: npx prettier --check .
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test

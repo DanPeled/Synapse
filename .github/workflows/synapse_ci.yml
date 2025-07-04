@@ -8,8 +8,6 @@ on:
       - 'synapse_core/**'
       - 'synapse_net/**'
   pull_request:
-    branches:
-      - main
     paths:
       - 'synapse_core/**'
       - 'synapse_net/**'
@@ -33,6 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .
+          pip install ".[dev]"
 
       - name: Run build check
         run: |
@@ -77,6 +76,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .
+          pip install ".[dev]"
 
       - name: Install Pyright
         run: |
@@ -101,6 +101,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .
+          pip install ".[dev]"
 
       - name: Install PyTest
         run: |

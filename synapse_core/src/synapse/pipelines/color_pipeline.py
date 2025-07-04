@@ -5,6 +5,7 @@ from synapse.stypes import CameraID, Frame
 
 class ColorPipeline(Pipeline[PipelineSettings]):
     def __init__(self, settings: PipelineSettings):
+        super().__init__(settings)
         self.settings = settings
 
     def bind(self, cameraIndex: CameraID): ...

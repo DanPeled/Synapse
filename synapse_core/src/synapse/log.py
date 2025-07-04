@@ -1,8 +1,12 @@
 import datetime
 import os
-import sys
+from enum import Enum
+from typing import Any, Optional
 
-from synapse.bcolors import bcolors
+from rich import print
+from synapse_net.socketServer import WebSocketServer
+
+from .bcolors import MarkupColors, TextTarget, parseTextStyle
 
 # Flag to control printing to the console
 PRINTS = True
@@ -14,15 +18,31 @@ os.makedirs("logs", exist_ok=True)
 LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
 
 
-class writer(object):
-    def write(self, data):
-        print(f"{bcolors.FAIL}{data}{bcolors.ENDC}", end="")
+class ErrorWriter(object):
+    def write(self, data: Any):
+        print(MarkupColors.fail(data), end="")
 
 
-sys.stderr = writer()
+# sys.stderr = ErrorWriter()
 
 
-def log(text: str):
+class LogMessageType(Enum):
+    INFO = "info"
+    ERR = "error"
+    WARN = "warning"
+
+
+def socketLog(
+    text: str, msgType: LogMessageType, socket: Optional[WebSocketServer]
+) -> None:
+    ...
+    # if socket:
+    #     socket.sendToAllSync(
+    #         createMessageFromDict("log", {"message": text, "type": msgType.value})
+    #     )
+
+
+def logInternal(text: str):
     """
     Logs a message with the current timestamp to both the console and a log file.
 
@@ -49,6 +69,11 @@ def log(text: str):
         f.write(str(final_string) + "\n")
 
 
+def log(text: str):
+    logInternal(text)
+    socketLog(text, LogMessageType.INFO, WebSocketServer.kInstance)
+
+
 def err(text: str):
     """
     Logs an error message with the current timestamp by prepending '[ERROR]' to the message.
@@ -58,7 +83,13 @@ def err(text: str):
 
     This function calls the `log` function and formats the message to indicate an error.
     """
-    log(bcolors.FAIL + f"[ERROR]: {text}" + bcolors.ENDC)
+    text = MarkupColors.fail(f"[ERROR]: {text}")
+    logInternal(parseTextStyle(MarkupColors.fail(text)))
+    socketLog(
+        parseTextStyle(text, target=TextTarget.kHTML),
+        LogMessageType.ERR,
+        WebSocketServer.kInstance,
+    )
 
 
 def warn(text: str):
@@ -70,4 +101,10 @@ def warn(text: str):
 
     This function calls the `log` function and formats the message to indicate an warning.
     """
-    log(bcolors.WARNING + f"[WARNING]: {text}" + bcolors.ENDC)
+    text = MarkupColors.warning(f"[WARNING]: {text}")
+    logInternal(parseTextStyle(text))
+    socketLog(
+        parseTextStyle(text, TextTarget.kHTML),
+        LogMessageType.WARN,
+        WebSocketServer.kInstance,
+    )

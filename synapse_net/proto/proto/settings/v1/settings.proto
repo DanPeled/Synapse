@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "proto/settings/v1/constraint_type.proto";
+import "proto/settings/v1/value.proto";
+
+// Represents a constraint applied to a setting, specifying its type and configuration.
+message ConstraintProto {
+  // The type of constraint (e.g., range, list, color)
+  ConstraintTypeProto type = 4;
+
+  // The configuration details for the constraint (oneof different constraint configs)
+  ConstraintConfigProto constraint = 5;
+}
+
+// Metadata describing a setting, including identification, categorization, and constraints.
+message SettingMetaProto {
+  // The unique name/key of the setting
+  string name = 1;
+
+  // The category or group this setting belongs to (e.g., "display", "audio")
+  string category = 2;
+
+  // A human-readable description explaining the purpose of the setting
+  string description = 3;
+
+  // The default value for the setting
+  SettingValueProto default = 4;
+
+  // Optional constraints that restrict or define valid values for the setting
+  ConstraintProto constraint = 5;
+}

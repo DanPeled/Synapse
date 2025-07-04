@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+// Enumeration of supported color formats
+enum ColorFormatProto {
+  // Default unspecified color format
+  COLOR_FORMAT_PROTO_UNSPECIFIED = 0;
+
+  // Color represented as a HEX string (e.g., "#FFAABB")
+  COLOR_FORMAT_PROTO_HEX = 1;
+
+  // Color represented using RGB components
+  COLOR_FORMAT_PROTO_RGB = 2;
+
+  // Color represented using HSV (Hue, Saturation, Value) components
+  COLOR_FORMAT_PROTO_HSV = 3;
+}
+
+// Defines constraints for color settings, specifying format and mode
+message ColorConstraintProto {
+  // The color format constraint (HEX, RGB, HSV)
+  ColorFormatProto format = 1;
+
+  // If true, enables a range mode for color selection rather than fixed values
+  bool range_mode = 2;
+}

@@ -3,12 +3,11 @@ import os
 import threading
 import time
 import traceback
-import typing
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type
 
 import cscore as cs
 import cv2
@@ -16,20 +15,23 @@ import numpy as np
 import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType)
-from synapse.bcolors import bcolors
-from synapse.core.config import yaml
-from synapse.stypes import CameraID, DataValue, Frame, PipelineID, PipelineName
 from synapse_net.nt_client import NtClient
+from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
+from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds
 
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraFactory,
+from ..bcolors import MarkupColors
+from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
+                      PipelineTypeName)
+from ..util import resolveGenericArgument
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
                              CameraSettingsKeys, SynapseCamera, getCameraTable,
                              getCameraTableName)
-from .config import Config
-from .pipeline import (CameraConfig, FrameResult, GlobalSettings, Pipeline,
-                       PipelineSettings)
-from .settings_api import PipelineSettingsMap
+from .config import Config, yaml
+from .global_settings import GlobalSettings
+from .pipeline import FrameResult, Pipeline, PipelineSettings
+from .settings_api import SettingsMap
 
 
 class NTKeys(Enum):
@@ -48,18 +50,12 @@ class FPSView:
     position = (10, 30)
 
 
-def resolveGenericArgument(cls) -> Optional[Type]:
-    orig_bases = getattr(cls, "__orig_bases__", ())
-    for base in orig_bases:
-        if typing.get_origin(base) is Pipeline:
-            args = typing.get_args(base)
-            if args:
-                return args[0]
-    return None
-
-
 class PipelineLoader:
     """Loads, manages, and binds pipeline configurations and instances."""
+
+    kPipelineTypeKey: Final[str] = "type"
+    kPipelineNameKey: Final[str] = "name"
+    kPipelinesArrayKey: Final[str] = "pipelines"
 
     def __init__(self, pipelineDirectory: Path):
         """Initializes the PipelineLoader with the specified directory.
@@ -67,12 +63,14 @@ class PipelineLoader:
         Args:
             pipelineDirectory (Path): Path to the directory containing pipeline files.
         """
-        self.pipelineTypeNames: Dict[PipelineID, PipelineName] = {}
+        self.pipelineTypeNames: Dict[PipelineID, PipelineTypeName] = {}
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
         self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
-        self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
+        self.pipelineInstanceBindings: List[Pipeline] = []
+        self.pipelineNames: Dict[PipelineID, PipelineName] = {}
         self.pipelineDirectory: Path = pipelineDirectory
+        self.onAddPipeline: List[Callable[[PipelineID, Pipeline], None]] = []
 
     def setup(self, directory: Path):
         """Initializes the pipeline system by loading pipeline classes and their settings.
@@ -80,18 +78,43 @@ class PipelineLoader:
         Args:
             directory (Path): The directory containing pipeline implementations.
         """
-        self.pipelineTypes = self.loadPipelines(directory)
+        self.pipelineTypes = self.loadPipelineTypes(directory)
         self.loadPipelineSettings()
         self.loadPipelineInstances()
 
     def loadPipelineInstances(self):
-        for pipelineIndex, settings in self.pipelineSettings.items():
+        for pipelineIndex in self.pipelineSettings.keys():
             pipelineType = self.getPipelineTypeByIndex(pipelineIndex)
-            currPipeline = pipelineType(settings=settings)
+            settings = self.pipelineSettings.get(pipelineIndex)
+            settingsMap: Dict = {}
+            if settings:
+                settingsMap = {
+                    key: settings.getAPI().getValue(key)
+                    for key in settings.getSchema().keys()
+                }
+            else:
+                settingsMap = {}
+            self.addPipeline(
+                self.pipelineNames[pipelineIndex],
+                pipelineType.__name__,
+                settingsMap,
+            )
 
-            self.setPipelineInstance(pipelineIndex, currPipeline)
+    def addPipeline(
+        self, name: str, typename: str, settings: Optional[SettingsMap] = None
+    ):
+        pipelineType: Optional[Type[Pipeline]] = self.pipelineTypes.get(typename, None)
+        if pipelineType is not None:
+            settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
+            settingsInst = settingsType(settings or {})
+            currPipeline = pipelineType(settings=settingsInst)
+            currPipeline.name = name
+            self.pipelineInstanceBindings.append(currPipeline)
 
-    def loadPipelines(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
+            for callback in self.onAddPipeline:
+                callback(len(self.pipelineInstanceBindings) - 1, currPipeline)
+
+    def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
         """Loads all classes that extend Pipeline from Python files in the directory.
 
         Args:
@@ -160,14 +183,17 @@ class PipelineLoader:
                 cameraIndex
             ].defaultPipeline
 
-        pipelines: dict = settings["pipelines"]
+        pipelines: dict = settings[self.kPipelinesArrayKey]
 
         for pipeIndex, _ in enumerate(pipelines):
             pipeline = pipelines[pipeIndex]
 
-            log.log(f"Loaded pipeline #{pipeIndex} with type {pipeline['type']}")
+            log.log(
+                f"Loaded pipeline #{pipeIndex} with type {pipeline[self.kPipelineTypeKey]}"
+            )
 
-            self.pipelineTypeNames[pipeIndex] = pipeline["type"]
+            self.pipelineTypeNames[pipeIndex] = pipeline[self.kPipelineTypeKey]
+            self.pipelineNames[pipeIndex] = pipeline[self.kPipelineNameKey]
 
             self.createPipelineSettings(
                 self.pipelineTypes[self.pipelineTypeNames[pipeIndex]],
@@ -181,7 +207,7 @@ class PipelineLoader:
         self,
         pipelineType: Type[Pipeline],
         pipelineIndex: PipelineID,
-        settings: PipelineSettingsMap,
+        settings: SettingsMap,
     ) -> None:
         """Creates and stores the settings object for a given pipeline.
 
@@ -224,7 +250,9 @@ class PipelineLoader:
         Returns:
             Optional[Pipeline]: The pipeline instance, or None if not bound.
         """
-        return self.pipelineInstanceBindings.get(pipelineIndex, None)
+        if pipelineIndex < len(self.pipelineInstanceBindings):
+            return self.pipelineInstanceBindings[pipelineIndex]
+        return None
 
     def setPipelineInstance(
         self, pipelineIndex: PipelineID, pipeline: Pipeline
@@ -279,6 +307,7 @@ class CameraHandler:
         self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[CameraID, CameraConfig] = {}
+        self.onAddCamera: List[Callable[[CameraID, str, SynapseCamera], None]] = []
 
     def setup(self) -> None:
         """
@@ -312,6 +341,31 @@ class CameraHandler:
         """
         return self.cameras.get(cameraIndex, None)
 
+    def getStreamRes(self, cameraIndex: CameraID) -> Tuple[int, int]:
+        """
+        Retrieves the streaming resolution for the given camera index.
+
+        If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
+        returns its configured stream resolution and updates `self.streamSizes`.
+        Otherwise, returns a default resolution.
+
+        Args:
+            cameraIndex (CameraID): The index of the camera.
+
+        Returns:
+            Tuple[int, int]: The width and height of the stream resolution.
+        """
+        cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
+            cameraIndex
+        )
+
+        if cameraConfig is not None:
+            streamRes = cameraConfig.streamRes
+            self.streamSizes[cameraIndex] = streamRes
+            return (streamRes[0], streamRes[1])
+
+        return self.DEFAULT_STREAM_SIZE
+
     def getCameraOutputs(self) -> Dict[CameraID, cs.CvSource]:
         """
         Initializes and returns video output streams for all configured cameras.
@@ -326,40 +380,16 @@ class CameraHandler:
             dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
             to their corresponding video output objects.
         """
-
-        def getStreamRes(cameraIndex: CameraID) -> Tuple[int, int]:
-            """
-            Retrieves the streaming resolution for the given camera index.
-
-            If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
-            returns its configured stream resolution and updates `self.streamSizes`.
-            Otherwise, returns a default resolution.
-
-            Args:
-                cameraIndex (CameraID): The index of the camera.
-
-            Returns:
-                Tuple[int, int]: The width and height of the stream resolution.
-            """
-            cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
-                cameraIndex
-            )
-
-            if cameraConfig is not None:
-                streamRes = cameraConfig.streamRes
-                self.streamSizes[cameraIndex] = streamRes
-                return (streamRes[0], streamRes[1])
-
-            return self.DEFAULT_STREAM_SIZE
-
-        return {
+        binds = {
             cameraIndex: cs.CameraServer.putVideo(
                 f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
-                width=getStreamRes(cameraIndex)[0],
-                height=getStreamRes(cameraIndex)[1],
+                width=self.getStreamRes(cameraIndex)[0],
+                height=self.getStreamRes(cameraIndex)[1],
             )
             for cameraIndex in self.cameras.keys()
         }
+
+        return binds
 
     def generateRecordingOutputs(
         self, cameraIndecies: List[CameraID]
@@ -471,6 +501,9 @@ class CameraHandler:
 
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
+
+            for callback in self.onAddCamera:
+                callback(cameraIndex, camera_config.name, camera)
             log.log(
                 f"Camera (name={camera_config.name}, path={camera_config.path}, id={cameraIndex}) added successfully."
             )
@@ -522,6 +555,9 @@ class CameraHandler:
             camera.close()
 
 
+SettingChangedCallback = Callable[[str, Any, CameraID], None]
+
+
 class RuntimeManager:
     """
     Handles the loading, configuration, and runtime execution of vision pipelines
@@ -544,6 +580,10 @@ class RuntimeManager:
         self.pipelineLoader: PipelineLoader = PipelineLoader(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
+        self.cameraManagementThreads: List[threading.Thread] = []
+        self.isRunning: bool = True
+        self.onSettingChanged: List[SettingChangedCallback] = []
+        self.onSettingChangedFromNT: List[SettingChangedCallback] = []
 
     def setup(self, directory: Path):
         """
@@ -561,14 +601,9 @@ class RuntimeManager:
         import atexit
 
         log.log(
-            bcolors.OKGREEN
-            + bcolors.BOLD
-            + "\n"
-            + "=" * 20
-            + " Loading Pipelines & Camera Configs... "
-            + "=" * 20
-            + bcolors.ENDC
-            + "\n"
+            MarkupColors.header(
+                "\n" + "=" * 20 + " Loading Pipelines & Camera Configs... " + "=" * 20
+            )
         )
 
         self.pipelineLoader.setup(directory)
@@ -596,66 +631,67 @@ class RuntimeManager:
             log.log(f"Setup default pipeline (#{pipeline}) for camera ({cameraIndex})")
 
     def startMetricsThread(self):
-        from multiprocessing import Process, Queue
-
         """
         Starts a multiprocessing process and thread to:
         - Collect system metrics from a background process.
         - Publish metrics as a double array to NetworkTables from the main process.
         """
 
-        def metricsProcess(queue: Queue):
-            from synapse.hardware import MetricsManager
+        def metricsWorker() -> None:
+            from synapse.hardware.metrics import MetricsManager
 
             metricsManager: Final[MetricsManager] = MetricsManager()
-            metricsManager.setConfig(None)  # Pass config if you have one
 
-            while True:
-                metrics_str: List[str] = [
-                    metricsManager.getTemp(),
-                    metricsManager.getUtilization(),
-                    metricsManager.getMemory(),
-                    metricsManager.getThrottleReason(),
-                    metricsManager.getUptime(),
-                    metricsManager.getGPUMemorySplit(),
-                    metricsManager.getUsedRam(),
-                    metricsManager.getMallocedMemory(),
-                    metricsManager.getUsedDiskPct(),
-                    metricsManager.getNpuUsage(),
-                ]
-
-                # Convert strings to floats safely
-                metrics = []
-                for s in metrics_str:
-                    try:
-                        metrics.append(float(s))
-                    except (ValueError, TypeError):
-                        metrics.append(0.0)
-
-                queue.put(metrics)
-                time.sleep(1)
-
-        def publishLoop(queue: Queue):
             entry = NetworkTableInstance.getDefault().getEntry(
                 f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
             )
-            while True:
+
+            while self.isRunning:
+                cpuTemp = metricsManager.getCpuTemp()
+                cpuUsage = metricsManager.getCpuUtilization()
+                memory = metricsManager.getMemory()
+                uptime = metricsManager.getUptime()
+                gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                usedRam = metricsManager.getUsedRam()
+                usedDiskPct = metricsManager.getUsedDiskPct()
+                npuUsage = metricsManager.getNpuUsage()
+
+                metrics = [
+                    cpuTemp,
+                    cpuUsage,
+                    memory,
+                    uptime,
+                    gpuMemorySplit,
+                    usedRam,
+                    usedDiskPct,
+                    npuUsage,
+                ]
+
+                if WebSocketServer.kInstance is not None:
+                    metricsMessage = HardwareMetricsProto()
+                    metricsMessage.cpu_temp = cpuTemp
+                    metricsMessage.cpu_usage = cpuUsage
+                    metricsMessage.uptime = uptime
+                    metricsMessage.memory = memory
+                    metricsMessage.ram_usage = usedRam
+                    metricsMessage.disk_usage = usedDiskPct
+
+                    WebSocketServer.kInstance.sendToAllSync(
+                        createMessage(
+                            MessageTypeProto.SEND_METRICS,
+                            metricsMessage,
+                        )
+                    )
+
+                entry.setDoubleArray(metrics)
+
                 try:
-                    metrics = queue.get(timeout=2)
-                    entry.setDoubleArray(metrics)
+                    time.sleep(1)
                 except Exception:
                     continue
-                time.sleep(1)
 
-        metricsQueue = Queue()
-
-        p = Process(target=metricsProcess, args=(metricsQueue,), daemon=True)
-        p.start()
-
-        publisher_thread = threading.Thread(
-            target=publishLoop, args=(metricsQueue,), daemon=True
-        )
-        publisher_thread.start()
+        self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
+        self.metricsThread.start()
 
     def __setupPipelineForCamera(
         self,
@@ -705,17 +741,10 @@ class RuntimeManager:
             def updateSettingListener(event: Event, cameraIndex=cameraIndex):
                 prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
                 value: Any = self.getEventDataValue(event)
-                self.pipelineLoader.getPipelineSettings(
-                    self.pipelineBindings[cameraIndex]
-                ).setSetting(prop, value)
+                self.updateSetting(prop, cameraIndex, value)
 
-                if prop in CSCORE_TO_CV_PROPS.keys():
-                    camera = self.cameraHandler.getCamera(cameraIndex)
-                    if camera is not None:
-                        camera.setProperty(
-                            prop=prop,
-                            value=int(value),
-                        )
+                for callback in self.onSettingChangedFromNT:
+                    callback(prop, value, cameraIndex)
 
             for key in pipeline_config.getMap().keys():
                 nt_table = getCameraTable(cameraIndex)
@@ -726,6 +755,27 @@ class RuntimeManager:
                         NetworkTableInstance.getDefault().addListener(
                             entry, EventFlags.kValueRemote, updateSettingListener
                         )
+
+    def updateSetting(self, prop: str, cameraIndex: CameraID, value: Any) -> None:
+        self.pipelineLoader.getPipelineSettings(
+            self.pipelineBindings[cameraIndex]
+        ).setSetting(prop, value)
+
+        if prop in CSCORE_TO_CV_PROPS.keys():
+            camera = self.cameraHandler.getCamera(cameraIndex)
+            if camera is not None:
+                camera.setProperty(
+                    prop=prop,
+                    value=int(value),
+                )
+
+        for callback in self.onSettingChanged:
+            callback(prop, value, cameraIndex)
+
+        nt_table = getCameraTable(cameraIndex)
+        entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
+        if entry is not None and entry.getValue() != value:
+            entry.setValue(value)
 
     @staticmethod
     def getEventDataValue(
@@ -787,7 +837,7 @@ class RuntimeManager:
         """
         if cameraIndex not in self.cameraHandler.cameras.keys():
             log.err(
-                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameraHandler.cameras.keys())-1})."
+                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameraHandler.cameras.keys()) - 1})."
             )
             return
 
@@ -832,9 +882,9 @@ class RuntimeManager:
             self.__pipelineEntryCache = {}
 
         if cameraIndex not in self.__pipelineEntryCache:
-            table = NetworkTableInstance.getDefault().getTable(NtClient.NT_TABLE)
-            entry_path = f"{getCameraTableName(cameraIndex)}/{CameraSettingsKeys.kPipeline.value}"
-            self.__pipelineEntryCache[cameraIndex] = table.getEntry(entry_path)
+            table = getCameraTable(cameraIndex)
+            pipeline_entryPath = f"{CameraSettingsKeys.kPipeline.value}"
+            self.__pipelineEntryCache[cameraIndex] = table.getEntry(pipeline_entryPath)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
 
@@ -848,7 +898,7 @@ class RuntimeManager:
 
             log.log(f"Started Camera #{cameraIndex} loop")
 
-            while True:
+            while self.isRunning:
                 maxFps = camera.getMaxFPS()
                 frame_time = 1.0 / float(maxFps)
                 loop_start = Timer.getFPGATimestamp()
@@ -906,24 +956,25 @@ class RuntimeManager:
                 thread = threading.Thread(target=processCamera, args=(cameraIndex,))
                 thread.daemon = True
                 thread.start()
+                self.cameraManagementThreads.append(thread)
 
         initThreads()
 
         log.log(
-            bcolors.OKGREEN
-            + bcolors.BOLD
-            + "\n"
-            + "=" * 20
-            + " Synapse Runtime Starting... "
-            + "=" * 20
-            + bcolors.ENDC
+            MarkupColors.header(
+                "\n" + "=" * 20 + " Synapse Runtime Starting... " + "=" * 20
+            )
         )
 
-        while True:
+        while self.isRunning:
             if NtClient.INSTANCE:
                 NtClient.INSTANCE.nt_inst.flush()
                 if NtClient.INSTANCE.server:
                     NtClient.INSTANCE.server.flush()
+            try:
+                time.sleep(0.05)
+            except Exception:
+                continue
 
     def handleResults(
         self, frames: FrameResult, cameraIndex: CameraID
@@ -1022,7 +1073,8 @@ class RuntimeManager:
 
         return frame
 
-    def toDict(self) -> dict:
+    def toDict(self) -> Dict:
+        print(self.pipelineLoader.pipelineInstanceBindings)
         return {
             "global": {
                 "camera_configs": {
@@ -1032,7 +1084,9 @@ class RuntimeManager:
             },
             "pipelines": {
                 key: pipeline.toDict(self.pipelineLoader.pipelineTypeNames[key])
-                for key, pipeline in self.pipelineLoader.pipelineInstanceBindings.items()
+                for key, pipeline in enumerate(
+                    self.pipelineLoader.pipelineInstanceBindings
+                )
             },
         }
 
@@ -1055,4 +1109,5 @@ class RuntimeManager:
         cv2.destroyAllWindows()
 
         self.cameraHandler.cleanup()
+        self.isRunning = False
         log.log("Cleaned up all resources.")

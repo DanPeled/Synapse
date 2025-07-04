@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package proto.v1;
+
+// Information about a device's network and system identification
+message DeviceInfoProto {
+  // The device's hostname
+  string hostname = 1;
+
+  // The IP address of the device
+  string ip = 2;
+
+  // The platform or operating system (e.g., "linux", "windows")
+  string platform = 3;
+
+  // List of network interfaces available on the device
+  repeated string network_interfaces = 4;
+}
+
+// Metrics related to the hardware status of a device
+message HardwareMetricsProto {
+  // CPU temperature in degrees Celsius
+  float cpu_temp = 1;
+
+  // CPU usage as a percentage (0 to 100)
+  float cpu_usage = 2;
+
+  // Disk usage as a percentage (0 to 100)
+  float disk_usage = 3;
+
+  // RAM usage
+  float ram_usage = 4;
+
+  // Total memory available
+  float memory = 5;
+
+  // Uptime of the device in seconds
+  float uptime = 6;
+
+  // Timestamp when the metrics were last fetched (ISO 8601 or other format)
+  string last_fetched = 7;
+}

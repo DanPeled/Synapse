@@ -9,7 +9,8 @@ import numpy as np
 import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
-from synapse.core.pipeline import GlobalSettings, Pipeline
+from synapse.core.global_settings import GlobalSettings
+from synapse.core.pipeline import Pipeline
 from synapse.core.settings_api import (BooleanConstraint,
                                        ListOptionsConstraint, PipelineSettings,
                                        RangeConstraint, settingField)
@@ -82,7 +83,7 @@ class ApriltagPipelineSettings(PipelineSettings):
     fieldpose = settingField(BooleanConstraint(), default=True)
     verbosity = settingField(
         ListOptionsConstraint(options=[ver.value for ver in ApriltagVerbosity]),
-        default=ApriltagVerbosity.kPoseOnly,
+        default=ApriltagVerbosity.kPoseOnly.value,
     )
     num_threads = settingField(RangeConstraint(minValue=1, maxValue=6), default=1)
 
@@ -317,10 +318,12 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if camConfig:
             measured_res = camConfig.measuredRes
-            current_res = [
-                self.getSetting(PipelineSettings.height),
-                self.getSetting(PipelineSettings.width),
-            ]
+            current_res = list(
+                map(
+                    lambda x: int(x),
+                    str(self.getSetting(PipelineSettings.resolution)).split("x"),
+                )
+            )
 
             if measured_res != current_res:
                 scale_x = current_res[0] / measured_res[0]  # pyright: ignore

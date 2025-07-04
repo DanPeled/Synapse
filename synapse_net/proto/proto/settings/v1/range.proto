@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proto.settings.v1;
+
+import "google/protobuf/wrappers.proto";
+
+// Defines a numeric range constraint with optional minimum, maximum, and step values.
+message RangeConstraintProto {
+  // Optional minimum allowed value (inclusive)
+  google.protobuf.FloatValue min = 1;
+
+  // Optional maximum allowed value (inclusive)
+  google.protobuf.FloatValue max = 2;
+
+  // Optional step/increment value for valid values within the range
+  google.protobuf.FloatValue step = 3;
+}
