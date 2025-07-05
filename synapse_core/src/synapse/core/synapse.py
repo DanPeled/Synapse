@@ -362,11 +362,18 @@ class Synapse:
                 addPipelineMsg.type
                 in self.runtime_handler.pipelineLoader.pipelineTypes.keys()
             ):
+                # BUG: When a pipeline is set-up it should get bind-ed to a camera if a camera is using it at the time
+                # This doesnt currently happen and raises a runtime error
+                # This also raises the question of what happens when a pipeline is being used by 2 cameras at the same time
+                # Is that being handled correctly?
                 self.runtime_handler.pipelineLoader.addPipeline(
                     index=addPipelineMsg.index,
                     name=addPipelineMsg.name,
                     typename=addPipelineMsg.type,
-                    settings={},
+                    settings={
+                        key: protoToSettingValue(valueProto)
+                        for key, valueProto in addPipelineMsg.settings_values.items()
+                    },
                 )
             else:
                 err(

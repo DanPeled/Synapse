@@ -22,6 +22,7 @@ import { CameraProto } from "@/proto/v1/camera";
 import { AlertDialog } from "@/widgets/alertDialog";
 import { WebSocketWrapper } from "@/services/websocket";
 import { AddPipelineDialog } from "./addPipelineDialog";
+import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 
 function ChangePipelineTypeDialog({
   visible,
@@ -217,7 +218,22 @@ export function CameraAndPipelineControls({
                     <Copy className="w-4 h-4" style={{ color: teamColor }} />
                   ),
                   label: "Duplicate",
-                  action: () => console.log("Duplicate clicked"),
+                  action: () => {
+                    if (selectedPipeline && selectedPipelineType) {
+                      const payload = MessageProto.create({
+                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
+                        pipelineInfo: PipelineProto.create({
+                          name: `Copy Of ${selectedPipeline.name}`,
+                          type: selectedPipelineType.type,
+                          index: Math.max(...Array.from(pipelines.keys())) + 1,
+                          settingsValues: selectedPipeline.settingsValues ?? {},
+                        }),
+                      });
+
+                      const binary = MessageProto.encode(payload).finish();
+                      socket?.sendBinary(binary);
+                    }
+                  },
                 },
                 {
                   icon: (
@@ -288,6 +304,20 @@ export function CameraAndPipelineControls({
           currentType={selectedPipelineType}
           setPipelineType={(val) => {
             setSelectedPipelineType(val);
+            if (selectedPipeline && selectedPipelineType) {
+              const payload = MessageProto.create({
+                type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
+                pipelineInfo: PipelineProto.create({
+                  name: selectedPipeline.name,
+                  type: val?.type ?? selectedPipeline.type,
+                  index: selectedPipeline.index,
+                  settingsValues: selectedPipeline.settingsValues ?? {},
+                }),
+              });
+
+              const binary = MessageProto.encode(payload).finish();
+              socket?.sendBinary(binary);
+            }
           }}
         />
       </CardContent>
