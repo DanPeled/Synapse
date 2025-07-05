@@ -22,6 +22,7 @@ import {
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
+import { SettingValueProto } from "@/proto/settings/v1/value";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -63,23 +64,25 @@ function CameraView({ selectedCamera }: CameraViewProps) {
 }
 
 export default function Dashboard() {
-  const { pipelinecontext, setPipelinecontext, connection, cameras, socket } =
-    useBackendContext();
-  const [selectedPipeline, setSelectedPipeline] = useState(
-    pipelinecontext.pipelines.get(0)!,
-  );
+  const {
+    pipelines,
+    connection,
+    cameras,
+    socket,
+    setPipelines,
+    pipelinetypes,
+    setPipelinetypes,
+  } = useBackendContext();
+  const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
   const [selectedPipelineType, setSelectedPipelineType] = useState(
-    Array.from(pipelinecontext.pipelineTypes.values()).at(0)!,
+    Array.from(pipelinetypes.values()).at(0)!,
   );
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    setSelectedPipeline(
-      pipelinecontext.pipelines.get(selectedCamera?.pipelineIndex ?? 0)!,
-    );
-    setSelectedPipelineType(
-      Array.from(pipelinecontext.pipelineTypes.values()).at(0)!,
-    );
+    setSelectedPipeline(pipelines.get(selectedCamera?.pipelineIndex ?? 0)!);
+
+    setSelectedPipelineType(pipelinetypes.values().toArray().at(0)!);
 
     let selectedPipelineIndex: number = -1;
     if (selectedPipeline === undefined) {
@@ -89,16 +92,14 @@ export default function Dashboard() {
       selectedPipelineIndex = selectedPipeline?.index;
 
       if (selectedPipelineIndex != -1) {
-        const updated = pipelinecontext.pipelines.get(selectedPipelineIndex);
+        const updated = pipelines.get(selectedPipelineIndex);
         if (updated) {
           setSelectedPipeline(updated);
-          setSelectedPipelineType(
-            pipelinecontext.pipelineTypes.get(updated.type)!,
-          );
+          setSelectedPipelineType(pipelinetypes.get(updated.type)!);
         }
       }
     }
-  }, [pipelinecontext]);
+  }, [pipelines, pipelinetypes]);
 
   useEffect(() => {
     setSelectedCamera(cameras.at(0));
@@ -121,10 +122,10 @@ export default function Dashboard() {
           <Column className="flex-[2] space-y-2 h-full">
             <CameraView selectedCamera={selectedCamera} />
             <PipelineConfigControl
-              pipelinecontext={pipelinecontext}
+              pipelines={pipelines}
+              setPipelines={setPipelines}
               selectedPipeline={selectedPipeline}
               selectedPipelineType={selectedPipelineType}
-              setpipelinecontext={setPipelinecontext}
               backendConnected={connection.backend}
               setSetting={(val, setting, pipeline) => {
                 if (hasSettingValue(val)) {
@@ -146,13 +147,13 @@ export default function Dashboard() {
 
           <Column className="flex-[1.2] space-y-2 h-full">
             <CameraAndPipelineControls
-              pipelinecontext={pipelinecontext}
+              pipelines={pipelines}
+              pipelinetypes={pipelinetypes}
+              socket={socket}
               setSelectedPipeline={(val) => {
                 if (val !== undefined) {
                   setSelectedPipeline(val);
-                  setSelectedPipelineType(
-                    pipelinecontext.pipelineTypes.get(val.type)!,
-                  );
+                  setSelectedPipelineType(pipelinetypes.get(val.type)!);
 
                   if (selectedCamera) {
                     setTimeout(() => {
@@ -189,12 +190,9 @@ export default function Dashboard() {
                     socket?.sendBinary(binary);
 
                     selectedPipeline.type = newType.type;
-                    const newPipelines = new Map(pipelinecontext.pipelines);
+                    const newPipelines = new Map(pipelines);
                     newPipelines.set(selectedPipeline.index, selectedPipeline);
-                    setPipelinecontext({
-                      ...pipelinecontext,
-                      pipelines: newPipelines,
-                    });
+                    setPipelines(newPipelines);
                   }
                 }, 0);
               }}

@@ -9,7 +9,6 @@ import React, {
   useRef,
 } from "react";
 import { BackendStateSystem } from "./dataStractures";
-import { PipelineManagement } from "./pipelineContext";
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
@@ -34,6 +33,8 @@ export function hasSettingValue(val: SettingValueProto): boolean {
 }
 
 const initialState: BackendStateSystem.State = {
+  pipelines: new Map(),
+  pipelinetypes: new Map(),
   deviceinfo: {
     hostname: "Unknown",
     ip: "127.0.0.1",
@@ -54,23 +55,6 @@ const initialState: BackendStateSystem.State = {
     networktables: false,
   },
   networktable: "Synapse",
-  pipelinecontext: new PipelineManagement.PipelineContext(
-    new Map<number, PipelineProto>([
-      [
-        0,
-        PipelineProto.create({
-          name: "Placeholder",
-          type: "PlaceholderPipeline",
-        }),
-      ],
-    ]),
-    new Map<string, PipelineTypeProto>([
-      [
-        "PlaceholderPipeline",
-        PipelineTypeProto.create({ type: "PlaceholderPipeline" }),
-      ],
-    ]),
-  ),
   logs: [] as BackendStateSystem.Log[],
   cameras: [],
   networktablesserver: null,
@@ -138,7 +122,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
     }, {} as BackendStateSystem.StateSetter);
   }, [dispatch, state]);
 
-  const socket = useRef<WebSocketWrapper | null>(null);
+  const socket = useRef<WebSocketWrapper | undefined>(undefined);
 
   useEffect(() => {
     const ws = new WebSocketWrapper(`ws://${window.location.hostname}:8765`, {
@@ -178,20 +162,15 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             break;
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE:
             const pipeline: PipelineProto = messageObj.pipelineInfo!;
-            const pipelines = state.pipelinecontext.pipelines;
+            const pipelines = state.pipelines;
             pipelines.set(pipeline.index, pipeline);
-            setters.setPipelinecontext({
-              ...state.pipelinecontext,
-              pipelines: pipelines,
-            });
+            setters.setPipelines(pipelines);
             break;
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES: {
             const types: PipelineTypeProto[] = messageObj.pipelineTypeInfo;
             const newMap = new Map(types.map((type) => [type.type, type]));
-            setters.setPipelinecontext({
-              ...state.pipelinecontext,
-              pipelineTypes: newMap,
-            });
+            setters.setPipelinetypes(newMap);
+            break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA: {
             const camera: CameraProto = messageObj.cameraInfo!;

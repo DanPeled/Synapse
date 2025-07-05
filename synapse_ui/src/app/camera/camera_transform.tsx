@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/card";
 import { Move3D } from "lucide-react";
 import { baseCardColor, teamColor } from "@/services/style";
-import { Placeholder } from "@/widgets/placeholder";
 import { Column, Row } from "@/widgets/containers";
 import TextInput from "@/widgets/textInput";
 import { Button } from "@/components/ui/button";

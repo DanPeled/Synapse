@@ -15,6 +15,7 @@ interface TextInputProps {
   maxLength?: number | null;
   textColor?: string;
   labelColor?: string;
+  textSize?: string;
 }
 
 export default function TextInput({
@@ -27,6 +28,7 @@ export default function TextInput({
   disabled = false,
   maxLength = null,
   labelColor = teamColor,
+  textSize = "text-base",
 }: TextInputProps) {
   const [invalid, setInvalid] = useState(false);
   const id = useId();
@@ -63,6 +65,7 @@ export default function TextInput({
       className={cn(
         "flex flex-col",
         disabled ? "opacity-50 pointer-events-none" : "",
+        textSize,
       )}
     >
       <div className="flex items-center gap-3 px-4 py-2 rounded-xl relative bg-[rgba(50, 50, 50, 1)]">
@@ -73,7 +76,7 @@ export default function TextInput({
         >
           {label}
         </label>
-        <Input
+        <input
           id={id}
           type="text"
           value={value}
@@ -82,9 +85,10 @@ export default function TextInput({
           disabled={disabled}
           maxLength={maxLength ?? undefined}
           className={cn(
-            "bg-[rgb(50,50,50)] text-white rounded-md text-base flex-1",
+            "text-white rounded-md flex-1 py-2 px-2",
             invalid ? "text-red-400" : "",
-            "focus:outline-none focus:ring-2 focus:ring-[rgba(0,0,0,0.15)] border-none selection:bg-[rgba(0,0,200,0.5)]",
+            "focus:outline-none focus:ring-2 focus:ring-[rgba(0,0,0,0.15)] selection:bg-[rgba(0,0,200,0.5)] bg-zinc-800",
+            textSize,
           )}
         />
       </div>

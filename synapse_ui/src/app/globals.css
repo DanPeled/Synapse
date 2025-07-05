@@ -186,3 +186,7 @@ input[type="range"]::-moz-range-thumb {
     transform: scale(1.05);
   }
 }
+
+.modal-open .app-slider {
+  display: none !important;
+}

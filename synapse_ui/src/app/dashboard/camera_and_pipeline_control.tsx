@@ -15,45 +15,13 @@ import {
 } from "@/services/style";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
 import { Column, Row } from "@/widgets/containers";
-import { PipelineManagement } from "@/services/backend/pipelineContext";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import ToggleButton from "@/widgets/toggleButtons";
 import { Card, CardContent } from "@/components/ui/card";
 import { CameraProto } from "@/proto/v1/camera";
 import { AlertDialog } from "@/widgets/alertDialog";
-import { SettingValueProto } from "@/proto/settings/v1/value";
-
-function AddPipelineDialog({
-  visible,
-  setVisible,
-}: {
-  visible: boolean;
-  setVisible: (state: boolean) => void;
-}) {
-  return (
-    <AlertDialog
-      visible={visible}
-      onClose={() => setVisible(false)}
-      className="w-[50vw] h-[40vh] -translate-y-40"
-    >
-      <Button
-        variant="outline"
-        size="sm"
-        className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
-        style={{
-          borderColor: borderColor,
-          color: teamColor,
-        }}
-        onClick={() => setVisible(false)}
-      >
-        <span className="flex items-center justify-center gap-2">
-          <X />
-          Close
-        </span>
-      </Button>
-    </AlertDialog>
-  );
-}
+import { WebSocketWrapper } from "@/services/websocket";
+import { AddPipelineDialog } from "./addPipelineDialog";
 
 function ChangePipelineTypeDialog({
   visible,
@@ -130,7 +98,6 @@ function ChangePipelineTypeDialog({
 }
 
 interface CameraAndPipelineControlsProps {
-  pipelinecontext: PipelineManagement.PipelineContext;
   setSelectedPipeline: (val?: PipelineProto) => void;
   selectedPipeline?: PipelineProto;
   selectedPipelineType?: PipelineTypeProto;
@@ -138,10 +105,12 @@ interface CameraAndPipelineControlsProps {
   selectedCamera: CameraProto | undefined;
   setSelectedCamera: (cam?: CameraProto) => void;
   cameras: CameraProto[];
+  socket?: WebSocketWrapper;
+  pipelines: Map<number, PipelineProto>;
+  pipelinetypes: Map<string, PipelineTypeProto>;
 }
 
 export function CameraAndPipelineControls({
-  pipelinecontext,
   setSelectedPipeline,
   selectedPipeline,
   selectedPipelineType,
@@ -149,6 +118,9 @@ export function CameraAndPipelineControls({
   selectedCamera,
   setSelectedCamera,
   cameras,
+  socket,
+  pipelines,
+  pipelinetypes,
 }: CameraAndPipelineControlsProps) {
   const [ignoreNetworkTablePipeline, setIgnoreNetworkTablePipeline] =
     useState(false);
@@ -192,9 +164,9 @@ export function CameraAndPipelineControls({
             value={selectedPipeline}
             disabled={!ignoreNetworkTablePipeline}
             onValueChange={(val) => setSelectedPipeline(val)}
-            options={Array.from(pipelinecontext.pipelines.entries()).map(
+            options={Array.from(pipelines.entries()).map(
               ([index, pipeline]) => ({
-                label: pipeline?.name,
+                label: `${pipeline?.name} (#${index})`,
                 value: pipeline,
               }),
             )}
@@ -286,12 +258,10 @@ export function CameraAndPipelineControls({
             setRequestedPipelineType(val);
             setChangePipelineTypeDialogVisible(true);
           }}
-          options={Array.from(pipelinecontext.pipelineTypes.entries()).map(
-            ([_, type]) => ({
-              label: type.type,
-              value: type,
-            }),
-          )}
+          options={Array.from(pipelinetypes.entries()).map(([_, type]) => ({
+            label: type.type,
+            value: type,
+          }))}
         />
         <div className="h-6" />
         <div className="flex justify-center items-center">
@@ -302,10 +272,15 @@ export function CameraAndPipelineControls({
             tooltip="Toggle to ignore using the pipeline ID from the NetworkTable entry"
           />
         </div>
-        <AddPipelineDialog
-          visible={addPipelineDialogVisible}
-          setVisible={setAddPipelineDialogVisible}
-        />
+        {addPipelineDialogVisible && (
+          <AddPipelineDialog
+            visible={addPipelineDialogVisible}
+            pipelineTypes={pipelinetypes}
+            setVisible={setAddPipelineDialogVisible}
+            socket={socket}
+            index={Math.max(...Array.from(pipelines.keys())) + 1}
+          />
+        )}
         <ChangePipelineTypeDialog
           visible={changePipelineTypeDialogVisible}
           setVisible={setChangePipelineTypeDialogVisible}
