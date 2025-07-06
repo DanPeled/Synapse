@@ -157,7 +157,6 @@ export default function Dashboard() {
 
                   if (selectedCamera) {
                     setTimeout(() => {
-                      console.log(val);
                       const payload = MessageProto.create({
                         type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
                         setPipelineIndex: SetPipelineIndexMessageProto.create({

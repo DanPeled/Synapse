@@ -893,6 +893,13 @@ class RuntimeManager:
             self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
             return
 
+        for cameraId, pipelineId in self.pipelineBindings.items():
+            if cameraId != cameraIndex and pipelineId == pipelineIndex:
+                log.err(
+                    f"Another camera is using this pipeline at the moment (camera=#{cameraId})"
+                )
+                return
+
         # If both indices are valid, proceed with the pipeline setting
         self.pipelineBindings[cameraIndex] = pipelineIndex
 
