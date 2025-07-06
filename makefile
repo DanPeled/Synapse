@@ -36,13 +36,18 @@ generate_buf:
 		buf lint && \
 		buf format -w && \
 		buf generate --template buf-ts.yaml && \
-		buf generate --template buf-python.yaml
+		buf generate --template buf-python.yaml && \
+		$(CD) .. &\
+		$(CD) .. &\
+		make install
 
 # Format code with tools
 format:
 	@python3 -m ruff format . >$(NULL) 2>&1 || echo ruff format failed
 	@python3 -m isort . >$(NULL) 2>&1 || echo isort failed
 	@$(CD) synapse_ui && npx prettier . --write >$(NULL) 2>&1 || echo prettier failed
+	@$(CD) synapse_net/proto && \
+		buf format -w
 
 # Build Python and UI
 build:

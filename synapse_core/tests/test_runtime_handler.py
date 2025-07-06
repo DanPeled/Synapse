@@ -92,7 +92,7 @@ class TestRuntimeManager(unittest.TestCase):
             "synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap"
         ) as mock_camera_map:
             mock_camera_map.return_value = {0: fake_config}
-            self.mock_loader.pipelineInstanceBindings = [fake_pipeline]
+            self.mock_loader.pipelineInstanceBindings = {0: fake_pipeline}
             self.mock_loader.pipelineTypeNames = {0: "mock"}
 
             expected_dict = {

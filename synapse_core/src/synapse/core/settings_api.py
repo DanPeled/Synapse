@@ -919,6 +919,9 @@ def setEntryValue(entry: NetworkTableEntry, value):
 class PipelineSettings(SettingsCollection):
     """Base class for creating pipeline settings collections."""
 
+    def __init__(self, settings: Optional[SettingsMap] = None):
+        super().__init__(settings)
+
     kCameraPropsCategory = "Camera Properties"
 
     brightness = settingField(

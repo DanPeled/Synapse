@@ -2,24 +2,24 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { hasSettingValue } from "@/services/backend/backendContext";
-import { PipelineManagement } from "@/services/backend/pipelineContext";
-import { GenerateControl } from "@/services/controls_generator";
+import {
+  GenerateControl,
+  settingValueToProto,
+} from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Activity, Camera, Settings } from "lucide-react";
 import { JSX, useEffect, useState } from "react";
 
 export function PipelineConfigControl({
-  pipelinecontext,
   selectedPipeline,
   selectedPipelineType,
-  setpipelinecontext,
   backendConnected,
   setSetting,
+  setPipelines,
+  pipelines,
 }: {
-  pipelinecontext: PipelineManagement.PipelineContext;
-  setpipelinecontext: (context: PipelineManagement.PipelineContext) => void;
-  selectedPipeline: PipelineProto;
+  selectedPipeline?: PipelineProto;
   selectedPipelineType?: PipelineTypeProto;
   backendConnected: boolean | undefined;
   setSetting: (
@@ -27,6 +27,8 @@ export function PipelineConfigControl({
     setting: string,
     pipeline: PipelineProto,
   ) => void;
+  setPipelines: (val: Map<number, PipelineProto>) => void;
+  pipelines: Map<number, PipelineProto>;
 }) {
   const [cameraControls, setCameraControls] = useState<
     (JSX.Element | undefined)[]
@@ -53,8 +55,8 @@ export function PipelineConfigControl({
           setValue={(val) => {
             if (hasSettingValue(val)) {
               setTimeout(() => {
-                if (selectedPipeline && pipelinecontext) {
-                  const oldPipelines = pipelinecontext.pipelines;
+                if (selectedPipeline) {
+                  const oldPipelines = pipelines;
 
                   const newSettingsValues = {
                     ...selectedPipeline.settingsValues,
@@ -68,11 +70,7 @@ export function PipelineConfigControl({
 
                   const newPipelines = new Map(oldPipelines);
                   newPipelines.set(selectedPipeline.index, updatedPipeline);
-
-                  setpipelinecontext({
-                    ...pipelinecontext,
-                    pipelines: newPipelines,
-                  });
+                  setPipelines(newPipelines);
                 }
               }, 0);
 
@@ -82,9 +80,9 @@ export function PipelineConfigControl({
             }
           }}
           value={
-            selectedPipeline.settingsValues[setting.name] ??
+            selectedPipeline?.settingsValues[setting.name] ??
             setting.default ??
-            ""
+            settingValueToProto("")
           }
           defaultValue={setting.default}
         />

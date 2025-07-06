@@ -68,7 +68,7 @@ class PipelineLoader:
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
         self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
-        self.pipelineInstanceBindings: List[Pipeline] = []
+        self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
         self.pipelineNames: Dict[PipelineID, PipelineName] = {}
         self.pipelineDirectory: Path = pipelineDirectory
         self.onAddPipeline: List[Callable[[PipelineID, Pipeline], None]] = []
@@ -96,24 +96,34 @@ class PipelineLoader:
             else:
                 settingsMap = {}
             self.addPipeline(
+                pipelineIndex,
                 self.pipelineNames[pipelineIndex],
                 pipelineType.__name__,
                 settingsMap,
             )
 
     def addPipeline(
-        self, name: str, typename: str, settings: Optional[SettingsMap] = None
+        self,
+        index: PipelineID,
+        name: str,
+        typename: str,
+        settings: Optional[SettingsMap] = None,
     ):
         pipelineType: Optional[Type[Pipeline]] = self.pipelineTypes.get(typename, None)
         if pipelineType is not None:
             settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
-            settingsInst = settingsType(settings or {})
+            settingsInst = settingsType(settings or {"width": 1920, "height": 1080})
             currPipeline = pipelineType(settings=settingsInst)
             currPipeline.name = name
-            self.pipelineInstanceBindings.append(currPipeline)
+            self.pipelineInstanceBindings[index] = currPipeline
+            self.pipelineNames[index] = name
+            self.pipelineTypeNames[index] = typename
+            self.pipelineSettings[index] = settingsInst
+
+            log.log(f"Added Pipeline #{index} with type {typename}")
 
             for callback in self.onAddPipeline:
-                callback(len(self.pipelineInstanceBindings) - 1, currPipeline)
+                callback(index, currPipeline)
 
     def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
         """Loads all classes that extend Pipeline from Python files in the directory.
@@ -754,6 +764,7 @@ class RuntimeManager:
             log.err(f"No pipeline with index: {self.pipelineBindings[cameraIndex]}")
             return
 
+        currPipeline.bind(cameraIndex)
         cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
         camera: Optional[SynapseCamera] = self.cameraHandler.getCamera(cameraIndex)
         if camera is not None:
@@ -768,7 +779,6 @@ class RuntimeManager:
         if cameraTable is not None:
             setattr(currPipeline, "nt_table", cameraTable)
             setattr(currPipeline, "builder_cache", {})
-            currPipeline.bind(cameraIndex)
             pipeline_config.sendSettings(
                 cameraTable.getSubTable(NTKeys.kSettings.value)
             )
@@ -882,6 +892,13 @@ class RuntimeManager:
             )
             self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
             return
+
+        for cameraId, pipelineId in self.pipelineBindings.items():
+            if cameraId != cameraIndex and pipelineId == pipelineIndex:
+                log.err(
+                    f"Another camera is using this pipeline at the moment (camera=#{cameraId})"
+                )
+                return
 
         # If both indices are valid, proceed with the pipeline setting
         self.pipelineBindings[cameraIndex] = pipelineIndex
@@ -1119,8 +1136,8 @@ class RuntimeManager:
             },
             "pipelines": {
                 key: pipeline.toDict(self.pipelineLoader.pipelineTypeNames[key])
-                for key, pipeline in enumerate(
-                    self.pipelineLoader.pipelineInstanceBindings
+                for key, pipeline in (
+                    self.pipelineLoader.pipelineInstanceBindings.items()
                 )
             },
         }

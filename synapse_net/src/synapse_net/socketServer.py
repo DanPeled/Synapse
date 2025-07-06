@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from dataclasses import fields
 from enum import Enum
 from functools import lru_cache
@@ -76,8 +77,11 @@ class WebSocketServer:
                 await self._emit(SocketEvent.kMessage, websocket, message)
         except ConnectionClosed:
             pass
-        except Exception as e:
-            await self._emit(SocketEvent.kError, websocket, str(e))
+        except Exception as error:
+            errString = "".join(
+                traceback.format_exception(type(error), error, error.__traceback__)
+            )
+            await self._emit(SocketEvent.kError, websocket, errString)
         finally:
             self.clients.remove(websocket)
             await self._emit(SocketEvent.kDisconnect, websocket)
@@ -89,7 +93,12 @@ class WebSocketServer:
             )
 
     def sendToAllSync(self, message: Data):
-        asyncio.run(self.sendToAll(message))
+        if self.loop and self.loop.is_running():
+            # Submit to the existing background event loop
+            asyncio.run_coroutine_threadsafe(self.sendToAll(message), self.loop)
+        else:
+            # Run in a temporary event loop (e.g. during test or before full setup)
+            asyncio.run(self.sendToAll(message))
 
     async def sendToClient(
         self,

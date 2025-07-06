@@ -18,6 +18,14 @@ export function AlertDialog({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (initialVisible) {
+      document.body.classList.add("modal-open");
+    } else {
+      document.body.classList.remove("modal-open");
+    }
+  }, [initialVisible]);
+
+  useEffect(() => {
     let timer1: ReturnType<typeof setTimeout>;
     let timer2: ReturnType<typeof setTimeout>;
 

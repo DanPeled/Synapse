@@ -19,7 +19,6 @@ import {
 import { RefreshCw, Download, ChevronUp, ChevronDown, X } from "lucide-react";
 import { Row } from "@/widgets/containers";
 import { baseCardColor, teamColor } from "@/services/style";
-import { useBackendContext } from "@/services/backend/backendContext";
 import { AlertDialog } from "@/widgets/alertDialog";
 
 // --- Calibration Data ---

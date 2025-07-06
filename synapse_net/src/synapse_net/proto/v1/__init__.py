@@ -21,6 +21,7 @@ class MessageTypeProto(betterproto.Enum):
     SET_TYPE_FOR_PIPELINE = 6
     SET_SETTING = 7
     SET_PIPELINE_INDEX = 8
+    SET_PIPELINE_NAME = 9
 
 
 @dataclass(eq=False, repr=False)
@@ -151,6 +152,12 @@ class SetPipelineIndexMessageProto(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class SetPipelineNameMessageProto(betterproto.Message):
+    pipeline_index: int = betterproto.int32_field(1)
+    name: str = betterproto.string_field(2)
+
+
+@dataclass(eq=False, repr=False)
 class MessageProto(betterproto.Message):
     type: "MessageTypeProto" = betterproto.enum_field(1)
     device_info: "DeviceInfoProto" = betterproto.message_field(2, group="payload")
@@ -168,4 +175,7 @@ class MessageProto(betterproto.Message):
     set_pipeline_index: "SetPipelineIndexMessageProto" = betterproto.message_field(
         8, group="payload"
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(9)
+    set_pipeline_name: "SetPipelineNameMessageProto" = betterproto.message_field(
+        9, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(10)

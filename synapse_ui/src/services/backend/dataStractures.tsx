@@ -1,7 +1,7 @@
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
-import { PipelineManagement } from "./pipelineContext";
 import { WebSocketWrapper } from "../websocket";
 import { CameraProto } from "@/proto/v1/camera";
+import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 
 export namespace BackendStateSystem {
   export interface State {
@@ -9,11 +9,12 @@ export namespace BackendStateSystem {
     hardwaremetrics: HardwareMetricsProto;
     connection: ConnectionState;
     networktable: string;
-    pipelinecontext: PipelineManagement.PipelineContext;
     logs: Log[];
-    socket?: WebSocketWrapper | null;
+    socket?: WebSocketWrapper;
     networktablesserver: string | null;
     cameras: CameraProto[];
+    pipelines: Map<number, PipelineProto>;
+    pipelinetypes: Map<string, PipelineTypeProto>;
   }
 
   export interface Log {

@@ -6,8 +6,10 @@ from typing import Any, List, Optional
 
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
-                                  MessageTypeProto, PipelineTypeProto,
+                                  MessageTypeProto, PipelineProto,
+                                  PipelineTypeProto,
                                   SetPipelineIndexMessageProto,
+                                  SetPipelineNameMessageProto,
                                   SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer,
                                       createMessage)
@@ -40,6 +42,7 @@ class Synapse:
 
     def __init__(self) -> None:
         self.isRunning: bool = False
+        self.runtime_handler: RuntimeManager
 
     def init(
         self,
@@ -196,9 +199,10 @@ class Synapse:
                 ),
             )
 
-            for id, pipeline in enumerate(
-                self.runtime_handler.pipelineLoader.pipelineInstanceBindings
-            ):
+            for (
+                id,
+                pipeline,
+            ) in self.runtime_handler.pipelineLoader.pipelineInstanceBindings.items():
                 msg = pipelineToProto(pipeline, id)
 
                 await self.websocket.sendToAll(
@@ -283,7 +287,7 @@ class Synapse:
         def onAddPipeline(id: PipelineID, inst: Pipeline) -> None:
             pipelineProto = pipelineToProto(inst, id)
 
-            self.websocket.sendToAllSync(
+            Synapse.kInstance.websocket.sendToAllSync(
                 createMessage(MessageTypeProto.ADD_PIPELINE, pipelineProto)
             )
 
@@ -292,7 +296,7 @@ class Synapse:
                 id, name, camera, self.runtime_handler.pipelineBindings.get(id, 0)
             )
 
-            self.websocket.sendToAllSync(
+            Synapse.kInstance.websocket.sendToAllSync(
                 createMessage(MessageTypeProto.ADD_CAMERA, cameraProto)
             )
 
@@ -311,7 +315,7 @@ class Synapse:
 
             msg = createMessage(MessageTypeProto.SET_SETTING, setSettingProto)
 
-            self.websocket.sendToAllSync(msg)
+            Synapse.kInstance.websocket.sendToAllSync(msg)
 
         self.runtime_handler.pipelineLoader.onAddPipeline.append(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.append(onAddCamera)
@@ -339,6 +343,49 @@ class Synapse:
                 cameraIndex=setPipeIndexMSG.camera_index,
                 pipelineIndex=setPipeIndexMSG.pipeline_index,
             )
+        elif msgType == MessageTypeProto.SET_PIPELINE_NAME:
+            setPipelineNameMsg: SetPipelineNameMessageProto = msgObj.set_pipeline_name
+            pipeline: Optional[Pipeline] = (
+                self.runtime_handler.pipelineLoader.getPipeline(
+                    setPipelineNameMsg.pipeline_index
+                )
+            )
+            if pipeline is not None:
+                pipeline.name = setPipelineNameMsg.name
+            else:
+                err(
+                    f'Attempted name modification ("{setPipelineNameMsg.name}") for non-existing pipeline in index: {setPipelineNameMsg.pipeline_index}'
+                )
+        elif msgType == MessageTypeProto.ADD_PIPELINE:
+            addPipelineMsg: PipelineProto = msgObj.pipeline_info
+            if addPipelineMsg.type is not None and (
+                addPipelineMsg.type
+                in self.runtime_handler.pipelineLoader.pipelineTypes.keys()
+            ):
+                self.runtime_handler.pipelineLoader.addPipeline(
+                    index=addPipelineMsg.index,
+                    name=addPipelineMsg.name,
+                    typename=addPipelineMsg.type,
+                    settings={
+                        key: protoToSettingValue(valueProto)
+                        for key, valueProto in addPipelineMsg.settings_values.items()
+                    },
+                )
+                for (
+                    cameraId,
+                    pipelineId,
+                ) in self.runtime_handler.pipelineBindings.items():
+                    if pipelineId == addPipelineMsg.index:
+                        pipeline = self.runtime_handler.pipelineLoader.getPipeline(
+                            pipelineId
+                        )
+                        if pipeline is not None:
+                            pipeline.bind(cameraId)
+                        break
+            else:
+                err(
+                    f"Cannot add pipeline of type {addPipelineMsg.type}, it is an invalid typename"
+                )
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

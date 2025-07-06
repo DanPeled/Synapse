@@ -54,3 +54,8 @@ message SetPipelineIndexMessageProto {
   int32 pipeline_index = 1;
   int32 camera_index = 2;
 }
+
+message SetPipelineNameMessageProto {
+  int32 pipeline_index = 1;
+  string name = 2;
+}

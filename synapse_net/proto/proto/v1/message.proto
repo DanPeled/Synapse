@@ -16,8 +16,9 @@ message MessageProto {
     SetPipelineTypeMessageProto set_pipeline_type = 6;
     SetPipleineSettingMessageProto set_pipeline_setting = 7;
     SetPipelineIndexMessageProto set_pipeline_index = 8;
+    SetPipelineNameMessageProto set_pipeline_name = 9;
   }
-  repeated PipelineTypeProto pipeline_type_info = 9;
+  repeated PipelineTypeProto pipeline_type_info = 10;
 }
 
 enum MessageTypeProto {
@@ -30,4 +31,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE = 6;
   MESSAGE_TYPE_PROTO_SET_SETTING = 7;
   MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX = 8;
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME = 9;
 }

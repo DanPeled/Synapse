@@ -59,6 +59,11 @@ export interface SetPipelineIndexMessageProto {
   cameraIndex: number;
 }
 
+export interface SetPipelineNameMessageProto {
+  pipelineIndex: number;
+  name: string;
+}
+
 function createBasePipelineTypeProto(): PipelineTypeProto {
   return { type: "", settings: [] };
 }
@@ -681,6 +686,96 @@ export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessagePro
       const message = createBaseSetPipelineIndexMessageProto();
       message.pipelineIndex = object.pipelineIndex ?? 0;
       message.cameraIndex = object.cameraIndex ?? 0;
+      return message;
+    },
+  };
+
+function createBaseSetPipelineNameMessageProto(): SetPipelineNameMessageProto {
+  return { pipelineIndex: 0, name: "" };
+}
+
+export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto> =
+  {
+    encode(
+      message: SetPipelineNameMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.pipelineIndex !== 0) {
+        writer.uint32(8).int32(message.pipelineIndex);
+      }
+      if (message.name !== "") {
+        writer.uint32(18).string(message.name);
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): SetPipelineNameMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetPipelineNameMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.pipelineIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.name = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): SetPipelineNameMessageProto {
+      return {
+        pipelineIndex: isSet(object.pipelineIndex)
+          ? globalThis.Number(object.pipelineIndex)
+          : 0,
+        name: isSet(object.name) ? globalThis.String(object.name) : "",
+      };
+    },
+
+    toJSON(message: SetPipelineNameMessageProto): unknown {
+      const obj: any = {};
+      if (message.pipelineIndex !== 0) {
+        obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      if (message.name !== "") {
+        obj.name = message.name;
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<SetPipelineNameMessageProto>, I>>(
+      base?: I,
+    ): SetPipelineNameMessageProto {
+      return SetPipelineNameMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<I extends Exact<DeepPartial<SetPipelineNameMessageProto>, I>>(
+      object: I,
+    ): SetPipelineNameMessageProto {
+      const message = createBaseSetPipelineNameMessageProto();
+      message.pipelineIndex = object.pipelineIndex ?? 0;
+      message.name = object.name ?? "";
       return message;
     },
   };

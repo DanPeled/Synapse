@@ -5,6 +5,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { teamColor } from "@/services/style";
 
 export interface DropdownOption<T> {
@@ -18,6 +19,7 @@ interface DropdownProps<T> {
   onValueChange: (value: T) => void;
   options: DropdownOption<T>[];
   disabled?: boolean;
+  textSize?: string;
 }
 
 export function Dropdown<T>({
@@ -26,6 +28,7 @@ export function Dropdown<T>({
   onValueChange,
   options,
   disabled = false,
+  textSize = "text-base",
 }: DropdownProps<T>) {
   const stringToValue = new Map<string, T>();
   const valueToString = new Map<T, string>();
@@ -48,7 +51,10 @@ export function Dropdown<T>({
       }}
     >
       <label
-        className="min-w-[80px] text font-bold whitespace-nowrap"
+        className={cn(
+          "min-w-[80px] text font-bold whitespace-nowrap",
+          textSize,
+        )}
         style={{ color: teamColor }}
       >
         {label}
@@ -63,7 +69,10 @@ export function Dropdown<T>({
           disabled={disabled}
         >
           <SelectTrigger
-            className="w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none"
+            className={cn(
+              "w-full border rounded-[10px] text-left px-4 py-2 transition-all select-none",
+              textSize,
+            )}
             style={{
               backgroundColor: "rgb(20, 20, 20)",
               borderColor: "#3a3a3a",
@@ -71,7 +80,7 @@ export function Dropdown<T>({
               cursor: disabled ? "not-allowed" : "pointer",
             }}
           >
-            <SelectValue className="select-none" />
+            <SelectValue className={cn("select-none", textSize)} />
           </SelectTrigger>
           <SelectContent
             className="rounded-[10px] shadow-lg max-h-[220px] overflow-y-auto"
@@ -87,7 +96,10 @@ export function Dropdown<T>({
                 <SelectItem
                   key={strKey}
                   value={strKey}
-                  className="px-4 py-2 transition-colors cursor-pointer"
+                  className={cn(
+                    "px-4 py-2 transition-colors cursor-pointer",
+                    textSize,
+                  )}
                   style={{
                     color: teamColor,
                     backgroundColor:
