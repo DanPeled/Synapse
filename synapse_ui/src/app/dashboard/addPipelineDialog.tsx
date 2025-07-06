@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { X, Check } from "lucide-react";
-import { teamColor, borderColor } from "@/services/style";
+
+import { Button } from "@/components/ui/button";
 import { Dropdown } from "@/widgets/dropdown";
 import { Column, Row } from "@/widgets/containers";
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { AlertDialog } from "@/widgets/alertDialog";
 import TextInput from "@/widgets/textInput";
+
+import { teamColor, borderColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";
+
+import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 
 export function AddPipelineDialog({
@@ -24,9 +27,26 @@ export function AddPipelineDialog({
   index: number;
 }) {
   const [pipelineType, setPipelineType] = useState<PipelineTypeProto>(
-    Array.from(pipelineTypes.values()).at(0)!,
+    Array.from(pipelineTypes.values())[0]!,
   );
   const [pipelineName, setPipelineName] = useState("New Pipeline");
+
+  const handleAdd = () => {
+    setVisible(false);
+
+    const payload = MessageProto.create({
+      type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
+      pipelineInfo: PipelineProto.create({
+        name: pipelineName,
+        type: pipelineType.type,
+        index,
+        settingsValues: {},
+      }),
+    });
+
+    const binary = MessageProto.encode(payload).finish();
+    socket?.sendBinary(binary);
+  };
 
   return (
     <AlertDialog
@@ -38,62 +58,45 @@ export function AddPipelineDialog({
         <TextInput
           label="Pipeline Name"
           value={pipelineName}
-          onChange={(val) => setPipelineName(val)}
+          onChange={setPipelineName}
           textSize="text-xl"
         />
         <Dropdown
-          textSize="text-xl"
           label="Pipeline Type"
+          textSize="text-xl"
           value={pipelineType}
-          onValueChange={(val) => {
-            setPipelineType(val);
-          }}
-          options={Array.from(pipelineTypes.entries()).map(([_, type]) => ({
+          onValueChange={setPipelineType}
+          options={Array.from(pipelineTypes.values()).map((type) => ({
             label: type.type,
             value: type,
           }))}
         />
+        <h2 className="text-xl text-center" style={{ color: teamColor }}>
+          Pipeline Index: #{index}
+        </h2>
       </Column>
+      <div className="h-5" />
       <Row gap="gap-2 pt-4 items-center justify-center">
         <Button
           disabled={pipelineName.length === 0}
           variant="outline"
-          className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
-          style={{
-            borderColor: borderColor,
-            color: teamColor,
-          }}
-          onClick={() => {
-            setVisible(false);
-            const payload = MessageProto.create({
-              type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
-              pipelineInfo: PipelineProto.create({
-                name: pipelineName,
-                type: pipelineType.type,
-                index: index,
-                settingsValues: {},
-              }),
-            });
-
-            const binary = MessageProto.encode(payload).finish();
-            socket?.sendBinary(binary);
-          }}
+          className="rounded-md bg-zinc-900 hover:bg-zinc-700 text-lg cursor-pointer"
+          style={{ borderColor, color: teamColor }}
+          onClick={handleAdd}
         >
-          <span className="flex items-center justify-center gap-2 text-lg">
+          <span className="flex items-center gap-2">
             <Check />
-            Confirm
+            Add Pipeline
           </span>
         </Button>
+
         <Button
           variant="outline"
-          className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700 text-lg"
-          style={{
-            borderColor: borderColor,
-            color: teamColor,
-          }}
+          className="rounded-md bg-zinc-900 hover:bg-zinc-700 text-lg cursor-pointer"
+          style={{ borderColor, color: teamColor }}
           onClick={() => setVisible(false)}
         >
-          <span className="flex items-center justify-center gap-2">
+          <span className="flex items-center gap-2">
             <X />
             Close
           </span>
