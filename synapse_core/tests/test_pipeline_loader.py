@@ -94,3 +94,37 @@ class TestPipelineLoader(unittest.TestCase):
         self.loader.defaultPipelineIndexes[2] = 9
         self.assertEqual(self.loader.getDefaultPipeline(2), 9)
         self.assertEqual(self.loader.getDefaultPipeline(999), 0)
+
+    def test_set_pipeline_while_running(self):
+        self.loader.pipelineTypes["DummyPipeline"] = DummyPipeline
+        self.loader.pipelineTypeNames[5] = "DummyPipeline"
+
+        self.assertEqual(self.loader.getPipelineTypeByIndex(5), DummyPipeline)
+        self.assertEqual(
+            self.loader.getPipelineTypeByName("DummyPipeline"), DummyPipeline
+        )
+
+        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.addPipeline(
+            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+        )
+
+        pipeline = self.loader.pipelineInstanceBindings.get(5, None)
+
+        self.assertIsNotNone(pipeline)
+        self.assertEqual(pipeline.name, "New Pipeline")  # pyright: ignore
+        self.assertEqual(self.loader.pipelineTypeNames.get(5), "AnotherDummy")
+
+    def test_add_pipeline(self):
+        self.assertIsNone(self.loader.getPipeline(5))
+
+        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.addPipeline(
+            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+        )
+
+        pipeline = self.loader.pipelineInstanceBindings.get(5, None)
+
+        self.assertIsNotNone(pipeline)
+        self.assertEqual(pipeline.name, "New Pipeline")  # pyright: ignore
+        self.assertEqual(self.loader.pipelineTypeNames.get(5), "AnotherDummy")

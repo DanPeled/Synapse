@@ -22,7 +22,6 @@ import {
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
-import { SettingValueProto } from "@/proto/settings/v1/value";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -71,7 +70,6 @@ export default function Dashboard() {
     socket,
     setPipelines,
     pipelinetypes,
-    setPipelinetypes,
   } = useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
   const [selectedPipelineType, setSelectedPipelineType] = useState(
