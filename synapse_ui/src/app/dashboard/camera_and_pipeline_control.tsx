@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit, Plus, Trash2, MoreVertical, X, Check } from "lucide-react";
+import { Copy, Edit, Plus, Trash2, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,89 +14,16 @@ import {
   borderColor,
 } from "@/services/style";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
-import { Column, Row } from "@/widgets/containers";
+import { Row } from "@/widgets/containers";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import ToggleButton from "@/widgets/toggleButtons";
 import { Card, CardContent } from "@/components/ui/card";
 import { CameraProto } from "@/proto/v1/camera";
-import { AlertDialog } from "@/widgets/alertDialog";
 import { WebSocketWrapper } from "@/services/websocket";
 import { AddPipelineDialog } from "./addPipelineDialog";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
-
-function ChangePipelineTypeDialog({
-  visible,
-  setVisible,
-  requestedType,
-  currentType,
-  setPipelineType,
-}: {
-  visible: boolean;
-  setVisible: (state: boolean) => void;
-  requestedType: PipelineTypeProto | undefined;
-  currentType: PipelineTypeProto | undefined;
-  setPipelineType: (pipeType: PipelineTypeProto | undefined) => void;
-}) {
-  return (
-    <AlertDialog
-      visible={visible}
-      onClose={() => setVisible(false)}
-      className="w-[40vw] h-[30vh] -translate-y-40"
-    >
-      <Column gap="gap-2">
-        <h1 className="text-center text-3xl" style={{ color: teamColor }}>
-          Are you sure you want to switch pipeline type from
-          <span className="font-semibold text-blue-300">
-            {" "}
-            {currentType?.type}{" "}
-          </span>
-          to
-          <span className="font-semibold text-yellow-400">
-            {" "}
-            {requestedType?.type}{" "}
-          </span>
-          ?
-        </h1>
-        <h1 className="text-lg text-center" style={{ color: teamColor }}>
-          This action will result in all the current pipeline settings being
-          deleted and becoming the defaults for the new pipleine
-        </h1>
-        <div className="h-4"></div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-md cursor-pointer bg-green-600 hover:bg-green-500 border-none"
-          onClick={() => {
-            setPipelineType?.(requestedType);
-            setVisible(false);
-          }}
-        >
-          <span
-            className="flex items-center justify-center gap-2 font-bold"
-            style={{ color: "black" }}
-          >
-            <Check />
-            Confirm
-          </span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-md cursor-pointer bg-red-600 hover:bg-red-500 border-none"
-          onClick={() => setVisible(false)}
-        >
-          <span
-            className="flex items-center justify-center gap-2"
-            style={{ color: "black" }}
-          >
-            <X />
-            Cancel
-          </span>
-        </Button>
-      </Column>
-    </AlertDialog>
-  );
-}
+import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
+import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
 
 interface CameraAndPipelineControlsProps {
   setSelectedPipeline: (val?: PipelineProto) => void;
@@ -129,6 +56,8 @@ export function CameraAndPipelineControls({
     useState(false);
   const [changePipelineTypeDialogVisible, setChangePipelineTypeDialogVisible] =
     useState(false);
+  const [deletePipelineDialogVisible, setDeletePipelineDialogVisible] =
+    useState<boolean>(false);
   const [requestedPipelineType, setRequestedPipelineType] = useState<
     PipelineTypeProto | undefined
   >(undefined);
@@ -190,10 +119,12 @@ export function CameraAndPipelineControls({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="rounded-md shadow-lg"
+              side="bottom"
+              align="end" // aligns to the start (left side of the trigger)
+              alignOffset={20} // nudges it 20px to the left
+              className="rounded-md shadow-lg bg-zinc-700"
               sideOffset={4}
               style={{
-                backgroundColor: baseCardColor,
                 borderColor: borderColor,
                 borderWidth: "1px",
               }}
@@ -205,6 +136,7 @@ export function CameraAndPipelineControls({
                   ),
                   label: "Rename",
                   action: () => console.log("Rename clicked"),
+                  disabled: () => selectedPipeline === undefined,
                 },
                 {
                   icon: (
@@ -212,12 +144,14 @@ export function CameraAndPipelineControls({
                   ),
                   label: "Add Pipeline",
                   action: () => setAddPipelineDialogVisible(true),
+                  disabled: () => false,
                 },
                 {
                   icon: (
                     <Copy className="w-4 h-4" style={{ color: teamColor }} />
                   ),
                   label: "Duplicate",
+                  disabled: () => selectedPipeline === undefined,
                   action: () => {
                     if (selectedPipeline && selectedPipelineType) {
                       const payload = MessageProto.create({
@@ -240,11 +174,13 @@ export function CameraAndPipelineControls({
                     <Trash2 className="w-4 h-4" style={{ color: teamColor }} />
                   ),
                   label: "Delete",
-                  action: () => console.log("Delete clicked"),
+                  action: () => setDeletePipelineDialogVisible(true),
+                  disabled: () => selectedPipeline === undefined,
                 },
-              ].map(({ icon, label, action }) => (
+              ].map(({ icon, label, action, disabled }) => (
                 <DropdownMenuItem
                   key={label}
+                  disabled={disabled()}
                   className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md cursor-pointer"
                   style={{
                     color: teamColor,
@@ -320,6 +256,13 @@ export function CameraAndPipelineControls({
             }
           }}
         />
+        {deletePipelineDialogVisible && (
+          <ConfirmDeletePipelineDialog
+            visible={deletePipelineDialogVisible}
+            setVisible={setDeletePipelineDialogVisible}
+            socket={socket}
+          />
+        )}
       </CardContent>
     </Card>
   );

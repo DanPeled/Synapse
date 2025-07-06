@@ -30,6 +30,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_SETTING = 7,
   MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX = 8,
   MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME = 9,
+  MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -65,6 +66,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 9:
     case "MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME;
+    case 10:
+    case "MESSAGE_TYPE_PROTO_DELETE_PIPELINE":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -94,6 +98,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME:
       return "MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE:
+      return "MESSAGE_TYPE_PROTO_DELETE_PIPELINE";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -110,6 +116,7 @@ export interface MessageProto {
   setPipelineSetting?: SetPipleineSettingMessageProto | undefined;
   setPipelineIndex?: SetPipelineIndexMessageProto | undefined;
   setPipelineName?: SetPipelineNameMessageProto | undefined;
+  removePipelineIndex?: number | undefined;
   pipelineTypeInfo: PipelineTypeProto[];
 }
 
@@ -124,6 +131,7 @@ function createBaseMessageProto(): MessageProto {
     setPipelineSetting: undefined,
     setPipelineIndex: undefined,
     setPipelineName: undefined,
+    removePipelineIndex: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -181,8 +189,11 @@ export const MessageProto: MessageFns<MessageProto> = {
         writer.uint32(74).fork(),
       ).join();
     }
+    if (message.removePipelineIndex !== undefined) {
+      writer.uint32(80).int32(message.removePipelineIndex);
+    }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(82).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -283,7 +294,15 @@ export const MessageProto: MessageFns<MessageProto> = {
           continue;
         }
         case 10: {
-          if (tag !== 82) {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.removePipelineIndex = reader.int32();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
             break;
           }
 
@@ -327,6 +346,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       setPipelineName: isSet(object.setPipelineName)
         ? SetPipelineNameMessageProto.fromJSON(object.setPipelineName)
+        : undefined,
+      removePipelineIndex: isSet(object.removePipelineIndex)
+        ? globalThis.Number(object.removePipelineIndex)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -372,6 +394,9 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.setPipelineName = SetPipelineNameMessageProto.toJSON(
         message.setPipelineName,
       );
+    }
+    if (message.removePipelineIndex !== undefined) {
+      obj.removePipelineIndex = Math.round(message.removePipelineIndex);
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -424,6 +449,7 @@ export const MessageProto: MessageFns<MessageProto> = {
       object.setPipelineName !== undefined && object.setPipelineName !== null
         ? SetPipelineNameMessageProto.fromPartial(object.setPipelineName)
         : undefined;
+    message.removePipelineIndex = object.removePipelineIndex ?? undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||
       [];

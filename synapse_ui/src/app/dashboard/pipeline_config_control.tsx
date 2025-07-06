@@ -124,7 +124,7 @@ export function PipelineConfigControl({
               value="pipeline"
               className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
             >
-              {selectedPipelineType?.type}
+              {selectedPipelineType?.type ?? "Pipeline"}
             </TabsTrigger>
             <TabsTrigger
               value="output"

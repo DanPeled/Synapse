@@ -317,9 +317,9 @@ class Synapse:
 
             Synapse.kInstance.websocket.sendToAllSync(msg)
 
-        self.runtime_handler.pipelineLoader.onAddPipeline.append(onAddPipeline)
-        self.runtime_handler.cameraHandler.onAddCamera.append(onAddCamera)
-        self.runtime_handler.onSettingChangedFromNT.append(onSettingChangedInNt)
+        self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
+        self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
+        self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
@@ -386,6 +386,9 @@ class Synapse:
                 err(
                     f"Cannot add pipeline of type {addPipelineMsg.type}, it is an invalid typename"
                 )
+        elif msgType == MessageTypeProto.DELETE_PIPELINE:
+            removePipelineIndex: int = msgObj.remove_pipeline_index
+            self.runtime_handler.pipelineLoader.removePipeline(removePipelineIndex)
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:
