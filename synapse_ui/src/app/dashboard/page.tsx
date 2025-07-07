@@ -18,6 +18,7 @@ import { CameraStepControl } from "./camera_step_control";
 import { CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
+  PipelineProto,
   SetPipelineIndexMessageProto,
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
@@ -78,29 +79,24 @@ export default function Dashboard() {
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    setSelectedPipeline(pipelines.get(selectedCamera?.pipelineIndex ?? 0)!);
+    let pipelineIndex = selectedCamera?.pipelineIndex ?? 0;
+    let pipeline: PipelineProto | undefined = pipelines.get(pipelineIndex);
 
-    setSelectedPipelineType(pipelinetypes.values().toArray().at(0)!);
-
-    let selectedPipelineIndex: number = -1;
-    if (selectedPipeline === undefined) {
-      selectedPipelineIndex = selectedCamera?.pipelineIndex ?? 0;
-      setSelectedCamera(cameras.at(0));
-    } else {
-      selectedPipelineIndex = selectedPipeline?.index;
-
-      if (selectedPipelineIndex != -1) {
-        const updated = pipelines.get(selectedPipelineIndex);
-        if (updated) {
-          setSelectedPipeline(updated);
-          setSelectedPipelineType(pipelinetypes.get(updated.type)!);
-        }
-      }
+    if (pipeline == undefined) {
+      pipelineIndex = selectedCamera?.defaultPipeline ?? 0;
+      pipeline = pipelines.get(pipelineIndex);
     }
-  }, [pipelines, pipelinetypes]);
+
+    if (pipeline != undefined) {
+      setSelectedPipeline(pipelines.get(pipelineIndex));
+      setSelectedPipelineType(pipelinetypes.get(pipeline.type)!);
+    }
+  }, [pipelines, pipelinetypes, selectedCamera]);
 
   useEffect(() => {
-    setSelectedCamera(cameras.at(0));
+    if (cameras.length > 0) {
+      setSelectedCamera(cameras.at(0));
+    }
   }, [cameras]);
 
   useEffect(() => {

@@ -67,7 +67,7 @@ export function CameraAndPipelineControls({
       style={{ backgroundColor: baseCardColor, color: teamColor }}
       className="border-gray-700"
     >
-      <CardContent className="space-y-0">
+      <CardContent className="space-y-5">
         {/* Camera Selection */}
         <div className="space-y-0">
           <Dropdown
