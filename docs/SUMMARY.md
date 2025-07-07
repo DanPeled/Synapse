@@ -20,7 +20,9 @@
   * [Pipeline Settings](usage/built-in-pipelines/pipeline-settings.md)
   * [Apriltag Detection](usage/built-in-pipelines/apriltag-detection.md)
   * [Color Detection](usage/built-in-pipelines/color-detection.md)
-* [Custom Pipelines](usage/custom-pipelines.md)
+* [Custom Pipelines](usage/custom-pipelines/README.md)
+  * [Settings API](usage/custom-pipelines/settings-api.md)
+  * [Accessing Global Settings](usage/custom-pipelines/accessing-global-settings.md)
 
 ## Robot Interfacing
 
