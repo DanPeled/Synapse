@@ -80,22 +80,30 @@ export default function Dashboard() {
 
   useEffect(() => {
     let pipelineIndex = selectedCamera?.pipelineIndex ?? 0;
-    let pipeline: PipelineProto | undefined = pipelines.get(pipelineIndex);
+    let pipeline = pipelines.get(pipelineIndex);
 
-    if (pipeline == undefined) {
+    if (!pipeline) {
       pipelineIndex = selectedCamera?.defaultPipeline ?? 0;
       pipeline = pipelines.get(pipelineIndex);
     }
 
-    if (pipeline != undefined) {
-      setSelectedPipeline(pipelines.get(pipelineIndex));
-      setSelectedPipelineType(pipelinetypes.get(pipeline.type)!);
+    if (pipeline) {
+      setSelectedPipeline(pipeline);
+
+      const type = pipelinetypes.get(pipeline.type);
+      if (type) {
+        setSelectedPipelineType(type);
+      } else {
+        console.warn("Pipeline type not found for", pipeline.type);
+      }
+    } else {
+      console.warn("No valid pipeline found for camera", selectedCamera);
     }
   }, [pipelines, pipelinetypes, selectedCamera]);
 
   useEffect(() => {
     if (cameras.length > 0) {
-      setSelectedCamera(cameras.at(0));
+      setSelectedCamera(CameraProto.create(cameras.at(0)));
     }
   }, [cameras]);
 

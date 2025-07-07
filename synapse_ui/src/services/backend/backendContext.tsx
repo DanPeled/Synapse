@@ -102,6 +102,10 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const setters = React.useMemo(() => {
     return Object.keys(initialState).reduce((acc, key) => {
@@ -185,11 +189,19 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
-            // const msg = messageObj.setPipelineIndex!;
-            /* BUG: For some weird reason the `state.cameras` is an
-             * empty list only when viewed from this switch-case.
-             * When viewed from the dashboard page for an e.g it stays filled
-             */
+            const msg = messageObj.setPipelineIndex!;
+            const camera = stateRef.current.cameras.at(msg.cameraIndex);
+
+            if (camera) {
+              camera.pipelineIndex = msg.pipelineIndex;
+              let newCamerasList = [...stateRef.current.cameras];
+              newCamerasList[camera.index] = camera;
+              newCamerasList = newCamerasList.sort(
+                (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
+              );
+              console.log("test x2");
+              setters.setCameras(newCamerasList);
+            }
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {

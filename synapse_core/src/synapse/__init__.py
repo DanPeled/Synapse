@@ -1,3 +1,5 @@
 from synapse import deploy
 
-__all__ = ["deploy"]
+from .core.pipeline import Pipeline, PipelineSettings
+
+__all__ = ["deploy", "Pipeline", "PipelineSettings"]

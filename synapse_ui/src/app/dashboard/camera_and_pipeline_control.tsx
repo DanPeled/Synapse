@@ -76,14 +76,11 @@ export function CameraAndPipelineControls({
               setSelectedCamera(val);
             }}
             label="Camera"
-            options={
-              (cameras
-                ? cameras.map((cam) => ({
-                    label: `${cam?.name}`,
-                    value: cam,
-                  }))
-                : []) as DropdownOption<CameraProto>[]
-            }
+            options={cameras.map((cam) => ({
+              label: <span>{cam.name}</span>,
+              value: cam,
+              key: cam.name,
+            }))}
           />
         </div>
 
@@ -105,6 +102,7 @@ export function CameraAndPipelineControls({
                   </span>
                 ),
                 value: pipeline,
+                key: pipeline.index.toString(),
               }),
             )}
           />
@@ -228,6 +226,7 @@ export function CameraAndPipelineControls({
           options={Array.from(pipelinetypes.entries()).map(([_, type]) => ({
             label: type.type,
             value: type,
+            key: type.type,
           }))}
         />
         <div className="h-6" />
