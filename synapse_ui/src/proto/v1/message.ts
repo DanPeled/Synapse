@@ -6,7 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { CameraProto } from "./camera";
+import { CameraProto, SetDefaultPipelineMessageProto } from "./camera";
 import { DeviceInfoProto, HardwareMetricsProto } from "./device";
 import {
   PipelineProto,
@@ -30,7 +30,8 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_SETTING = 7,
   MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX = 8,
   MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME = 9,
-  MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 10,
+  MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE = 10,
+  MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11,
   UNRECOGNIZED = -1,
 }
 
@@ -67,6 +68,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case "MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME;
     case 10:
+    case "MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE;
+    case 11:
     case "MESSAGE_TYPE_PROTO_DELETE_PIPELINE":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE;
     case -1:
@@ -98,6 +102,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME:
       return "MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE:
+      return "MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE:
       return "MESSAGE_TYPE_PROTO_DELETE_PIPELINE";
     case MessageTypeProto.UNRECOGNIZED:
@@ -116,6 +122,7 @@ export interface MessageProto {
   setPipelineSetting?: SetPipleineSettingMessageProto | undefined;
   setPipelineIndex?: SetPipelineIndexMessageProto | undefined;
   setPipelineName?: SetPipelineNameMessageProto | undefined;
+  setDefaultPipeline?: SetDefaultPipelineMessageProto | undefined;
   removePipelineIndex?: number | undefined;
   pipelineTypeInfo: PipelineTypeProto[];
 }
@@ -131,6 +138,7 @@ function createBaseMessageProto(): MessageProto {
     setPipelineSetting: undefined,
     setPipelineIndex: undefined,
     setPipelineName: undefined,
+    setDefaultPipeline: undefined,
     removePipelineIndex: undefined,
     pipelineTypeInfo: [],
   };
@@ -189,11 +197,17 @@ export const MessageProto: MessageFns<MessageProto> = {
         writer.uint32(74).fork(),
       ).join();
     }
+    if (message.setDefaultPipeline !== undefined) {
+      SetDefaultPipelineMessageProto.encode(
+        message.setDefaultPipeline,
+        writer.uint32(82).fork(),
+      ).join();
+    }
     if (message.removePipelineIndex !== undefined) {
-      writer.uint32(80).int32(message.removePipelineIndex);
+      writer.uint32(88).int32(message.removePipelineIndex);
     }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(90).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -294,15 +308,26 @@ export const MessageProto: MessageFns<MessageProto> = {
           continue;
         }
         case 10: {
-          if (tag !== 80) {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.setDefaultPipeline = SetDefaultPipelineMessageProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 11: {
+          if (tag !== 88) {
             break;
           }
 
           message.removePipelineIndex = reader.int32();
           continue;
         }
-        case 11: {
-          if (tag !== 90) {
+        case 12: {
+          if (tag !== 98) {
             break;
           }
 
@@ -346,6 +371,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       setPipelineName: isSet(object.setPipelineName)
         ? SetPipelineNameMessageProto.fromJSON(object.setPipelineName)
+        : undefined,
+      setDefaultPipeline: isSet(object.setDefaultPipeline)
+        ? SetDefaultPipelineMessageProto.fromJSON(object.setDefaultPipeline)
         : undefined,
       removePipelineIndex: isSet(object.removePipelineIndex)
         ? globalThis.Number(object.removePipelineIndex)
@@ -393,6 +421,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.setPipelineName !== undefined) {
       obj.setPipelineName = SetPipelineNameMessageProto.toJSON(
         message.setPipelineName,
+      );
+    }
+    if (message.setDefaultPipeline !== undefined) {
+      obj.setDefaultPipeline = SetDefaultPipelineMessageProto.toJSON(
+        message.setDefaultPipeline,
       );
     }
     if (message.removePipelineIndex !== undefined) {
@@ -448,6 +481,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.setPipelineName =
       object.setPipelineName !== undefined && object.setPipelineName !== null
         ? SetPipelineNameMessageProto.fromPartial(object.setPipelineName)
+        : undefined;
+    message.setDefaultPipeline =
+      object.setDefaultPipeline !== undefined &&
+      object.setDefaultPipeline !== null
+        ? SetDefaultPipelineMessageProto.fromPartial(object.setDefaultPipeline)
         : undefined;
     message.removePipelineIndex = object.removePipelineIndex ?? undefined;
     message.pipelineTypeInfo =

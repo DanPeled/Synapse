@@ -22,7 +22,8 @@ class MessageTypeProto(betterproto.Enum):
     SET_SETTING = 7
     SET_PIPELINE_INDEX = 8
     SET_PIPELINE_NAME = 9
-    DELETE_PIPELINE = 10
+    SET_DEFAULT_PIPELINE = 10
+    DELETE_PIPELINE = 11
 
 
 @dataclass(eq=False, repr=False)
@@ -186,5 +187,8 @@ class MessageProto(betterproto.Message):
     set_pipeline_name: "SetPipelineNameMessageProto" = betterproto.message_field(
         9, group="payload"
     )
-    remove_pipeline_index: int = betterproto.int32_field(10, group="payload")
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(11)
+    set_default_pipeline: "SetDefaultPipelineMessageProto" = betterproto.message_field(
+        10, group="payload"
+    )
+    remove_pipeline_index: int = betterproto.int32_field(11, group="payload")
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(12)

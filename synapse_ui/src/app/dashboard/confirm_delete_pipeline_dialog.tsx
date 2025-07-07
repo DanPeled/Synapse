@@ -12,6 +12,7 @@ interface ConfirmDeletePipelineDialogProps {
   setVisible: (val: boolean) => void;
   socket?: WebSocketWrapper;
   pipelineToBeDeleted?: PipelineProto;
+  onRemovePipeline: (pipeline: PipelineProto) => void;
 }
 
 export function ConfirmDeletePipelineDialog({
@@ -19,6 +20,7 @@ export function ConfirmDeletePipelineDialog({
   setVisible,
   socket,
   pipelineToBeDeleted,
+  onRemovePipeline,
 }: ConfirmDeletePipelineDialogProps) {
   return (
     <AlertDialog
@@ -42,6 +44,7 @@ export function ConfirmDeletePipelineDialog({
             className="rounded-md bg-zinc-800 hover:bg-zinc-700 text-lg cursor-pointer"
             style={{ color: teamColor }}
             onClick={() => {
+              console.log(pipelineToBeDeleted);
               if (pipelineToBeDeleted) {
                 const payload = MessageProto.create({
                   type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
@@ -50,7 +53,9 @@ export function ConfirmDeletePipelineDialog({
 
                 const binary = MessageProto.encode(payload).finish();
                 socket?.sendBinary(binary);
+                onRemovePipeline(pipelineToBeDeleted);
               }
+              setVisible(false);
             }}
           >
             <span className="flex items-center gap-2">

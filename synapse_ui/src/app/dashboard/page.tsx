@@ -18,7 +18,6 @@ import { CameraStepControl } from "./camera_step_control";
 import { CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
-  PipelineProto,
   SetPipelineIndexMessageProto,
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
@@ -156,6 +155,7 @@ export default function Dashboard() {
 
             <Column className="flex-[1.2] space-y-2 h-full">
               <CameraAndPipelineControls
+                setpipelines={setPipelines}
                 pipelines={pipelines}
                 pipelinetypes={pipelinetypes}
                 socket={socket}

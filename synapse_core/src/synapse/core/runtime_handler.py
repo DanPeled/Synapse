@@ -13,8 +13,13 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
@@ -24,12 +29,24 @@ from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
 from ..callback import Callback
-from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
-                      PipelineTypeName)
+from ..stypes import (
+    CameraID,
+    DataValue,
+    Frame,
+    PipelineID,
+    PipelineName,
+    PipelineTypeName,
+)
 from ..util import resolveGenericArgument
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (
+    CSCORE_TO_CV_PROPS,
+    CameraConfig,
+    CameraFactory,
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraTableName,
+)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -79,6 +96,7 @@ class PipelineLoader:
 
         self.onAddPipeline: Callback[PipelineID, Pipeline] = Callback()
         self.onRemovePipeline: Callback[PipelineID, Pipeline] = Callback()
+        self.onDefaultPipelineSet: Callback[PipelineID, CameraID] = Callback()
 
     def setup(self, directory: Path):
         """Initializes the pipeline system by loading pipeline classes and their settings.
@@ -108,6 +126,20 @@ class PipelineLoader:
                 self.pipelineNames[pipelineIndex],
                 pipelineType.__name__,
                 settingsMap,
+            )
+
+    def setDefaultPipeline(
+        self, cameraIndex: CameraID, pipelineIndex: PipelineID
+    ) -> None:
+        if pipelineIndex in self.pipelineSettings.keys():
+            self.defaultPipelineIndexes[cameraIndex] = pipelineIndex
+            log.log(
+                f"Default Pipeline set (#{pipelineIndex}) for Camera #{cameraIndex}"
+            )
+            self.onDefaultPipelineSet.call(pipelineIndex, cameraIndex)
+        else:
+            log.err(
+                f"Default Pipeline attempted to be set (#{pipelineIndex}) for Camera #{cameraIndex} but that pipeline does not exist"
             )
 
     def removePipeline(self, index: PipelineID) -> Optional[Pipeline]:
@@ -648,6 +680,7 @@ class RuntimeManager:
         self.onSettingChanged: SettingChangedCallback = Callback()
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
         self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
+        self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
         self.isSetup: bool = False
 
     def setup(self, directory: Path):
@@ -932,7 +965,7 @@ class RuntimeManager:
             cameraIndex=cameraIndex,
             pipeline_config=settings,
         )
-
+        self.onPipelineChanged.call(pipelineIndex, cameraIndex)
         log.log(f"Set pipeline #{pipelineIndex} for camera ({cameraIndex})")
 
     def setNTPipelineIndex(
@@ -1198,6 +1231,7 @@ class RuntimeManager:
             By default, it will switch to it's default pipeline.
             If the removed pipeline *is* the default pipeline,
             it will become invalidated and not process any pipeline
+            which may result in undefined behaviour
             """
             matches = [
                 cameraid

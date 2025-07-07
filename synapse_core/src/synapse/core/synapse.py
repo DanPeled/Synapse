@@ -6,14 +6,18 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
-                                  MessageTypeProto, PipelineProto,
-                                  PipelineTypeProto,
-                                  SetPipelineIndexMessageProto,
-                                  SetPipelineNameMessageProto,
-                                  SetPipleineSettingMessageProto)
-from synapse_net.socketServer import (SocketEvent, WebSocketServer,
-                                      createMessage)
+from synapse_net.proto.v1 import (
+    DeviceInfoProto,
+    MessageProto,
+    MessageTypeProto,
+    PipelineProto,
+    PipelineTypeProto,
+    SetDefaultPipelineMessageProto,
+    SetPipelineIndexMessageProto,
+    SetPipelineNameMessageProto,
+    SetPipleineSettingMessageProto,
+)
+from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
 
 from ..bcolors import MarkupColors
 from ..hardware.metrics import Platform
@@ -25,8 +29,7 @@ from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import (protoToSettingValue, settingsToProto,
-                           settingValueToProto)
+from .settings_api import protoToSettingValue, settingsToProto, settingValueToProto
 
 
 class Synapse:
@@ -351,7 +354,7 @@ class Synapse:
         self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
-        self.runtime_handler.onPipelineChangedFromNT.add(onPipelineIndexChangedInNt)
+        self.runtime_handler.onPipelineChanged.add(onPipelineIndexChangedInNt)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
@@ -403,6 +406,7 @@ class Synapse:
                         for key, valueProto in addPipelineMsg.settings_values.items()
                     },
                 )
+
                 for (
                     cameraId,
                     pipelineId,
@@ -421,6 +425,14 @@ class Synapse:
         elif msgType == MessageTypeProto.DELETE_PIPELINE:
             removePipelineIndex: int = msgObj.remove_pipeline_index
             self.runtime_handler.pipelineLoader.removePipeline(removePipelineIndex)
+        elif msgType == MessageTypeProto.SET_DEFAULT_PIPELINE:
+            defaultPipelineMsg: SetDefaultPipelineMessageProto = (
+                msgObj.set_default_pipeline
+            )
+            self.runtime_handler.pipelineLoader.setDefaultPipeline(
+                cameraIndex=defaultPipelineMsg.camera_index,
+                pipelineIndex=defaultPipelineMsg.pipeline_index,
+            )
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:
