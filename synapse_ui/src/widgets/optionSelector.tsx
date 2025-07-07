@@ -65,7 +65,7 @@ export default function OptionSelector({
   return (
     <div
       className={cn(
-        "mb-3 flex items-center",
+        "flex items-center",
         disabled ? "opacity-50 pointer-events-none select-none" : "",
       )}
     >
@@ -88,8 +88,10 @@ export default function OptionSelector({
                 disabled={disabled}
                 className={cn(
                   "px-3 py-1.5 rounded border font-bold text-base transition-all select-none",
-                  isSelected ? "bg-neutral-800" : "bg-transparent",
-                  "border-teal-500",
+                  isSelected
+                    ? "bg-zinc-600 hover:bg-zinc-700"
+                    : "bg-transparent hover:bg-zinc-800",
+                  "border-stone-800",
                   disabled ? "cursor-not-allowed" : "cursor-pointer",
                 )}
                 style={{ color: teamColor }}

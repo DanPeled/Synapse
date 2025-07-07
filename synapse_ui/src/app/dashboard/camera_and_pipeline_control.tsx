@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit, Plus, Trash2, MoreVertical } from "lucide-react";
+import { Copy, Edit, Plus, Trash2, MoreVertical, Star } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,7 +96,14 @@ export function CameraAndPipelineControls({
             onValueChange={(val) => setSelectedPipeline(val)}
             options={Array.from(pipelines.entries()).map(
               ([index, pipeline]) => ({
-                label: `${pipeline?.name} (#${index})`,
+                label: (
+                  <span className="inline-flex items-center gap-2">
+                    {pipeline?.name} (#{index}){" "}
+                    {selectedCamera?.defaultPipeline == pipeline.index ? (
+                      <Star className="w-4 h-4 text-yellow-500" fill="yellow" />
+                    ) : undefined}
+                  </span>
+                ),
                 value: pipeline,
               }),
             )}
@@ -120,10 +127,10 @@ export function CameraAndPipelineControls({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               side="bottom"
-              align="end" // aligns to the start (left side of the trigger)
-              alignOffset={20} // nudges it 20px to the left
-              className="rounded-md shadow-lg bg-zinc-700"
-              sideOffset={4}
+              align="end"
+              alignOffset={20}
+              className="rounded-md shadow-lg bg-zinc-800"
+              sideOffset={-20}
               style={{
                 borderColor: borderColor,
                 borderWidth: "1px",
@@ -145,6 +152,14 @@ export function CameraAndPipelineControls({
                   label: "Add Pipeline",
                   action: () => setAddPipelineDialogVisible(true),
                   disabled: () => false,
+                },
+                {
+                  icon: (
+                    <Star className="w-4 h-4" style={{ color: teamColor }} />
+                  ),
+                  label: "Set As Default",
+                  action: () => {},
+                  disabled: () => selectedPipeline === undefined,
                 },
                 {
                   icon: (

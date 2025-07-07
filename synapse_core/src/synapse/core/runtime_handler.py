@@ -226,7 +226,7 @@ class PipelineLoader:
             pipeline = pipelines[pipeIndex]
 
             log.log(
-                f"Loaded pipeline #{pipeIndex} with type {pipeline[self.kPipelineTypeKey]}"
+                f"Loaded pipeline #{pipeIndex} from disk with type {pipeline[self.kPipelineTypeKey]}"
             )
 
             self.pipelineTypeNames[pipeIndex] = pipeline[self.kPipelineTypeKey]
@@ -647,6 +647,8 @@ class RuntimeManager:
         self.isRunning: bool = True
         self.onSettingChanged: SettingChangedCallback = Callback()
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
+        self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
+        self.isSetup: bool = False
 
     def setup(self, directory: Path):
         """
@@ -678,6 +680,8 @@ class RuntimeManager:
         self.setupNetworkTables()
 
         self.startMetricsThread()
+
+        self.isSetup = True
 
         atexit.register(self.cleanup)
 
@@ -1091,13 +1095,18 @@ class RuntimeManager:
                 entry = getCameraTable(cameraIndex=cameraIndex).getEntry(
                     CameraSettingsKeys.kPipeline.value
                 )
+
+            def updateNTPipelineListener(event: Event):
+                pipelineIndex = event.data.value.getInteger()  # pyright: ignore
+
+                self.onPipelineChangedFromNT.call(pipelineIndex, cameraIndex)
+
+                self.setPipelineByIndex(
+                    pipelineIndex=pipelineIndex, cameraIndex=cameraIndex
+                )
+
             NetworkTableInstance.getDefault().addListener(
-                entry,
-                EventFlags.kValueRemote,
-                lambda event: self.setPipelineByIndex(
-                    cameraIndex,
-                    event.data.value.getInteger(),  # pyright: ignore
-                ),
+                entry, EventFlags.kValueRemote, updateNTPipelineListener
             )
 
             entry.setInteger(self.pipelineLoader.defaultPipelineIndexes[cameraIndex])

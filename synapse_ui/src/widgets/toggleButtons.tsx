@@ -20,7 +20,7 @@ export default function ToggleButton({
   tooltip?: string;
 }) {
   return (
-    <div className={cn("flex items-center mb-3 pl-4", `gap-${labelGap}`)}>
+    <div className={cn("flex items-center mb-3", `gap-${labelGap}`)}>
       <label
         className="relative group font-bold min-w-[120px]"
         style={{ color: teamColor }}

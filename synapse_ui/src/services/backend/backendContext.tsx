@@ -13,7 +13,11 @@ import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import {
+  PipelineProto,
+  PipelineTypeProto,
+  SetPipelineIndexMessageProto,
+} from "@/proto/v1/pipeline";
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 
@@ -179,6 +183,20 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
             );
             setters.setCameras(newCamerasList);
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
+            const setPipelineIndexMsg: SetPipelineIndexMessageProto =
+              messageObj.setPipelineIndex!;
+            const changedCamera = state.cameras.at(
+              setPipelineIndexMsg.cameraIndex,
+            );
+            if (changedCamera) {
+              changedCamera.pipelineIndex = setPipelineIndexMsg.pipelineIndex;
+              let newCameras: CameraProto[] = Array.from(state.cameras);
+              newCameras[changedCamera.index] = changedCamera;
+              setters.setCameras(newCameras);
+            }
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {

@@ -8,9 +8,15 @@ message CameraProto {
   string physical_connection = 3;
   int32 index = 4;
   int32 pipeline_index = 5;
+  int32 default_pipeline = 6;
 }
 
 message LatencyStatusProto {
   int64 latency_capture = 1;
   int64 latency_process = 2;
+}
+
+message SetDefaultPipelineMessageProto {
+  int32 camera_index = 1;
+  int32 pipeline_index = 2;
 }

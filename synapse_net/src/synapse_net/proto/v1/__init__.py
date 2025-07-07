@@ -32,12 +32,19 @@ class CameraProto(betterproto.Message):
     physical_connection: str = betterproto.string_field(3)
     index: int = betterproto.int32_field(4)
     pipeline_index: int = betterproto.int32_field(5)
+    default_pipeline: int = betterproto.int32_field(6)
 
 
 @dataclass(eq=False, repr=False)
 class LatencyStatusProto(betterproto.Message):
     latency_capture: int = betterproto.int64_field(1)
     latency_process: int = betterproto.int64_field(2)
+
+
+@dataclass(eq=False, repr=False)
+class SetDefaultPipelineMessageProto(betterproto.Message):
+    camera_index: int = betterproto.int32_field(1)
+    pipeline_index: int = betterproto.int32_field(2)
 
 
 @dataclass(eq=False, repr=False)

@@ -1,6 +1,7 @@
 import asyncio
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -199,6 +200,12 @@ class Synapse:
                 ),
             )
 
+            while not self.runtime_handler.isSetup:
+                try:
+                    time.sleep(0.1)
+                except Exception:
+                    ...
+
             for (
                 id,
                 pipeline,
@@ -235,6 +242,9 @@ class Synapse:
                     camera.name,
                     camera,
                     self.runtime_handler.pipelineBindings.get(id, 0),
+                    self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
+                        id, -1
+                    ),
                 )
 
                 await self.websocket.sendToAll(
@@ -291,9 +301,15 @@ class Synapse:
                 createMessage(MessageTypeProto.ADD_PIPELINE, pipelineProto)
             )
 
-        def onAddCamera(id: CameraID, name: str, camera: SynapseCamera) -> None:
+        def onAddCamera(cameraid: CameraID, name: str, camera: SynapseCamera) -> None:
             cameraProto = cameraToProto(
-                id, name, camera, self.runtime_handler.pipelineBindings.get(id, 0)
+                cameraid,
+                name,
+                camera,
+                self.runtime_handler.pipelineBindings.get(cameraid, 0),
+                self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
+                    cameraid, 0
+                ),
             )
 
             Synapse.kInstance.websocket.sendToAllSync(
@@ -317,9 +333,25 @@ class Synapse:
 
             Synapse.kInstance.websocket.sendToAllSync(msg)
 
+        def onPipelineIndexChangedInNt(
+            pipelineIndex: PipelineID, cameraIndex: CameraID
+        ) -> None:
+            setPipelineIndexProto: SetPipelineIndexMessageProto = (
+                SetPipelineIndexMessageProto(
+                    pipeline_index=pipelineIndex, camera_index=cameraIndex
+                )
+            )
+
+            msg = createMessage(
+                MessageTypeProto.SET_PIPELINE_INDEX, setPipelineIndexProto
+            )
+
+            Synapse.kInstance.websocket.sendToAllSync(msg)
+
         self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
+        self.runtime_handler.onPipelineChangedFromNT.add(onPipelineIndexChangedInNt)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
