@@ -63,7 +63,7 @@ export default function TextInput({
     <div
       className={cn(disabled ? "opacity-50 pointer-events-none" : "", textSize)}
     >
-      <div className="flex items-center gap-3 py-2 rounded-xl relative bg-[rgba(50, 50, 50, 1)]">
+      <div className="flex items-center gap-3 rounded-xl relative bg-[rgba(50, 50, 50, 1)]">
         <label
           htmlFor={id}
           className="min-w-0 text font-semibold"
@@ -80,7 +80,7 @@ export default function TextInput({
           disabled={disabled}
           maxLength={maxLength ?? undefined}
           className={cn(
-            "text-white rounded-md flex-1 py-2 px-2",
+            "text-white rounded-md flex-1 px-2 py-2",
             invalid ? "text-red-400" : "",
             "focus:outline-none focus:ring-2 focus:ring-[rgba(0,0,0,0.15)] selection:bg-[rgba(0,0,200,0.5)] bg-zinc-800",
             textSize,

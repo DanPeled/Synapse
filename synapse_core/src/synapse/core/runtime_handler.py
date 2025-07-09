@@ -13,13 +13,8 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType)
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer, createMessage
@@ -29,24 +24,12 @@ from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
 from ..callback import Callback
-from ..stypes import (
-    CameraID,
-    DataValue,
-    Frame,
-    PipelineID,
-    PipelineName,
-    PipelineTypeName,
-)
+from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
+                      PipelineTypeName)
 from ..util import resolveGenericArgument
-from .camera_factory import (
-    CSCORE_TO_CV_PROPS,
-    CameraConfig,
-    CameraFactory,
-    CameraSettingsKeys,
-    SynapseCamera,
-    getCameraTable,
-    getCameraTableName,
-)
+from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -319,7 +302,7 @@ class PipelineLoader:
         Returns:
             Optional[Pipeline]: The pipeline instance, or None if not bound.
         """
-        if pipelineIndex < len(self.pipelineInstanceBindings):
+        if pipelineIndex in self.pipelineInstanceBindings:
             return self.pipelineInstanceBindings[pipelineIndex]
         return None
 
@@ -816,7 +799,7 @@ class RuntimeManager:
             self.pipelineBindings[cameraIndex]
         )
 
-        if not currPipeline:
+        if currPipeline is None:
             log.err(f"No pipeline with index: {self.pipelineBindings[cameraIndex]}")
             return
 

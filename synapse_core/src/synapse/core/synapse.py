@@ -6,18 +6,15 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import (
-    DeviceInfoProto,
-    MessageProto,
-    MessageTypeProto,
-    PipelineProto,
-    PipelineTypeProto,
-    SetDefaultPipelineMessageProto,
-    SetPipelineIndexMessageProto,
-    SetPipelineNameMessageProto,
-    SetPipleineSettingMessageProto,
-)
-from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
+from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
+                                  MessageTypeProto, PipelineProto,
+                                  PipelineTypeProto,
+                                  SetDefaultPipelineMessageProto,
+                                  SetPipelineIndexMessageProto,
+                                  SetPipelineNameMessageProto,
+                                  SetPipleineSettingMessageProto)
+from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+                                      createMessage)
 
 from ..bcolors import MarkupColors
 from ..hardware.metrics import Platform
@@ -29,7 +26,8 @@ from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import protoToSettingValue, settingsToProto, settingValueToProto
+from .settings_api import (protoToSettingValue, settingsToProto,
+                           settingValueToProto)
 
 
 class Synapse:
@@ -351,10 +349,29 @@ class Synapse:
 
             Synapse.kInstance.websocket.sendToAllSync(msg)
 
+        def onDefaultPipelineSet(pipelineIndex: PipelineID, cameraIndex: CameraID):
+            camera: Optional[SynapseCamera] = (
+                Synapse.kInstance.runtime_handler.cameraHandler.getCamera(cameraIndex)
+            )
+            if camera:
+                cameraMsg = cameraToProto(
+                    cameraIndex,
+                    camera.name,
+                    camera,
+                    pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
+                    defaultPipeline=pipelineIndex,
+                )
+                msg = createMessage(MessageTypeProto.ADD_CAMERA, cameraMsg)
+
+                Synapse.kInstance.websocket.sendToAllSync(msg)
+
         self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
         self.runtime_handler.onPipelineChanged.add(onPipelineIndexChangedInNt)
+        self.runtime_handler.pipelineLoader.onDefaultPipelineSet.add(
+            onDefaultPipelineSet
+        )
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
@@ -387,6 +404,19 @@ class Synapse:
             )
             if pipeline is not None:
                 pipeline.name = setPipelineNameMsg.name
+                log(
+                    f"Changed name for pipeline #{setPipelineNameMsg.pipeline_index} to `{setPipelineNameMsg.name}`"
+                )
+
+                response: bytes = createMessage(
+                    MessageTypeProto.SET_PIPELINE_NAME,
+                    SetPipelineNameMessageProto(
+                        pipeline_index=setPipelineNameMsg.pipeline_index,
+                        name=pipeline.name,
+                    ),
+                )
+
+                Synapse.kInstance.websocket.sendToAllSync(response)
             else:
                 err(
                     f'Attempted name modification ("{setPipelineNameMsg.name}") for non-existing pipeline in index: {setPipelineNameMsg.pipeline_index}'
