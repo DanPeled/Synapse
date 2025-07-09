@@ -7,10 +7,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { teamColor } from "@/services/style";
+import React from "react";
 
 export interface DropdownOption<T> {
   value: T;
-  label: string;
+  label: React.ReactNode;
 }
 
 interface DropdownProps<T> {
@@ -43,7 +44,7 @@ export function Dropdown<T>({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 relative transition-colors w-full"
+      className="flex items-center gap-3 relative transition-colors w-full"
       style={{
         color: teamColor,
         fontWeight: 500,

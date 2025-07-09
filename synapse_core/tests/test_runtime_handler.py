@@ -1,31 +1,40 @@
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
+from synapse import Pipeline, PipelineSettings
+from synapse.core.pipeline import FrameResult
 from synapse.core.runtime_handler import RuntimeManager
+
+
+class DummyPipeline(Pipeline[PipelineSettings]):
+    __is_enabled__ = True
+
+    def __init__(self, settings: PipelineSettings):
+        super().__init__(settings)
+
+    def processFrame(self, img, timestamp: float) -> FrameResult:
+        pass
+
+
+class DummySettings(PipelineSettings):
+    def __init__(self, config_map=None):
+        self.config_map = config_map or {}
 
 
 class TestRuntimeManager(unittest.TestCase):
     def setUp(self):
-        self.mock_loader = MagicMock()
         self.mock_camera_handler = MagicMock()
 
-        with (
-            patch(
-                "synapse.core.runtime_handler.PipelineLoader",
-                return_value=self.mock_loader,
-            ),
-            patch(
-                "synapse.core.runtime_handler.CameraHandler",
-                return_value=self.mock_camera_handler,
-            ),
+        with patch(
+            "synapse.core.runtime_handler.CameraHandler",
+            return_value=self.mock_camera_handler,
         ):
             self.handler = RuntimeManager(directory=Path("."))
 
     def test_assign_default_pipelines(self):
         self.mock_camera_handler.cameras = {0: "Camera0", 1: "Camera1"}
-        self.mock_loader.getDefaultPipeline.side_effect = [10, 20]
-
+        self.handler.pipelineLoader.getDefaultPipeline = MagicMock(side_effect=[10, 20])
         self.handler.setPipelineByIndex = MagicMock()
 
         self.handler.assignDefaultPipelines()
@@ -36,7 +45,7 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_set_pipeline_by_index_invalid_camera(self):
         self.mock_camera_handler.cameras = {0: "Camera0"}
-        self.mock_loader.pipelineTypeNames = {1: "PipelineA"}
+        self.handler.pipelineLoader.pipelineTypeNames = {1: "PipelineA"}
 
         with patch("synapse.core.runtime_handler.log.err") as mock_log:
             self.handler.setPipelineByIndex(cameraIndex=5, pipelineIndex=1)
@@ -44,7 +53,7 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_set_pipeline_by_index_invalid_pipeline(self):
         self.mock_camera_handler.cameras = {0: "Camera0"}
-        self.mock_loader.pipelineTypeNames = {1: "PipelineA"}
+        self.handler.pipelineLoader.pipelineTypeNames = {1: "PipelineA"}
         self.handler.pipelineBindings = {0: 1}
         self.handler.setNTPipelineIndex = MagicMock()
 
@@ -84,7 +93,6 @@ class TestRuntimeManager(unittest.TestCase):
         # Setup fake camera config and pipeline binding
         fake_config = MagicMock()
         fake_config.toDict.return_value = {"mock": "camera_config"}
-        self.mock_loader.pipelineTypeNames = {"pipe1": "MockType"}
         fake_pipeline = MagicMock()
         fake_pipeline.toDict.return_value = {"mock": "pipeline_config"}
 
@@ -92,19 +100,17 @@ class TestRuntimeManager(unittest.TestCase):
             "synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap"
         ) as mock_camera_map:
             mock_camera_map.return_value = {0: fake_config}
-            self.mock_loader.pipelineInstanceBindings = {0: fake_pipeline}
-            self.mock_loader.pipelineTypeNames = {0: "mock"}
+            self.handler.pipelineLoader.pipelineInstanceBindings = {0: fake_pipeline}
+            self.handler.pipelineLoader.pipelineTypeNames = {0: "mock"}
 
             expected_dict = {
                 "global": {"camera_configs": {0: {"mock": "camera_config"}}},
                 "pipelines": {0: {"mock": "pipeline_config"}},
             }
 
-            # Test toDict
             result_dict = self.handler.toDict()
             self.assertEqual(result_dict, expected_dict)
 
-            # Test save (write to a temp path)
             with patch(
                 "builtins.open",
                 new_callable=unittest.mock.mock_open,  # pyright: ignore
@@ -118,7 +124,46 @@ class TestRuntimeManager(unittest.TestCase):
                         indent=2,
                         width=80,
                     )
-                    mock_open.assert_called_once()  # Ensure a file write was attempted
+                    mock_open.assert_called_once()
+
+    def test_remove_pipeline_auto_bind(self):
+        """
+        Tests logic for automatic binding for cameras that use a removed pipeline
+        """
+        on_removed = Mock()
+        self.handler.pipelineLoader.onRemovePipeline.add(on_removed)
+        self.handler.setupCallbacks()
+
+        self.mock_camera_handler.cameras = {0: Mock()}
+
+        self.handler.pipelineLoader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.handler.pipelineLoader.addPipeline(
+            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+        )
+        self.handler.pipelineLoader.setDefaultPipeline(0, 5)
+
+        self.handler.pipelineLoader.pipelineTypes["DummyPipeline"] = DummyPipeline
+        self.handler.pipelineLoader.pipelineTypeNames[5] = "DummyPipeline"
+
+        self.assertEqual(
+            self.handler.pipelineLoader.getPipelineTypeByIndex(5), DummyPipeline
+        )
+        self.assertEqual(
+            self.handler.pipelineLoader.getPipelineTypeByName("DummyPipeline"),
+            DummyPipeline,
+        )
+
+        self.handler.pipelineLoader.addPipeline(
+            index=7, name="New Pipeline", typename="AnotherDummy", settings={}
+        )
+        self.handler.pipelineBindings[0] = 7
+        self.handler.setPipelineByIndex(0, 7)
+        self.handler.pipelineLoader.removePipeline(7)
+
+        on_removed.assert_called_once()
+        called_args = on_removed.call_args[0]
+        self.assertEqual(called_args[0], 7)
+        self.assertEqual(self.handler.pipelineBindings[0], 5)
 
 
 if __name__ == "__main__":

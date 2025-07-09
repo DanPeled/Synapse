@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from pathlib import Path
-from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, TypeAlias
 
 import cscore as cs
 import cv2
@@ -23,6 +23,7 @@ from wpimath.geometry import Transform3d
 from wpimath.units import seconds
 
 from ..bcolors import MarkupColors
+from ..callback import Callback
 from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
                       PipelineTypeName)
 from ..util import resolveGenericArgument
@@ -57,6 +58,8 @@ class PipelineLoader:
     kPipelineTypeKey: Final[str] = "type"
     kPipelineNameKey: Final[str] = "name"
     kPipelinesArrayKey: Final[str] = "pipelines"
+    kPipelineFilesQuery: Final[str] = "*_pipeline.py"
+    kInvalidPipelineIndex: Final[int] = -1
 
     def __init__(self, pipelineDirectory: Path):
         """Initializes the PipelineLoader with the specified directory.
@@ -66,12 +69,17 @@ class PipelineLoader:
         """
         self.pipelineTypeNames: Dict[PipelineID, PipelineTypeName] = {}
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
-        self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
-        self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
         self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
         self.pipelineNames: Dict[PipelineID, PipelineName] = {}
+
+        self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
+        self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
+
         self.pipelineDirectory: Path = pipelineDirectory
-        self.onAddPipeline: List[Callable[[PipelineID, Pipeline], None]] = []
+
+        self.onAddPipeline: Callback[PipelineID, Pipeline] = Callback()
+        self.onRemovePipeline: Callback[PipelineID, Pipeline] = Callback()
+        self.onDefaultPipelineSet: Callback[PipelineID, CameraID] = Callback()
 
     def setup(self, directory: Path):
         """Initializes the pipeline system by loading pipeline classes and their settings.
@@ -79,6 +87,7 @@ class PipelineLoader:
         Args:
             directory (Path): The directory containing pipeline implementations.
         """
+        self.pipelineDirectory = directory
         self.pipelineTypes = self.loadPipelineTypes(directory)
         self.loadPipelineSettings()
         self.loadPipelineInstances()
@@ -102,6 +111,38 @@ class PipelineLoader:
                 settingsMap,
             )
 
+    def setDefaultPipeline(
+        self, cameraIndex: CameraID, pipelineIndex: PipelineID
+    ) -> None:
+        if pipelineIndex in self.pipelineSettings.keys():
+            self.defaultPipelineIndexes[cameraIndex] = pipelineIndex
+            log.log(
+                f"Default Pipeline set (#{pipelineIndex}) for Camera #{cameraIndex}"
+            )
+            self.onDefaultPipelineSet.call(pipelineIndex, cameraIndex)
+        else:
+            log.err(
+                f"Default Pipeline attempted to be set (#{pipelineIndex}) for Camera #{cameraIndex} but that pipeline does not exist"
+            )
+
+    def removePipeline(self, index: PipelineID) -> Optional[Pipeline]:
+        if index in self.pipelineInstanceBindings:
+            pipeline = self.pipelineInstanceBindings.pop(index)
+            self.pipelineTypeNames.pop(index)
+            self.pipelineNames.pop(index)
+            self.pipelineSettings.pop(index)
+
+            log.warn(f"Pipeline at index {index} was removed.")
+
+            self.onRemovePipeline.call(index, pipeline)
+
+            return pipeline
+        else:
+            log.warn(
+                f"Attempted to remove pipeline at index {index}, but it was not found."
+            )
+            return None
+
     def addPipeline(
         self,
         index: PipelineID,
@@ -112,18 +153,17 @@ class PipelineLoader:
         pipelineType: Optional[Type[Pipeline]] = self.pipelineTypes.get(typename, None)
         if pipelineType is not None:
             settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
-            settingsInst = settingsType(settings or {"width": 1920, "height": 1080})
+            settingsInst = settingsType(settings)
             currPipeline = pipelineType(settings=settingsInst)
             currPipeline.name = name
+
             self.pipelineInstanceBindings[index] = currPipeline
             self.pipelineNames[index] = name
             self.pipelineTypeNames[index] = typename
             self.pipelineSettings[index] = settingsInst
 
             log.log(f"Added Pipeline #{index} with type {typename}")
-
-            for callback in self.onAddPipeline:
-                callback(index, currPipeline)
+            self.onAddPipeline.call(index, currPipeline)
 
     def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
         """Loads all classes that extend Pipeline from Python files in the directory.
@@ -146,7 +186,7 @@ class PipelineLoader:
                 Dict[str, Type[Pipeline]]: Loaded pipeline classes found in the directory.
             """
             pipelineClasses = {}
-            for file_path in directory.rglob("*_pipeline.py"):
+            for file_path in directory.rglob(PipelineLoader.kPipelineFilesQuery):
                 if file_path.name not in ignoredFiles:
                     module_name = file_path.stem
 
@@ -201,7 +241,7 @@ class PipelineLoader:
             pipeline = pipelines[pipeIndex]
 
             log.log(
-                f"Loaded pipeline #{pipeIndex} with type {pipeline[self.kPipelineTypeKey]}"
+                f"Loaded pipeline #{pipeIndex} from disk with type {pipeline[self.kPipelineTypeKey]}"
             )
 
             self.pipelineTypeNames[pipeIndex] = pipeline[self.kPipelineTypeKey]
@@ -262,7 +302,7 @@ class PipelineLoader:
         Returns:
             Optional[Pipeline]: The pipeline instance, or None if not bound.
         """
-        if pipelineIndex < len(self.pipelineInstanceBindings):
+        if pipelineIndex in self.pipelineInstanceBindings:
             return self.pipelineInstanceBindings[pipelineIndex]
         return None
 
@@ -320,7 +360,7 @@ class CameraHandler:
         self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[CameraID, CameraConfig] = {}
-        self.onAddCamera: List[Callable[[CameraID, str, SynapseCamera], None]] = []
+        self.onAddCamera: Callback[CameraID, str, SynapseCamera] = Callback()
 
     def setup(self) -> None:
         """
@@ -539,16 +579,7 @@ class CameraHandler:
             self.recordingOutputs[cameraIndex] = self.createRecordingOutput(cameraIndex)
             self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
 
-            for callback in self.onAddCamera:
-                try:
-                    callback(cameraIndex, cameraConfig.name, camera)
-                except Exception as error:
-                    errString = "".join(
-                        traceback.format_exception(
-                            type(error), error, error.__traceback__
-                        )
-                    )
-                    log.err(errString)
+            self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
 
             log.log(
                 f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
@@ -574,20 +605,21 @@ class CameraHandler:
             Dict[str, Any]: Dictionary of updated settings (currently unused).
         """
         updated_settings = {}
-        for name in settings.keys():
-            if name in CSCORE_TO_CV_PROPS.keys():
-                setting_value = settings.get(name)
+        for settingName in settings.keys():
+            if settingName in CSCORE_TO_CV_PROPS.keys():
+                setting_value = settings.get(settingName)
                 if setting_value is not None:
                     camera.setProperty(
-                        prop=name,
+                        prop=settingName,
                         value=setting_value,
                     )
 
-        camera.setVideoMode(
-            width=int(settings["width"]),
-            height=int(settings["height"]),
-            fps=int(camera.getMaxFPS()),
-        )
+        if {"width", "height"}.issubset(settings):
+            camera.setVideoMode(
+                width=int(settings["width"]),
+                height=int(settings["height"]),
+                fps=int(camera.getMaxFPS()),
+            )
 
         return updated_settings
 
@@ -601,7 +633,7 @@ class CameraHandler:
             camera.close()
 
 
-SettingChangedCallback = Callable[[str, Any, CameraID], None]
+SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
 
 
 class RuntimeManager:
@@ -628,8 +660,11 @@ class RuntimeManager:
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
         self.isRunning: bool = True
-        self.onSettingChanged: List[SettingChangedCallback] = []
-        self.onSettingChangedFromNT: List[SettingChangedCallback] = []
+        self.onSettingChanged: SettingChangedCallback = Callback()
+        self.onSettingChangedFromNT: SettingChangedCallback = Callback()
+        self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
+        self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
+        self.isSetup: bool = False
 
     def setup(self, directory: Path):
         """
@@ -652,6 +687,8 @@ class RuntimeManager:
             )
         )
 
+        self.setupCallbacks()
+
         self.cameraHandler.setup()
         self.pipelineLoader.setup(directory)
         self.assignDefaultPipelines()
@@ -659,6 +696,8 @@ class RuntimeManager:
         self.setupNetworkTables()
 
         self.startMetricsThread()
+
+        self.isSetup = True
 
         atexit.register(self.cleanup)
 
@@ -760,7 +799,7 @@ class RuntimeManager:
             self.pipelineBindings[cameraIndex]
         )
 
-        if not currPipeline:
+        if currPipeline is None:
             log.err(f"No pipeline with index: {self.pipelineBindings[cameraIndex]}")
             return
 
@@ -788,8 +827,7 @@ class RuntimeManager:
                 value: Any = self.getEventDataValue(event)
                 self.updateSetting(prop, cameraIndex, value)
 
-                for callback in self.onSettingChangedFromNT:
-                    callback(prop, value, cameraIndex)
+                self.onSettingChangedFromNT.call(prop, value, cameraIndex)
 
             for key in pipeline_config.getMap().keys():
                 nt_table = getCameraTable(cameraIndex)
@@ -814,8 +852,7 @@ class RuntimeManager:
                     value=int(value),
                 )
 
-        for callback in self.onSettingChanged:
-            callback(prop, value, cameraIndex)
+        self.onSettingChanged.call(prop, value, cameraIndex)
 
         nt_table = getCameraTable(cameraIndex)
         entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
@@ -882,7 +919,7 @@ class RuntimeManager:
         """
         if cameraIndex not in self.cameraHandler.cameras.keys():
             log.err(
-                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameraHandler.cameras.keys()) - 1})."
+                f"Invalid cameraIndex {cameraIndex}. Must be in {list(self.cameraHandler.cameras.keys())})."
             )
             return
 
@@ -911,7 +948,7 @@ class RuntimeManager:
             cameraIndex=cameraIndex,
             pipeline_config=settings,
         )
-
+        self.onPipelineChanged.call(pipelineIndex, cameraIndex)
         log.log(f"Set pipeline #{pipelineIndex} for camera ({cameraIndex})")
 
     def setNTPipelineIndex(
@@ -1074,13 +1111,18 @@ class RuntimeManager:
                 entry = getCameraTable(cameraIndex=cameraIndex).getEntry(
                     CameraSettingsKeys.kPipeline.value
                 )
+
+            def updateNTPipelineListener(event: Event):
+                pipelineIndex = event.data.value.getInteger()  # pyright: ignore
+
+                self.onPipelineChangedFromNT.call(pipelineIndex, cameraIndex)
+
+                self.setPipelineByIndex(
+                    pipelineIndex=pipelineIndex, cameraIndex=cameraIndex
+                )
+
             NetworkTableInstance.getDefault().addListener(
-                entry,
-                EventFlags.kValueRemote,
-                lambda event: self.setPipelineByIndex(
-                    cameraIndex,
-                    event.data.value.getInteger(),  # pyright: ignore
-                ),
+                entry, EventFlags.kValueRemote, updateNTPipelineListener
             )
 
             entry.setInteger(self.pipelineLoader.defaultPipelineIndexes[cameraIndex])
@@ -1163,3 +1205,30 @@ class RuntimeManager:
         self.cameraHandler.cleanup()
         self.isRunning = False
         log.log("Cleaned up all resources.")
+
+    def setupCallbacks(self):
+        def onRemovePipeline(index: PipelineID, pipeline: Pipeline) -> None:
+            """
+            Once A pipeline is removed, any camera using it will become
+            invalidated and will need to switch to a different pipeline.
+            By default, it will switch to it's default pipeline.
+            If the removed pipeline *is* the default pipeline,
+            it will become invalidated and not process any pipeline
+            which may result in undefined behaviour
+            """
+            matches = [
+                cameraid
+                for cameraid in self.pipelineBindings.keys()
+                if self.pipelineBindings[cameraid] == index
+            ]
+
+            for cameraid in matches:
+                defaultIndex = self.pipelineLoader.defaultPipelineIndexes[cameraid]
+                if defaultIndex != index:
+                    self.setPipelineByIndex(cameraid, defaultIndex)
+                else:
+                    self.setPipelineByIndex(
+                        cameraid, self.pipelineLoader.kInvalidPipelineIndex
+                    )  # Will result in the camera not processing any pipeline
+
+        self.pipelineLoader.onRemovePipeline.add(onRemovePipeline)

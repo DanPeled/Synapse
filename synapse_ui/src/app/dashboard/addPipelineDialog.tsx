@@ -33,13 +33,14 @@ export function AddPipelineDialog({
 
   const handleAdd = () => {
     setVisible(false);
+    const safeIndex = index === -Infinity ? 0 : index;
 
     const payload = MessageProto.create({
       type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
       pipelineInfo: PipelineProto.create({
         name: pipelineName,
         type: pipelineType.type,
-        index,
+        index: safeIndex,
         settingsValues: {},
       }),
     });

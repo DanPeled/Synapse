@@ -1,6 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit, Plus, Trash2, MoreVertical, X, Check } from "lucide-react";
+import {
+  Copy,
+  Edit,
+  Plus,
+  Trash2,
+  MoreVertical,
+  Star,
+  Check,
+  Ban,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,90 +22,23 @@ import {
   hoverBg,
   borderColor,
 } from "@/services/style";
-import { Dropdown, DropdownOption } from "@/widgets/dropdown";
-import { Column, Row } from "@/widgets/containers";
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import { Dropdown } from "@/widgets/dropdown";
+import { Row } from "@/widgets/containers";
+import {
+  PipelineProto,
+  PipelineTypeProto,
+  SetPipelineNameMessageProto,
+} from "@/proto/v1/pipeline";
 import ToggleButton from "@/widgets/toggleButtons";
 import { Card, CardContent } from "@/components/ui/card";
-import { CameraProto } from "@/proto/v1/camera";
-import { AlertDialog } from "@/widgets/alertDialog";
+import { CameraProto, SetDefaultPipelineMessageProto } from "@/proto/v1/camera";
 import { WebSocketWrapper } from "@/services/websocket";
 import { AddPipelineDialog } from "./addPipelineDialog";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
-
-function ChangePipelineTypeDialog({
-  visible,
-  setVisible,
-  requestedType,
-  currentType,
-  setPipelineType,
-}: {
-  visible: boolean;
-  setVisible: (state: boolean) => void;
-  requestedType: PipelineTypeProto | undefined;
-  currentType: PipelineTypeProto | undefined;
-  setPipelineType: (pipeType: PipelineTypeProto | undefined) => void;
-}) {
-  return (
-    <AlertDialog
-      visible={visible}
-      onClose={() => setVisible(false)}
-      className="w-[40vw] h-[30vh] -translate-y-40"
-    >
-      <Column gap="gap-2">
-        <h1 className="text-center text-3xl" style={{ color: teamColor }}>
-          Are you sure you want to switch pipeline type from
-          <span className="font-semibold text-blue-300">
-            {" "}
-            {currentType?.type}{" "}
-          </span>
-          to
-          <span className="font-semibold text-yellow-400">
-            {" "}
-            {requestedType?.type}{" "}
-          </span>
-          ?
-        </h1>
-        <h1 className="text-lg text-center" style={{ color: teamColor }}>
-          This action will result in all the current pipeline settings being
-          deleted and becoming the defaults for the new pipleine
-        </h1>
-        <div className="h-4"></div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-md cursor-pointer bg-green-600 hover:bg-green-500 border-none"
-          onClick={() => {
-            setPipelineType?.(requestedType);
-            setVisible(false);
-          }}
-        >
-          <span
-            className="flex items-center justify-center gap-2 font-bold"
-            style={{ color: "black" }}
-          >
-            <Check />
-            Confirm
-          </span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-md cursor-pointer bg-red-600 hover:bg-red-500 border-none"
-          onClick={() => setVisible(false)}
-        >
-          <span
-            className="flex items-center justify-center gap-2"
-            style={{ color: "black" }}
-          >
-            <X />
-            Cancel
-          </span>
-        </Button>
-      </Column>
-    </AlertDialog>
-  );
-}
+import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
+import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
+import { Placeholder } from "@/widgets/placeholder";
+import TextInput from "@/widgets/textInput";
 
 interface CameraAndPipelineControlsProps {
   setSelectedPipeline: (val?: PipelineProto) => void;
@@ -108,6 +50,7 @@ interface CameraAndPipelineControlsProps {
   cameras: CameraProto[];
   socket?: WebSocketWrapper;
   pipelines: Map<number, PipelineProto>;
+  setpipelines: (pipeline: Map<number, PipelineProto>) => void;
   pipelinetypes: Map<string, PipelineTypeProto>;
 }
 
@@ -121,6 +64,7 @@ export function CameraAndPipelineControls({
   cameras,
   socket,
   pipelines,
+  setpipelines,
   pipelinetypes,
 }: CameraAndPipelineControlsProps) {
   const [ignoreNetworkTablePipeline, setIgnoreNetworkTablePipeline] =
@@ -129,198 +73,339 @@ export function CameraAndPipelineControls({
     useState(false);
   const [changePipelineTypeDialogVisible, setChangePipelineTypeDialogVisible] =
     useState(false);
+  const [deletePipelineDialogVisible, setDeletePipelineDialogVisible] =
+    useState<boolean>(false);
   const [requestedPipelineType, setRequestedPipelineType] = useState<
     PipelineTypeProto | undefined
   >(undefined);
 
-  return (
-    <Card
-      style={{ backgroundColor: baseCardColor, color: teamColor }}
-      className="border-gray-700"
-    >
-      <CardContent className="space-y-0">
-        {/* Camera Selection */}
-        <div className="space-y-0">
-          <Dropdown
-            value={selectedCamera}
-            onValueChange={(val) => {
-              setSelectedCamera(val);
-            }}
-            label="Camera"
-            options={
-              (cameras
-                ? cameras.map((cam) => ({
-                    label: `${cam?.name}`,
-                    value: cam,
-                  }))
-                : []) as DropdownOption<CameraProto>[]
-            }
-          />
-        </div>
+  const [renamingPipeline, setRenamingPipeline] = useState<boolean>(false);
+  const [newPipelineName, setNewPipelineName] =
+    useState<string>("New Pipeline");
 
-        {/* Pipeline Selection */}
-        <Row gap="gap-2" className="items-center">
-          <Dropdown
-            label="Pipeline"
-            value={selectedPipeline}
-            disabled={!ignoreNetworkTablePipeline}
-            onValueChange={(val) => setSelectedPipeline(val)}
-            options={Array.from(pipelines.entries()).map(
-              ([index, pipeline]) => ({
-                label: `${pipeline?.name} (#${index})`,
-                value: pipeline,
-              }),
-            )}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
-                style={{
-                  borderColor: borderColor,
-                  color: teamColor,
-                }}
-              >
-                <MoreVertical
-                  className="w-4 h-4"
-                  style={{ color: teamColor }}
-                />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className="rounded-md shadow-lg"
-              sideOffset={4}
-              style={{
-                backgroundColor: baseCardColor,
-                borderColor: borderColor,
-                borderWidth: "1px",
+  useEffect(() => {
+    if (selectedPipeline && renamingPipeline) {
+      setNewPipelineName(selectedPipeline.name);
+    }
+  }, [renamingPipeline]);
+
+  return (
+    <>
+      <Card
+        style={{ backgroundColor: baseCardColor, color: teamColor }}
+        className="border-gray-700"
+      >
+        <CardContent className="space-y-5">
+          {/* Camera Selection */}
+          <div className="space-y-0">
+            <Dropdown
+              value={selectedCamera}
+              onValueChange={(val) => {
+                setSelectedCamera(val);
               }}
-            >
-              {[
-                {
-                  icon: (
-                    <Edit className="w-4 h-4" style={{ color: teamColor }} />
-                  ),
-                  label: "Rename",
-                  action: () => console.log("Rename clicked"),
-                },
-                {
-                  icon: (
-                    <Plus className="w-4 h-4" style={{ color: teamColor }} />
-                  ),
-                  label: "Add Pipeline",
-                  action: () => setAddPipelineDialogVisible(true),
-                },
-                {
-                  icon: (
-                    <Copy className="w-4 h-4" style={{ color: teamColor }} />
-                  ),
-                  label: "Duplicate",
-                  action: () => {
-                    if (selectedPipeline && selectedPipelineType) {
+              label="Camera"
+              options={cameras.map((cam) => ({
+                label: <span>{cam.name}</span>,
+                value: cam,
+                key: cam.name,
+              }))}
+            />
+          </div>
+
+          {/* Pipeline Selection */}
+          <Row gap="gap-2" className="items-center">
+            {renamingPipeline ? (
+              <>
+                <TextInput
+                  value={newPipelineName}
+                  onChange={(val) => setNewPipelineName(val)}
+                  label="Pipeline Name"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
+                  style={{
+                    borderColor: borderColor,
+                    color: teamColor,
+                  }}
+                  onClick={() => {
+                    setRenamingPipeline(false);
+                  }}
+                >
+                  <Ban className="w-4 h-4" style={{ color: teamColor }} />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
+                  style={{
+                    borderColor: borderColor,
+                    color: teamColor,
+                  }}
+                  onClick={() => {
+                    if (selectedPipeline) {
                       const payload = MessageProto.create({
-                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
-                        pipelineInfo: PipelineProto.create({
-                          name: `Copy Of ${selectedPipeline.name}`,
-                          type: selectedPipelineType.type,
-                          index: Math.max(...Array.from(pipelines.keys())) + 1,
-                          settingsValues: selectedPipeline.settingsValues ?? {},
+                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME,
+                        setPipelineName: SetPipelineNameMessageProto.create({
+                          name: newPipelineName,
+                          pipelineIndex: selectedPipeline.index,
                         }),
                       });
 
                       const binary = MessageProto.encode(payload).finish();
                       socket?.sendBinary(binary);
                     }
-                  },
-                },
-                {
-                  icon: (
-                    <Trash2 className="w-4 h-4" style={{ color: teamColor }} />
-                  ),
-                  label: "Delete",
-                  action: () => console.log("Delete clicked"),
-                },
-              ].map(({ icon, label, action }) => (
-                <DropdownMenuItem
-                  key={label}
-                  className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md cursor-pointer"
-                  style={{
-                    color: teamColor,
-                    transition: "background 0.15s ease",
+
+                    setRenamingPipeline(false);
                   }}
-                  onClick={action}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = hoverBg)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
                 >
-                  {icon}
-                  {label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </Row>
+                  <Edit className="w-4 h-4" style={{ color: teamColor }} />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Dropdown
+                  label="Pipeline"
+                  value={selectedPipeline}
+                  disabled={!ignoreNetworkTablePipeline}
+                  onValueChange={(val) => setSelectedPipeline(val)}
+                  options={Array.from(pipelines.entries()).map(
+                    ([index, pipeline]) => ({
+                      label: (
+                        <span className="inline-flex items-center gap-2">
+                          {pipeline?.name} (#{index}){" "}
+                          {selectedCamera?.defaultPipeline == pipeline.index ? (
+                            <Star
+                              className="w-4 h-4 text-yellow-500"
+                              fill="yellow"
+                            />
+                          ) : undefined}
+                        </span>
+                      ),
+                      value: pipeline,
+                      key: pipeline.index.toString(),
+                    }),
+                  )}
+                />
 
-        {/* Pipeline Type */}
-        <Dropdown
-          label="Pipeline Type"
-          value={selectedPipelineType}
-          onValueChange={(val) => {
-            setRequestedPipelineType(val);
-            setChangePipelineTypeDialogVisible(true);
-          }}
-          options={Array.from(pipelinetypes.entries()).map(([_, type]) => ({
-            label: type.type,
-            value: type,
-          }))}
-        />
-        <div className="h-6" />
-        <div className="flex justify-center items-center">
-          <ToggleButton
-            label="Ignore NetworkTables Pipeline"
-            value={ignoreNetworkTablePipeline}
-            onToggleAction={setIgnoreNetworkTablePipeline}
-            tooltip="Toggle to ignore using the pipeline ID from the NetworkTable entry"
-          />
-        </div>
-        {addPipelineDialogVisible && (
-          <AddPipelineDialog
-            visible={addPipelineDialogVisible}
-            pipelineTypes={pipelinetypes}
-            setVisible={setAddPipelineDialogVisible}
-            socket={socket}
-            index={Math.max(...Array.from(pipelines.keys())) + 1}
-          />
-        )}
-        <ChangePipelineTypeDialog
-          visible={changePipelineTypeDialogVisible}
-          setVisible={setChangePipelineTypeDialogVisible}
-          requestedType={requestedPipelineType}
-          currentType={selectedPipelineType}
-          setPipelineType={(val) => {
-            setSelectedPipelineType(val);
-            if (selectedPipeline && selectedPipelineType) {
-              const payload = MessageProto.create({
-                type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
-                pipelineInfo: PipelineProto.create({
-                  name: selectedPipeline.name,
-                  type: val?.type ?? selectedPipeline.type,
-                  index: selectedPipeline.index,
-                  settingsValues: selectedPipeline.settingsValues ?? {},
-                }),
-              });
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
+                      style={{
+                        borderColor: borderColor,
+                        color: teamColor,
+                      }}
+                    >
+                      <MoreVertical
+                        className="w-4 h-4"
+                        style={{ color: teamColor }}
+                      />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="bottom"
+                    align="end"
+                    alignOffset={20}
+                    className="rounded-md shadow-lg bg-zinc-800"
+                    style={{
+                      borderColor: borderColor,
+                      borderWidth: "1px",
+                    }}
+                  >
+                    {[
+                      {
+                        icon: (
+                          <Edit
+                            className="w-4 h-4"
+                            style={{ color: teamColor }}
+                          />
+                        ),
+                        label: "Rename",
+                        action: () => setRenamingPipeline(true),
+                        disabled: () => selectedPipeline === undefined,
+                      },
+                      {
+                        icon: (
+                          <Plus
+                            className="w-4 h-4"
+                            style={{ color: teamColor }}
+                          />
+                        ),
+                        label: "Add Pipeline",
+                        action: () => setAddPipelineDialogVisible(true),
+                        disabled: () => false,
+                      },
+                      {
+                        icon: (
+                          <Star
+                            className="w-4 h-4"
+                            style={{ color: teamColor }}
+                          />
+                        ),
+                        label: "Set As Default",
+                        action: () => {
+                          if (selectedPipeline && selectedCamera) {
+                            const payload = MessageProto.create({
+                              type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE,
+                              setDefaultPipeline:
+                                SetDefaultPipelineMessageProto.create({
+                                  cameraIndex: selectedCamera.index,
+                                  pipelineIndex: selectedPipeline.index,
+                                }),
+                            });
 
-              const binary = MessageProto.encode(payload).finish();
-              socket?.sendBinary(binary);
-            }
+                            const binary =
+                              MessageProto.encode(payload).finish();
+                            socket?.sendBinary(binary);
+                          }
+                        },
+                        disabled: () => selectedPipeline === undefined,
+                      },
+                      {
+                        icon: (
+                          <Copy
+                            className="w-4 h-4"
+                            style={{ color: teamColor }}
+                          />
+                        ),
+                        label: "Duplicate",
+                        disabled: () => selectedPipeline === undefined,
+                        action: () => {
+                          if (selectedPipeline && selectedPipelineType) {
+                            const payload = MessageProto.create({
+                              type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
+                              pipelineInfo: PipelineProto.create({
+                                name: `Copy Of ${selectedPipeline.name}`,
+                                type: selectedPipelineType.type,
+                                index:
+                                  Math.max(...Array.from(pipelines.keys())) + 1,
+                                settingsValues:
+                                  selectedPipeline.settingsValues ?? {},
+                              }),
+                            });
+
+                            const binary =
+                              MessageProto.encode(payload).finish();
+                            socket?.sendBinary(binary);
+                          }
+                        },
+                      },
+                      {
+                        icon: (
+                          <Trash2
+                            className="w-4 h-4"
+                            style={{ color: teamColor }}
+                          />
+                        ),
+                        label: "Delete",
+                        action: () => setDeletePipelineDialogVisible(true),
+                        disabled: () =>
+                          selectedPipeline === undefined ||
+                          selectedPipeline.index ==
+                            selectedCamera?.defaultPipeline,
+                      },
+                    ].map(({ icon, label, action, disabled }) => (
+                      <DropdownMenuItem
+                        key={label}
+                        disabled={disabled()}
+                        className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md cursor-pointer"
+                        style={{
+                          color: teamColor,
+                          transition: "background 0.15s ease",
+                        }}
+                        onClick={action}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.backgroundColor = hoverBg)
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            "transparent")
+                        }
+                      >
+                        {icon}
+                        {label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+          </Row>
+
+          {/* Pipeline Type */}
+          <Dropdown
+            label="Pipeline Type"
+            value={selectedPipelineType}
+            onValueChange={(val) => {
+              setRequestedPipelineType(val);
+              setChangePipelineTypeDialogVisible(true);
+            }}
+            options={Array.from(pipelinetypes.entries()).map(([_, type]) => ({
+              label: type.type,
+              value: type,
+              key: type.type,
+            }))}
+          />
+          <div className="h-6" />
+          <div className="flex justify-center items-center">
+            <ToggleButton
+              label="Ignore NetworkTables Pipeline"
+              value={ignoreNetworkTablePipeline}
+              onToggleAction={setIgnoreNetworkTablePipeline}
+              tooltip="Toggle to ignore using the pipeline ID from the NetworkTable entry"
+            />
+          </div>
+        </CardContent>
+      </Card>
+      {addPipelineDialogVisible && (
+        <AddPipelineDialog
+          visible={addPipelineDialogVisible}
+          pipelineTypes={pipelinetypes}
+          setVisible={setAddPipelineDialogVisible}
+          socket={socket}
+          index={Math.max(...Array.from(pipelines.keys())) + 1}
+        />
+      )}
+      <ChangePipelineTypeDialog
+        visible={changePipelineTypeDialogVisible}
+        setVisible={setChangePipelineTypeDialogVisible}
+        requestedType={requestedPipelineType}
+        currentType={selectedPipelineType}
+        setPipelineType={(val) => {
+          setSelectedPipelineType(val);
+          if (selectedPipeline && selectedPipelineType) {
+            const payload = MessageProto.create({
+              type: MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE,
+              pipelineInfo: PipelineProto.create({
+                name: selectedPipeline.name,
+                type: val?.type ?? selectedPipeline.type,
+                index: selectedPipeline.index,
+                settingsValues: selectedPipeline.settingsValues ?? {},
+              }),
+            });
+
+            const binary = MessageProto.encode(payload).finish();
+            socket?.sendBinary(binary);
+          }
+        }}
+      />
+      {deletePipelineDialogVisible && (
+        <ConfirmDeletePipelineDialog
+          visible={deletePipelineDialogVisible}
+          setVisible={setDeletePipelineDialogVisible}
+          socket={socket}
+          pipelineToBeDeleted={selectedPipeline}
+          onRemovePipeline={(pipeline) => {
+            const newPipelines = pipelines;
+            newPipelines.delete(pipeline.index);
+            setpipelines(newPipelines);
           }}
         />
-      </CardContent>
-    </Card>
+      )}
+    </>
   );
 }

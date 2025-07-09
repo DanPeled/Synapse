@@ -15,11 +15,17 @@ export interface CameraProto {
   physicalConnection: string;
   index: number;
   pipelineIndex: number;
+  defaultPipeline: number;
 }
 
 export interface LatencyStatusProto {
   latencyCapture: number;
   latencyProcess: number;
+}
+
+export interface SetDefaultPipelineMessageProto {
+  cameraIndex: number;
+  pipelineIndex: number;
 }
 
 function createBaseCameraProto(): CameraProto {
@@ -29,6 +35,7 @@ function createBaseCameraProto(): CameraProto {
     physicalConnection: "",
     index: 0,
     pipelineIndex: 0,
+    defaultPipeline: 0,
   };
 }
 
@@ -51,6 +58,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.pipelineIndex !== 0) {
       writer.uint32(40).int32(message.pipelineIndex);
+    }
+    if (message.defaultPipeline !== 0) {
+      writer.uint32(48).int32(message.defaultPipeline);
     }
     return writer;
   },
@@ -103,6 +113,14 @@ export const CameraProto: MessageFns<CameraProto> = {
           message.pipelineIndex = reader.int32();
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.defaultPipeline = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -125,6 +143,9 @@ export const CameraProto: MessageFns<CameraProto> = {
       pipelineIndex: isSet(object.pipelineIndex)
         ? globalThis.Number(object.pipelineIndex)
         : 0,
+      defaultPipeline: isSet(object.defaultPipeline)
+        ? globalThis.Number(object.defaultPipeline)
+        : 0,
     };
   },
 
@@ -145,6 +166,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.pipelineIndex !== 0) {
       obj.pipelineIndex = Math.round(message.pipelineIndex);
     }
+    if (message.defaultPipeline !== 0) {
+      obj.defaultPipeline = Math.round(message.defaultPipeline);
+    }
     return obj;
   },
 
@@ -160,6 +184,7 @@ export const CameraProto: MessageFns<CameraProto> = {
     message.physicalConnection = object.physicalConnection ?? "";
     message.index = object.index ?? 0;
     message.pipelineIndex = object.pipelineIndex ?? 0;
+    message.defaultPipeline = object.defaultPipeline ?? 0;
     return message;
   },
 };
@@ -254,6 +279,98 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
     return message;
   },
 };
+
+function createBaseSetDefaultPipelineMessageProto(): SetDefaultPipelineMessageProto {
+  return { cameraIndex: 0, pipelineIndex: 0 };
+}
+
+export const SetDefaultPipelineMessageProto: MessageFns<SetDefaultPipelineMessageProto> =
+  {
+    encode(
+      message: SetDefaultPipelineMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.cameraIndex !== 0) {
+        writer.uint32(8).int32(message.cameraIndex);
+      }
+      if (message.pipelineIndex !== 0) {
+        writer.uint32(16).int32(message.pipelineIndex);
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): SetDefaultPipelineMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetDefaultPipelineMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.pipelineIndex = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): SetDefaultPipelineMessageProto {
+      return {
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+        pipelineIndex: isSet(object.pipelineIndex)
+          ? globalThis.Number(object.pipelineIndex)
+          : 0,
+      };
+    },
+
+    toJSON(message: SetDefaultPipelineMessageProto): unknown {
+      const obj: any = {};
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      if (message.pipelineIndex !== 0) {
+        obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<SetDefaultPipelineMessageProto>, I>>(
+      base?: I,
+    ): SetDefaultPipelineMessageProto {
+      return SetDefaultPipelineMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<
+      I extends Exact<DeepPartial<SetDefaultPipelineMessageProto>, I>,
+    >(object: I): SetDefaultPipelineMessageProto {
+      const message = createBaseSetDefaultPipelineMessageProto();
+      message.cameraIndex = object.cameraIndex ?? 0;
+      message.pipelineIndex = object.pipelineIndex ?? 0;
+      return message;
+    },
+  };
 
 type Builtin =
   | Date

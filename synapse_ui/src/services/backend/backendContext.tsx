@@ -13,7 +13,11 @@ import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import {
+  PipelineProto,
+  PipelineTypeProto,
+  SetPipelineNameMessageProto,
+} from "@/proto/v1/pipeline";
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 
@@ -102,6 +106,10 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const setters = React.useMemo(() => {
     return Object.keys(initialState).reduce((acc, key) => {
@@ -143,7 +151,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         const messageObj = MessageProto.decode(uint8Array);
         // console.log(messageObj);
         switch (messageObj.type) {
-          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO:
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO: {
             const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
             setters.setDeviceinfo({
               ...state.deviceinfo,
@@ -151,7 +159,8 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             });
 
             break;
-          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS:
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS: {
             const hardwareMetrics: HardwareMetricsProto =
               messageObj.hardwareMetrics!;
             setters.setHardwaremetrics({
@@ -160,12 +169,14 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               lastFetched: formatHHMMSSLocal(new Date()),
             });
             break;
-          case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE:
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE: {
             const pipeline: PipelineProto = messageObj.pipelineInfo!;
             const pipelines = state.pipelines;
             pipelines.set(pipeline.index, pipeline);
             setters.setPipelines(pipelines);
             break;
+          }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES: {
             const types: PipelineTypeProto[] = messageObj.pipelineTypeInfo;
             const newMap = new Map(types.map((type) => [type.type, type]));
@@ -179,6 +190,37 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
             );
             setters.setCameras(newCamerasList);
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
+            const msg = messageObj.setPipelineIndex!;
+            const camera = stateRef.current.cameras.at(msg.cameraIndex);
+
+            if (camera) {
+              camera.pipelineIndex = msg.pipelineIndex;
+              let newCamerasList = [...stateRef.current.cameras];
+              newCamerasList[camera.index] = camera;
+              newCamerasList = newCamerasList.sort(
+                (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
+              );
+              setters.setCameras(newCamerasList);
+            }
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME: {
+            const setPipelineNameMSG: SetPipelineNameMessageProto =
+              messageObj.setPipelineName!;
+
+            const pipeline = stateRef.current.pipelines.get(
+              setPipelineNameMSG.pipelineIndex,
+            );
+
+            if (pipeline) {
+              pipeline.name = setPipelineNameMSG.name;
+              const newPipelines = new Map(stateRef.current.pipelines);
+              newPipelines.set(setPipelineNameMSG.pipelineIndex, pipeline);
+              setters.setPipelines(newPipelines);
+            }
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {

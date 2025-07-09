@@ -68,6 +68,7 @@ function NetworkSettings({}) {
   const teamNumberOrIPRegex = new RegExp(
     `^(${teamNumberRegex}|${ipAddressRegex})$`,
   );
+  const ipv4Regex = /^((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.|$)){4}$/;
 
   useEffect(() => {
     if (connection.backend) {
@@ -89,7 +90,7 @@ function NetworkSettings({}) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Column gap="gap-3">
+        <Column gap="gap-3 text-lg">
           <TextInput
             label="Team Number / NetworkTables Server Address"
             pattern={teamNumberOrIPRegex}
@@ -98,6 +99,7 @@ function NetworkSettings({}) {
             onChange={(val) => {
               setNetworktablesserver(val);
             }}
+            textSize="text-lg"
           />
           <TextInput
             label="NetworkTable"
@@ -105,6 +107,7 @@ function NetworkSettings({}) {
             onChange={(val) => {
               setNetworktable(val);
             }}
+            textSize="text-lg"
           />
           <ToggleButton
             label="Manage Device Networking"
@@ -119,13 +122,13 @@ function NetworkSettings({}) {
                 ipMode === IPMode.static ? "Static IP" : "Current IP (DHCP)"
               }
               value={staticIPAddr ?? "127.0.0.1"}
-              pattern={ipAddressRegex}
               errorMessage="Invalid IPv4 Address"
               onChange={(val) => {
                 setStaticIPAddr(val);
               }}
+              pattern={ipv4Regex}
+              textSize="text-lg"
               disabled={!manageDeviceNetworking || ipMode === IPMode.dhcp}
-              allowedChars={"[\\d.]+"}
             />
             {ipMode === IPMode.static && (
               <TextInput
@@ -135,37 +138,42 @@ function NetworkSettings({}) {
                 maxLength={2}
                 onChange={(_) => {}}
                 value="24"
+                textSize="text-lg"
                 disabled={
                   !manageDeviceNetworking || ipMode === IPMode.dhcp.valueOf()
                 }
+                inputWidth="w-10"
                 allowedChars={"[0-9]"}
               />
             )}
-            <OptionSelector
-              label=""
-              options={[
-                {
-                  label: IPMode.dhcp,
-                  value: IPMode.dhcp,
-                  tooltip:
-                    "Router will automatically assign an IP address that changes across reboots",
-                },
-                {
-                  label: IPMode.static,
-                  value: IPMode.static,
-                  tooltip: "User-picked IP address that doesn't change",
-                },
-              ]}
-              onChange={(val) => setIpMode(val.toString())}
-              value={ipMode}
-              disabled={!manageDeviceNetworking}
-            />
+            <div className="ml-auto pr-8">
+              <OptionSelector
+                label=""
+                options={[
+                  {
+                    label: IPMode.dhcp,
+                    value: IPMode.dhcp,
+                    tooltip:
+                      "Router will automatically assign an IP address that changes across reboots",
+                  },
+                  {
+                    label: IPMode.static,
+                    value: IPMode.static,
+                    tooltip: "User-picked IP address that doesn't change",
+                  },
+                ]}
+                onChange={(val) => setIpMode(val.toString())}
+                value={ipMode}
+                disabled={!manageDeviceNetworking}
+              />
+            </div>
           </Row>
           <TextInput
             label="Hostname"
             onChange={setPropHostname}
             disabled={!manageDeviceNetworking}
             value={deviceinfo.hostname ?? "Unknown"}
+            textSize="text-lg"
           />
           <Dropdown<string>
             label="NetworkManager Interface"
@@ -178,8 +186,10 @@ function NetworkSettings({}) {
               setNetworkInterface(val);
             }}
             disabled={!manageDeviceNetworking}
+            textSize="text-lg"
           />
           <Button
+            className="mt-8"
             onClickAction={() => {
               // socket?.send(
               //   createMessage("set_network_config", {
@@ -404,6 +414,10 @@ function DeviceControls({}) {
 }
 
 export default function Settings({}) {
+  useEffect(() => {
+    document.title = "Synapse Client";
+  }, []);
+
   return (
     <div
       className="w-full text-pink-600"

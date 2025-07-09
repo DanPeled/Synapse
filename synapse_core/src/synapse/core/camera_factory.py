@@ -465,7 +465,11 @@ class CameraFactory:
 
 
 def cameraToProto(
-    camid: CameraID, name: str, camera: SynapseCamera, pipelineIndex: PipelineID
+    camid: CameraID,
+    name: str,
+    camera: SynapseCamera,
+    pipelineIndex: PipelineID,
+    defaultPipeline: PipelineID,
 ) -> CameraProto:
     return CameraProto(
         name=name,
@@ -473,4 +477,5 @@ def cameraToProto(
         stream_path=camera.stream,
         physical_connection="unknown",
         pipeline_index=pipelineIndex,
+        default_pipeline=defaultPipeline,
     )

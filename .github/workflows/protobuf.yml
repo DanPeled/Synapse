@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - '**/*.proto'
-      - 'synapse_net/proto/buf.yaml'
-      - 'synapse_net/proto/buf.gen.yaml'
+      - "**/*.proto"
+      - "synapse_net/proto/buf.yaml"
+      - "synapse_net/proto/buf.gen.yaml"
   pull_request:
     paths:
-      - '**/*.proto'
-      - 'synapse_net/proto/buf.yaml'
-      - 'synapse_net/proto/buf.gen.yaml'
+      - "**/*.proto"
+      - "synapse_net/proto/buf.yaml"
+      - "synapse_net/proto/buf.gen.yaml"
 
 jobs:
   protobuf:
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.7'
+          python-version: "3.10.7"
 
       - name: Install Buf CLI
         uses: bufbuild/buf-setup-action@v1.50.0

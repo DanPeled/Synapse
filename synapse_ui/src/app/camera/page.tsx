@@ -22,6 +22,10 @@ export default function CameraConfigPage() {
     setSelectedCamera(cameras.at(0));
   }, [cameras]);
 
+  useEffect(() => {
+    document.title = "Synapse Client";
+  }, []);
+
   return (
     <div
       className="w-full min-h-screen text-pink-600"

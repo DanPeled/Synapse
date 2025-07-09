@@ -78,131 +78,148 @@ export default function Dashboard() {
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    setSelectedPipeline(pipelines.get(selectedCamera?.pipelineIndex ?? 0)!);
+    let pipelineIndex = selectedCamera?.pipelineIndex ?? 0;
+    let pipeline = pipelines.get(pipelineIndex);
 
-    setSelectedPipelineType(pipelinetypes.values().toArray().at(0)!);
-
-    let selectedPipelineIndex: number = -1;
-    if (selectedPipeline === undefined) {
-      selectedPipelineIndex = cameras.at(0)?.pipelineIndex ?? 0;
-      setSelectedCamera(cameras.at(0));
-    } else {
-      selectedPipelineIndex = selectedPipeline?.index;
-
-      if (selectedPipelineIndex != -1) {
-        const updated = pipelines.get(selectedPipelineIndex);
-        if (updated) {
-          setSelectedPipeline(updated);
-          setSelectedPipelineType(pipelinetypes.get(updated.type)!);
-        }
-      }
+    if (!pipeline) {
+      pipelineIndex = selectedCamera?.defaultPipeline ?? 0;
+      pipeline = pipelines.get(pipelineIndex);
     }
-  }, [pipelines, pipelinetypes]);
+
+    if (pipeline) {
+      setSelectedPipeline(pipeline);
+
+      const type = pipelinetypes.get(pipeline.type);
+      if (type) {
+        setSelectedPipelineType(type);
+      } else {
+        console.warn("Pipeline type not found for", pipeline.type);
+      }
+    } else {
+      console.warn("No valid pipeline found for camera", selectedCamera);
+    }
+  }, [pipelines, pipelinetypes, selectedCamera]);
 
   useEffect(() => {
-    setSelectedCamera(cameras.at(0));
+    if (cameras.length > 0) {
+      setSelectedCamera(CameraProto.create(cameras.at(0)));
+    }
   }, [cameras]);
 
+  useEffect(() => {
+    document.title = "Synapse Client";
+  }, []);
+
   return (
-    <div
-      className="w-full min-h-screen text-pink-600"
-      style={{ backgroundColor: background, color: teamColor }}
-    >
+    <>
       <div
-        className="max-w-8xl mx-auto"
-        style={{
-          backgroundColor: background,
-          borderRadius: "12px",
-          padding: "10px",
-        }}
+        className="w-full min-h-screen text-pink-600"
+        style={{ backgroundColor: background, color: teamColor }}
       >
-        <Row gap="gap-2" className="h-full">
-          <Column className="flex-[2] space-y-2 h-full">
-            <CameraView selectedCamera={selectedCamera} />
-            <PipelineConfigControl
-              pipelines={pipelines}
-              setPipelines={setPipelines}
-              selectedPipeline={selectedPipeline}
-              selectedPipelineType={selectedPipelineType}
-              backendConnected={connection.backend}
-              setSetting={(val, setting, pipeline) => {
-                if (hasSettingValue(val)) {
-                  const payload = MessageProto.create({
-                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
-                    setPipelineSetting: SetPipleineSettingMessageProto.create({
-                      pipelineIndex: pipeline.index,
-                      value: val,
-                      setting: setting,
-                    }),
-                  });
+        <div
+          className="max-w-8xl mx-auto"
+          style={{
+            backgroundColor: background,
+            borderRadius: "12px",
+            padding: "10px",
+          }}
+        >
+          <Row gap="gap-2" className="h-full">
+            <Column className="flex-[2] space-y-2 h-full">
+              <CameraView selectedCamera={selectedCamera} />
+              <PipelineConfigControl
+                pipelines={pipelines}
+                setPipelines={setPipelines}
+                selectedPipeline={selectedPipeline}
+                selectedPipelineType={selectedPipelineType}
+                backendConnected={connection.backend}
+                setSetting={(val, setting, pipeline) => {
+                  if (hasSettingValue(val)) {
+                    const payload = MessageProto.create({
+                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
+                      setPipelineSetting: SetPipleineSettingMessageProto.create(
+                        {
+                          pipelineIndex: pipeline.index,
+                          value: val,
+                          setting: setting,
+                        },
+                      ),
+                    });
 
-                  const binary = MessageProto.encode(payload).finish();
-                  socket?.sendBinary(binary);
-                }
-              }}
-            />
-          </Column>
+                    const binary = MessageProto.encode(payload).finish();
+                    socket?.sendBinary(binary);
+                  }
+                }}
+              />
+            </Column>
 
-          <Column className="flex-[1.2] space-y-2 h-full">
-            <CameraAndPipelineControls
-              pipelines={pipelines}
-              pipelinetypes={pipelinetypes}
-              socket={socket}
-              setSelectedPipeline={(val) => {
-                if (val !== undefined) {
-                  setSelectedPipeline(val);
-                  setSelectedPipelineType(pipelinetypes.get(val.type)!);
+            <Column className="flex-[1.2] space-y-2 h-full">
+              <CameraAndPipelineControls
+                setpipelines={setPipelines}
+                pipelines={pipelines}
+                pipelinetypes={pipelinetypes}
+                socket={socket}
+                setSelectedPipeline={(val) => {
+                  if (val !== undefined) {
+                    setSelectedPipeline(val);
+                    setSelectedPipelineType(pipelinetypes.get(val.type)!);
 
-                  if (selectedCamera) {
-                    setTimeout(() => {
+                    if (selectedCamera) {
+                      setTimeout(() => {
+                        const payload = MessageProto.create({
+                          type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
+                          setPipelineIndex: SetPipelineIndexMessageProto.create(
+                            {
+                              cameraIndex: selectedCamera.index,
+                              pipelineIndex: val.index,
+                            },
+                          ),
+                        });
+
+                        const binary = MessageProto.encode(payload).finish();
+                        socket?.sendBinary(binary);
+                      }, 0);
+                    }
+                  }
+                }}
+                selectedPipeline={selectedPipeline}
+                setSelectedPipelineType={(newType) => {
+                  setSelectedPipelineType(newType!);
+
+                  setTimeout(() => {
+                    if (selectedPipeline && newType) {
                       const payload = MessageProto.create({
-                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
-                        setPipelineIndex: SetPipelineIndexMessageProto.create({
-                          cameraIndex: selectedCamera.index,
-                          pipelineIndex: val.index,
+                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE,
+                        setPipelineType: SetPipelineTypeMessageProto.create({
+                          newType: newType.type,
+                          pipelineIndex: selectedPipeline.index,
                         }),
                       });
 
                       const binary = MessageProto.encode(payload).finish();
                       socket?.sendBinary(binary);
-                    }, 0);
-                  }
-                }
-              }}
-              selectedPipeline={selectedPipeline}
-              setSelectedPipelineType={(newType) => {
-                setSelectedPipelineType(newType!);
 
-                setTimeout(() => {
-                  if (selectedPipeline && newType) {
-                    const payload = MessageProto.create({
-                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE,
-                      setPipelineType: SetPipelineTypeMessageProto.create({
-                        newType: newType.type,
-                        pipelineIndex: selectedPipeline.index,
-                      }),
-                    });
-
-                    const binary = MessageProto.encode(payload).finish();
-                    socket?.sendBinary(binary);
-
-                    selectedPipeline.type = newType.type;
-                    const newPipelines = new Map(pipelines);
-                    newPipelines.set(selectedPipeline.index, selectedPipeline);
-                    setPipelines(newPipelines);
-                  }
-                }, 0);
-              }}
-              selectedPipelineType={selectedPipelineType}
-              cameras={cameras}
-              setSelectedCamera={setSelectedCamera}
-              selectedCamera={selectedCamera}
-            />
-            <CameraStepControl />
-            <ResultsView />
-          </Column>
-        </Row>
+                      selectedPipeline.type = newType.type;
+                      const newPipelines = new Map(pipelines);
+                      newPipelines.set(
+                        selectedPipeline.index,
+                        selectedPipeline,
+                      );
+                      setPipelines(newPipelines);
+                    }
+                  }, 0);
+                }}
+                selectedPipelineType={selectedPipelineType}
+                cameras={cameras}
+                setSelectedCamera={setSelectedCamera}
+                selectedCamera={selectedCamera}
+              />
+              <CameraStepControl />
+              <ResultsView />
+            </Column>
+          </Row>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

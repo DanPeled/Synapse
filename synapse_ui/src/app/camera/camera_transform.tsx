@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -28,19 +30,49 @@ export function CameraTransformModule({}) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Column gap="gap-2">
+        <Column gap="gap-2 items-center">
           <h3>Camera Position</h3>
-          <Row>
-            <TextInput value={"0"} label="Forward (m)" labelColor="red" />
-            <TextInput value={"0"} label="Left (m)" labelColor="green" />
-            <TextInput value={"0"} label="Up (m)" labelColor="blue" />
+          <Row gap="gap-8">
+            <TextInput
+              value={"0"}
+              label="Forward (m)"
+              labelColor="red"
+              inputWidth="w-30"
+            />
+            <TextInput
+              value={"0"}
+              label="Left (m)"
+              labelColor="green"
+              inputWidth="w-30"
+            />
+            <TextInput
+              value={"0"}
+              label="Up (m)"
+              labelColor="blue"
+              inputWidth="w-30"
+            />
           </Row>
           <div className="h-5" />
           <h3>Camera Rotation</h3>
-          <Row>
-            <TextInput value="0" label="Roll (deg CCW)" labelColor="red" />
-            <TextInput value="0" label="Pitch (deg CCW)" labelColor="green" />
-            <TextInput value="0" label="Yaw (deg CCW)" labelColor="blue" />
+          <Row gap="gap-8">
+            <TextInput
+              value="0"
+              label="Roll (deg CCW)"
+              labelColor="red"
+              inputWidth="w-30"
+            />
+            <TextInput
+              value="0"
+              label="Pitch (deg CCW)"
+              labelColor="green"
+              inputWidth="w-30"
+            />
+            <TextInput
+              value="0"
+              label="Yaw (deg CCW)"
+              labelColor="blue"
+              inputWidth="w-30"
+            />
           </Row>
           <div className="h-7" />
           <Button
