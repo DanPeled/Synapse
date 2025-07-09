@@ -919,7 +919,7 @@ class RuntimeManager:
         """
         if cameraIndex not in self.cameraHandler.cameras.keys():
             log.err(
-                f"Invalid cameraIndex {cameraIndex}. Must be in range(0, {len(self.cameraHandler.cameras.keys()) - 1})."
+                f"Invalid cameraIndex {cameraIndex}. Must be in {list(self.cameraHandler.cameras.keys())})."
             )
             return
 
