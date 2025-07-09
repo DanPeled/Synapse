@@ -2,6 +2,12 @@ from setuptools import find_packages, setup
 
 WPILIB_VERSION = "2025.2.1.1"
 
+modules = {
+    "synapse_net": "synapse_net/src",
+    "synapse_installer": "synapse_installer/src",
+    "": "synapse_core/src",
+}
+
 
 def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
     return f"{name}=={version}"
@@ -23,15 +29,21 @@ def deviceAccessDep(name: str) -> str:
     return name
 
 
+allModules = []
+moduleDirs = {}
+
+for name, path in modules.items():
+    allModules += find_packages(where=path)
+    if name:  # not root
+        moduleDirs[name] = f"{path}/{name}"
+    else:
+        moduleDirs[""] = path
+
 setup(
     name="Synapse",
     version="0.1.0",
-    packages=find_packages(where="synapse_net/src/")
-    + find_packages(where="synapse_core/src"),
-    package_dir={
-        "synapse_net": "synapse_net/src/synapse_net",
-        "": "synapse_core/src/",
-    },
+    packages=allModules,
+    package_dir=moduleDirs,
     install_requires=[
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),
