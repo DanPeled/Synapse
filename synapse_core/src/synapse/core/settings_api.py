@@ -55,9 +55,6 @@ class Constraint(ABC):
         pass
 
 
-TConstraintType = TypeVar("TConstraintType", bound=Constraint)
-
-
 class RangeConstraint(Constraint):
     """Constraint for numeric ranges"""
 
@@ -511,8 +508,12 @@ class BooleanConstraint(Constraint):
         return ConstraintConfigProto()
 
 
+TConstraintType = TypeVar("TConstraintType", bound=Constraint)
+TSettingValueType = TypeVar("TSettingValueType")
+
+
 @dataclass
-class Setting(Generic[TConstraintType]):
+class Setting(Generic[TConstraintType, TSettingValueType]):
     """A single setting with its constraint and metadata
 
     Attributes:
@@ -625,10 +626,10 @@ class SettingsAPI:
 
 def settingField(
     constraint: TConstraintType,
-    default: Any,
+    default: TSettingValueType,
     description: Optional[str] = None,
     category: Optional[str] = None,
-) -> Setting[TConstraintType]:
+) -> Setting[TConstraintType, TSettingValueType]:
     """
     Creates a Setting instance for use in SettingsCollection classes.
 
@@ -641,7 +642,9 @@ def settingField(
     Returns:
         Setting: A new Setting object with the specified configuration.
     """
-    return Setting[TConstraintType]("", constraint, default, description, category)
+    return Setting[TConstraintType, TSettingValueType](
+        "", constraint, default, description, category
+    )
 
 
 class SettingsCollection:
@@ -753,7 +756,9 @@ class SettingsCollection:
     def getSetting(self, setting: str) -> Optional[Any]: ...
 
     @overload
-    def getSetting(self, setting: Setting) -> Any: ...
+    def getSetting(
+        self, setting: Setting[TConstraintType, TSettingValueType]
+    ) -> TSettingValueType: ...
 
     def getSetting(self, setting: Union[str, Setting]) -> Optional[Any]:
         """

@@ -116,8 +116,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             apriltag.AprilTagDetector.Config()
         )
 
-        detectorConfig.numThreads = int(
-            self.settings.getSetting(ApriltagPipelineSettings.num_threads)
+        detectorConfig.numThreads = self.settings.getSetting(
+            ApriltagPipelineSettings.num_threads
         )
         self.apriltagDetector.setConfig(detectorConfig)
         self.apriltagDetector.addFamily(
@@ -126,7 +126,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
-                    tagSize=float(
+                    tagSize=(
                         self.settings.getSetting(ApriltagPipelineSettings.tag_size)
                     ),
                     fx=self.cameraMatrix[0][0],
@@ -321,13 +321,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             current_res = list(
                 map(
                     lambda x: int(x),
-                    str(self.getSetting(PipelineSettings.resolution)).split("x"),
+                    self.getSetting(PipelineSettings.resolution).split("x"),
                 )
             )
 
             if measured_res != current_res:
-                scale_x = current_res[0] / measured_res[0]  # pyright: ignore
-                scale_y = current_res[1] / measured_res[1]  # pyright: ignore
+                scale_x = current_res[0] / measured_res[0]
+                scale_y = current_res[1] / measured_res[1]
 
                 matrix = camConfig.matrix
 
