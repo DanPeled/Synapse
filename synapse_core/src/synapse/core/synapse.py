@@ -18,7 +18,7 @@ from synapse_net.socketServer import (SocketEvent, WebSocketServer,
 
 from ..bcolors import MarkupColors
 from ..hardware.metrics import Platform
-from ..log import err, log
+from ..log import err, log, logs
 from ..stypes import CameraID, PipelineID
 from ..util import resolveGenericArgument
 from .camera_factory import SynapseCamera, cameraToProto
@@ -251,6 +251,10 @@ class Synapse:
                 await self.websocket.sendToAll(
                     createMessage(MessageTypeProto.ADD_CAMERA, msg)
                 )
+
+            for log_ in logs:
+                msg = createMessage(MessageTypeProto.LOG, log_)
+                await self.websocket.sendToAll(msg)
 
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):

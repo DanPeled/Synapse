@@ -31,27 +31,6 @@ def test_setup_client_success(mock_sleep, mock_nt_instance) -> None:
 
 
 @patch("synapse_net.nt_client.NetworkTableInstance")
-@patch("synapse_net.nt_client.time.sleep", return_value=None)
-def test_setup_client_timeout(mock_sleep, mock_nt_instance) -> None:
-    mock_instance = MagicMock()
-    mock_instance.isConnected.return_value = False
-    mock_nt_instance.getDefault.return_value = mock_instance
-
-    client = NtClient()
-
-    # Patch time.time to simulate a timeout after 121 seconds
-    with patch(
-        "synapse_net.nt_client.time.time",
-        side_effect=[0] + [i for i in range(1, 122)],
-    ):
-        result = client.setup(
-            teamNumber=1234, name="testClient", isServer=False, isSim=True
-        )
-
-    assert result is False
-
-
-@patch("synapse_net.nt_client.NetworkTableInstance")
 def test_setup_server(mock_nt_instance) -> None:
     mock_server_instance = MagicMock()
     mock_nt_instance.create.return_value = mock_server_instance

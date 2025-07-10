@@ -1,4 +1,3 @@
-import re
 from enum import Enum
 
 
@@ -47,21 +46,4 @@ class MarkupColors:
 
 
 def parseTextStyle(text: str, target: TextTarget = TextTarget.kTerminal) -> str:
-    def repl(match):
-        tags = match.group(1).strip().split()
-        content = match.group(2)
-
-        if target == TextTarget.kTerminal:
-            tag_str = " ".join(tags)
-            return f"[{tag_str}]{content}[/{tag_str}]"
-        elif target == TextTarget.kHTML:
-            styles = []
-            for tag in tags:
-                if tag == "bold":
-                    styles.append("font-weight: bold")
-                else:
-                    styles.append(f"color: {tag}")
-            return f'<span style="{"; ".join(styles)}">{content}</span>'
-
-    pattern = re.compile(r"\[([a-zA-Z0-9\s]+)\](.*?)\[/\1\]", re.DOTALL)
-    return re.sub(pattern, repl, text)
+    return text
