@@ -1,10 +1,12 @@
 import datetime
 import os
-from enum import Enum
+import time
 from typing import Any, Optional
 
 from rich import print
-from synapse_net.socketServer import WebSocketServer
+from synapse_net.socketServer import WebSocketServer, createMessage
+
+from synapse_net.proto import v1
 
 from .bcolors import MarkupColors, TextTarget, parseTextStyle
 
@@ -25,21 +27,32 @@ class ErrorWriter(object):
 
 # sys.stderr = ErrorWriter()
 
-
-class LogMessageType(Enum):
-    INFO = "info"
-    ERR = "error"
-    WARN = "warning"
+logs = []
 
 
 def socketLog(
-    text: str, msgType: LogMessageType, socket: Optional[WebSocketServer]
+    text: str, msgType: v1.LogLevelProto, socket: Optional[WebSocketServer]
 ) -> None:
-    ...
-    # if socket:
-    #     socket.sendToAllSync(
-    #         createMessageFromDict("log", {"message": text, "type": msgType.value})
-    #     )
+    logs.append(
+        v1.LogMessageProto(
+            message=text, level=msgType, timestamp=int(time.time() * 1_000)
+        )
+    )
+
+    if socket is not None:
+        msg = createMessage(v1.MessageTypeProto.LOG, logs[-1])
+
+        socket.sendToAllSync(msg)
+
+
+def addTime(text: str) -> str:
+    # Get the current time
+    current_time = datetime.datetime.now()
+
+    # Format the time in a human-readable way
+    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    final_string = f"[{formatted_time}]: {text}"
+    return final_string
 
 
 def logInternal(text: str):
@@ -53,12 +66,6 @@ def logInternal(text: str):
         - The log message to the console.
         - The log message to the log file `logs/logfile_<timestamp>.log`.
     """
-    # Get the current time
-    current_time = datetime.datetime.now()
-
-    # Format the time in a human-readable way
-    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
-    final_string = f"[{formatted_time}]: {text}"
 
     # Print the log message to the console if PRINTS is True
     if PRINTS:
@@ -66,12 +73,13 @@ def logInternal(text: str):
 
     # Write the log to the new file
     with open(LOG_FILE, "a") as f:
-        f.write(str(final_string) + "\n")
+        f.write(str(text) + "\n")
 
 
 def log(text: str):
+    text = addTime(text)
     logInternal(text)
-    socketLog(text, LogMessageType.INFO, WebSocketServer.kInstance)
+    socketLog(text, v1.LogLevelProto.INFO, WebSocketServer.kInstance)
 
 
 def err(text: str):
@@ -84,10 +92,11 @@ def err(text: str):
     This function calls the `log` function and formats the message to indicate an error.
     """
     text = MarkupColors.fail(f"[ERROR]: {text}")
+    text = addTime(text)
     logInternal(parseTextStyle(MarkupColors.fail(text)))
     socketLog(
         parseTextStyle(text, target=TextTarget.kHTML),
-        LogMessageType.ERR,
+        v1.LogLevelProto.ERROR,
         WebSocketServer.kInstance,
     )
 
@@ -102,9 +111,10 @@ def warn(text: str):
     This function calls the `log` function and formats the message to indicate an warning.
     """
     text = MarkupColors.warning(f"[WARNING]: {text}")
+    text = addTime(text)
     logInternal(parseTextStyle(text))
     socketLog(
-        parseTextStyle(text, TextTarget.kHTML),
-        LogMessageType.WARN,
+        text,
+        v1.LogLevelProto.WARNING,
         WebSocketServer.kInstance,
     )
