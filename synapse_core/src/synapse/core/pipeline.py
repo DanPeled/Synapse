@@ -8,7 +8,8 @@ from wpiutil import Sendable, SendableBuilder
 
 from ..stypes import CameraID, Frame
 from .settings_api import (PipelineSettings, Setting, SettingsAPI,
-                           SettingsValue, settingValueToProto)
+                           SettingsValue, TConstraintType, TSettingValueType,
+                           settingValueToProto)
 
 FrameResult = Optional[Union[Iterable[Frame], Frame]]
 
@@ -71,7 +72,9 @@ class Pipeline(ABC, Generic[TSettingsType]):
     @overload
     def getSetting(self, setting: str) -> Optional[Any]: ...
     @overload
-    def getSetting(self, setting: Setting) -> Any: ...
+    def getSetting(
+        self, setting: Setting[TConstraintType, TSettingValueType]
+    ) -> TSettingValueType: ...
 
     def getSetting(
         self,
