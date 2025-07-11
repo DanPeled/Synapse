@@ -11,9 +11,9 @@ from synapse_net.proto.settings.v1 import (ColorConstraintProto,
                                            ConstraintConfigProto,
                                            ConstraintProto,
                                            ConstraintTypeProto,
+                                           EnumeratedConstraintProto,
                                            ListConstraintProto,
-                                           ListOptionsConstraintProto,
-                                           RangeConstraintProto,
+                                           NumberConstraintProto,
                                            SettingMetaProto, SettingValueProto,
                                            StringConstraintProto)
 
@@ -23,18 +23,19 @@ from ..log import err
 SettingsValue = Any
 
 SettingsMap = Dict[str, SettingsValue]
+TSettingValueType = TypeVar("TSettingValueType")
 
 
 @dataclass
-class ValidationResult:
+class ValidationResult(Generic[TSettingValueType]):
     """Result of a validation operation"""
 
     isValid: bool
     errorMessage: Optional[str] = None
-    normalizedValue: SettingsValue = None
+    normalizedValue: Optional[TSettingValueType] = None
 
 
-class Constraint(ABC):
+class Constraint(ABC, Generic[TSettingValueType]):
     """Base class for all constraints"""
 
     def __init__(self, constraintType: ConstraintTypeProto):
@@ -55,8 +56,8 @@ class Constraint(ABC):
         pass
 
 
-class RangeConstraint(Constraint):
-    """Constraint for numeric ranges"""
+class NumberConstraint(Constraint[Union[float, int]]):
+    """Constraint for numeric values inside a provided range"""
 
     def __init__(
         self,
@@ -65,7 +66,7 @@ class RangeConstraint(Constraint):
         step: Optional[float] = None,
     ):
         """
-        Initialize a RangeConstraint instance.
+        Initialize a NumberConstraint instance.
 
         Args:
             minValue (Optional[Union[int, float]]): The minimum allowed value for the range.
@@ -76,7 +77,7 @@ class RangeConstraint(Constraint):
                 If None, any value within the range is allowed.
 
         """
-        super().__init__(ConstraintTypeProto.RANGE)
+        super().__init__(ConstraintTypeProto.NUMBER)
         self.minValue = minValue
         self.maxValue = maxValue
         self.step = step
@@ -115,16 +116,19 @@ class RangeConstraint(Constraint):
 
     def configToProto(self) -> ConstraintConfigProto:
         return ConstraintConfigProto(
-            range=RangeConstraintProto(
+            numeric=NumberConstraintProto(
                 min=self.minValue, max=self.maxValue, step=self.step
             )
         )
 
 
-class ListOptionsConstraint(Constraint):
+TEnumeratedType = TypeVar("TEnumeratedType")
+
+
+class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]):
     """Constraint for selecting from predefined options"""
 
-    def __init__(self, options: List[Any], allowMultiple: bool = False):
+    def __init__(self, options: List[TEnumeratedType]):
         """
         Initialize a ListOptionsConstraint instance.
 
@@ -134,41 +138,31 @@ class ListOptionsConstraint(Constraint):
                 Defaults to False.
 
         """
-        super().__init__(ConstraintTypeProto.LIST_OPTIONS)
+        super().__init__(ConstraintTypeProto.ENUMERATED)
         self.options = options
-        self.allowMultiple = allowMultiple
 
     def validate(self, value: SettingsValue) -> ValidationResult:
-        if self.allowMultiple:
-            if not isinstance(value, list):
-                return ValidationResult(
-                    False, "Value must be a list when multiple selection is allowed"
-                )
-
-            invalidItems = [item for item in value if item not in self.options]
-            if invalidItems:
-                return ValidationResult(False, f"Invalid options: {invalidItems}")
-
-            return ValidationResult(True, None, value)
-        else:
-            if value not in self.options:
-                return ValidationResult(
-                    False, f"Value {value} not in allowed options: {self.options}"
-                )
-            return ValidationResult(True, None, value)
+        expectedType = type(self.options[0])
+        if not isinstance(value, expectedType):
+            return ValidationResult(
+                False, f"Expected type {expectedType}, got {type(value)}"
+            )
+        if value not in self.options:
+            return ValidationResult(
+                False, f"Value {value} not in allowed options: {self.options}"
+            )
+        return ValidationResult(True, None, value)
 
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
             "options": self.options,
-            "allowMultiple": self.allowMultiple,
         }
 
     def configToProto(self) -> ConstraintConfigProto:
         return ConstraintConfigProto(
-            list_options=ListOptionsConstraintProto(
+            enumerated=EnumeratedConstraintProto(
                 options=list(map(lambda op: settingValueToProto(op), self.options)),
-                allow_multiple=self.allowMultiple,
             )
         )
 
@@ -187,7 +181,7 @@ class ColorFormat(Enum):
             return ColorFormatProto.RGB
 
 
-class ColorConstraint(Constraint):
+class ColorConstraint(Constraint[Union[tuple, list]]):
     import re
 
     """Constraint for color values (hex, rgb, hsv) or ranges of them."""
@@ -317,7 +311,7 @@ class ColorConstraint(Constraint):
         )
 
 
-class ListConstraint(Constraint):
+class ListConstraint(Constraint[List]):
     """Constraint for list values with optional item constraints and nested depth"""
 
     def __init__(
@@ -399,7 +393,7 @@ class ListConstraint(Constraint):
         )
 
 
-class StringConstraint(Constraint):
+class StringConstraint(Constraint[str]):
     """Constraint for string values"""
 
     def __init__(
@@ -469,7 +463,7 @@ class StringConstraint(Constraint):
         )
 
 
-class BooleanConstraint(Constraint):
+class BooleanConstraint(Constraint[bool]):
     """Constraint for boolean values"""
 
     def __init__(self):
@@ -509,7 +503,6 @@ class BooleanConstraint(Constraint):
 
 
 TConstraintType = TypeVar("TConstraintType", bound=Constraint)
-TSettingValueType = TypeVar("TSettingValueType")
 
 
 @dataclass
@@ -526,7 +519,7 @@ class Setting(Generic[TConstraintType, TSettingValueType]):
 
     key: str
     constraint: TConstraintType
-    defaultValue: Any
+    defaultValue: TSettingValueType
     description: Optional[str] = None
     category: Optional[str] = None
 
@@ -555,7 +548,7 @@ class SettingsAPI:
         self.settings: Dict[str, Setting] = {}
         self.values: Dict[str, Any] = {}
 
-    def addSetting(self, setting: Setting):
+    def addSetting(self, setting: Setting) -> None:
         """Adds a new setting to the API.
 
         If a default value is specified and no value is already set,
@@ -625,11 +618,11 @@ class SettingsAPI:
 
 
 def settingField(
-    constraint: TConstraintType,
+    constraint: Constraint[TSettingValueType],
     default: TSettingValueType,
     description: Optional[str] = None,
     category: Optional[str] = None,
-) -> Setting[TConstraintType, TSettingValueType]:
+) -> Setting[Constraint[TSettingValueType], TSettingValueType]:
     """
     Creates a Setting instance for use in SettingsCollection classes.
 
@@ -642,7 +635,7 @@ def settingField(
     Returns:
         Setting: A new Setting object with the specified configuration.
     """
-    return Setting[TConstraintType, TSettingValueType](
+    return Setting[Constraint[TSettingValueType], TSettingValueType](
         "", constraint, default, description, category
     )
 
@@ -676,7 +669,7 @@ class SettingsCollection:
                 if isinstance(value, bool):
                     constraint = BooleanConstraint()
                 elif isinstance(value, float | int):
-                    constraint = RangeConstraint(
+                    constraint = NumberConstraint(
                         minValue=None,
                         maxValue=None,
                         step=None if isinstance(value, float) else 1,
@@ -930,43 +923,43 @@ class PipelineSettings(SettingsCollection):
     kCameraPropsCategory = "Camera Properties"
 
     brightness = settingField(
-        RangeConstraint(0, 100),
+        NumberConstraint(0, 100),
         default=50,
         category=kCameraPropsCategory,
         description="Adjusts the brightness level of the image.",
     )
     exposure = settingField(
-        RangeConstraint(0, 100),
+        NumberConstraint(0, 100),
         default=50,
         category=kCameraPropsCategory,
         description="Controls the exposure level.",
     )
     saturation = settingField(
-        RangeConstraint(0, 100),
+        NumberConstraint(0, 100),
         default=50,
         category=kCameraPropsCategory,
         description="Changes the intensity of color saturation.",
     )
     sharpness = settingField(
-        RangeConstraint(0, 100),
+        NumberConstraint(0, 100),
         default=50,
         category=kCameraPropsCategory,
         description="Determines the sharpness of the image.",
     )
     gain = settingField(
-        RangeConstraint(0, 100),
+        NumberConstraint(0, 100),
         default=50,
         category=kCameraPropsCategory,
         description="Amplifies the signal brightness.",
     )
     orientation = settingField(
-        ListOptionsConstraint(allowMultiple=False, options=[0, 90, 180, 270]),
+        EnumeratedConstraint(options=[0, 90, 180, 270]),
         default=0,
         category=kCameraPropsCategory,
         description="Rotates the image orientation (0, 90, 180, 270 degrees).",
     )
     resolution = settingField(
-        ListOptionsConstraint(allowMultiple=False, options=["1080x1920"]),
+        EnumeratedConstraint(options=["1080x1920"]),
         default="1080x1920",
         category=kCameraPropsCategory,
         description="Camera Resolution",

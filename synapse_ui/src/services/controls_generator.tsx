@@ -6,9 +6,11 @@ import { Slider } from "@/widgets/slider";
 import TextInput from "@/widgets/textInput";
 import ToggleButton from "@/widgets/toggleButtons";
 import { toTitleCase } from "./stringUtil";
-import { Placeholder } from "@/widgets/placeholder";
 import { NumberInput } from "@/widgets/numberInput";
 import LabeledControl from "@/widgets/labeledControl";
+import { Button } from "@/components/ui/button";
+import { teamColor } from "./style";
+import { RefreshCcw } from "lucide-react";
 
 interface ControlGeneratorProps {
   setting: SettingMetaProto;
@@ -40,6 +42,27 @@ export function protoToSettingValue(proto: SettingValueProto): unknown {
   if (proto.bytesArrayValue.length > 0) return proto.bytesArrayValue;
 
   return undefined;
+}
+
+function ResetToDefaultButton({
+  defaultValue,
+  setValue,
+}: {
+  defaultValue?: SettingValueProto;
+  setValue: (val: SettingValueProto) => void;
+}) {
+  return defaultValue !== undefined ? (
+    <Button
+      size="sm"
+      style={{ color: teamColor }}
+      className="hover:bg-zinc-700 cursor-pointer"
+      onClick={() => {
+        setValue(defaultValue);
+      }}
+    >
+      <RefreshCcw />
+    </Button>
+  ) : null;
 }
 
 export function settingValueToProto(val: unknown): SettingValueProto {
@@ -93,6 +116,10 @@ export function GenerateControl({
             value={val as boolean}
             onToggleAction={(val) => setValue(settingValueToProto(val))}
           />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+          />
         </LabeledControl>
       );
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING:
@@ -104,18 +131,26 @@ export function GenerateControl({
             maxLength={setting.constraint.constraint?.string?.maxLength}
             onChange={(val) => setValue(settingValueToProto(val))}
           />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+          />
         </LabeledControl>
       );
-    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
-      if (setting.constraint.constraint?.range?.max) {
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_NUMBER:
+      if (setting.constraint.constraint?.numeric?.max) {
         return (
           <LabeledControl label={settingName}>
             <Slider
-              min={setting.constraint.constraint?.range?.min}
-              max={setting.constraint.constraint?.range?.max}
-              step={setting.constraint.constraint?.range?.step}
+              min={setting.constraint.constraint?.numeric?.min}
+              max={setting.constraint.constraint?.numeric?.max}
+              step={setting.constraint.constraint?.numeric?.step}
               value={toNumber(val) ?? 0}
               onChange={(val) => setValue(settingValueToProto(val))}
+            />
+            <ResetToDefaultButton
+              defaultValue={defaultValue}
+              setValue={setValue}
             />
           </LabeledControl>
         );
@@ -126,31 +161,34 @@ export function GenerateControl({
               value={val as number}
               onChange={(val) => setValue(settingValueToProto(val))}
             />
-          </LabeledControl>
-        );
-      }
-    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST_OPTIONS:
-      if (setting.constraint.constraint?.listOptions?.allowMultiple) {
-        return <Placeholder text="TODO: multiple options not implemented" />;
-      } else {
-        return (
-          <LabeledControl label={settingName}>
-            <Dropdown
-              label=""
-              options={
-                (setting.constraint.constraint?.listOptions?.options.map(
-                  (op) => ({
-                    label: protoToSettingValue(op),
-                    value: protoToSettingValue(op),
-                  }),
-                ) as DropdownOption<SettingValueProto>[]) ?? []
-              }
-              value={val}
-              onValueChange={(val) => setValue(settingValueToProto(val))}
+            <ResetToDefaultButton
+              defaultValue={defaultValue}
+              setValue={setValue}
             />
           </LabeledControl>
         );
       }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED: {
+      return (
+        <LabeledControl label={settingName}>
+          <Dropdown
+            label=""
+            options={
+              (setting.constraint.constraint?.enumerated?.options.map((op) => ({
+                label: protoToSettingValue(op),
+                value: protoToSettingValue(op),
+              })) as DropdownOption<SettingValueProto>[]) ?? []
+            }
+            value={val}
+            onValueChange={(val) => setValue(settingValueToProto(val))}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+          />
+        </LabeledControl>
+      );
+    }
     default:
       return null;
   }
