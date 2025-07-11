@@ -7,9 +7,9 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ColorConstraintProto } from "./color";
+import { EnumeratedConstraintProto } from "./enumerated";
 import { ListConstraintProto } from "./list";
-import { ListOptionsConstraintProto } from "./list_options";
-import { RangeConstraintProto } from "./range";
+import { NumberConstraintProto } from "./number";
 import { StringConstraintProto } from "./string";
 
 export const protobufPackage = "proto.settings.v1";
@@ -21,8 +21,8 @@ export const protobufPackage = "proto.settings.v1";
 export enum ConstraintTypeProto {
   /** CONSTRAINT_TYPE_PROTO_UNSPECIFIED - Default unspecified constraint type */
   CONSTRAINT_TYPE_PROTO_UNSPECIFIED = 0,
-  /** CONSTRAINT_TYPE_PROTO_RANGE - Numeric range constraint */
-  CONSTRAINT_TYPE_PROTO_RANGE = 1,
+  /** CONSTRAINT_TYPE_PROTO_NUMBER - Numeric range constraint */
+  CONSTRAINT_TYPE_PROTO_NUMBER = 1,
   /** CONSTRAINT_TYPE_PROTO_LIST - Constraint requiring value to be one of a predefined list */
   CONSTRAINT_TYPE_PROTO_LIST = 2,
   /** CONSTRAINT_TYPE_PROTO_STRING - String-based constraint */
@@ -31,8 +31,8 @@ export enum ConstraintTypeProto {
   CONSTRAINT_TYPE_PROTO_COLOR = 4,
   /** CONSTRAINT_TYPE_PROTO_BOOLEAN - Boolean constraint (true/false), no separate config message needed */
   CONSTRAINT_TYPE_PROTO_BOOLEAN = 5,
-  /** CONSTRAINT_TYPE_PROTO_LIST_OPTIONS - List options constraint with additional options (e.g., multi-select) */
-  CONSTRAINT_TYPE_PROTO_LIST_OPTIONS = 8,
+  /** CONSTRAINT_TYPE_PROTO_ENUMERATED - List options constraint */
+  CONSTRAINT_TYPE_PROTO_ENUMERATED = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -42,8 +42,8 @@ export function constraintTypeProtoFromJSON(object: any): ConstraintTypeProto {
     case "CONSTRAINT_TYPE_PROTO_UNSPECIFIED":
       return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_UNSPECIFIED;
     case 1:
-    case "CONSTRAINT_TYPE_PROTO_RANGE":
-      return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE;
+    case "CONSTRAINT_TYPE_PROTO_NUMBER":
+      return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_NUMBER;
     case 2:
     case "CONSTRAINT_TYPE_PROTO_LIST":
       return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST;
@@ -57,8 +57,8 @@ export function constraintTypeProtoFromJSON(object: any): ConstraintTypeProto {
     case "CONSTRAINT_TYPE_PROTO_BOOLEAN":
       return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN;
     case 8:
-    case "CONSTRAINT_TYPE_PROTO_LIST_OPTIONS":
-      return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST_OPTIONS;
+    case "CONSTRAINT_TYPE_PROTO_ENUMERATED":
+      return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -70,8 +70,8 @@ export function constraintTypeProtoToJSON(object: ConstraintTypeProto): string {
   switch (object) {
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_UNSPECIFIED:
       return "CONSTRAINT_TYPE_PROTO_UNSPECIFIED";
-    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
-      return "CONSTRAINT_TYPE_PROTO_RANGE";
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_NUMBER:
+      return "CONSTRAINT_TYPE_PROTO_NUMBER";
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST:
       return "CONSTRAINT_TYPE_PROTO_LIST";
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING:
@@ -80,8 +80,8 @@ export function constraintTypeProtoToJSON(object: ConstraintTypeProto): string {
       return "CONSTRAINT_TYPE_PROTO_COLOR";
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN:
       return "CONSTRAINT_TYPE_PROTO_BOOLEAN";
-    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST_OPTIONS:
-      return "CONSTRAINT_TYPE_PROTO_LIST_OPTIONS";
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED:
+      return "CONSTRAINT_TYPE_PROTO_ENUMERATED";
     case ConstraintTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -93,10 +93,10 @@ export function constraintTypeProtoToJSON(object: ConstraintTypeProto): string {
  * Uses a oneof to specify exactly one type of constraint configuration.
  */
 export interface ConstraintConfigProto {
-  /** Constraint based on a numeric range */
-  range?: RangeConstraintProto | undefined;
+  /** Constraint based on a numeric value */
+  numeric?: NumberConstraintProto | undefined;
   /** Constraint based on selectable list options with extra options */
-  listOptions?: ListOptionsConstraintProto | undefined;
+  enumerated?: EnumeratedConstraintProto | undefined;
   /** Constraint based on color formats and modes */
   color?: ColorConstraintProto | undefined;
   /** Constraint based on string properties (e.g., regex, length) */
@@ -107,8 +107,8 @@ export interface ConstraintConfigProto {
 
 function createBaseConstraintConfigProto(): ConstraintConfigProto {
   return {
-    range: undefined,
-    listOptions: undefined,
+    numeric: undefined,
+    enumerated: undefined,
     color: undefined,
     string: undefined,
     list: undefined,
@@ -120,15 +120,15 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     message: ConstraintConfigProto,
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
-    if (message.range !== undefined) {
-      RangeConstraintProto.encode(
-        message.range,
+    if (message.numeric !== undefined) {
+      NumberConstraintProto.encode(
+        message.numeric,
         writer.uint32(10).fork(),
       ).join();
     }
-    if (message.listOptions !== undefined) {
-      ListOptionsConstraintProto.encode(
-        message.listOptions,
+    if (message.enumerated !== undefined) {
+      EnumeratedConstraintProto.encode(
+        message.enumerated,
         writer.uint32(18).fork(),
       ).join();
     }
@@ -166,7 +166,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.range = RangeConstraintProto.decode(reader, reader.uint32());
+          message.numeric = NumberConstraintProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 2: {
@@ -174,7 +177,7 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.listOptions = ListOptionsConstraintProto.decode(
+          message.enumerated = EnumeratedConstraintProto.decode(
             reader,
             reader.uint32(),
           );
@@ -218,11 +221,11 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
 
   fromJSON(object: any): ConstraintConfigProto {
     return {
-      range: isSet(object.range)
-        ? RangeConstraintProto.fromJSON(object.range)
+      numeric: isSet(object.numeric)
+        ? NumberConstraintProto.fromJSON(object.numeric)
         : undefined,
-      listOptions: isSet(object.listOptions)
-        ? ListOptionsConstraintProto.fromJSON(object.listOptions)
+      enumerated: isSet(object.enumerated)
+        ? EnumeratedConstraintProto.fromJSON(object.enumerated)
         : undefined,
       color: isSet(object.color)
         ? ColorConstraintProto.fromJSON(object.color)
@@ -238,11 +241,11 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
 
   toJSON(message: ConstraintConfigProto): unknown {
     const obj: any = {};
-    if (message.range !== undefined) {
-      obj.range = RangeConstraintProto.toJSON(message.range);
+    if (message.numeric !== undefined) {
+      obj.numeric = NumberConstraintProto.toJSON(message.numeric);
     }
-    if (message.listOptions !== undefined) {
-      obj.listOptions = ListOptionsConstraintProto.toJSON(message.listOptions);
+    if (message.enumerated !== undefined) {
+      obj.enumerated = EnumeratedConstraintProto.toJSON(message.enumerated);
     }
     if (message.color !== undefined) {
       obj.color = ColorConstraintProto.toJSON(message.color);
@@ -265,13 +268,13 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     object: I,
   ): ConstraintConfigProto {
     const message = createBaseConstraintConfigProto();
-    message.range =
-      object.range !== undefined && object.range !== null
-        ? RangeConstraintProto.fromPartial(object.range)
+    message.numeric =
+      object.numeric !== undefined && object.numeric !== null
+        ? NumberConstraintProto.fromPartial(object.numeric)
         : undefined;
-    message.listOptions =
-      object.listOptions !== undefined && object.listOptions !== null
-        ? ListOptionsConstraintProto.fromPartial(object.listOptions)
+    message.enumerated =
+      object.enumerated !== undefined && object.enumerated !== null
+        ? EnumeratedConstraintProto.fromPartial(object.enumerated)
         : undefined;
     message.color =
       object.color !== undefined && object.color !== null

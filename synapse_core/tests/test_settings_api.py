@@ -1,65 +1,46 @@
 from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
                                        ColorFormat, ConstraintTypeProto,
-                                       ListConstraint, ListOptionsConstraint,
-                                       RangeConstraint, StringConstraint)
-
-# ------------------ RangeConstraint ------------------
+                                       EnumeratedConstraint, ListConstraint,
+                                       NumberConstraint, StringConstraint)
 
 
-def test_range_constraint_valid():
-    c = RangeConstraint(0, 10)
+# ------------------ NumberConstraint ------------------
+def test_number_constraint_valid():
+    c = NumberConstraint(0, 10)
     result = c.validate(5)
     assert result.isValid
     assert result.normalizedValue == 5
 
 
-def test_range_constraint_out_of_bounds():
-    c = RangeConstraint(0, 10)
+def test_number_constraint_out_of_bounds():
+    c = NumberConstraint(0, 10)
     result = c.validate(15)
     assert not result.isValid
     assert result.errorMessage is not None
     assert "is greater than max" in result.errorMessage
 
 
-def test_range_constraint_with_step():
-    c = RangeConstraint(0, 10, step=2)
+def test_number_constraint_with_step():
+    c = NumberConstraint(0, 10, step=2)
     result = c.validate(3)
     assert result.isValid
     assert result.normalizedValue == 4  # Snapped
 
 
-# ------------------ ListOptionsConstraint ------------------
-
-
-def test_list_options_constraint_single_valid():
-    c = ListOptionsConstraint(["a", "b", "c"])
+# ------------------ EnumeratedConstraint ------------------
+def test_enumerated_constraint_single_valid():
+    c = EnumeratedConstraint(["a", "b", "c"])
     result = c.validate("a")
     assert result.isValid
 
 
-def test_list_options_constraint_single_invalid():
-    c = ListOptionsConstraint(["a", "b", "c"])
+def test_enumerated_constraint_single_invalid():
+    c = EnumeratedConstraint(["a", "b", "c"])
     result = c.validate("x")
     assert not result.isValid
 
 
-def test_list_options_constraint_multiple_valid():
-    c = ListOptionsConstraint(["a", "b", "c"], allowMultiple=True)
-    result = c.validate(["a", "b"])
-    assert result.isValid
-
-
-def test_list_options_constraint_multiple_invalid():
-    c = ListOptionsConstraint(["a", "b", "c"], allowMultiple=True)
-    result = c.validate(["a", "x"])
-    assert not result.isValid
-    assert result.errorMessage is not None
-    assert "Invalid options" in result.errorMessage
-
-
 # ------------------ ColorConstraint ------------------
-
-
 def test_color_constraint_hex_valid_string_short():
     c = ColorConstraint(formatType=ColorFormat.kHex)
     result = c.validate("#abc")
@@ -191,8 +172,6 @@ def test_color_constraint_to_dict():
 
 
 # ------------------ ListConstraint ------------------
-
-
 def test_list_constraint_valid_length():
     c = ListConstraint(minLength=1, maxLength=3)
     result = c.validate([1, 2])
@@ -246,8 +225,6 @@ def test_list_constraint_invalid_nested_depth_3_structure():
 
 
 # ------------------ StringConstraint ------------------
-
-
 def test_string_constraint_valid():
     c = StringConstraint(minLength=2, maxLength=5)
     result = c.validate("abc")
@@ -273,8 +250,6 @@ def test_string_constraint_pattern_invalid():
 
 
 # ------------------ BooleanConstraint ------------------
-
-
 def test_boolean_constraint_true_values():
     c = BooleanConstraint()
     for val in [True, "true", "1", "yes", 1]:

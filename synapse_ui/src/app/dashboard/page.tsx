@@ -78,7 +78,8 @@ export default function Dashboard() {
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
 
   useEffect(() => {
-    let pipelineIndex = selectedCamera?.pipelineIndex ?? 0;
+    let pipelineIndex =
+      selectedCamera?.pipelineIndex ?? selectedPipeline?.index ?? 0;
     let pipeline = pipelines.get(pipelineIndex);
 
     if (!pipeline) {
