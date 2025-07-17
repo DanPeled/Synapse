@@ -20,6 +20,7 @@ import {
 } from "@/proto/v1/pipeline";
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
+import { LogMessageProto } from "@/proto/v1/log";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -59,7 +60,7 @@ const initialState: BackendStateSystem.State = {
     networktables: false,
   },
   networktable: "Synapse",
-  logs: [] as BackendStateSystem.Log[],
+  logs: [],
   cameras: [],
   networktablesserver: null,
 };
@@ -137,13 +138,13 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
       onOpen: () => {
         dispatch({
           type: "SET_CONNECTION",
-          payload: { ...state.connection, backend: true },
+          payload: { ...stateRef.current.connection, backend: true },
         });
       },
       onClose: () => {
         dispatch({
           type: "SET_CONNECTION",
-          payload: { ...state.connection, backend: false },
+          payload: { ...stateRef.current.connection, backend: false },
         });
       },
       onMessage: (message: ArrayBufferLike) => {
@@ -154,7 +155,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO: {
             const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
             setters.setDeviceinfo({
-              ...state.deviceinfo,
+              ...stateRef.current.deviceinfo,
               ...deviceInfo,
             });
 
@@ -164,7 +165,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const hardwareMetrics: HardwareMetricsProto =
               messageObj.hardwareMetrics!;
             setters.setHardwaremetrics({
-              ...state.hardwaremetrics,
+              ...stateRef.current.hardwaremetrics,
               ...hardwareMetrics,
               lastFetched: formatHHMMSSLocal(new Date()),
             });
@@ -172,7 +173,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE: {
             const pipeline: PipelineProto = messageObj.pipelineInfo!;
-            const pipelines = state.pipelines;
+            const pipelines = stateRef.current.pipelines;
             pipelines.set(pipeline.index, pipeline);
             setters.setPipelines(pipelines);
             break;
@@ -185,7 +186,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA: {
             const camera: CameraProto = messageObj.cameraInfo!;
-            let newCamerasList = [...state.cameras, camera];
+            let newCamerasList = [...stateRef.current.cameras, camera];
             newCamerasList = newCamerasList.sort(
               (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
             );
@@ -221,6 +222,24 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               newPipelines.set(setPipelineNameMSG.pipelineIndex, pipeline);
               setters.setPipelines(newPipelines);
             }
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_LOG: {
+            const logMsg: LogMessageProto = messageObj.log!;
+            const logs = [...stateRef.current.logs];
+            stateRef.current.logs = logs; // Keep the ref updated!
+
+            const exists = logs.some(
+              (log) => log.timestamp === logMsg.timestamp,
+            );
+
+            if (!exists) {
+              logs.push(logMsg);
+              // Sort logs by timestamp ascending (older first)
+              logs.sort((a, b) => a.timestamp - b.timestamp);
+              setters.setLogs(logs);
+            }
+            console.log(logs);
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {

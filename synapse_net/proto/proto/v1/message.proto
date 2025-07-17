@@ -4,6 +4,7 @@ package proto.v1;
 
 import "proto/v1/camera.proto";
 import "proto/v1/device.proto";
+import "proto/v1/log.proto";
 import "proto/v1/pipeline.proto";
 
 message MessageProto {
@@ -19,9 +20,10 @@ message MessageProto {
     SetPipelineNameMessageProto set_pipeline_name = 9;
     SetDefaultPipelineMessageProto set_default_pipeline = 10;
     int32 remove_pipeline_index = 11;
+    LogMessageProto log = 12;
   }
 
-  repeated PipelineTypeProto pipeline_type_info = 12;
+  repeated PipelineTypeProto pipeline_type_info = 13;
 }
 
 enum MessageTypeProto {
@@ -37,4 +39,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME = 9;
   MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE = 10;
   MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11;
+  MESSAGE_TYPE_PROTO_LOG = 12;
 }

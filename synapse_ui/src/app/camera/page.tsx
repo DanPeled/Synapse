@@ -4,7 +4,7 @@ import { Column, Row } from "@/widgets/containers";
 import { CameraCalibrationModule } from "./camera_calibration";
 import { background, baseCardColor, teamColor } from "@/services/style";
 import { CameraStream } from "@/widgets/cameraStream";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
 import { Placeholder } from "@/widgets/placeholder";
 import { CameraTransformModule } from "./camera_transform";
@@ -42,21 +42,24 @@ export default function CameraConfigPage() {
             className="items-center border-none"
             style={{ backgroundColor: baseCardColor }}
           >
-            <Dropdown
-              options={
-                (cameras
-                  ? cameras.map((cam) => ({
-                      label: `${cam?.name}`,
-                      value: cam,
-                    }))
-                  : []) as DropdownOption<CameraProto>[]
-              }
-              label="Camera"
-              value={selectedCamera}
-              onValueChange={(camera) => {
-                setSelectedCamera(camera);
-              }}
-            />
+            <CardContent className="w-full items-center h-full">
+              {" "}
+              <Dropdown
+                options={
+                  (cameras
+                    ? cameras.map((cam) => ({
+                        label: `${cam?.name}`,
+                        value: cam,
+                      }))
+                    : []) as DropdownOption<CameraProto>[]
+                }
+                label="Camera"
+                value={selectedCamera}
+                onValueChange={(camera) => {
+                  setSelectedCamera(camera);
+                }}
+              />
+            </CardContent>
             <CameraStream stream={selectedCamera?.streamPath} />
           </Card>
           <Card

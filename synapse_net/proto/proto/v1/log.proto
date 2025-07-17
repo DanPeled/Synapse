@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package proto.v1;
+
+enum LogLevelProto {
+  // Unspecified log level, used for default or unknown cases
+  LOG_LEVEL_PROTO_UNSPECIFIED = 0;
+  // Debug level, used for detailed debugging information
+  LOG_LEVEL_PROTO_INFO = 2;
+  // Warning level, used for potentially harmful situations
+  LOG_LEVEL_PROTO_WARNING = 3;
+  // Error level, used for error events that might still allow the application to continue running
+  LOG_LEVEL_PROTO_ERROR = 4;
+}
+
+// Represents a log message with its content, level, and timestamp
+message LogMessageProto {
+  // The log message content
+  string message = 1;
+
+  // Log level of the message
+  LogLevelProto level = 2;
+
+  // Unix timestamp in milliseconds
+  int64 timestamp = 3;
+}

@@ -11,9 +11,9 @@ import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.pipeline import Pipeline
-from synapse.core.settings_api import (BooleanConstraint,
-                                       ListOptionsConstraint, PipelineSettings,
-                                       RangeConstraint, settingField)
+from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
+                                       NumberConstraint, PipelineSettings,
+                                       settingField)
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
@@ -74,18 +74,18 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
 
 class ApriltagPipelineSettings(PipelineSettings):
     tag_size = settingField(
-        RangeConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
+        NumberConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
     )
     tag_family = settingField(
-        ListOptionsConstraint(["tag36h11", "tag16h5"]), default="tag36h11"
+        EnumeratedConstraint(["tag36h11", "tag16h5"]), default="tag36h11"
     )
     stick_to_ground = settingField(BooleanConstraint(), default=False)
     fieldpose = settingField(BooleanConstraint(), default=True)
     verbosity = settingField(
-        ListOptionsConstraint(options=[ver.value for ver in ApriltagVerbosity]),
+        EnumeratedConstraint(options=[ver.value for ver in ApriltagVerbosity]),
         default=ApriltagVerbosity.kPoseOnly.value,
     )
-    num_threads = settingField(RangeConstraint(minValue=1, maxValue=6), default=1)
+    num_threads = settingField(NumberConstraint(minValue=1, maxValue=6), default=1)
 
 
 class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
@@ -126,7 +126,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
-                    tagSize=float(
+                    tagSize=(
                         self.settings.getSetting(ApriltagPipelineSettings.tag_size)
                     ),
                     fx=self.cameraMatrix[0][0],
@@ -321,13 +321,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             current_res = list(
                 map(
                     lambda x: int(x),
-                    str(self.getSetting(PipelineSettings.resolution)).split("x"),
+                    self.getSetting(PipelineSettings.resolution).split("x"),
                 )
             )
 
             if measured_res != current_res:
-                scale_x = current_res[0] / measured_res[0]  # pyright: ignore
-                scale_y = current_res[1] / measured_res[1]  # pyright: ignore
+                scale_x = current_res[0] / measured_res[0]
+                scale_y = current_res[1] / measured_res[1]
 
                 matrix = camConfig.matrix
 

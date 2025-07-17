@@ -2,7 +2,7 @@
 // versions:
 //   protoc-gen-ts_proto  v2.7.5
 //   protoc               unknown
-// source: proto/settings/v1/list_options.proto
+// source: proto/settings/v1/enumerated.proto
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
@@ -10,35 +10,24 @@ import { SettingValueProto } from "./value";
 
 export const protobufPackage = "proto.settings.v1";
 
-/**
- * Constraint that limits a setting to a predefined list of possible values,
- * with an option to allow single or multiple selections.
- */
-export interface ListOptionsConstraintProto {
+/** Constraint that limits a setting to a predefined list of possible values */
+export interface EnumeratedConstraintProto {
   /** List of allowed option values for the setting */
   options: SettingValueProto[];
-  /**
-   * If true, multiple options can be selected by the user.
-   * If false, only a single option can be selected.
-   */
-  allowMultiple: boolean;
 }
 
-function createBaseListOptionsConstraintProto(): ListOptionsConstraintProto {
-  return { options: [], allowMultiple: false };
+function createBaseEnumeratedConstraintProto(): EnumeratedConstraintProto {
+  return { options: [] };
 }
 
-export const ListOptionsConstraintProto: MessageFns<ListOptionsConstraintProto> =
+export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
   {
     encode(
-      message: ListOptionsConstraintProto,
+      message: EnumeratedConstraintProto,
       writer: BinaryWriter = new BinaryWriter(),
     ): BinaryWriter {
       for (const v of message.options) {
         SettingValueProto.encode(v!, writer.uint32(10).fork()).join();
-      }
-      if (message.allowMultiple !== false) {
-        writer.uint32(16).bool(message.allowMultiple);
       }
       return writer;
     },
@@ -46,11 +35,11 @@ export const ListOptionsConstraintProto: MessageFns<ListOptionsConstraintProto> 
     decode(
       input: BinaryReader | Uint8Array,
       length?: number,
-    ): ListOptionsConstraintProto {
+    ): EnumeratedConstraintProto {
       const reader =
         input instanceof BinaryReader ? input : new BinaryReader(input);
       const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseListOptionsConstraintProto();
+      const message = createBaseEnumeratedConstraintProto();
       while (reader.pos < end) {
         const tag = reader.uint32();
         switch (tag >>> 3) {
@@ -64,14 +53,6 @@ export const ListOptionsConstraintProto: MessageFns<ListOptionsConstraintProto> 
             );
             continue;
           }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
-
-            message.allowMultiple = reader.bool();
-            continue;
-          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -81,40 +62,33 @@ export const ListOptionsConstraintProto: MessageFns<ListOptionsConstraintProto> 
       return message;
     },
 
-    fromJSON(object: any): ListOptionsConstraintProto {
+    fromJSON(object: any): EnumeratedConstraintProto {
       return {
         options: globalThis.Array.isArray(object?.options)
           ? object.options.map((e: any) => SettingValueProto.fromJSON(e))
           : [],
-        allowMultiple: isSet(object.allowMultiple)
-          ? globalThis.Boolean(object.allowMultiple)
-          : false,
       };
     },
 
-    toJSON(message: ListOptionsConstraintProto): unknown {
+    toJSON(message: EnumeratedConstraintProto): unknown {
       const obj: any = {};
       if (message.options?.length) {
         obj.options = message.options.map((e) => SettingValueProto.toJSON(e));
       }
-      if (message.allowMultiple !== false) {
-        obj.allowMultiple = message.allowMultiple;
-      }
       return obj;
     },
 
-    create<I extends Exact<DeepPartial<ListOptionsConstraintProto>, I>>(
+    create<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(
       base?: I,
-    ): ListOptionsConstraintProto {
-      return ListOptionsConstraintProto.fromPartial(base ?? ({} as any));
+    ): EnumeratedConstraintProto {
+      return EnumeratedConstraintProto.fromPartial(base ?? ({} as any));
     },
-    fromPartial<I extends Exact<DeepPartial<ListOptionsConstraintProto>, I>>(
+    fromPartial<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(
       object: I,
-    ): ListOptionsConstraintProto {
-      const message = createBaseListOptionsConstraintProto();
+    ): EnumeratedConstraintProto {
+      const message = createBaseEnumeratedConstraintProto();
       message.options =
         object.options?.map((e) => SettingValueProto.fromPartial(e)) || [];
-      message.allowMultiple = object.allowMultiple ?? false;
       return message;
     },
   };
@@ -144,10 +118,6 @@ export type Exact<P, I extends P> = P extends Builtin
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
       [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
     };
-
-function isSet(value: any): boolean {
-  return value !== null && value !== undefined;
-}
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;

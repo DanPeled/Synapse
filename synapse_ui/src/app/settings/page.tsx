@@ -39,6 +39,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ProgramLogsDialog } from "./programLogsDialog";
 
 enum IPMode {
   static = "Static",
@@ -345,6 +346,7 @@ function DangerZone() {
 
 function DeviceControls({}) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
+  const { logs } = useBackendContext();
 
   return (
     <Card
@@ -393,21 +395,11 @@ function DeviceControls({}) {
           <DangerZone />
         </Column>
 
-        <AlertDialog
+        <ProgramLogsDialog
           visible={programLogsVisible}
-          onClose={() => setProgramLogsVisible(false)}
-          className="w-[80vw] h-[80vh]"
-        >
-          <Button
-            onClickAction={() => setProgramLogsVisible(false)}
-            className="w-auto"
-          >
-            <span className="flex items-center justify-center gap-2">
-              <X />
-              Close
-            </span>
-          </Button>
-        </AlertDialog>
+          setVisible={setProgramLogsVisible}
+          logs={logs}
+        />
       </CardContent>
     </Card>
   );

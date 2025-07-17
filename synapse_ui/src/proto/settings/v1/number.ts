@@ -2,7 +2,7 @@
 // versions:
 //   protoc-gen-ts_proto  v2.7.5
 //   protoc               unknown
-// source: proto/settings/v1/range.proto
+// source: proto/settings/v1/number.proto
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
@@ -10,8 +10,8 @@ import { FloatValue } from "../../../google/protobuf/wrappers";
 
 export const protobufPackage = "proto.settings.v1";
 
-/** Defines a numeric range constraint with optional minimum, maximum, and step values. */
-export interface RangeConstraintProto {
+/** Defines a numeric constraint with optional minimum, maximum, and step values. */
+export interface NumberConstraintProto {
   /** Optional minimum allowed value (inclusive) */
   min: number | undefined;
   /** Optional maximum allowed value (inclusive) */
@@ -20,13 +20,13 @@ export interface RangeConstraintProto {
   step: number | undefined;
 }
 
-function createBaseRangeConstraintProto(): RangeConstraintProto {
+function createBaseNumberConstraintProto(): NumberConstraintProto {
   return { min: undefined, max: undefined, step: undefined };
 }
 
-export const RangeConstraintProto: MessageFns<RangeConstraintProto> = {
+export const NumberConstraintProto: MessageFns<NumberConstraintProto> = {
   encode(
-    message: RangeConstraintProto,
+    message: NumberConstraintProto,
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
     if (message.min !== undefined) {
@@ -53,11 +53,11 @@ export const RangeConstraintProto: MessageFns<RangeConstraintProto> = {
   decode(
     input: BinaryReader | Uint8Array,
     length?: number,
-  ): RangeConstraintProto {
+  ): NumberConstraintProto {
     const reader =
       input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRangeConstraintProto();
+    const message = createBaseNumberConstraintProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -94,7 +94,7 @@ export const RangeConstraintProto: MessageFns<RangeConstraintProto> = {
     return message;
   },
 
-  fromJSON(object: any): RangeConstraintProto {
+  fromJSON(object: any): NumberConstraintProto {
     return {
       min: isSet(object.min) ? Number(object.min) : undefined,
       max: isSet(object.max) ? Number(object.max) : undefined,
@@ -102,7 +102,7 @@ export const RangeConstraintProto: MessageFns<RangeConstraintProto> = {
     };
   },
 
-  toJSON(message: RangeConstraintProto): unknown {
+  toJSON(message: NumberConstraintProto): unknown {
     const obj: any = {};
     if (message.min !== undefined) {
       obj.min = message.min;
@@ -116,15 +116,15 @@ export const RangeConstraintProto: MessageFns<RangeConstraintProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RangeConstraintProto>, I>>(
+  create<I extends Exact<DeepPartial<NumberConstraintProto>, I>>(
     base?: I,
-  ): RangeConstraintProto {
-    return RangeConstraintProto.fromPartial(base ?? ({} as any));
+  ): NumberConstraintProto {
+    return NumberConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RangeConstraintProto>, I>>(
+  fromPartial<I extends Exact<DeepPartial<NumberConstraintProto>, I>>(
     object: I,
-  ): RangeConstraintProto {
-    const message = createBaseRangeConstraintProto();
+  ): NumberConstraintProto {
+    const message = createBaseNumberConstraintProto();
     message.min = object.min ?? undefined;
     message.max = object.max ?? undefined;
     message.step = object.step ?? undefined;

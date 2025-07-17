@@ -3,20 +3,20 @@ syntax = "proto3";
 package proto.settings.v1;
 
 import "proto/settings/v1/color.proto";
+import "proto/settings/v1/enumerated.proto";
 import "proto/settings/v1/list.proto";
-import "proto/settings/v1/list_options.proto";
-import "proto/settings/v1/range.proto";
+import "proto/settings/v1/number.proto";
 import "proto/settings/v1/string.proto";
 
 // Configuration for different types of constraints on settings values.
 // Uses a oneof to specify exactly one type of constraint configuration.
 message ConstraintConfigProto {
   oneof config {
-    // Constraint based on a numeric range
-    RangeConstraintProto range = 1;
+    // Constraint based on a numeric value
+    NumberConstraintProto numeric = 1;
 
     // Constraint based on selectable list options with extra options
-    ListOptionsConstraintProto list_options = 2;
+    EnumeratedConstraintProto enumerated = 2;
 
     // Constraint based on color formats and modes
     ColorConstraintProto color = 3;
@@ -36,7 +36,7 @@ enum ConstraintTypeProto {
   CONSTRAINT_TYPE_PROTO_UNSPECIFIED = 0;
 
   // Numeric range constraint
-  CONSTRAINT_TYPE_PROTO_RANGE = 1;
+  CONSTRAINT_TYPE_PROTO_NUMBER = 1;
 
   // Constraint requiring value to be one of a predefined list
   CONSTRAINT_TYPE_PROTO_LIST = 2;
@@ -50,6 +50,6 @@ enum ConstraintTypeProto {
   // Boolean constraint (true/false), no separate config message needed
   CONSTRAINT_TYPE_PROTO_BOOLEAN = 5;
 
-  // List options constraint with additional options (e.g., multi-select)
-  CONSTRAINT_TYPE_PROTO_LIST_OPTIONS = 8;
+  // List options constraint
+  CONSTRAINT_TYPE_PROTO_ENUMERATED = 8;
 }
