@@ -13,7 +13,7 @@ def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
     return f"{name}=={version}"
 
 
-def deployProcessDep(name: str) -> str:
+def synapseInstallerDep(name: str) -> str:
     return name
 
 
@@ -56,9 +56,9 @@ setup(
         "opencv_contrib_python",
         deviceAccessDep("PyYAML"),
         deviceAccessDep("pathspec"),
-        deployProcessDep("paramiko"),
-        deployProcessDep("scp>=0.15.0"),
-        deployProcessDep("questionary"),
+        synapseInstallerDep("paramiko"),
+        synapseInstallerDep("scp>=0.15.0"),
+        synapseInstallerDep("questionary"),
         hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),
