@@ -1,0 +1,4 @@
+orangepi:
+  hostname: orangepi
+  ip: 10.97.38.14
+  password: orangepi

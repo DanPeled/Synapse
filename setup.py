@@ -58,6 +58,7 @@ setup(
         deviceAccessDep("pathspec"),
         deployProcessDep("paramiko"),
         deployProcessDep("scp>=0.15.0"),
+        deployProcessDep("questionary"),
         hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),
@@ -74,4 +75,11 @@ setup(
         ]
     },
     include_package_data=True,
+    entry_points={
+        "console_scripts": [
+            "synapse_install=synapse_installer.installer:main",
+            "synapse_create=synapse_installer.create:createProject",
+            "synapse_deploy=synapse_installer.deploy:setupAndRunDeploy",
+        ],
+    },
 )
