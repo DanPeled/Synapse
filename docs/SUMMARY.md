@@ -4,7 +4,6 @@
 
 ## Getting Started
 
-* [About Synapse](getting-started/about-synapse.md)
 * [Quick Start](getting-started/quick-start/README.md)
   * [Common Hardware Setups](getting-started/quick-start/common-hardware-setups.md)
   * [Wiring](getting-started/quick-start/wiring.md)
