@@ -59,6 +59,7 @@ setup(
         synapseInstallerDep("paramiko"),
         synapseInstallerDep("scp>=0.15.0"),
         synapseInstallerDep("questionary"),
+        synapseInstallerDep("tqdm"),
         hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),

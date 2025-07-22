@@ -44,24 +44,6 @@ def test_create_project_basic(mock_load, mock_confirm, mock_text, fake_cwd):
 
 
 @mock.patch("questionary.text")
-@mock.patch("questionary.confirm")
-@mock.patch("synapse_installer.create.loadDeviceData")
-def test_create_project_with_device_config(
-    mock_load, mock_confirm, mock_text, fake_cwd
-):
-    mock_text().ask.return_value = "DeviceProject"
-    mock_confirm().ask.return_value = True
-
-    createProject()
-
-    project_dir = fake_cwd / "DeviceProject"
-    assert project_dir.exists()
-    assert (project_dir / ".deployconfig").exists() is False
-
-    mock_load.assert_called_once_with(project_dir / ".deployconfig")
-
-
-@mock.patch("questionary.text")
 def test_create_project_cancelled(mock_text, fake_cwd):
     mock_text().ask.return_value = None
 

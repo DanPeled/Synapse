@@ -1,1 +1,6 @@
+deploy:
+  orangepi:
+    hostname: orangepi
+    ip: 127.0.0.1
+    password: orangepi
 name: example
