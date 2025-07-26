@@ -5,10 +5,12 @@
 * Orange Pi 5
   * 2x 2.0USB Ports, 1x 3.0USB port, Up to 2.4Ghz out of the box
   * Type-C power supply 5V @ 4A
+  * Can be powered via the GPIO pins
   * 4GB/8GB/16GB of RAM
 * Rasberry Pi 5&#x20;
   * 2x 2.0USB Ports, 2x 3.0USB ports, Up to 2.4Ghz out of the box
   * Type-C power supply 5V @ 5A
+  * Can be powered via the GPIO pins
   * PoE+ support (requires separate PoE+ HAT)
   * Up to 16GB of RAM
 
@@ -53,7 +55,7 @@ Any generic USB camera will be compatible with Synapse out of the box.
 
 
 
-See [hardware-selection](../hardware-selection/ "mention")for info on why these are recommended
+See [hardware-selection](../hardware-selection/ "mention") for info on why these are recommended
 
 {% hint style="success" %}
 This section was inspired by PhotonVision's guide for common hardware setups
