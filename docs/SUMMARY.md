@@ -9,7 +9,9 @@
   * [Wiring](getting-started/quick-start/wiring.md)
   * [Networking](getting-started/quick-start/networking.md)
   * [Camera Calibration](getting-started/quick-start/camera-calibration.md)
-  * [Quick Configure](getting-started/quick-start/quick-configure.md)
+* [Hardware Selection](getting-started/hardware-selection/README.md)
+  * [Selecting Hardware](getting-started/hardware-selection/selecting-hardware.md)
+  * [Deploying on Custom Hardware](getting-started/hardware-selection/deploying-on-custom-hardware.md)
 * [Installing Software](getting-started/installing-software.md)
 
 ## Usage
