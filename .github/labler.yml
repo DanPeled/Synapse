@@ -1,0 +1,31 @@
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ["setup.py"]
+
+SynapseUI:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_ui/**"]
+
+SynapseLib:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_lib/**"]
+
+SynapseNet:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_net/**"]
+
+SynapseInstaller:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_installer/**"]
+
+ProtoBuf:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_net/proto/**"]
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ["**/tests/**"]
+
+workflows:
+  - changed-files:
+      - any-glob-to-any-file: [".github/workflows/**"]

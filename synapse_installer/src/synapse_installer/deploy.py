@@ -1,16 +1,20 @@
 import ipaddress
+from scp import SCPClient
+import paramiko
 import os
 import pathlib as pthl
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
-from .lockfile import createSynapseZIP
+from .lockfile import createDirectoryZIP, createPackageZIP
 import questionary
 import yaml
 from rich import print as fprint
 from synapse.bcolors import MarkupColors
+
+BUILD_DIR = "build"
 
 
 class SetupOptions(Enum):
@@ -81,6 +85,51 @@ def setupConfigFile(path: pthl.Path):
             )
 
 
+def _connectAndDeploydeploy(
+    hostname: str, ip: str, password: str, zip_paths: List[pthl.Path]
+):
+    try:
+        print(f"Connecting to {hostname}@{ip}...")
+
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(
+            ip,
+            username="root",
+            password=password,
+            timeout=10,
+            banner_timeout=10,
+            auth_timeout=5,
+        )
+        transport = client.get_transport()
+
+        assert transport is not None
+
+        with SCPClient(transport) as scp:
+            for zip_path in zip_paths:
+                remote_zip = f"/tmp/{zip_path.name}"
+                print(f"Uploading {zip_path.name} to {remote_zip}")
+                scp.put(str(zip_path), remote_zip)
+
+                unzip_cmd = f"unzip -o {remote_zip} -d ~"
+                stdin, stdout, stderr = client.exec_command(unzip_cmd)
+                exit_status = stdout.channel.recv_exit_status()
+                if exit_status == 0:
+                    print(f"Unzipped {zip_path.name} on {hostname}")
+                else:
+                    print(f"Error unzipping {zip_path.name}:\n{stderr.read().decode()}")
+                    break
+            else:
+                print("Restaring Synapse runtime...")
+                ...  # Restart Synapse Runtime
+
+        client.close()
+        print(f"Deployment completed on {hostname}")
+
+    except Exception as e:
+        print(f"Deployment to {hostname}@{ip} failed: {e}")
+
+
 def deploy(path: pthl.Path):
     data = {}
     with open(path, "r") as f:
@@ -98,8 +147,15 @@ def deploy(path: pthl.Path):
     for i in range(1, argc):
         currHostname = argv[i]
         if currHostname in data["deploy"]:
-            print(f"Attempting deploy to `{currHostname}`...")
-            ...  # Deploy to device
+            data = data["deploy"][currHostname]
+            project_zip = pthl.Path.cwd() / BUILD_DIR / "project.zip"
+            package_zip = pthl.Path.cwd() / BUILD_DIR / "synapse.zip"
+            _connectAndDeploydeploy(
+                data["hostname"],
+                data["ip"],
+                data["password"],
+                [project_zip, package_zip],
+            )
         else:
             fprint(
                 MarkupColors.fail(
@@ -123,5 +179,11 @@ def setupAndRunDeploy():
 
     deployConfigPath = cwd / ".synapseproject"
     loadDeviceData(deployConfigPath)
-    createSynapseZIP(cwd / "build")
+    createPackageZIP(cwd / BUILD_DIR)
+    createDirectoryZIP(
+        pthl.Path(os.getcwd()),
+        cwd / BUILD_DIR / "project.zip",
+        lambda f: not f.is_relative_to(pthl.Path.cwd() / BUILD_DIR)
+        and not (str(f)).endswith(".log"),
+    )
     deploy(deployConfigPath)

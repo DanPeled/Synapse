@@ -5,9 +5,8 @@ from tqdm import tqdm
 import os
 import hashlib
 import json
-from importlib.metadata import distribution, Distribution, PackagePath
-from typing import Dict, Final, List, Any
-
+from importlib.metadata import distribution, Distribution
+from typing import Dict, Final, List, Any, Optional, Callable
 
 PACKAGE_NAME: Final[str] = "Synapse"
 OUTPUT_ZIP: Final[str] = "synapse.zip"
@@ -20,18 +19,6 @@ def getFileHash(path: str) -> str:
         while chunk := f.read(8192):
             hasher.update(chunk)
     return hasher.hexdigest()
-
-
-def calculateFilesHashes(
-    files: List[PackagePath], dist: Distribution
-) -> Dict[str, str]:
-    hashes: Dict[str, str] = {}
-    for file in files:
-        full_path: Path = Path(str(dist.locate_file(file)))
-        if full_path.is_file():
-            rel_path: str = str(file)
-            hashes[rel_path] = getFileHash(str(full_path))
-    return hashes
 
 
 def loadExistingHashes(path: Path) -> Dict[str, str]:
@@ -49,52 +36,87 @@ def saveHashes(hashes: Dict[str, str], distPath: Path) -> None:
         json.dump(hashes, f, indent=2)
 
 
-def createSynapseZIP(baseDistPath: Path) -> None:
-    if not baseDistPath.exists():
-        os.makedirs(baseDistPath)
+def calculateFileHashesFromPaths(files: List[Path], root_path: Path) -> Dict[str, str]:
+    hashes: Dict[str, str] = {}
+    for file in files:
+        if file.is_file():
+            rel_path = str(file.relative_to(root_path))
+            hashes[rel_path] = getFileHash(str(file))
+    return hashes
+
+
+def zipFiles(
+    files: List[Path], root_path: Path, zip_path: Path, desc: str = "Zipping files"
+) -> List[str]:
+    caught_warnings: List[str] = []
+
+    def custom_warn_handler(message, category, filename, lineno, file=None, line=None):
+        caught_warnings.append(f"{category.__name__}: {message} ({filename}:{lineno})")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        warnings.showwarning = custom_warn_handler  # type: ignore
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for file in tqdm(files, desc=desc, unit="file"):
+                arcname = file.relative_to(root_path)
+                zf.write(str(file), str(arcname))
+
+    return caught_warnings
+
+
+def createPackageZIP(baseDestPath: Path) -> None:
+    if not baseDestPath.exists():
+        os.makedirs(baseDestPath)
+
     dist: Distribution = distribution(PACKAGE_NAME)
-    files: List[PackagePath] = [
-        f
+    files: List[Path] = [
+        Path(str(dist.locate_file(f)))
         for f in dist.files or []
-        if Path(str(dist.locate_file(f))).is_file()
-        if "__pycache__" not in str(f)
+        if Path(str(dist.locate_file(f))).is_file() and "__pycache__" not in str(f)
     ]
 
-    new_hashes: Dict[str, str] = calculateFilesHashes(files, dist)
-    old_hashes: Dict[str, str] = loadExistingHashes(baseDistPath)
+    root_path = Path(str(dist.locate_file("")))
+    new_hashes = calculateFileHashesFromPaths(files, root_path)
+    old_hashes = loadExistingHashes(baseDestPath)
+
+    if new_hashes == old_hashes:
+        return
+
+    caught_warnings = zipFiles(
+        files, root_path, baseDestPath / OUTPUT_ZIP, f"Packaging {PACKAGE_NAME}"
+    )
+    saveHashes(new_hashes, baseDestPath)
+
+    if caught_warnings:
+        print("\nWarnings encountered during zip creation:")
+        for w in caught_warnings:
+            print(w)
+
+
+def createDirectoryZIP(
+    directory: Path,
+    output_path: Optional[Path] = None,
+    filterFunc: Optional[Callable[[Path], bool]] = None,
+) -> None:
+    directory = Path(directory)
+    output_path = output_path or (directory / OUTPUT_ZIP)
+    if not directory.exists():
+        raise FileNotFoundError(f"Directory {directory} does not exist")
+
+    all_files = [f for f in directory.rglob("*") if f.is_file()]
+
+    if filter:
+        all_files = list(filter(filterFunc, all_files))
+
+    new_hashes = calculateFileHashesFromPaths(all_files, directory)
+    old_hashes = loadExistingHashes(directory)
 
     if new_hashes == old_hashes:
         print("No changes detected. Skipping zip creation.")
         return
 
-    root_path: Path = Path(str(dist.locate_file("")))
-
-    caught_warnings: List[str] = []
-
-    def custom_warn_handler(
-        message: Warning,
-        category: type[Warning],
-        filename: str,
-        lineno: int,
-        file: Any = None,
-        line: Any = None,
-    ) -> None:
-        caught_warnings.append(f"{category.__name__}: {message} ({filename}:{lineno})")
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # suppress warnings
-        warnings.showwarning = custom_warn_handler  # type: ignore
-
-        with zipfile.ZipFile(
-            baseDistPath / OUTPUT_ZIP, "w", zipfile.ZIP_DEFLATED
-        ) as zf:
-            for file in tqdm(files, desc="Packaging project", unit="file"):
-                full_path: Path = Path(str(dist.locate_file(file)))
-                arcname: str = os.path.relpath(str(full_path), str(root_path))
-                zf.write(str(full_path), arcname)
-
-    saveHashes(new_hashes, baseDistPath)
-
+    caught_warnings = zipFiles(all_files, directory, output_path, "Packaging directory")
     if caught_warnings:
         print("\nWarnings encountered during zip creation:")
         for w in caught_warnings:
