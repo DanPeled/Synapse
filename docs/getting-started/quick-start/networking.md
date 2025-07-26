@@ -1,3 +1,7 @@
+---
+icon: network-wired
+---
+
 # Networking
 
 ## Physical Connection

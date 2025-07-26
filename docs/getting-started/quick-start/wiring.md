@@ -1,3 +1,10 @@
+---
+description: >-
+  Quick Guide on how to connect the coprocessor with the robot power
+  distribution
+icon: plug
+---
+
 # Wiring
 
 {% hint style="info" %}

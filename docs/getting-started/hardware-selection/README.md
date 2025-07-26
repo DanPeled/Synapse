@@ -1,2 +1,6 @@
+---
+icon: hammer
+---
+
 # Hardware Selection
 

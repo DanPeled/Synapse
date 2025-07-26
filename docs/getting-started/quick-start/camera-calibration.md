@@ -1,3 +1,7 @@
+---
+icon: camera-polaroid
+---
+
 # Camera Calibration
 
 {% hint style="info" %}

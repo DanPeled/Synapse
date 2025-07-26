@@ -1,3 +1,7 @@
+---
+icon: gears
+---
+
 # Common Hardware Setups
 
 ## Coprocessors
