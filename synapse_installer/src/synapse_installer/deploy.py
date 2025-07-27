@@ -1,6 +1,4 @@
 import ipaddress
-from scp import SCPClient
-import paramiko
 import os
 import pathlib as pthl
 import sys
@@ -8,11 +6,20 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
-from .lockfile import createDirectoryZIP, createPackageZIP
+import paramiko
 import questionary
 import yaml
 from rich import print as fprint
+from scp import SCPClient
 from synapse.bcolors import MarkupColors
+
+from .lockfile import createDirectoryZIP, createPackageZIP
+from .setup_service import (
+    SERVICE_NAME,
+    isServiceSetup,
+    restartService,
+    setupServiceOnConnectedClient,
+)
 
 BUILD_DIR = "build"
 
@@ -85,7 +92,7 @@ def setupConfigFile(path: pthl.Path):
             )
 
 
-def _connectAndDeploydeploy(
+def _connectAndDeploy(
     hostname: str, ip: str, password: str, zip_paths: List[pthl.Path]
 ):
     try:
@@ -120,8 +127,12 @@ def _connectAndDeploydeploy(
                     print(f"Error unzipping {zip_path.name}:\n{stderr.read().decode()}")
                     break
             else:
-                print("Restaring Synapse runtime...")
-                ...  # Restart Synapse Runtime
+                if not isServiceSetup(client, SERVICE_NAME):
+                    setupServiceOnConnectedClient(
+                        client,
+                        hostname,
+                    )
+                restartService(client, SERVICE_NAME)
 
         client.close()
         print(f"Deployment completed on {hostname}")
@@ -130,7 +141,7 @@ def _connectAndDeploydeploy(
         print(f"Deployment to {hostname}@{ip} failed: {e}")
 
 
-def deploy(path: pthl.Path):
+def deploy(path: pthl.Path, cwd: pthl.Path):
     data = {}
     with open(path, "r") as f:
         data: dict = yaml.full_load(f)
@@ -148,9 +159,9 @@ def deploy(path: pthl.Path):
         currHostname = argv[i]
         if currHostname in data["deploy"]:
             data = data["deploy"][currHostname]
-            project_zip = pthl.Path.cwd() / BUILD_DIR / "project.zip"
-            package_zip = pthl.Path.cwd() / BUILD_DIR / "synapse.zip"
-            _connectAndDeploydeploy(
+            project_zip = cwd / BUILD_DIR / "project.zip"
+            package_zip = cwd / BUILD_DIR / "synapse.zip"
+            _connectAndDeploy(
                 data["hostname"],
                 data["ip"],
                 data["password"],
@@ -173,17 +184,26 @@ def loadDeviceData(deployConfigPath: pthl.Path):
 
 def setupAndRunDeploy():
     cwd: pthl.Path = pthl.Path(os.getcwd())
+
     assert (cwd / ".synapseproject").exists(), (
         "No .synpaseproject file found, are you sure you're inside of a Synapse project?"
     )
 
+    def fileShouldDeploy(f: pthl.Path):
+        return (
+            str(f).endswith(".py")
+            or f.is_relative_to(cwd / "deploy")
+            or f.is_relative_to(cwd / "config")
+        )
+
     deployConfigPath = cwd / ".synapseproject"
     loadDeviceData(deployConfigPath)
+
     createPackageZIP(cwd / BUILD_DIR)
     createDirectoryZIP(
         pthl.Path(os.getcwd()),
         cwd / BUILD_DIR / "project.zip",
-        lambda f: not f.is_relative_to(pthl.Path.cwd() / BUILD_DIR)
-        and not (str(f)).endswith(".log"),
+        fileShouldDeploy,
     )
-    deploy(deployConfigPath)
+
+    deploy(deployConfigPath, cwd)

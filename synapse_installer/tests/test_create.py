@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
-from synapse_installer.create import createProject, baseMainPy
+from synapse_installer.create import baseMainPy, createProject
 
 
 @pytest.fixture

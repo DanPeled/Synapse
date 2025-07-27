@@ -1,12 +1,13 @@
-from pathlib import Path
-import zipfile
-import warnings
-from tqdm import tqdm
-import os
 import hashlib
 import json
-from importlib.metadata import distribution, Distribution
-from typing import Dict, Final, List, Any, Optional, Callable
+import os
+import warnings
+import zipfile
+from importlib.metadata import Distribution, distribution
+from pathlib import Path
+from typing import Any, Callable, Dict, Final, List, Optional
+
+from tqdm import tqdm
 
 PACKAGE_NAME: Final[str] = "Synapse"
 OUTPUT_ZIP: Final[str] = "synapse.zip"
