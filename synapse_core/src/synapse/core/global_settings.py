@@ -1,6 +1,5 @@
 from typing import Dict, Optional, Union, overload
 
-from ..log import err
 from ..stypes import CameraID
 from ..util import listToTransform3d
 from .camera_factory import CameraConfig, CameraConfigKey
@@ -51,9 +50,7 @@ class GlobalSettingsMeta(type):
                     )
                     cls.__cameraConfigs[index] = camConfig
             return True
-        else:
-            err("No camera configs provided")
-            return False
+        return True
 
     def hasCameraData(cls, cameraIndex: CameraID) -> bool:
         """Checks if camera data exists for the given camera index.
