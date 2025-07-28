@@ -137,7 +137,7 @@ def _connectAndDeploy(
         print(f"Deployment to {hostname}@{ip} failed: {e}")
 
 
-def deploy(path: pthl.Path, cwd: pthl.Path):
+def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
     data = {}
     with open(path, "r") as f:
         data: dict = yaml.full_load(f)
@@ -147,10 +147,13 @@ def deploy(path: pthl.Path, cwd: pthl.Path):
         with open(path, "r") as f:
             data: dict = yaml.full_load(f) or {"deploy": {}}
 
-    argc = len(sys.argv)
+    if argv is None:
+        argv = sys.argv
+
+    argc = len(argv)
     if argc < 2:
         ...  # Throw error
-    argv = sys.argv
+
     for i in range(1, argc):
         currHostname = argv[i]
         if currHostname in data["deploy"]:
@@ -178,7 +181,7 @@ def loadDeviceData(deployConfigPath: pthl.Path):
         setupConfigFile(deployConfigPath)
 
 
-def setupAndRunDeploy():
+def setupAndRunDeploy(argv: Optional[List[str]] = None):
     cwd: pthl.Path = pthl.Path(os.getcwd())
 
     assert (cwd / ".synapseproject").exists(), (
@@ -202,4 +205,4 @@ def setupAndRunDeploy():
         fileShouldDeploy,
     )
 
-    deploy(deployConfigPath, cwd)
+    deploy(deployConfigPath, cwd, argv)

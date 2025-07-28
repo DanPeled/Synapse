@@ -89,7 +89,7 @@ def test_deploy_runs_connect_deploy(mock_connect, tmp_path, monkeypatch):
 
     monkeypatch.setattr(sys, "argv", ["deploy", "my-device"])
 
-    deploy(deploy_cfg, tmp_path)
+    deploy(deploy_cfg, tmp_path, None)
 
     mock_connect.assert_called_once()
 
