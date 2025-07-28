@@ -3,7 +3,7 @@ from functools import lru_cache
 from typing import Optional
 
 from ntcore import Event, EventFlags, NetworkTableInstance
-from synapse.log import err, log
+from synapse.log import log, warn
 
 
 @lru_cache
@@ -59,7 +59,7 @@ class NtClient:
         # Client mode: set the server and start the client
         self.nt_inst.startClient4(name)
 
-        timeout = 120  # seconds
+        timeout = 10  # seconds
         start_time = time.time()
 
         def connectionListener(event: Event):
@@ -77,11 +77,10 @@ class NtClient:
         while not self.nt_inst.isConnected():
             curr = time.time() - start_time
             if curr > timeout:
-                err(
+                warn(
                     f"connection to server ({'127.0.0.1' if isServer else teamNumber}) from client ({name}) timed out after {curr} seconds"
                 )
-                self.cleanup()
-                return False
+                break
             if not isServer:
                 log(f"Trying to connect to {teamNumberToIP(teamNumber, 4)}...")
             else:

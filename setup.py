@@ -2,12 +2,18 @@ from setuptools import find_packages, setup
 
 WPILIB_VERSION = "2025.2.1.1"
 
+modules = {
+    "synapse_net": "synapse_net/src",
+    "synapse_installer": "synapse_installer/src",
+    "": "synapse_core/src",
+}
+
 
 def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
     return f"{name}=={version}"
 
 
-def deployProcessDep(name: str) -> str:
+def synapseInstallerDep(name: str) -> str:
     return name
 
 
@@ -23,29 +29,42 @@ def deviceAccessDep(name: str) -> str:
     return name
 
 
+def visionProcessingDep(name: str) -> str:
+    return name
+
+
+allModules = []
+moduleDirs = {}
+
+for name, path in modules.items():
+    allModules += find_packages(where=path)
+    if name:  # not root
+        moduleDirs[name] = f"{path}/{name}"
+    else:
+        moduleDirs[""] = path
+
 setup(
-    name="Synapse",
+    name="synapsefrc",
     version="0.1.0",
-    packages=find_packages(where="synapse_net/src/")
-    + find_packages(where="synapse_core/src"),
-    package_dir={
-        "synapse_net": "synapse_net/src/synapse_net",
-        "": "synapse_core/src/",
-    },
+    packages=allModules,
+    package_dir=moduleDirs,
+    python_requires=">=3.9, <3.12",
     install_requires=[
+        "rich",
+        "numpy==1.23.3",
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),
         wpilibDep("robotpy_cscore"),
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
-        "rich",
-        "numpy==1.23.3",
-        "opencv_python",
-        "opencv_contrib_python",
+        visionProcessingDep("opencv_python"),
+        visionProcessingDep("opencv_contrib_python"),
         deviceAccessDep("PyYAML"),
         deviceAccessDep("pathspec"),
-        deployProcessDep("paramiko"),
-        deployProcessDep("scp>=0.15.0"),
+        synapseInstallerDep("paramiko"),
+        synapseInstallerDep("scp>=0.15.0"),
+        synapseInstallerDep("questionary"),
+        synapseInstallerDep("tqdm"),
         hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),
@@ -62,4 +81,9 @@ setup(
         ]
     },
     include_package_data=True,
+    entry_points={
+        "console_scripts": [
+            "synapse_installer=synapse_installer.__main__:main",
+        ],
+    },
 )

@@ -41,13 +41,22 @@ generate_buf:
 		$(CD) .. &\
 		make install
 
-# Format code with tools
 format:
+	@echo Ruff format...
 	@python3 -m ruff format . >$(NULL) 2>&1 || echo ruff format failed
+	@echo Isort format...
 	@python3 -m isort . >$(NULL) 2>&1 || echo isort failed
+	@echo Prettier format...
 	@$(CD) synapse_ui && npx prettier . --write >$(NULL) 2>&1 || echo prettier failed
+	@echo ProtoBuf format...
 	@$(CD) synapse_net/proto && \
 		buf format -w
+
+test:
+	@echo Reinstalling Synapse Runtime...
+	@pip install . > $(NULL)
+	@echo Starting Tests...
+	@python3 -m pytest .
 
 # Build Python and UI
 build:

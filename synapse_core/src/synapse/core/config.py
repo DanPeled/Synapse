@@ -46,8 +46,8 @@ class NetworkConfig:
             NetworkConfig: An instance populated with values from the dictionary.
         """
         return NetworkConfig(
-            teamNumber=data["team_number"],
-            name=data["name"],
+            teamNumber=data.get("team_number", 0000),
+            name=data.get("name", "Synapse"),
         )
 
 
@@ -86,7 +86,11 @@ class Config:
         Returns:
             dict: The parsed configuration data.
         """
-        return self.__dictData
+        return self.__dictData or {
+            "pipelines": {
+                0: {"type": "ApriltagPipeline", "name": "New Pipeline", "settings": {}}
+            }
+        }
 
     @property
     def network(self) -> NetworkConfig:
@@ -96,4 +100,4 @@ class Config:
         Returns:
             NetworkConfig: The network settings from the config map.
         """
-        return NetworkConfig.fromJson(self.getConfigMap()["network"])
+        return NetworkConfig.fromJson(self.getConfigMap().get("network", {}))

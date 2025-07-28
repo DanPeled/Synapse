@@ -5,12 +5,14 @@ on:
     branches:
       - main
     paths:
-      - 'synapse_core/**'
-      - 'synapse_net/**'
+      - "synapse_core/**"
+      - "synapse_net/**"
+      - "synapse_installer/**"
   pull_request:
     paths:
-      - 'synapse_core/**'
-      - 'synapse_net/**'
+      - "synapse_core/**"
+      - "synapse_net/**"
+      - "synapse_installer/**"
 
 jobs:
   build:
@@ -26,7 +28,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.7'
+          python-version: "3.10.7"
 
       - name: Install dependencies
         run: |
@@ -47,7 +49,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.7'
+          python-version: "3.10.7"
 
       - name: Install Ruff and isort
         run: |
@@ -71,7 +73,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.7'
+          python-version: "3.10.7"
 
       - name: Install dependencies
         run: |
@@ -87,7 +89,7 @@ jobs:
           pyright
 
   test:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -96,7 +98,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.7'
+          python-version: "3.10.7"
 
       - name: Install dependencies
         run: |

@@ -17,16 +17,3 @@ def test_synapse_run_called_when_init_succeeds():
         s.run()
 
     s.run.assert_called_once()
-
-
-def test_synapse_run_not_called_when_init_fails():
-    root = Path(__file__).parent
-    handler = RuntimeManager(root)
-    s = Synapse()
-
-    s.run = MagicMock()
-
-    if s.init(handler, root / "config" / "fake.yml"):
-        s.run()
-
-    s.run.assert_not_called()
