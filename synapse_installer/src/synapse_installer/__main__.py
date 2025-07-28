@@ -2,9 +2,9 @@ import sys
 
 COMMAND_ARGV_IDX = 1
 
-if __name__ == "__main__":
+
+def main():
     argv = sys.argv
-    argc = len(argv)
 
     cmd = argv[COMMAND_ARGV_IDX]
 
@@ -18,3 +18,7 @@ if __name__ == "__main__":
         createProject()
     else:
         print(f"Unknown command: `{cmd}`!\nvalid commands: `create` or `deploy`")
+
+
+if __name__ == "__main__":
+    main()

@@ -83,9 +83,7 @@ setup(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "synapse_install=synapse_installer.installer:main",
-            "synapse_create=synapse_installer.create:createProject",
-            "synapse_deploy=synapse_installer.deploy:setupAndRunDeploy",
+            "synapse_installer=synapse_installer.__main__:main",
         ],
     },
 )
