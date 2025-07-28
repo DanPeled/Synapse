@@ -29,6 +29,10 @@ def deviceAccessDep(name: str) -> str:
     return name
 
 
+def visionProcessingDep(name: str) -> str:
+    return name
+
+
 allModules = []
 moduleDirs = {}
 
@@ -40,21 +44,21 @@ for name, path in modules.items():
         moduleDirs[""] = path
 
 setup(
-    name="Synapse",
+    name="synapsefrc",
     version="0.1.0",
     packages=allModules,
     package_dir=moduleDirs,
     python_requires=">=3.9, <3.12",
     install_requires=[
+        "rich",
+        "numpy==1.23.3",
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),
         wpilibDep("robotpy_cscore"),
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
-        "rich",
-        "numpy==1.23.3",
-        "opencv_python",
-        "opencv_contrib_python",
+        visionProcessingDep("opencv_python"),
+        visionProcessingDep("opencv_contrib_python"),
         deviceAccessDep("PyYAML"),
         deviceAccessDep("pathspec"),
         synapseInstallerDep("paramiko"),

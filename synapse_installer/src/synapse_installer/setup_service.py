@@ -1,4 +1,5 @@
 from typing import Tuple
+import tempfile
 
 from paramiko import SFTPClient, SSHClient
 
@@ -94,9 +95,11 @@ WantedBy=multi-user.target
 """
 
     remote_service_tmp: str = f"/home/{username}/{SERVICE_NAME}.service"
-    with open("/tmp/temp.service", "w") as f:
-        f.write(service_content)
-    sftp.put("/tmp/temp.service", remote_service_tmp)
+    with tempfile.NamedTemporaryFile("w", delete=False) as temp_file:
+        temp_file.write(service_content)
+        temp_file_path = temp_file.name
+
+    sftp.put(temp_file_path, remote_service_tmp)
 
     def run_sudo(cmd: str) -> Tuple[str, str]:
         stdin, stdout, stderr = client.exec_command(f"sudo -S bash -c '{cmd}'")
@@ -117,5 +120,5 @@ WantedBy=multi-user.target
     run_sudo(f"systemctl start {SERVICE_NAME}")
 
     sftp.close()
-    os.remove("/tmp/temp.service")
+    os.remove(temp_file_path)
     print("Synapse Runtime Service installed and started.")
