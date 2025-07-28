@@ -44,6 +44,7 @@ setup(
     version="0.1.0",
     packages=allModules,
     package_dir=moduleDirs,
+    python_requires=">=3.9, <3.12",
     install_requires=[
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),

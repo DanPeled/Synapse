@@ -36,6 +36,44 @@ def setupServiceOnConnectedClient(
 
     sftp: SFTPClient = client.open_sftp()
 
+    find_python_cmd = r"""
+    LOW="3.9.0"
+    HIGH="3.12.0"
+    ver_ge() {
+        [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" = "$2" ]
+    }
+    ver_in_range() {
+        local ver=$1
+        ver_ge "$ver" "$LOW" && ver_ge "$HIGH" "$ver"
+    }
+    highest_version=""
+    highest_path=""
+    mapfile -t python_execs < <(compgen -c python | sort -u)
+    for py in "${python_execs[@]}"; do
+        path=$(command -v "$py" 2>/dev/null)
+        if [[ -x "$path" ]]; then
+            version=$("$path" --version 2>&1 | awk '{print $2}')
+            if [[ -n $version ]] && ver_in_range "$version"; then
+                if [[ -z "$highest_version" ]] || ver_ge "$version" "$highest_version"; then
+                    highest_version=$version
+                    highest_path=$path
+                fi
+            fi
+        fi
+    done
+    echo "$highest_path"
+    """
+
+    stdin, stdout, stderr = client.exec_command(find_python_cmd)
+    python_path = stdout.read().decode().strip()
+    err = stderr.read().decode()
+    if err:
+        print("Error finding python:", err)
+
+    if not python_path:
+        # Fallback to /usr/bin/python3
+        python_path = "/usr/bin/python3"
+
     remote_main: str = f"/home/{username}/main.py"
     sftp.chmod(remote_main, 0o755)
 
@@ -46,7 +84,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/{username}/main.py
+ExecStart={python_path} /home/{username}/main.py
 WorkingDirectory=/home/{username}
 Restart=always
 RestartSec=5
@@ -62,7 +100,6 @@ WantedBy=multi-user.target
 
     def run_sudo(cmd: str) -> Tuple[str, str]:
         stdin, stdout, stderr = client.exec_command(f"sudo -S bash -c '{cmd}'")
-        # Note: If sudo asks for password, you'd handle stdin here.
         out: str = stdout.read().decode()
         err: str = stderr.read().decode()
         print(out)
@@ -70,7 +107,9 @@ WantedBy=multi-user.target
             print("Error:", err)
         return out, err
 
-    print("Moving service file to system directory and enabling service...")
+    print(
+        "Moving synapse runtime service file to system directory and enabling service..."
+    )
     run_sudo(f"mv {remote_service_tmp} /etc/systemd/system/{SERVICE_NAME}.service")
     run_sudo("systemctl daemon-reexec")
     run_sudo("systemctl daemon-reload")
@@ -79,4 +118,4 @@ WantedBy=multi-user.target
 
     sftp.close()
     os.remove("/tmp/temp.service")
-    print("Service installed and started.")
+    print("Synapse Runtime Service installed and started.")
