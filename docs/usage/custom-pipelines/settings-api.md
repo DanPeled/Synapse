@@ -20,18 +20,19 @@ In order for a pipeline to use some setting collection, first we need to define 
 
 e.g:&#x20;
 
+{% code title="my_pipeline.py" overflow="wrap" %}
 ```python
 # ... imports
 
 class MyPipelineSettings(PipelineSettings):
-    circle_size = settingField(RangeConstraint(minValue=0, maxValue=None), default=20)
+    circle_size = settingField(NumberConstraint(minValue=0, maxValue=None), default=20)
     """Setting for the size of the circle drawn onto the screen"""
 
     circle_x = settingField(
-        RangeConstraint(minValue=0, maxValue=1920), default=1920 / 2
+        NumberConstraint(minValue=0, maxValue=1920), default=1920 / 2
     )
     circle_y = settingField(
-        RangeConstraint(minValue=0, maxValue=1080), default=1080 / 2
+        NumberConstraint(minValue=0, maxValue=1080), default=1080 / 2
     )
     """Position of the circle on screen, where (0, 0) is the top-left corner."""
 
@@ -39,6 +40,7 @@ class MyPipeline(Pipeline[MyPipelineSettings]):
     def __init__(self, settings: MyPipelineSettings):
         super().__init__(settings)
 ```
+{% endcode %}
 
 This class holds 3 settings for our `MyPipeline` pipeline:
 
@@ -65,20 +67,32 @@ This allows for automatic setting generation and validation, without any modific
 
 There are a few constrainted types built into Synapse:
 
-### Range Constraint
+### Number Constraint
 
-the `RangeConstraint` describes a value that exists inside some _range_ with optional min, max and step values.\
+the `NumberConstraint` describes a value that exists inside some _range_ with optional min, max and step values.\
 This Constraint will be rendered as a Slider if both min and max values where provided, and a number input field otherwise.
+
+<figure><img src="../../.gitbook/assets/Slider.png" alt=""><figcaption></figcaption></figure>
+
+<figure><img src="../../.gitbook/assets/NumberInput.png" alt=""><figcaption></figcaption></figure>
 
 ### Boolean Constraint
 
 The `BooleanConstraint` describes a boolean value, and will be rendered as a toggle button.
 
+<figure><img src="../../.gitbook/assets/BooleanValue.png" alt=""><figcaption></figcaption></figure>
+
 ### StringConstraint
 
-### ListOptionsConstraint
+### EnumeratedConstraint
+
+Describes a list of options to choose from, renders as a dropdown menu.
+
+<figure><img src="../../.gitbook/assets/ListOptions.png" alt=""><figcaption></figcaption></figure>
 
 ### ListConstraint
 
 ### ColorConstraint
+
+Coming soon...
 

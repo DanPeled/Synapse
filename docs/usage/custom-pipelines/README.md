@@ -20,6 +20,7 @@ Any file with the name convention `*_pipeline.py` (e.g `apriltag_pipeline.py`) w
 
 Inside of the file, we can define a class that extends the base `Pipeline` class from the _Synapse_ library:
 
+{% code overflow="wrap" %}
 ```python
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult
@@ -34,6 +35,7 @@ class MyPipeline(Pipeline):
         # Here we can run any opencv-like code we would like.
         return img
 ```
+{% endcode %}
 
 This class will automatically be recognized as a valid pipeline type and will be accessable via the UI without any changes.
 
@@ -45,16 +47,17 @@ The <kbd>super().\_\_init\_\_(settings)</kbd>call is required in order for the p
 
 In order for our pipeline to have configurable settings, we will need to define a settings class, which will extend from the `PipelineSettings` class, and will be automatically validated with in-code constraints:
 
+{% code overflow="wrap" %}
 ```python
 # ... previous imports
 from synapse.core.settings_api import RangeConstraint, settingField
 
 class MyPipelineSettings(PipelineSettings):
-    circle_size = settingField(RangeConstraint(minValue=0, maxValue=None), default=20)
+    circle_size = settingField(NumberConstraint(minValue=0, maxValue=None), default=20)
     """Setting for the size of the circle drawn onto the screen"""
 
-    circle_x = settingField(RangeConstraint(minValue=0, maxValue=1920), default=1920 / 2)
-    circle_y = settingField(RangeConstraint(minValue=0, maxValue=1080), default=1080 / 2)
+    circle_x = settingField(NumberConstraint(minValue=0, maxValue=1920), default=1920 / 2)
+    circle_y = settingField(NumberConstraint(minValue=0, maxValue=1080), default=1080 / 2)
     """Position of the circle on screen, where (0, 0) is the top-left corner."""
 
 # ...
@@ -71,6 +74,7 @@ class MyPipeline(Pipeline[MyPipelineSettings]):
         circleX = self.getSetting("circle_x")
         return img
 ```
+{% endcode %}
 
 Now, these settings will be accessable via the UI and be validated automatically to match the constraint we gave it in-code.
 
@@ -82,6 +86,7 @@ For detailed information about the Settings API and the available constraint typ
 
 Now, we can add some OpenCV code that will draw a circle on the screen for us, based on the settings we provide it in the UI:
 
+{% code overflow="wrap" %}
 ```python
 import cv2
 from synapse.core.pipeline import Pipeline
@@ -90,14 +95,14 @@ from synapse.stypes import Frame
 
 
 class MyPipelineSettings(PipelineSettings):
-    circle_size = settingField(RangeConstraint(minValue=0, maxValue=None), default=20)
+    circle_size = settingField(NumberConstraint(minValue=0, maxValue=None), default=20)
     """Setting for the size of the circle drawn onto the screen"""
 
     circle_x = settingField(
-        RangeConstraint(minValue=0, maxValue=1920), default=1920 / 2
+        NumberConstraint(minValue=0, maxValue=1920), default=1920 / 2
     )
     circle_y = settingField(
-        RangeConstraint(minValue=0, maxValue=1080), default=1080 / 2
+        NumberConstraint(minValue=0, maxValue=1080), default=1080 / 2
     )
     """Position of the circle on screen, where (0, 0) is the top-left corner."""
 
@@ -126,6 +131,7 @@ class MyPipeline(Pipeline[MyPipelineSettings]):
 
 
 ```
+{% endcode %}
 
 This pipeline will automatically become a valid and validated pipeline within the **UI** & **NetworkTables** without any modifications to it.&#x20;
 
