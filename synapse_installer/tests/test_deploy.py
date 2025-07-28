@@ -4,14 +4,8 @@ from pathlib import Path
 from unittest import mock
 
 import yaml
-
-from synapse_installer.deploy import (
-    IsValidIP,
-    setupConfigFile,
-    _connectAndDeploy,
-    deploy,
-    loadDeviceData,
-)
+from synapse_installer.deploy import (IsValidIP, _connectAndDeploy, deploy,
+                                      loadDeviceData, setupConfigFile)
 
 
 def test_is_valid_ip():

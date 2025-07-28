@@ -1,5 +1,5 @@
-from typing import Tuple
 import tempfile
+from typing import Tuple
 
 from paramiko import SFTPClient, SSHClient
 

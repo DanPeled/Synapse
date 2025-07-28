@@ -1,13 +1,9 @@
 from unittest import mock
 
 import pytest
-
-from synapse_installer.setup_service import (
-    isServiceSetup,
-    restartService,
-    setupServiceOnConnectedClient,
-    SERVICE_NAME,
-)
+from synapse_installer.setup_service import (SERVICE_NAME, isServiceSetup,
+                                             restartService,
+                                             setupServiceOnConnectedClient)
 
 
 @pytest.fixture
