@@ -4,10 +4,15 @@ icon: down-to-line
 
 # Installing Software
 
-## Imaging A Device
+## Coprocessor Installation
+
+### Imaging A Device
 
 
 
 
 
-## Manual Install
+### Manual Install
+
+## Development Computer Installation
+
