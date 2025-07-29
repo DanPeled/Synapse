@@ -18,6 +18,7 @@ export function PipelineConfigControl({
   setSetting,
   setPipelines,
   pipelines,
+  locked,
 }: {
   selectedPipeline?: PipelineProto;
   selectedPipelineType?: PipelineTypeProto;
@@ -29,6 +30,7 @@ export function PipelineConfigControl({
   ) => void;
   setPipelines: (val: Map<number, PipelineProto>) => void;
   pipelines: Map<number, PipelineProto>;
+  locked: boolean;
 }) {
   const [cameraControls, setCameraControls] = useState<
     (JSX.Element | undefined)[]
@@ -37,7 +39,7 @@ export function PipelineConfigControl({
     (JSX.Element | undefined)[]
   >([]);
 
-  useEffect(() => {
+  function generateControls() {
     if (!selectedPipelineType || !backendConnected) {
       setCameraControls([]);
       setPipelineControls([]);
@@ -85,6 +87,7 @@ export function PipelineConfigControl({
             settingValueToProto("")
           }
           defaultValue={setting.default}
+          locked={locked}
         />
       );
 
@@ -97,7 +100,15 @@ export function PipelineConfigControl({
 
     setCameraControls(cameraItems);
     setPipelineControls(pipelineItems);
-  }, [selectedPipelineType, selectedPipeline, backendConnected]);
+  }
+
+  useEffect(() => {
+    generateControls();
+  }, [selectedPipelineType, selectedPipeline, backendConnected, locked]);
+
+  useEffect(() => {
+    generateControls();
+  }, [locked]);
 
   return (
     <Card

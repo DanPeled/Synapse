@@ -17,6 +17,7 @@ interface ControlGeneratorProps {
   setValue: (val: SettingValueProto) => void;
   value: SettingValueProto;
   defaultValue: SettingValueProto | undefined;
+  locked: boolean;
 }
 
 export function toNumber(val: unknown | undefined): number | undefined {
@@ -47,9 +48,11 @@ export function protoToSettingValue(proto: SettingValueProto): unknown {
 function ResetToDefaultButton({
   defaultValue,
   setValue,
+  disabled,
 }: {
   defaultValue?: SettingValueProto;
   setValue: (val: SettingValueProto) => void;
+  disabled: boolean;
 }) {
   return defaultValue !== undefined ? (
     <Button
@@ -59,6 +62,7 @@ function ResetToDefaultButton({
       onClick={() => {
         setValue(defaultValue);
       }}
+      disabled={disabled}
     >
       <RefreshCcw />
     </Button>
@@ -104,6 +108,7 @@ export function GenerateControl({
   setValue,
   value,
   defaultValue,
+  locked,
 }: ControlGeneratorProps) {
   const settingName = toTitleCase(setting.name.replaceAll("_", " "));
   const val = protoToSettingValue(value);
@@ -115,10 +120,12 @@ export function GenerateControl({
           <ToggleButton
             value={val as boolean}
             onToggleAction={(val) => setValue(settingValueToProto(val))}
+            disabled={locked}
           />
           <ResetToDefaultButton
             defaultValue={defaultValue}
             setValue={setValue}
+            disabled={locked}
           />
         </LabeledControl>
       );
@@ -130,10 +137,12 @@ export function GenerateControl({
             pattern={setting.constraint.constraint?.string?.pattern}
             maxLength={setting.constraint.constraint?.string?.maxLength}
             onChange={(val) => setValue(settingValueToProto(val))}
+            disabled={locked}
           />
           <ResetToDefaultButton
             defaultValue={defaultValue}
             setValue={setValue}
+            disabled={locked}
           />
         </LabeledControl>
       );
@@ -147,10 +156,12 @@ export function GenerateControl({
               step={setting.constraint.constraint?.numeric?.step}
               value={toNumber(val) ?? 0}
               onChange={(val) => setValue(settingValueToProto(val))}
+              disabled={locked}
             />
             <ResetToDefaultButton
               defaultValue={defaultValue}
               setValue={setValue}
+              disabled={locked}
             />
           </LabeledControl>
         );
@@ -160,10 +171,12 @@ export function GenerateControl({
             <NumberInput
               value={val as number}
               onChange={(val) => setValue(settingValueToProto(val))}
+              disabled={locked}
             />
             <ResetToDefaultButton
               defaultValue={defaultValue}
               setValue={setValue}
+              disabled={locked}
             />
           </LabeledControl>
         );
@@ -181,10 +194,12 @@ export function GenerateControl({
             }
             value={val}
             onValueChange={(val) => setValue(settingValueToProto(val))}
+            disabled={locked}
           />
           <ResetToDefaultButton
             defaultValue={defaultValue}
             setValue={setValue}
+            disabled={locked}
           />
         </LabeledControl>
       );

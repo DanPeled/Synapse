@@ -11,6 +11,7 @@ interface NumberInputProps {
   labelGap?: string;
   className?: string;
   onChange?: (value: number) => void;
+  disabled?: boolean;
 }
 
 export function NumberInput({
@@ -22,6 +23,7 @@ export function NumberInput({
   labelGap = "0px",
   className = "",
   onChange,
+  disabled = false,
 }: NumberInputProps) {
   const [internalValue, setInternalValue] = useState<number | "">(value);
 
@@ -80,6 +82,7 @@ export function NumberInput({
         onBlur={handleInputBlur}
         className="w-20 px-2 py-1 rounded-lg font-semibold text-base text-center bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.2)] focus:outline-none focus:border-current"
         style={{ color: teamColor }}
+        disabled={disabled}
       />
     </div>
   );

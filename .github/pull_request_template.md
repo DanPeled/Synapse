@@ -11,9 +11,11 @@ Fixes #<issue_number> (if applicable)
 ## Affected Subproject(s)
 
 <!-- Check all that apply -->
+
 - [ ] `synapse_lib` (Java - robot communication)
 - [ ] `synapse_core` (Python - runtime handling)
 - [ ] `synapse_net` (Python - networking)
+- [ ] `synapse_installer` (Python - Deployment)
 - [ ] `synapse_ui` (Web UI - webserver/webapp)
 - [ ] Other (describe)
 
