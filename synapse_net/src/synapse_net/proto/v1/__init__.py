@@ -41,6 +41,7 @@ class MessageTypeProto(betterproto.Enum):
     SET_DEFAULT_PIPELINE = 10
     DELETE_PIPELINE = 11
     LOG = 12
+    SAVE = 13
 
 
 @dataclass(eq=False, repr=False)

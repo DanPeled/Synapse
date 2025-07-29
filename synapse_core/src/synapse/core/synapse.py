@@ -470,6 +470,8 @@ class Synapse:
                 cameraIndex=defaultPipelineMsg.camera_index,
                 pipelineIndex=defaultPipelineMsg.pipeline_index,
             )
+        elif msgType == MessageTypeProto.SAVE:
+            self.runtime_handler.save()
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

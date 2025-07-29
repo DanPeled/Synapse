@@ -13,6 +13,7 @@ interface SliderProps {
   labelGap?: string;
   className?: string;
   onChange?: (value: number) => void;
+  disabled?: boolean;
 }
 
 export function Slider({
@@ -24,6 +25,7 @@ export function Slider({
   labelGap = "0px",
   className = "",
   onChange,
+  disabled = false,
 }: SliderProps) {
   const [internalValue, setInternalValue] = useState<number | "">(value);
 
@@ -99,7 +101,10 @@ export function Slider({
           variant="outline"
           size="sm"
           onClick={decrement}
-          disabled={typeof internalValue === "number" && internalValue <= min}
+          disabled={
+            (typeof internalValue === "number" && internalValue <= min) ||
+            disabled
+          }
           className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center cursor-pointer hover:bg-stone-900 bg-zinc-800"
           style={{
             borderColor: "rgba(255,255,255,0.2)",
@@ -115,12 +120,21 @@ export function Slider({
           max={max}
           step={step}
           value={internalValue === "" ? min : internalValue}
+          disabled={disabled}
           onChange={handleSliderChange}
-          className="custom-range appearance-none h-1 w-full rounded-md cursor-pointer"
+          className={`custom-range appearance-none h-1 w-full rounded-md 
+    ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
           style={
             {
-              "--thumb-color": darken(10, teamColor),
-              background: `linear-gradient(to right, ${teamColor} 0%, ${teamColor} ${valuePercent}%, rgba(255,255,255,0.2) ${valuePercent}%, rgba(255,255,255,0.2) 100%)`,
+              ...(disabled
+                ? {
+                    background: "rgba(200, 200, 200, 0.3)",
+                    "--thumb-color": "#999",
+                  }
+                : {
+                    background: `linear-gradient(to right, ${teamColor} 0%, ${teamColor} ${valuePercent}%, rgba(255,255,255,0.2) ${valuePercent}%, rgba(255,255,255,0.2) 100%)`,
+                    "--thumb-color": darken(10, teamColor),
+                  }),
             } as React.CSSProperties & Record<string, string>
           }
         />
@@ -129,7 +143,10 @@ export function Slider({
           variant="outline"
           size="sm"
           onClick={increment}
-          disabled={typeof internalValue === "number" && internalValue >= max}
+          disabled={
+            (typeof internalValue === "number" && internalValue >= max) ||
+            disabled
+          }
           className="w-8 h-8 rounded-full font-bold text-lg grid place-items-center cursor-pointer hover:bg-stone-900 bg-zinc-800"
           style={{
             borderColor: "rgba(255,255,255,0.2)",
@@ -147,8 +164,10 @@ export function Slider({
           step={step}
           onChange={handleInputChange}
           onBlur={handleInputBlur}
-          className="w-15 px-2 py-1 rounded-lg font-semibold text-base text-center bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.2)] focus:outline-none focus:border-current"
-          style={{ color: teamColor }}
+          className={`w-15 px-2 py-1 rounded-lg font-semibold text-base text-center border focus:outline-none focus:border-current
+    ${"bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.2)]"}`}
+          style={!disabled ? { color: teamColor } : {}}
+          disabled={disabled}
         />
       </div>
     </div>

@@ -1168,7 +1168,6 @@ class RuntimeManager:
         return frame
 
     def toDict(self) -> Dict:
-        print(self.pipelineLoader.pipelineInstanceBindings)
         return {
             "global": {
                 "camera_configs": {

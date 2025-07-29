@@ -34,6 +34,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE = 10,
   MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11,
   MESSAGE_TYPE_PROTO_LOG = 12,
+  MESSAGE_TYPE_PROTO_SAVE = 13,
   UNRECOGNIZED = -1,
 }
 
@@ -78,6 +79,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 12:
     case "MESSAGE_TYPE_PROTO_LOG":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_LOG;
+    case 13:
+    case "MESSAGE_TYPE_PROTO_SAVE":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -113,6 +117,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_DELETE_PIPELINE";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_LOG:
       return "MESSAGE_TYPE_PROTO_LOG";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE:
+      return "MESSAGE_TYPE_PROTO_SAVE";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

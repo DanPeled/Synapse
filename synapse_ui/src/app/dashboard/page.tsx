@@ -22,6 +22,7 @@ import {
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
+import { SaveActionsDialog } from "./save_actions";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -76,6 +77,7 @@ export default function Dashboard() {
     Array.from(pipelinetypes.values()).at(0)!,
   );
   const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
+  const [locked, setLocked] = useState(false);
 
   useEffect(() => {
     let pipelineIndex =
@@ -151,6 +153,7 @@ export default function Dashboard() {
                     socket?.sendBinary(binary);
                   }
                 }}
+                locked={locked}
               />
             </Column>
 
@@ -215,7 +218,19 @@ export default function Dashboard() {
                 setSelectedCamera={setSelectedCamera}
                 selectedCamera={selectedCamera}
               />
-              <CameraStepControl />
+              <SaveActionsDialog
+                locked={locked}
+                setLocked={setLocked}
+                save={() => {
+                  const payload = MessageProto.create({
+                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE,
+                    removePipelineIndex: -1, // Forces me to put some payload
+                  });
+
+                  const binary = MessageProto.encode(payload).finish();
+                  socket?.sendBinary(binary);
+                }}
+              />
               <ResultsView />
             </Column>
           </Row>
