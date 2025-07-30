@@ -35,3 +35,8 @@
   * [Getting Target Data](robot-interfacing/synapse-bridge/getting-target-data.md)
   * [Runtime Camera Settings](robot-interfacing/synapse-bridge/runtime-camera-settings.md)
   * [Custom Pipeline Data](robot-interfacing/synapse-bridge/custom-pipeline-data.md)
+
+## Additional Resources
+
+* [Troubleshooting](additional-resources/troubleshooting.md)
+* [NetworkTables API](additional-resources/networktables-api.md)
