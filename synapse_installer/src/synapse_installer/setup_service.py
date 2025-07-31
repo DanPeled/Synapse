@@ -1,7 +1,6 @@
-import tempfile
 from typing import Tuple
 
-from paramiko import SFTPClient, SSHClient
+from paramiko import SSHClient
 
 SERVICE_NAME: str = "synapseruntime"
 
@@ -33,9 +32,7 @@ def setupServiceOnConnectedClient(
     client: SSHClient,
     username: str,
 ) -> None:
-    import os
-
-    sftp: SFTPClient = client.open_sftp()
+    SERVICE_NAME = "synapse-runtime"  # or whatever your service name is
 
     find_python_cmd = r"""
     LOW="3.9.0"
@@ -72,21 +69,21 @@ def setupServiceOnConnectedClient(
         print("Error finding python:", err)
 
     if not python_path:
-        # Fallback to /usr/bin/python3
         python_path = "/usr/bin/python3"
 
-    remote_main: str = f"/home/{username}/main.py"
-    sftp.chmod(remote_main, 0o755)
+    service_path = f"/etc/systemd/system/{SERVICE_NAME}.service"
+    working_dir = "~/Synapse"
+    main_path = f"{working_dir}/main.py"
 
-    service_content: str = f"""[Unit]
+    service_content = f"""[Unit]
 Description=Start Synapse Runtime 
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart={python_path} /home/{username}/main.py
-WorkingDirectory=/home/{username}
+ExecStart={python_path} {main_path}
+WorkingDirectory={working_dir}
 Restart=always
 RestartSec=5
 
@@ -94,31 +91,28 @@ RestartSec=5
 WantedBy=multi-user.target
 """
 
-    remote_service_tmp: str = f"/home/{username}/{SERVICE_NAME}.service"
-    with tempfile.NamedTemporaryFile("w", delete=False) as temp_file:
-        temp_file.write(service_content)
-        temp_file_path = temp_file.name
+    heredoc = f"sudo tee {service_path} > /dev/null << 'EOF'\n{service_content}\nEOF\n"
 
-    sftp.put(temp_file_path, remote_service_tmp)
-
-    def run_sudo(cmd: str) -> Tuple[str, str]:
-        stdin, stdout, stderr = client.exec_command(f"sudo -S bash -c '{cmd}'")
-        out: str = stdout.read().decode()
-        err: str = stderr.read().decode()
-        print(out)
-        if err:
+    def run_command(cmd: str) -> Tuple[str, str]:
+        stdin, stdout, stderr = client.exec_command(cmd)
+        out = stdout.read().decode()
+        err = stderr.read().decode()
+        if err and "Created symlink" not in err:
             print("Error:", err)
         return out, err
 
-    print(
-        "Moving synapse runtime service file to system directory and enabling service..."
-    )
-    run_sudo(f"mv {remote_service_tmp} /etc/systemd/system/{SERVICE_NAME}.service")
-    run_sudo("systemctl daemon-reexec")
-    run_sudo("systemctl daemon-reload")
-    run_sudo(f"systemctl enable {SERVICE_NAME}")
-    run_sudo(f"systemctl start {SERVICE_NAME}")
+    # Make sure main.py is executable
+    run_command(f"chmod +x {main_path}")
 
-    sftp.close()
-    os.remove(temp_file_path)
+    # Create the service file remotely
+    print("Creating systemd service file remotely...")
+    run_command(heredoc)
+
+    # Enable and start the service
+    print("Enabling and starting the service...")
+    run_command("sudo systemctl daemon-reexec")
+    run_command("sudo systemctl daemon-reload")
+    run_command(f"sudo systemctl enable {SERVICE_NAME}")
+    run_command(f"sudo systemctl start {SERVICE_NAME}")
+
     print("Synapse Runtime Service installed and started.")

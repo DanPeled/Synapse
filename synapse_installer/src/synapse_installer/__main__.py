@@ -16,6 +16,10 @@ def main():
         from .create import createProject
 
         createProject()
+    elif cmd == "sync":
+        from .sync import sync
+
+        sync(argv[1::])
     else:
         print(f"Unknown command: `{cmd}`!\nvalid commands: `create` or `deploy`")
 
