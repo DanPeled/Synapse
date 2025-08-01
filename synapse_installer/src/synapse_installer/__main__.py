@@ -20,6 +20,12 @@ def main():
         from .sync import sync
 
         sync(argv[1::])
+    elif cmd == "install":
+        from .deploy import setupAndRunDeploy
+        from .sync import sync
+
+        sync(argv[1::])
+        setupAndRunDeploy(argv[1::])
     else:
         print(f"Unknown command: `{cmd}`!\nvalid commands: `create` or `deploy`")
 
