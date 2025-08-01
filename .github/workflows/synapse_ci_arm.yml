@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies for QEMU and image mounting
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu qemu-user-static binfmt-support qemu-utils
+          sudo apt-get install -y qemu-user-static binfmt-support qemu-utils
 
       - name: Download ARM disk image
         run: |
