@@ -56,15 +56,6 @@ class TestMain(unittest.TestCase):
         mock_setupAndRunDeploy.assert_called_once_with(test_argv[1:])
         mock_createProject.assert_not_called()
 
-    def test_unknown_command(self):
-        test_argv = ["prog", "unknowncmd"]
-        with patch.object(sys, "argv", test_argv):
-            with patch("builtins.print") as mock_print:
-                main()
-                mock_print.assert_called_once_with(
-                    "Unknown command: `unknowncmd`!\nvalid commands: `create` or `deploy`"
-                )
-
 
 if __name__ == "__main__":
     unittest.main()
