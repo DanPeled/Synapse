@@ -72,7 +72,9 @@ def setupServiceOnConnectedClient(
         python_path = "/usr/bin/python3"
 
     service_path = f"/etc/systemd/system/{SERVICE_NAME}.service"
-    working_dir = "~/Synapse"
+    stdin, stdout, stderr = client.exec_command("echo $HOME")
+    home_dir = stdout.read().decode().strip()
+    working_dir = f"{home_dir}/Synapse"
     main_path = f"{working_dir}/main.py"
 
     service_content = f"""[Unit]
