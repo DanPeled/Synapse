@@ -32,7 +32,7 @@ StartLimitInterval=0
 [Service]
 User=$user
 Type=simple
-WorkingDirectory=/home/$user/Synapse/
+WorkingDirectory=~/Synapse/
 ExecStart=/usr/bin/python3 main.py
 Restart=always
 RestartSec=1

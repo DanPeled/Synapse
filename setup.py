@@ -55,6 +55,7 @@ setup(
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),
         wpilibDep("robotpy_cscore"),
+        wpilibDep("robotpy_wpiutil"),
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
         visionProcessingDep("opencv_python"),

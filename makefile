@@ -54,7 +54,7 @@ format:
 
 test:
 	@echo Reinstalling Synapse Runtime...
-	@pip install . > $(NULL)
+	@make install
 	@echo Starting Tests...
 	@python3 -m pytest .
 

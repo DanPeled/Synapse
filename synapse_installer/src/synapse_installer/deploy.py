@@ -2,6 +2,7 @@ import ipaddress
 import os
 import pathlib as pthl
 import sys
+import traceback
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
@@ -113,8 +114,7 @@ def _connectAndDeploy(
                 remote_zip = f"/tmp/{zip_path.name}"
                 print(f"Uploading {zip_path.name} to {remote_zip}")
                 scp.put(str(zip_path), remote_zip)
-
-                unzip_cmd = f"unzip -o {remote_zip} -d ~"
+                unzip_cmd = f"mkdir ~/Synapse && unzip -o {remote_zip} -d ~/Synapse"
                 stdin, stdout, stderr = client.exec_command(unzip_cmd)
                 exit_status = stdout.channel.recv_exit_status()
                 if exit_status == 0:
@@ -133,8 +133,11 @@ def _connectAndDeploy(
         client.close()
         print(f"Deployment completed on {hostname}")
 
-    except Exception as e:
-        print(f"Deployment to {hostname}@{ip} failed: {e}")
+    except Exception as error:
+        errString = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        print(f"Deployment to {hostname}@{ip} failed: {errString}")
 
 
 def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
