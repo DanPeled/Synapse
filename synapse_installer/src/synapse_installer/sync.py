@@ -1,20 +1,21 @@
 import os
 import sys
 import traceback
+from importlib.metadata import distribution
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import paramiko
-import pkg_resources
 import synapse.log as log
 import yaml
-from scp import Optional
 from synapse_installer.deploy import fprint
 
 from .deploy import setupConfigFile
 
 
-def syncRequirements(hostname: str, password: str, ip: str, requirements) -> None:
+def syncRequirements(
+    hostname: str, password: str, ip: str, requirements: List[str]
+) -> None:
     try:
         print(f"Connecting to {hostname}@{ip}...")
 
@@ -29,22 +30,39 @@ def syncRequirements(hostname: str, password: str, ip: str, requirements) -> Non
             auth_timeout=5,
         )
         transport = client.get_transport()
-
         assert transport is not None
 
-        for requirement, i in enumerate(requirements):
-            fprint(
-                f"Installing {str(requirement)}... {log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
-            )
-            *_, stderr = client.exec_command(
-                f"python3 -m pip install {str(requirement)} --extra-index-url=https://wpilib.jfrog.io/artifactory/api/pypi/wpilib-python-release-2025/simple/ --break-system-packages"
-            )
+        # Get installed packages on remote device
+        stdin, stdout, stderr = client.exec_command("python3 -m pip freeze")
+        installed_packages = {
+            line.strip().split("==")[0].lower()
+            for line in stdout.read().decode().splitlines()
+            if "==" in line
+        }
+
+        for i, requirement in enumerate(requirements, start=1):
+            pkg_name = str(requirement).split()[0].lower()
+            if pkg_name in installed_packages:
+                fprint(
+                    f"✓ {pkg_name} already installed "
+                    f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
+                )
+                continue
 
             fprint(
-                log.MarkupColors.fail(
-                    f"Install for {str(requirement)} failed!\n{stderr.read().decode()}"
-                )
+                f"Installing {pkg_name}... "
+                f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
             )
+
+            stdin, stdout, stderr = client.exec_command(
+                f"python3 -m pip install {str(requirement)} "
+                f"--extra-index-url=https://wpilib.jfrog.io/artifactory/api/pypi/wpilib-python-release-2025/simple/ "
+                f"--break-system-packages --upgrade-strategy only-if-needed"
+            )
+
+            err = stderr.read().decode()
+            if err.strip():
+                fprint(log.MarkupColors.fail(f"Install for {pkg_name} failed!\n{err}"))
 
         client.close()
         print(f"Sync completed on {hostname}")
@@ -58,6 +76,7 @@ def sync(argv: Optional[List[str]]) -> None:
     assert (cwd / ".synapseproject").exists(), (
         "No .synpaseproject file found, are you sure you're inside of a Synapse project?"
     )
+
     data = {}
     deployConfigPath = cwd / ".synapseproject"
     with open(deployConfigPath, "r") as f:
@@ -79,8 +98,8 @@ def sync(argv: Optional[List[str]]) -> None:
     for i in range(1, argc):
         currHostname = argv[i]
         if currHostname in data["deploy"]:
-            dist = pkg_resources.get_distribution("synapsefrc")
-            requirements = dist.requires()
+            dist = distribution("synapsefrc")
+            requirements = dist.requires or []
             deviceData = data["deploy"][currHostname]
             syncRequirements(
                 deviceData["hostname"],
