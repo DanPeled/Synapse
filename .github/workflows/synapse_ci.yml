@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -30,20 +30,46 @@ jobs:
         with:
           python-version: "3.10.7"
 
-      - name: Install dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Install Node.js dependencies
+        working-directory: synapse_ui
+        run: npm install
+
+      - name: Install Python dependencies
         run: |
-          pip install .
+          make install
           pip install ".[dev]"
 
       - name: Run build check
+        run: make build
+
+      - name: Check wheel contents
         run: |
-          python -m build
+          pip install wheel
+          python -c "
+          import sys, glob, zipfile, re
+          wheel_files = glob.glob('dist/*.whl')
+          if not wheel_files:
+              print('No wheel file found', file=sys.stderr)
+              sys.exit(1)
+          wheel_file = wheel_files[0]
+          print(f'Wheel file: {wheel_file}')
+          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          with zipfile.ZipFile(wheel_file) as zf:
+              for info in zf.infolist():
+                  if pattern.search(info.filename):
+                      print(info.filename)
+          "
 
   lint:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -51,23 +77,29 @@ jobs:
         with:
           python-version: "3.10.7"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Install Node.js dependencies
+        working-directory: synapse_ui
+        run: npm install
+
       - name: Install Ruff and isort
-        run: |
-          pip install ruff isort
+        run: pip install ruff isort
 
       - name: Run Ruff linting
-        run: |
-          ruff check .
+        run: ruff check .
 
       - name: Run isort check
-        run: |
-          isort --check-only --diff .
+        run: isort --check-only --diff .
 
   type-check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -75,24 +107,31 @@ jobs:
         with:
           python-version: "3.10.7"
 
-      - name: Install dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Install Node.js dependencies
+        working-directory: synapse_ui
+        run: npm install
+
+      - name: Install Python dependencies
         run: |
-          pip install .
+          make install
           pip install ".[dev]"
 
       - name: Install Pyright
-        run: |
-          pip install pyright
+        run: pip install pyright
 
       - name: Run Pyright type checks
-        run: |
-          pyright
+        run: pyright
 
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -100,15 +139,22 @@ jobs:
         with:
           python-version: "3.10.7"
 
-      - name: Install dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Install Node.js dependencies
+        working-directory: synapse_ui
+        run: npm install
+
+      - name: Install Python dependencies
         run: |
-          pip install .
+          make install
           pip install ".[dev]"
 
       - name: Install PyTest
-        run: |
-          pip install pytest
+        run: pip install pytest
 
       - name: Run Tests
-        run: |
-          pytest .
+        run: make test

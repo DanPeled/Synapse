@@ -618,7 +618,7 @@ class CameraHandler:
             camera.setVideoMode(
                 width=int(settings["width"]),
                 height=int(settings["height"]),
-                fps=int(camera.getMaxFPS()),
+                fps=1000,
             )
 
         return updated_settings
@@ -1024,6 +1024,7 @@ class RuntimeManager:
                     time.sleep(remaining)
                 loop_end = Timer.getFPGATimestamp()
                 total_loop_time = loop_end - loop_start
+
                 fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
 
                 # Overlay FPS on the frame

@@ -14,7 +14,7 @@ import { ResultsView } from "./results_view";
 import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
 import { Activity, Camera } from "lucide-react";
-import { CameraStepControl } from "./camera_step_control";
+// import { CameraStepControl } from "./camera_step_control";
 import { CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {

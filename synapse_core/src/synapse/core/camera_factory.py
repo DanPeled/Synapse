@@ -130,7 +130,11 @@ class SynapseCamera(ABC):
 
     def setIndex(self, cameraIndex: CameraID) -> None:
         self.cameraIndex: CameraID = cameraIndex
-        ip = socket.gethostbyname(socket.gethostname())
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
         self.stream = f"http://{ip}:{1181 + cameraIndex}/?action=stream/stream.mjpeg"
 
     @abstractmethod
@@ -320,6 +324,7 @@ class CsCoreCamera(SynapseCamera):
             inst.camera = UsbCamera(f"USB Camera {index}", path)
 
         inst.sink = CameraServer.getVideo(inst.camera)
+        inst.sink.getProperty("auto_exposure").set(0)
 
         # Cache properties and metadata
         props = inst.camera.enumerateProperties()
@@ -336,6 +341,7 @@ class CsCoreCamera(SynapseCamera):
         # Cache video modes and valid resolutions
         inst._videoModes = inst.camera.enumerateVideoModes()
         inst._validVideoModes = [mode for mode in inst._videoModes]
+        inst.setVideoMode(1000, 1920, 1080)
 
         # Initialize frame buffer to current resolution
         mode = inst.camera.getVideoMode()
@@ -380,7 +386,10 @@ class CsCoreCamera(SynapseCamera):
 
     def _waitForNextFrame(self):
         if self.isConnected():
-            time.sleep(1.0 / self.getMaxFPS() / 2.0)  # Half the expected frame interval
+            if self.camera.getVideoMode().fps > 0:
+                time.sleep(
+                    1.0 / self.camera.getActualFPS() / 2.0
+                )  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
         try:
@@ -411,7 +420,7 @@ class CsCoreCamera(SynapseCamera):
             return self._properties[prop].get()
         return None
 
-    def setVideoMode(self, fps: int, width: int, height: int) -> None:
+    def setVideoMode(self, fps: int, width: int, height: int, _fallback=False) -> None:
         pixelFormat = VideoMode.PixelFormat.kMJPEG
 
         for mode in self._validVideoModes:
@@ -428,10 +437,29 @@ class CsCoreCamera(SynapseCamera):
                 )
                 self.frameBuffer = np.zeros((height, width, 3), dtype=np.uint8)
                 return
-        else:
-            warn(
-                f"Invalid video mode (width={width}, height={height}). Using default settings."
+
+        if not _fallback:
+            # Find the largest available resolution and try again
+            largest_mode = max(
+                (m for m in self._validVideoModes if m.pixelFormat == pixelFormat),
+                key=lambda m: m.width * m.height,
+                default=None,
             )
+
+            if largest_mode:
+                warn(
+                    f"Invalid video mode (width={width}, height={height}). "
+                    f"Falling back to largest available mode ({largest_mode.width}x{largest_mode.height})."
+                )
+                self.setVideoMode(
+                    fps, largest_mode.width, largest_mode.height, _fallback=True
+                )
+                return
+
+        warn(
+            f"No valid video modes found for pixelFormat={pixelFormat}. "
+            f"Camera default settings will be used."
+        )
 
     def getResolution(self) -> Tuple[int, int]:
         videoMode = self.camera.getVideoMode()

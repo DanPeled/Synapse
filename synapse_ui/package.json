@@ -6,9 +6,10 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0",
-    "build": "prettier 'src/**/*.{js,ts,tsx}' --write && next build",
+    "build": "next build && python3 move_out_to_subdir.py",
     "start": "next start",
     "lint": "next lint",
+    "format": "prettier 'src/**/*.{js,ts,tsx}' --write",
     "test": "jest --passWithNoTests"
   },
   "dependencies": {

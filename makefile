@@ -27,6 +27,10 @@ clean:
 
 # Install Python package locally
 install:
+	@echo Building UI...
+	@$(CD) synapse_ui && npm run build
+	@$(CD) ..
+	@echo Installing Synapse Package...
 	pip install .
 
 # Generate protobuf code with buf
@@ -47,7 +51,7 @@ format:
 	@echo Isort format...
 	@python3 -m isort . >$(NULL) 2>&1 || echo isort failed
 	@echo Prettier format...
-	@$(CD) synapse_ui && npx prettier . --write >$(NULL) 2>&1 || echo prettier failed
+	@$(CD) synapse_ui && npm run format
 	@echo ProtoBuf format...
 	@$(CD) synapse_net/proto && \
 		buf format -w
@@ -60,5 +64,5 @@ test:
 
 # Build Python and UI
 build:
+	make install
 	python3 -m build .
-	@$(CD) synapse_ui && npm run build

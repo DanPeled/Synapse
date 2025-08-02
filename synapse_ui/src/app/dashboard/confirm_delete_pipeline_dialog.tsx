@@ -44,7 +44,6 @@ export function ConfirmDeletePipelineDialog({
             className="rounded-md bg-zinc-800 hover:bg-zinc-700 text-lg cursor-pointer"
             style={{ color: teamColor }}
             onClick={() => {
-              console.log(pipelineToBeDeleted);
               if (pipelineToBeDeleted) {
                 const payload = MessageProto.create({
                   type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
