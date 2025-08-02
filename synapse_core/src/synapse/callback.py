@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import traceback
 from typing import Callable, Generic, List, ParamSpec
 
