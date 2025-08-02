@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0",
-    "build": "prettier 'src/**/*.{js,ts,tsx}' --write && next build",
+    "build": "prettier 'src/**/*.{js,ts,tsx}' --write && next build && python3 move_out_to_subdir.py",
     "start": "next start",
     "lint": "next lint",
     "test": "jest --passWithNoTests"

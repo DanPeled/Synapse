@@ -6,6 +6,7 @@ modules = {
     "synapse_net": "synapse_net/src",
     "synapse_installer": "synapse_installer/src",
     "": "synapse_core/src",
+    "synapse_ui": "synapse_ui/out",
 }
 
 

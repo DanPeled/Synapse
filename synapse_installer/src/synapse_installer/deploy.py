@@ -15,8 +15,12 @@ from scp import SCPClient
 from synapse.bcolors import MarkupColors
 
 from .lockfile import createDirectoryZIP, createPackageZIP
-from .setup_service import (SERVICE_NAME, isServiceSetup, restartService,
-                            setupServiceOnConnectedClient)
+from .setup_service import (
+    SERVICE_NAME,
+    isServiceSetup,
+    restartService,
+    setupServiceOnConnectedClient,
+)
 
 BUILD_DIR = "build"
 
@@ -114,7 +118,7 @@ def _connectAndDeploy(
                 remote_zip = f"/tmp/{zip_path.name}"
                 print(f"Uploading {zip_path.name} to {remote_zip}")
                 scp.put(str(zip_path), remote_zip)
-                unzip_cmd = f"mkdir ~/Synapse && unzip -o {remote_zip} -d ~/Synapse"
+                unzip_cmd = f"mkdir -p ~/Synapse && unzip -o {remote_zip} -d ~/Synapse"
                 stdin, stdout, stderr = client.exec_command(unzip_cmd)
                 exit_status = stdout.channel.recv_exit_status()
                 if exit_status == 0:

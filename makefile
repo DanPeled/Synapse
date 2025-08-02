@@ -27,6 +27,10 @@ clean:
 
 # Install Python package locally
 install:
+	@echo Building UI...
+	@$(CD) synapse_ui && npm run build
+	@$(CD) ..
+	@echo Installing Synapse Package...
 	pip install .
 
 # Generate protobuf code with buf

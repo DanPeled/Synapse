@@ -1,4 +1,6 @@
 import asyncio
+import traceback
+import importlib
 import os
 import threading
 import time
@@ -6,15 +8,18 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
-                                  MessageTypeProto, PipelineProto,
-                                  PipelineTypeProto,
-                                  SetDefaultPipelineMessageProto,
-                                  SetPipelineIndexMessageProto,
-                                  SetPipelineNameMessageProto,
-                                  SetPipleineSettingMessageProto)
-from synapse_net.socketServer import (SocketEvent, WebSocketServer,
-                                      createMessage)
+from synapse_net.proto.v1 import (
+    DeviceInfoProto,
+    MessageProto,
+    MessageTypeProto,
+    PipelineProto,
+    PipelineTypeProto,
+    SetDefaultPipelineMessageProto,
+    SetPipelineIndexMessageProto,
+    SetPipelineNameMessageProto,
+    SetPipleineSettingMessageProto,
+)
+from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
 
 from ..bcolors import MarkupColors
 from ..hardware.metrics import Platform
@@ -26,8 +31,49 @@ from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import (protoToSettingValue, settingsToProto,
-                           settingValueToProto)
+from .settings_api import protoToSettingValue, settingsToProto, settingValueToProto
+import importlib.util
+import subprocess
+
+
+class UIHandle:
+    @staticmethod
+    def isPIDRunning(pid):
+        # Example implementation; replace with your actual method
+        import os
+
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        else:
+            return True
+
+    @staticmethod
+    def startUI():
+        spec = importlib.util.find_spec("synapse_ui")
+        if spec and spec.origin:
+            file_path = Path("./.uistart")
+            if not file_path.exists():
+                file_path.touch()
+
+            with open(file_path, "r+") as f:
+                content = f.read().strip()
+                pid = int(content) if content.isdigit() else None
+
+                if pid and UIHandle.isPIDRunning(pid):
+                    os.kill(pid, 1)
+                f.seek(0)
+                f.truncate()
+                print(f"Starting serve in directory: {Path(spec.origin).parent}")
+                proc = subprocess.Popen(
+                    ["serve", "."],
+                    cwd=Path(spec.origin).parent,
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                f.write(str(proc.pid))
 
 
 class Synapse:
@@ -61,6 +107,8 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
+        UIHandle.startUI()
+
         self.isRunning = True
         Synapse.kInstance = self
 
@@ -121,9 +169,12 @@ class Synapse:
                 return False
 
             # Setup global settings
-        except Exception as e:
-            log(f"Something went wrong while reading settings config file. {repr(e)}")
-            raise e
+        except Exception as error:
+            errString = "".join(
+                traceback.format_exception(type(error), error, error.__traceback__)
+            )
+            log(f"Something went wrong while reading settings config file. {errString}")
+            raise error
         return True
 
     def __init_networktables(self, settings: NetworkConfig) -> bool:
@@ -189,7 +240,12 @@ class Synapse:
             import synapse.hardware.metrics as metrics
 
             deviceInfo: DeviceInfoProto = DeviceInfoProto()
-            deviceInfo.ip = socket.gethostbyname(socket.gethostname())
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+            s.connect(("8.8.8.8", 80))
+            deviceInfo.ip = s.getsockname()[0]
+            s.close()
+
             deviceInfo.platform = (
                 metrics.Platform.getCurrentPlatform().getOSType().value
             )

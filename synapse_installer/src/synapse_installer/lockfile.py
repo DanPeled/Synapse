@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Final, List, Optional
 
 from tqdm import tqdm
 
-PACKAGE_NAME: Final[str] = "Synapse"
+PACKAGE_NAME: Final[str] = "synapsefrc"
 OUTPUT_ZIP: Final[str] = "synapse.zip"
 LOCK_FILE: Final[str] = ".synapse.lock"
 

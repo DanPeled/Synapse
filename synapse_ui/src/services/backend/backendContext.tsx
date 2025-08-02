@@ -154,10 +154,9 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         switch (messageObj.type) {
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO: {
             const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
-            setters.setDeviceinfo({
-              ...stateRef.current.deviceinfo,
-              ...deviceInfo,
-            });
+
+            stateRef.current.deviceinfo = deviceInfo;
+            setters.setDeviceinfo(deviceInfo);
 
             break;
           }
@@ -239,7 +238,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               logs.sort((a, b) => a.timestamp - b.timestamp);
               setters.setLogs(logs);
             }
-            console.log(logs);
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {
