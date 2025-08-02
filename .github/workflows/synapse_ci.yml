@@ -118,4 +118,4 @@ jobs:
 
       - name: Run Tests
         run: |
-          pytest .
+          make test
