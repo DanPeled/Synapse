@@ -50,9 +50,20 @@ jobs:
       - name: Check wheel contents
         run: |
           pip install wheel
-          WHEEL_FILE=$(ls dist/*.whl | head -n 1)
-          echo "Wheel file: $WHEEL_FILE"
-          unzip -l "$WHEEL_FILE" | grep -E 'synapse/|synapse_net/|synapse_installer/|synapse_ui/'
+          python -c "
+          import sys, glob, zipfile, re
+          wheel_files = glob.glob('dist/*.whl')
+          if not wheel_files:
+              print('No wheel file found', file=sys.stderr)
+              sys.exit(1)
+          wheel_file = wheel_files[0]
+          print(f'Wheel file: {wheel_file}')
+          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          with zipfile.ZipFile(wheel_file) as zf:
+              for info in zf.infolist():
+                  if pattern.search(info.filename):
+                      print(info.filename)
+          "
 
   lint:
     runs-on: ubuntu-latest
