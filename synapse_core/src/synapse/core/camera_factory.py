@@ -385,7 +385,7 @@ class CsCoreCamera(SynapseCamera):
 
     def _waitForNextFrame(self):
         if self.isConnected():
-            if self.camera.getActualFPS() > 0:
+            if self.camera.getVideoMode().fps > 0:
                 time.sleep(
                     1.0 / self.camera.getActualFPS() / 2.0
                 )  # Half the expected frame interval
