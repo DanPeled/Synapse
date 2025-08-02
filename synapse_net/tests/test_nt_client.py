@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from unittest.mock import MagicMock, patch
 
 from synapse_net.nt_client import NtClient, teamNumberToIP

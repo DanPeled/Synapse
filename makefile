@@ -46,6 +46,8 @@ generate_buf:
 		make install
 
 format:
+	@pip install reuse
+	@python3 -m reuse annotate --license GPL-3.0-or-later --copyright "Dan Peled" **/*.py
 	@echo Ruff format...
 	@python3 -m ruff format . >$(NULL) 2>&1 || echo ruff format failed
 	@echo Isort format...

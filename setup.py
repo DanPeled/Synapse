@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from setuptools import find_packages, setup
 
 WPILIB_VERSION = "2025.2.1.1"
@@ -80,6 +84,7 @@ setup(
             "isort",
             "pyright",
             "build",
+            "reuse",
         ]
     },
     include_package_data=True,
