@@ -15,12 +15,8 @@ from scp import SCPClient
 from synapse.bcolors import MarkupColors
 
 from .lockfile import createDirectoryZIP, createPackageZIP
-from .setup_service import (
-    SERVICE_NAME,
-    isServiceSetup,
-    restartService,
-    setupServiceOnConnectedClient,
-)
+from .setup_service import (SERVICE_NAME, isServiceSetup, restartService,
+                            setupServiceOnConnectedClient)
 
 BUILD_DIR = "build"
 

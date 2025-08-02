@@ -1,25 +1,24 @@
 import asyncio
-import traceback
 import importlib
+import importlib.util
 import os
+import subprocess
 import threading
 import time
+import traceback
 from pathlib import Path
 from typing import Any, List, Optional
 
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import (
-    DeviceInfoProto,
-    MessageProto,
-    MessageTypeProto,
-    PipelineProto,
-    PipelineTypeProto,
-    SetDefaultPipelineMessageProto,
-    SetPipelineIndexMessageProto,
-    SetPipelineNameMessageProto,
-    SetPipleineSettingMessageProto,
-)
-from synapse_net.socketServer import SocketEvent, WebSocketServer, createMessage
+from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
+                                  MessageTypeProto, PipelineProto,
+                                  PipelineTypeProto,
+                                  SetDefaultPipelineMessageProto,
+                                  SetPipelineIndexMessageProto,
+                                  SetPipelineNameMessageProto,
+                                  SetPipleineSettingMessageProto)
+from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+                                      createMessage)
 
 from ..bcolors import MarkupColors
 from ..hardware.metrics import Platform
@@ -31,9 +30,8 @@ from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import protoToSettingValue, settingsToProto, settingValueToProto
-import importlib.util
-import subprocess
+from .settings_api import (protoToSettingValue, settingsToProto,
+                           settingValueToProto)
 
 
 class UIHandle:
