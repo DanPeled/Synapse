@@ -32,12 +32,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install .
+          make install
           pip install ".[dev]"
 
       - name: Run build check
         run: |
-          python -m build
+          make build
+
+      - name: Check wheel contents
+        run: |
+          pip install wheel
+          WHEEL_FILE=$(ls dist/*.whl | head -n 1)
+          echo "Wheel file: $WHEEL_FILE"
+          unzip -l "$WHEEL_FILE" | grep -E 'synapse/|synapse_net/|synapse_installer/|synapse_ui/'
 
   lint:
     runs-on: ubuntu-latest
@@ -77,7 +84,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install .
+          make install
           pip install ".[dev]"
 
       - name: Install Pyright
@@ -102,7 +109,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install .
+          make install
           pip install ".[dev]"
 
       - name: Install PyTest

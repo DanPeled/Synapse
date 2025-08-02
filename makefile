@@ -64,5 +64,5 @@ test:
 
 # Build Python and UI
 build:
+	make install
 	python3 -m build .
-	@$(CD) synapse_ui && npm run build
