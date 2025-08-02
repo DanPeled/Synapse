@@ -19,11 +19,17 @@ for item in os.listdir(source):
 
     shutil.move(src_path, dst_path)
     moved_items.append(item)
-print("✅ Moved files to 'out/synapse_ui/':")
+try:
+    print("✅ Moved files to 'out/synapse_ui/'")
+except UnicodeEncodeError:
+    print("[OK] Moved files to 'out/synapse_ui/'")
 
 # Create __init__.py
 init_path = os.path.join(destination, "__init__.py")
 with open(init_path, "w"):
     pass
 
-print("✅ Created __init__.py in 'out/synapse_ui/'")
+try:
+    print("✅ Created __init__.py in 'out/synapse_ui/'")
+except UnicodeEncodeError:
+    print("[OK] Created __init__.py in 'out/synapse_ui/'")
