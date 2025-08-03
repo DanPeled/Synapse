@@ -12,9 +12,8 @@ from typing import List, Optional
 import paramiko
 import synapse.log as log
 import yaml
-from synapse_installer.deploy import fprint
 
-from .deploy import setupConfigFile
+from .deploy import fprint, setupConfigFile
 
 
 def syncRequirements(
