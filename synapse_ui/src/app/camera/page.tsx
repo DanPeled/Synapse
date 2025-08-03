@@ -47,7 +47,7 @@ export default function CameraConfigPage() {
               <Dropdown
                 options={
                   (cameras
-                    ? cameras.values().map((cam: CameraProto) => ({
+                    ? Array.from(cameras.values()).map((cam: CameraProto) => ({
                         label: `${cam?.name}`,
                         value: cam,
                       }))
