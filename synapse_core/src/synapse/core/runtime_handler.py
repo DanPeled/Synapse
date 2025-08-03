@@ -31,9 +31,9 @@ from ..callback import Callback
 from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
                       PipelineTypeName)
 from ..util import resolveGenericArgument
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (CSCORE_TO_CV_PROPS, CalibrationData, CameraConfig,
+                             CameraFactory, CameraSettingsKeys, SynapseCamera,
+                             getCameraTable, getCameraTableName)
 from .config import Config, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
@@ -416,9 +416,13 @@ class CameraHandler:
                     id=f"{info.name}_{info.productId}",
                     transform=Transform3d(),
                     defaultPipeline=0,
-                    matrix=np.eye(3).tolist(),
-                    distCoeff=[0] * 5,
-                    measuredRes=(1920, 1080),
+                    calibration={
+                        "1920x1080": CalibrationData(
+                            matrix=np.eye(3).tolist(),
+                            distCoeff=np.zeros(5).tolist(),
+                            measuredRes=(1920, 1080),
+                        )
+                    },
                     streamRes=self.DEFAULT_STREAM_SIZE,
                 )
                 GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)

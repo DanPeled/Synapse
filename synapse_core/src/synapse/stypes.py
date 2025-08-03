@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import List, Union
+from typing import List, Tuple, Union
 
 from cv2 import Mat
 from numpy import ndarray
@@ -24,3 +24,5 @@ PipelineID = int
 PipelineName = str
 
 PipelineTypeName = str
+
+Resolution = Tuple[int, int]

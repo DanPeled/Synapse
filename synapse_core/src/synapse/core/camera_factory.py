@@ -19,11 +19,12 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import warn
-from synapse.stypes import CameraID, Frame, PipelineID
-from synapse.util import transform3dToList
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import CameraProto
 from wpimath import geometry
+
+from ..stypes import CameraID, Frame, PipelineID, Resolution
+from ..util import listToTransform3d, transform3dToList
 
 PropertMetaDict = Dict[str, Dict[str, Union[int, float]]]
 
@@ -66,15 +67,35 @@ def getCameraTableName(cameraIndex: CameraID) -> str:
 
 
 @dataclass
+class CalibrationData:
+    matrix: List[List[float]]
+    distCoeff: List[float]
+    measuredRes: Resolution
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            CameraConfigKey.kMatrix.value: self.matrix,
+            CameraConfigKey.kDistCoeff.value: self.distCoeff,
+            CameraConfigKey.kMeasuredRes.value: self.measuredRes,
+        }
+
+    @staticmethod
+    def fromDict(data: Dict[str, Any]) -> "CalibrationData":
+        return CalibrationData(
+            matrix=data[CameraConfigKey.kMatrix.value],
+            distCoeff=data[CameraConfigKey.kDistCoeff.value],
+            measuredRes=data[CameraConfigKey.kMeasuredRes.value],
+        )
+
+
+@dataclass
 class CameraConfig:
     name: str
     id: str
     transform: geometry.Transform3d
+    calibration: Dict[str, CalibrationData]
     defaultPipeline: int
-    matrix: List[List[float]]
-    distCoeff: List[float]
-    measuredRes: Tuple[int, int]
-    streamRes: Tuple[int, int]
+    streamRes: Resolution
 
     def toDict(self) -> Dict[str, Any]:
         return {
@@ -82,11 +103,23 @@ class CameraConfig:
             CameraConfigKey.kPath.value: self.id,
             CameraConfigKey.kTransform.value: transform3dToList(self.transform),
             CameraConfigKey.kDefaultPipeline.value: self.defaultPipeline,
-            CameraConfigKey.kMatrix.value: self.matrix,
-            CameraConfigKey.kDistCoeff.value: list(self.distCoeff),
-            CameraConfigKey.kMeasuredRes.value: list(self.measuredRes),
             CameraConfigKey.kStreamRes.value: list(self.streamRes),
+            CameraConfigKey.kCalibration.value: self.calibration,
         }
+
+    @staticmethod
+    def fromDict(data: Dict[str, Any]) -> "CameraConfig":
+        return CameraConfig(
+            name=data[CameraConfigKey.kName.value],
+            id=data[CameraConfigKey.kPath.value],
+            streamRes=data[CameraConfigKey.kStreamRes.value],
+            transform=listToTransform3d(data[CameraConfigKey.kTransform.value]),
+            defaultPipeline=data[CameraConfigKey.kDefaultPipeline.value],
+            calibration={
+                key: CalibrationData.fromDict(calib)
+                for key, calib in data.get(CameraConfigKey.kCalibration.value, {})
+            },
+        )
 
 
 class CameraConfigKey(Enum):
@@ -98,6 +131,7 @@ class CameraConfigKey(Enum):
     kMeasuredRes = "measured_res"
     kStreamRes = "stream_res"
     kTransform = "transform"
+    kCalibration = "calibration"
 
 
 @cache
@@ -392,7 +426,7 @@ class CsCoreCamera(SynapseCamera):
         if self.isConnected():
             if self.camera.getVideoMode().fps > 0:
                 time.sleep(
-                    1.0 / self.camera.getActualFPS() / 2.0
+                    1.0 / self.camera.getVideoMode().fps / 2.0
                 )  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
@@ -465,7 +499,7 @@ class CsCoreCamera(SynapseCamera):
             f"Camera default settings will be used."
         )
 
-    def getResolution(self) -> Tuple[int, int]:
+    def getResolution(self) -> Resolution:
         videoMode = self.camera.getVideoMode()
         return (videoMode.width, videoMode.height)
 

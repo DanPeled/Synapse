@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import synapse.core.camera_factory
 from cscore import VideoMode
-from synapse.core.camera_factory import CsCoreCamera
+from synapse.core.camera_factory import CalibrationData, CsCoreCamera
 
 
 class TestUtilityFunctions(unittest.TestCase):
@@ -37,9 +37,13 @@ class TestCameraConfig(unittest.TestCase):
             id="mock_123",
             transform=transform,
             defaultPipeline=1,
-            matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            distCoeff=[0.1, 0.01],
-            measuredRes=(640, 480),
+            calibration={
+                "640x480": CalibrationData(
+                    matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                    distCoeff=[0.1, 0.01],
+                    measuredRes=(640, 480),
+                )
+            },
             streamRes=(320, 240),
         )
         self.assertEqual(config.name, "cam")

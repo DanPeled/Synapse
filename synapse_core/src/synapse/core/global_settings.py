@@ -5,8 +5,7 @@
 from typing import Dict, Optional, Union, overload
 
 from ..stypes import CameraID
-from ..util import listToTransform3d
-from .camera_factory import CameraConfig, CameraConfigKey
+from .camera_factory import CameraConfig
 from .settings_api import (Setting, SettingsCollection, SettingsMap,
                            SettingsValue)
 
@@ -40,18 +39,7 @@ class GlobalSettingsMeta(type):
         if cls.kCameraConfigsKey in settings:
             if settings[cls.kCameraConfigsKey] is not None:
                 for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
-                    camConfig: CameraConfig = CameraConfig(
-                        name=camData[CameraConfigKey.kName.value],
-                        id=camData[CameraConfigKey.kPath.value],
-                        distCoeff=camData[CameraConfigKey.kDistCoeff.value],
-                        matrix=camData[CameraConfigKey.kMatrix.value],
-                        measuredRes=camData[CameraConfigKey.kMeasuredRes.value],
-                        streamRes=camData[CameraConfigKey.kStreamRes.value],
-                        transform=listToTransform3d(
-                            camData[CameraConfigKey.kTransform.value]
-                        ),
-                        defaultPipeline=camData[CameraConfigKey.kDefaultPipeline.value],
-                    )
+                    camConfig: CameraConfig = CameraConfig.fromDict(camData)
                     cls.__cameraConfigs[index] = camConfig
             return True
         return True

@@ -321,37 +321,21 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     def getCameraMatrix(self, cameraIndex: CameraID) -> Optional[List[List[float]]]:
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if camConfig:
-            measured_res = camConfig.measuredRes
-            current_res = list(
-                map(
-                    lambda x: int(x),
-                    self.getSetting(PipelineSettings.resolution).split("x"),
-                )
-            )
-
-            if measured_res != current_res:
-                scale_x = current_res[0] / measured_res[0]
-                scale_y = current_res[1] / measured_res[1]
-
-                matrix = camConfig.matrix
-
-                scaled_matrix = [
-                    [matrix[0][0] * scale_x, matrix[0][1], matrix[0][2] * scale_x],
-                    [matrix[1][0], matrix[1][1] * scale_y, matrix[1][2] * scale_y],
-                    [matrix[2][0], matrix[2][1], matrix[2][2]],
-                ]
-
-                return scaled_matrix
-
-            return camConfig.matrix
+            calibrationData = camConfig.calibration
+            currRes = self.getSetting(self.settings.resolution)
+            if currRes in calibrationData:
+                return calibrationData[currRes].matrix
+            else:
+                return None
         else:
             log.err("No camera matrix found, invalid results for AprilTag detection")
         return None
 
     def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
-        if data:
-            return data.distCoeff
+        currRes = self.getSetting(self.settings.resolution)
+        if data and currRes in data.calibration:
+            return data.calibration[currRes].distCoeff
         return None
 
     def getCameraTransform(self, cameraIndex: CameraID) -> Optional[Transform3d]:
