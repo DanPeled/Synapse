@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import cv2
 import numpy as np
 import synapse.core.camera_factory
+from cscore import VideoEvent, VideoMode
 from synapse.core.camera_factory import CsCoreCamera
 
 
@@ -85,6 +86,7 @@ class TestCsCoreCamera(unittest.TestCase):
     @patch("synapse.core.camera_factory.CameraServer.getVideo")
     def test_create_with_usb_index(self, mock_get_video, mock_usb_camera):
         camera_instance = MagicMock()
+        camera_instance.getVideoMode.return_value = VideoMode()
         mock_usb_camera.return_value = camera_instance
         mock_get_video.return_value = MagicMock()
         camera_instance.enumerateProperties.return_value = []
