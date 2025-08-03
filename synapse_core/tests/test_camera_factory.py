@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import cv2
 import numpy as np
 import synapse.core.camera_factory
-from cscore import VideoEvent, VideoMode
+from cscore import VideoMode
 from synapse.core.camera_factory import CsCoreCamera
 
 
