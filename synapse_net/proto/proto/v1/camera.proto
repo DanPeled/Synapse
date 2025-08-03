@@ -11,9 +11,11 @@ message CameraProto {
   int32 default_pipeline = 6;
 }
 
-message LatencyStatusProto {
-  int64 latency_capture = 1;
-  int64 latency_process = 2;
+message CameraPerformanceProto {
+  float latency_capture = 1;
+  float latency_process = 2;
+  int64 fps = 3;
+  int32 camera_index = 4;
 }
 
 message SetDefaultPipelineMessageProto {

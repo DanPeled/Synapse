@@ -21,6 +21,7 @@ import {
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
+import { Camera } from "three/src/Three.Core.js";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -61,7 +62,8 @@ const initialState: BackendStateSystem.State = {
   },
   networktable: "Synapse",
   logs: [],
-  cameras: [],
+  cameras: new Map(),
+  cameraPerformance: new Map(),
   networktablesserver: null,
 };
 
@@ -185,24 +187,19 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA: {
             const camera: CameraProto = messageObj.cameraInfo!;
-            let newCamerasList = [...stateRef.current.cameras, camera];
-            newCamerasList = newCamerasList.sort(
-              (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
-            );
+            const newCamerasList = new Map(stateRef.current.cameras);
+            newCamerasList.set(camera.index, camera);
             setters.setCameras(newCamerasList);
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
             const msg = messageObj.setPipelineIndex!;
-            const camera = stateRef.current.cameras.at(msg.cameraIndex);
+            const camera = stateRef.current.cameras.get(msg.cameraIndex);
 
             if (camera) {
               camera.pipelineIndex = msg.pipelineIndex;
-              let newCamerasList = [...stateRef.current.cameras];
-              newCamerasList[camera.index] = camera;
-              newCamerasList = newCamerasList.sort(
-                (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
-              );
+              const newCamerasList = new Map(stateRef.current.cameras);
+              newCamerasList.set(camera.index, camera);
               setters.setCameras(newCamerasList);
             }
             break;
@@ -238,6 +235,15 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               logs.sort((a, b) => a.timestamp - b.timestamp);
               setters.setLogs(logs);
             }
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE: {
+            const report = messageObj.cameraPerformance!;
+            const reports = new Map(stateRef.current.cameraPerformance);
+            reports.set(report.cameraIndex, report);
+
+            setters.setCameraPerformance(reports);
+            stateRef.current.cameraPerformance = reports;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {

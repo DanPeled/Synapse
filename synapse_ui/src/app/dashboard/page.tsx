@@ -15,7 +15,7 @@ import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
 import { Activity, Camera } from "lucide-react";
 // import { CameraStepControl } from "./camera_step_control";
-import { CameraProto } from "@/proto/v1/camera";
+import { CameraPerformanceProto, CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
   SetPipelineIndexMessageProto,
@@ -26,9 +26,10 @@ import { SaveActionsDialog } from "./save_actions";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
+  cameraPerformance?: CameraPerformanceProto;
 }
 
-function CameraView({ selectedCamera }: CameraViewProps) {
+function CameraView({ selectedCamera, cameraPerformance }: CameraViewProps) {
   return (
     <Card
       style={{ backgroundColor: baseCardColor }}
@@ -50,7 +51,8 @@ function CameraView({ selectedCamera }: CameraViewProps) {
               style={{ color: teamColor }}
             >
               <Activity className="w-3 h-3 mr-1" />
-              Processing @ 0 FPS – 0ms latency
+              Processing @ {cameraPerformance?.fps ?? 0} FPS –{" "}
+              {cameraPerformance?.latencyProcess.toFixed(2) ?? 0}ms latency
             </Badge>
           </Row>
         </Row>
@@ -71,13 +73,17 @@ export default function Dashboard() {
     socket,
     setPipelines,
     pipelinetypes,
+    cameraPerformance,
   } = useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
   const [selectedPipelineType, setSelectedPipelineType] = useState(
     Array.from(pipelinetypes.values()).at(0)!,
   );
-  const [selectedCamera, setSelectedCamera] = useState(cameras.at(0));
+  const [selectedCamera, setSelectedCamera] = useState(cameras.get(0));
   const [locked, setLocked] = useState(false);
+  const [selectedCameraPerformance, setSelectedCameraPerformance] = useState<
+    CameraPerformanceProto | undefined
+  >(undefined);
 
   useEffect(() => {
     let pipelineIndex =
@@ -104,8 +110,15 @@ export default function Dashboard() {
   }, [pipelines, pipelinetypes, selectedCamera]);
 
   useEffect(() => {
-    if (cameras.length > 0) {
-      setSelectedCamera(CameraProto.create(cameras.at(0)));
+    if (selectedCamera) {
+      console.log(cameraPerformance);
+      setSelectedCameraPerformance(cameraPerformance.get(selectedCamera.index));
+    }
+  }, [cameraPerformance]);
+
+  useEffect(() => {
+    if (Array.from(cameras.keys()).length > 0) {
+      setSelectedCamera(CameraProto.create(cameras.get(0)));
     }
   }, [cameras]);
 
@@ -129,7 +142,10 @@ export default function Dashboard() {
         >
           <Row gap="gap-2" className="h-full">
             <Column className="flex-[2] space-y-2 h-full">
-              <CameraView selectedCamera={selectedCamera} />
+              <CameraView
+                selectedCamera={selectedCamera}
+                cameraPerformance={selectedCameraPerformance}
+              />
               <PipelineConfigControl
                 pipelines={pipelines}
                 setPipelines={setPipelines}

@@ -20,11 +20,12 @@ import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType)
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
+from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
+                                  MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.geometry import Transform3d
-from wpimath.units import seconds
+from wpimath.units import seconds, secondsToMilliseconds
 
 from ..bcolors import MarkupColors
 from ..callback import Callback
@@ -1021,9 +1022,6 @@ class RuntimeManager:
                         processed_frame = frame
 
                 processLatency = Timer.getFPGATimestamp() - process_start
-                total_time = Timer.getFPGATimestamp() - loop_start
-                fps = 1.0 / total_time if total_time > 0 else 0
-                self.sendLatency(cameraIndex, captureLatency, processLatency)
 
                 # Sleep to enforce max FPS
                 elapsed = Timer.getFPGATimestamp() - loop_start
@@ -1034,6 +1032,7 @@ class RuntimeManager:
                 total_loop_time = loop_end - loop_start
 
                 fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
+                self.sendLatency(cameraIndex, captureLatency, processLatency, fps)
 
                 # Overlay FPS on the frame
                 cv2.putText(
@@ -1106,11 +1105,27 @@ class RuntimeManager:
                     return var
 
     def sendLatency(
-        self, cameraIndex: CameraID, captureLatency: seconds, processingLatency: seconds
+        self,
+        cameraIndex: CameraID,
+        captureLatency: seconds,
+        processingLatency: seconds,
+        fps: float,
     ) -> None:
         cameraTable = getCameraTable(cameraIndex)
         cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
         cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
+
+        if WebSocketServer.kInstance is not None:
+            WebSocketServer.kInstance.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.REPORT_CAMERA_PERFORMANCE,
+                    CameraPerformanceProto(
+                        secondsToMilliseconds(captureLatency),
+                        secondsToMilliseconds(processingLatency),
+                        int(fps),
+                    ),
+                )
+            )
 
     def setupNetworkTables(self) -> None:
         for cameraIndex, camera in self.cameraHandler.cameras.items():

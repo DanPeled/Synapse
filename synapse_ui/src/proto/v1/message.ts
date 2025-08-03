@@ -6,7 +6,11 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { CameraProto, SetDefaultPipelineMessageProto } from "./camera";
+import {
+  CameraPerformanceProto,
+  CameraProto,
+  SetDefaultPipelineMessageProto,
+} from "./camera";
 import { DeviceInfoProto, HardwareMetricsProto } from "./device";
 import { LogMessageProto } from "./log";
 import {
@@ -35,6 +39,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11,
   MESSAGE_TYPE_PROTO_LOG = 12,
   MESSAGE_TYPE_PROTO_SAVE = 13,
+  MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE = 14,
   UNRECOGNIZED = -1,
 }
 
@@ -82,6 +87,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 13:
     case "MESSAGE_TYPE_PROTO_SAVE":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE;
+    case 14:
+    case "MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -119,6 +127,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_LOG";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE:
       return "MESSAGE_TYPE_PROTO_SAVE";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE:
+      return "MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -138,6 +148,7 @@ export interface MessageProto {
   setDefaultPipeline?: SetDefaultPipelineMessageProto | undefined;
   removePipelineIndex?: number | undefined;
   log?: LogMessageProto | undefined;
+  cameraPerformance?: CameraPerformanceProto | undefined;
   pipelineTypeInfo: PipelineTypeProto[];
 }
 
@@ -155,6 +166,7 @@ function createBaseMessageProto(): MessageProto {
     setDefaultPipeline: undefined,
     removePipelineIndex: undefined,
     log: undefined,
+    cameraPerformance: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -224,8 +236,14 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.log !== undefined) {
       LogMessageProto.encode(message.log, writer.uint32(98).fork()).join();
     }
+    if (message.cameraPerformance !== undefined) {
+      CameraPerformanceProto.encode(
+        message.cameraPerformance,
+        writer.uint32(106).fork(),
+      ).join();
+    }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(106).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -357,6 +375,17 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
+          message.cameraPerformance = CameraPerformanceProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
           message.pipelineTypeInfo.push(
             PipelineTypeProto.decode(reader, reader.uint32()),
           );
@@ -405,6 +434,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         ? globalThis.Number(object.removePipelineIndex)
         : undefined,
       log: isSet(object.log) ? LogMessageProto.fromJSON(object.log) : undefined,
+      cameraPerformance: isSet(object.cameraPerformance)
+        ? CameraPerformanceProto.fromJSON(object.cameraPerformance)
+        : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
         : [],
@@ -460,6 +492,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.log !== undefined) {
       obj.log = LogMessageProto.toJSON(message.log);
+    }
+    if (message.cameraPerformance !== undefined) {
+      obj.cameraPerformance = CameraPerformanceProto.toJSON(
+        message.cameraPerformance,
+      );
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -521,6 +558,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.log =
       object.log !== undefined && object.log !== null
         ? LogMessageProto.fromPartial(object.log)
+        : undefined;
+    message.cameraPerformance =
+      object.cameraPerformance !== undefined &&
+      object.cameraPerformance !== null
+        ? CameraPerformanceProto.fromPartial(object.cameraPerformance)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||

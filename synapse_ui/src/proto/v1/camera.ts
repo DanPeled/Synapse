@@ -18,9 +18,11 @@ export interface CameraProto {
   defaultPipeline: number;
 }
 
-export interface LatencyStatusProto {
+export interface CameraPerformanceProto {
   latencyCapture: number;
   latencyProcess: number;
+  fps: number;
+  cameraIndex: number;
 }
 
 export interface SetDefaultPipelineMessageProto {
@@ -189,20 +191,26 @@ export const CameraProto: MessageFns<CameraProto> = {
   },
 };
 
-function createBaseLatencyStatusProto(): LatencyStatusProto {
-  return { latencyCapture: 0, latencyProcess: 0 };
+function createBaseCameraPerformanceProto(): CameraPerformanceProto {
+  return { latencyCapture: 0, latencyProcess: 0, fps: 0, cameraIndex: 0 };
 }
 
-export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
+export const CameraPerformanceProto: MessageFns<CameraPerformanceProto> = {
   encode(
-    message: LatencyStatusProto,
+    message: CameraPerformanceProto,
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
     if (message.latencyCapture !== 0) {
-      writer.uint32(8).int64(message.latencyCapture);
+      writer.uint32(13).float(message.latencyCapture);
     }
     if (message.latencyProcess !== 0) {
-      writer.uint32(16).int64(message.latencyProcess);
+      writer.uint32(21).float(message.latencyProcess);
+    }
+    if (message.fps !== 0) {
+      writer.uint32(24).int64(message.fps);
+    }
+    if (message.cameraIndex !== 0) {
+      writer.uint32(32).int32(message.cameraIndex);
     }
     return writer;
   },
@@ -210,28 +218,44 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
   decode(
     input: BinaryReader | Uint8Array,
     length?: number,
-  ): LatencyStatusProto {
+  ): CameraPerformanceProto {
     const reader =
       input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLatencyStatusProto();
+    const message = createBaseCameraPerformanceProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 8) {
+          if (tag !== 13) {
             break;
           }
 
-          message.latencyCapture = longToNumber(reader.int64());
+          message.latencyCapture = reader.float();
           continue;
         }
         case 2: {
-          if (tag !== 16) {
+          if (tag !== 21) {
             break;
           }
 
-          message.latencyProcess = longToNumber(reader.int64());
+          message.latencyProcess = reader.float();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.fps = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.cameraIndex = reader.int32();
           continue;
         }
       }
@@ -243,7 +267,7 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
     return message;
   },
 
-  fromJSON(object: any): LatencyStatusProto {
+  fromJSON(object: any): CameraPerformanceProto {
     return {
       latencyCapture: isSet(object.latencyCapture)
         ? globalThis.Number(object.latencyCapture)
@@ -251,31 +275,43 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
       latencyProcess: isSet(object.latencyProcess)
         ? globalThis.Number(object.latencyProcess)
         : 0,
+      fps: isSet(object.fps) ? globalThis.Number(object.fps) : 0,
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
     };
   },
 
-  toJSON(message: LatencyStatusProto): unknown {
+  toJSON(message: CameraPerformanceProto): unknown {
     const obj: any = {};
     if (message.latencyCapture !== 0) {
-      obj.latencyCapture = Math.round(message.latencyCapture);
+      obj.latencyCapture = message.latencyCapture;
     }
     if (message.latencyProcess !== 0) {
-      obj.latencyProcess = Math.round(message.latencyProcess);
+      obj.latencyProcess = message.latencyProcess;
+    }
+    if (message.fps !== 0) {
+      obj.fps = Math.round(message.fps);
+    }
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(
+  create<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(
     base?: I,
-  ): LatencyStatusProto {
-    return LatencyStatusProto.fromPartial(base ?? ({} as any));
+  ): CameraPerformanceProto {
+    return CameraPerformanceProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(
+  fromPartial<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(
     object: I,
-  ): LatencyStatusProto {
-    const message = createBaseLatencyStatusProto();
+  ): CameraPerformanceProto {
+    const message = createBaseCameraPerformanceProto();
     message.latencyCapture = object.latencyCapture ?? 0;
     message.latencyProcess = object.latencyProcess ?? 0;
+    message.fps = object.fps ?? 0;
+    message.cameraIndex = object.cameraIndex ?? 0;
     return message;
   },
 };
