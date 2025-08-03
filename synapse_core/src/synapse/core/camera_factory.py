@@ -392,7 +392,7 @@ class CsCoreCamera(SynapseCamera):
         if self.isConnected():
             if self.camera.getVideoMode().fps > 0:
                 time.sleep(
-                    1.0 / self.camera.getActualFPS() / 2.0
+                    1.0 / self.camera.getVideoMode().fps / 2.0
                 )  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:

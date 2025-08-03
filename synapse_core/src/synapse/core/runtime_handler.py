@@ -365,6 +365,10 @@ class CameraHandler:
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[CameraID, CameraConfig] = {}
         self.onAddCamera: Callback[CameraID, str, SynapseCamera] = Callback()
+        self.cameraIds: List[str] = []
+
+        self.cameraScanningThreadRunning: bool = True
+        self.cameraScanningThread: threading.Thread
 
     def setup(self) -> None:
         """
@@ -372,6 +376,16 @@ class CameraHandler:
         and initializing recording outputs.
         """
         self.createCameras()
+
+        def cameraScanAction():
+            while self.cameraScanningThreadRunning:
+                self.scanCameras()
+                time.sleep(10)
+
+        self.cameraScanningThread = threading.Thread(
+            target=cameraScanAction, daemon=True
+        )
+        self.cameraScanningThread.start()
 
     def createCameras(self) -> None:
         """
@@ -387,7 +401,7 @@ class CameraHandler:
         found: List[int] = []
 
         for cameraIndex, cameraConfig in self.cameraBindings.items():
-            if len(cameraConfig.id):
+            if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraIds:
                 info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
                     cameraConfig.id, None
                 )
@@ -395,17 +409,26 @@ class CameraHandler:
                     found.append(info.productId)
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
+                    else:
+                        self.cameraIds.append(cameraConfig.id)
                 else:
                     log.warn(
                         f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped"
                     )
                     continue
 
+        self.scanCameras()
+
+    def scanCameras(self) -> None:
+        self.usbCameraInfos = {
+            f"{info.name}_{info.productId}": info
+            for info in cs.UsbCamera.enumerateUsbCameras()
+        }
+
+        found: List[int] = []
+
         for info in self.usbCameraInfos.values():
             if info.productId not in found:
-                log.log(
-                    f"Found non-registered camera: {info.name} (i={info.dev}), adding automatically"
-                )
                 found.append(info.productId)
                 newIndex = 0
                 if len(self.cameras.keys()) > 0:
@@ -421,9 +444,16 @@ class CameraHandler:
                     measuredRes=(1920, 1080),
                     streamRes=self.DEFAULT_STREAM_SIZE,
                 )
-                GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
-                if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
-                    continue
+
+                if cameraConfig.id not in self.cameraIds:
+                    log.log(
+                        f"Found non-registered camera: {info.name} (i={info.dev}), adding automatically"
+                    )
+                    GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
+                    if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
+                        continue
+                    else:
+                        self.cameraIds.append(cameraConfig.id)
 
     def getCamera(self, cameraIndex: CameraID) -> Optional[SynapseCamera]:
         """
@@ -631,6 +661,9 @@ class CameraHandler:
         """
         Releases all video writers and closes all active camera connections.
         """
+        self.cameraScanningThreadRunning = False
+        self.cameraScanningThread.join()
+
         for record in self.recordingOutputs.values():
             record.release()
         for camera in self.cameras.values():
@@ -1004,8 +1037,9 @@ class RuntimeManager:
                 frame = self.fixtureFrame(cameraIndex, frame)
 
                 process_start = Timer.getFPGATimestamp()
+
                 pipeline = self.pipelineLoader.getPipeline(
-                    self.pipelineBindings[cameraIndex]
+                    self.pipelineBindings.get(cameraIndex, -1)
                 )
 
                 processed_frame: Frame = frame
@@ -1164,11 +1198,12 @@ class RuntimeManager:
         return np.clip(image * 255, 0, 255).astype(np.uint8)
 
     def fixtureFrame(self, cameraIndex: CameraID, frame: Frame) -> Frame:
-        settings = self.pipelineLoader.pipelineSettings[
-            self.pipelineBindings[cameraIndex]
-        ]
-        frame = self.rotateCameraBySettings(settings, frame)
-        # frame = self.fixBlackLevelOffset(settings, frame)
+        if cameraIndex in self.pipelineBindings:
+            settings = self.pipelineLoader.pipelineSettings[
+                self.pipelineBindings[cameraIndex]
+            ]
+            frame = self.rotateCameraBySettings(settings, frame)
+            # frame = self.fixBlackLevelOffset(settings, frame)
 
         return frame
 
