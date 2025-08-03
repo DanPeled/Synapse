@@ -4,41 +4,20 @@ global:
       name: Monochrome
       id: Integrated Webcam_27152
       transform:
-        - [0.24637, -0.23285, 0.28899]
-        - [-0.0005665884008032782, 0.0012184696791468336, 0.007600204623678377]
+      - [0.24637, -0.23285, 0.28899]
+      - [-9.88883309762649e-06, 2.126630773683114e-05, 0.0001326485945084843]
       default_pipeline: 0
       stream_res: [320, 180]
       calibration: {}
 pipelines:
   0:
     type: ApriltagPipeline
-    settings:
-      {
-        brightness: 100.0,
-        exposure: 20.0,
-        fieldpose: true,
-        gain: 50.0,
-        num_threads: 4.0,
-        orientation: 180,
-        resolution: 1080x1920,
-        saturation: 10.0,
-        sharpness: 50.0,
-        stick_to_ground: true,
-        tag_family: tag36h11,
-        tag_size: 0.1651,
-        verbosity: 1,
-      }
+    settings: {brightness: 100.0, exposure: 20.0, fieldpose: true, gain: 50.0, num_threads: 4.0,
+      orientation: 180, resolution: 1080x1920, saturation: 10.0, sharpness: 50.0,
+      stick_to_ground: true, tag_family: tag36h11, tag_size: 0.1651, verbosity: 1}
     name: FieldPose
   1:
     type: ColorPipeline
-    settings:
-      {
-        brightness: 100.0,
-        exposure: 20.0,
-        gain: 50.0,
-        orientation: 0,
-        resolution: 1080x1920,
-        saturation: 50.0,
-        sharpness: 50.0,
-      }
+    settings: {brightness: 100.0, exposure: 20.0, gain: 50.0, orientation: 0, resolution: 1080x1920,
+      saturation: 50.0, sharpness: 50.0}
     name: Cheese

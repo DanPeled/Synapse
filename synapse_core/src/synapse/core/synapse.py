@@ -28,7 +28,7 @@ from ..bcolors import MarkupColors
 from ..hardware.metrics import Platform
 from ..log import err, log, logs
 from ..stypes import CameraID, PipelineID
-from ..util import resolveGenericArgument
+from ..util import getIP, resolveGenericArgument
 from .camera_factory import SynapseCamera, cameraToProto
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
@@ -75,6 +75,7 @@ class UIHandle:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+                log(f"Started UI at: https://{getIP()}:3000")
                 f.write(str(proc.pid))
 
 
@@ -109,8 +110,6 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
-        UIHandle.startUI()
-
         self.isRunning = True
         Synapse.kInstance = self
 
@@ -120,6 +119,8 @@ class Synapse:
             os.system("cls")
         else:
             os.system("clear")
+
+        UIHandle.startUI()
 
         log(
             MarkupColors.bold(
@@ -242,11 +243,7 @@ class Synapse:
             import synapse.hardware.metrics as metrics
 
             deviceInfo: DeviceInfoProto = DeviceInfoProto()
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-            s.connect(("8.8.8.8", 80))
-            deviceInfo.ip = s.getsockname()[0]
-            s.close()
+            deviceInfo.ip = getIP()
 
             deviceInfo.platform = (
                 metrics.Platform.getCurrentPlatform().getOSType().value

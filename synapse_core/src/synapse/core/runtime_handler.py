@@ -1200,9 +1200,15 @@ class RuntimeManager:
             indent=2,  # control indentation
             width=80,  # wrap width for long lists
         )
-
-        with open(Path(os.getcwd()) / "config" / "settings.yml", "w") as f:
+        savefile = Path(os.getcwd()) / "config" / "settings.yml"
+        with open(savefile, "w") as f:
             f.write(y)
+
+        log.log(
+            MarkupColors.bold(
+                MarkupColors.okblue(f"Saved into {savefile.absolute().__str__()}")
+            )
+        )
 
     def cleanup(self) -> None:
         """

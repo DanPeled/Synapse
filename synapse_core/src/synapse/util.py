@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import socket
 import typing
 from typing import List, Optional, Type
 
@@ -76,3 +77,12 @@ def resolveGenericArgument(cls) -> Optional[Type]:
             if args:
                 return args[0]
     return None
+
+
+def getIP() -> str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
