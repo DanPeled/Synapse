@@ -661,13 +661,13 @@ class CameraHandler:
         """
         Releases all video writers and closes all active camera connections.
         """
+        self.cameraScanningThreadRunning = False
+        self.cameraScanningThread.join()
+
         for record in self.recordingOutputs.values():
             record.release()
         for camera in self.cameras.values():
             camera.close()
-
-        self.cameraScanningThreadRunning = False
-        self.cameraScanningThread.join()
 
 
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
