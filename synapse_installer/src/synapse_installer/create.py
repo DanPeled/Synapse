@@ -71,7 +71,7 @@ def createProject() -> None:
     projectName, projectPath = selectProjectName(cwd)
 
     if projectName is not None:
-        deployConfigPath = projectPath / ".deployconfig"
+        deployConfigPath = projectPath / ".synapseproject"
         setupDeviceConfig = questionary.confirm("Setup coprocessor info").ask()
         if setupDeviceConfig:
             loadDeviceData(deployConfigPath)

@@ -182,10 +182,7 @@ def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
 
 
 def loadDeviceData(deployConfigPath: pthl.Path):
-    if not deployConfigPath.exists():
-        setupConfigFile(deployConfigPath)
-    elif os.path.getsize(deployConfigPath) == 0:
-        setupConfigFile(deployConfigPath)
+    setupConfigFile(deployConfigPath)
 
 
 def setupAndRunDeploy(argv: Optional[List[str]] = None):
