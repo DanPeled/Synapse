@@ -16,6 +16,7 @@
 
 ## Usage
 
+* [Project Creation And Management](usage/project-creation-and-management.md)
 * [UI Interaction](usage/built-in-pipelines/README.md)
   * [Pipeline Settings](usage/built-in-pipelines/pipeline-settings.md)
   * [Camera Calibration](usage/built-in-pipelines/camera-calibration.md)
