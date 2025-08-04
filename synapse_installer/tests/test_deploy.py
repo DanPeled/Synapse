@@ -38,8 +38,8 @@ def test_setup_config_file_manual(mock_password, mock_text, mock_select, tmp_pat
         data = yaml.safe_load(f)
 
     assert "deploy" in data
-    assert "my-device" in data["deploy"]
-    assert data["deploy"]["my-device"]["ip"] == "192.168.1.5"
+    assert "hostname" in data["deploy"]
+    assert data["deploy"]["hostname"]["ip"] == "192.168.1.5"
 
 
 @mock.patch("synapse_installer.deploy.paramiko.SSHClient")
