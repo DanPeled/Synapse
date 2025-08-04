@@ -45,52 +45,63 @@ def IsValidIP(ip_str):
         return False
 
 
-def setupConfigFile(path: pthl.Path):
-    print("Deploy config doesn't exist, creating...")
+def addDeviceConfig(path: pthl.Path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     baseFile = {}
     if path.exists():
         with open(path, "r") as f:
             baseFile = yaml.full_load(f) or {}
-    with open(path, "w") as f:
-        answer = questionary.select(
-            "Choose setup mode:",
-            choices=[
-                SetupOptions.kManual.value,
-                SetupOptions.kAutomatic.value,
-            ],
+    answer = questionary.select(
+        "Choose setup mode:",
+        choices=[
+            SetupOptions.kManual.value,
+            SetupOptions.kAutomatic.value,
+        ],
+    ).ask()
+
+    if answer == SetupOptions.kManual.value:
+        hostname = questionary.text("What's your device's hostname?").ask()
+        if hostname is None:
+            return
+
+        deviceNickname = questionary.text(
+            f"Device Nickname (Leave blank for `{hostname}`)", default=hostname
         ).ask()
 
-        if answer == SetupOptions.kManual.value:
-            hostname = questionary.text("What's your device's hostname?").ask()
-            deviceNickname = (
-                questionary.text(f"Device Nickname (Leave blank for `{hostname}`").ask()
-                or hostname
+        while deviceNickname in baseFile.get("deploy", {}):
+            print(
+                f"Device with nickname `{deviceNickname} already exists! Please provide another one`"
             )
+            deviceNickname = questionary.text(
+                f"Device Nickname (Leave blank for `{hostname}`)", default=hostname
+            ).ask()
 
-            ip: Optional[str] = None
-            while True:
-                ip = questionary.text("What's your device's IP address?").ask()
-                if ip is None:
-                    return
-                if IsValidIP(ip):
-                    break
-                else:
-                    print(
-                        "Invalid IP address. Please enter a valid IPv4 or IPv6 address."
-                    )
-            password = questionary.password("What's the password to your device?").ask()
+        ip: Optional[str] = None
+        while True:
+            ip = questionary.text("What's your device's IP address?").ask()
+            if ip is None:
+                return
+            if IsValidIP(ip):
+                break
+            else:
+                print("Invalid IP address. Please enter a valid IPv4 or IPv6 address.")
 
-            baseFile["deploy"] = {
-                deviceNickname: DeployDeviceConfig(
-                    hostname=hostname, ip=ip, password=password
-                ).__dict__
-            }
+        password = questionary.password("What's the password to your device?").ask()
 
-            yaml.dump(
-                baseFile,
-                f,
-            )
+        if "deploy" not in baseFile:
+            baseFile["deploy"] = {}
+
+        baseFile["deploy"][deviceNickname] = {
+            deviceNickname: DeployDeviceConfig(
+                hostname=hostname, ip=ip, password=password
+            ).__dict__
+        }
+
+    with open(path, "w") as f:
+        yaml.dump(
+            baseFile,
+            f,
+        )
 
 
 def _connectAndDeploy(
@@ -150,7 +161,7 @@ def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
         data: dict = yaml.full_load(f)
 
     if "deploy" not in data:
-        setupConfigFile(path)
+        addDeviceConfig(path)
         with open(path, "r") as f:
             data: dict = yaml.full_load(f) or {"deploy": {}}
 
@@ -182,7 +193,7 @@ def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
 
 
 def loadDeviceData(deployConfigPath: pthl.Path):
-    setupConfigFile(deployConfigPath)
+    addDeviceConfig(deployConfigPath)
 
 
 def setupAndRunDeploy(argv: Optional[List[str]] = None):
