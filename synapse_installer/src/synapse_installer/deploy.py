@@ -91,11 +91,9 @@ def addDeviceConfig(path: pthl.Path):
         if "deploy" not in baseFile:
             baseFile["deploy"] = {}
 
-        baseFile["deploy"][deviceNickname] = {
-            deviceNickname: DeployDeviceConfig(
-                hostname=hostname, ip=ip, password=password
-            ).__dict__
-        }
+        baseFile["deploy"][deviceNickname] = DeployDeviceConfig(
+            hostname=hostname, ip=ip, password=password
+        ).__dict__
 
     with open(path, "w") as f:
         yaml.dump(
