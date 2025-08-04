@@ -26,7 +26,7 @@ def test_setup_config_file_manual(mock_password, mock_text, mock_select, tmp_pat
     mock_select().ask.return_value = "Manual (Provide hostname & password)"
     mock_text.side_effect = [
         mock.Mock(ask=lambda: "my-device"),  # hostname
-        mock.Mock(ask=lambda: ""),  # nickname
+        mock.Mock(ask=lambda: "my-device"),  # nickname
         mock.Mock(ask=lambda: "192.168.1.5"),  # IP
     ]
     mock_password().ask.return_value = "pass"
