@@ -13,7 +13,7 @@ import paramiko
 import synapse.log as log
 import yaml
 
-from .deploy import fprint, setupConfigFile
+from .deploy import addDeviceConfig, fprint
 
 
 def syncRequirements(
@@ -86,7 +86,7 @@ def sync(argv: Optional[List[str]]) -> None:
         data: dict = yaml.full_load(f)
 
     if "deploy" not in data:
-        setupConfigFile(deployConfigPath)
+        addDeviceConfig(deployConfigPath)
         with open(deployConfigPath, "r") as f:
             data: dict = yaml.full_load(f) or {"deploy": {}}
 
