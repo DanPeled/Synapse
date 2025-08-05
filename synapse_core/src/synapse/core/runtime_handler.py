@@ -698,7 +698,16 @@ class RuntimeManager:
         self.cameraManagementThreads: List[threading.Thread] = []
         self.isRunning: bool = True
         self.isSetup: bool = False
-        self.networkSettings: NetworkConfig
+
+        self.metricsThread: Optional[threading.Thread]
+
+        self.networkSettings: NetworkConfig = NetworkConfig(
+            name="Synapse",
+            teamNumber=0000,
+            hostname="synapse",
+            ip=None,
+            networkInterface=None,
+        )
 
         self.onSettingChanged: SettingChangedCallback = Callback()
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
@@ -1248,7 +1257,8 @@ class RuntimeManager:
         self.isRunning = False
         for thread in self.cameraManagementThreads:
             thread.join()
-        self.metricsThread.join()
+        if self.metricsThread:
+            self.metricsThread.join()
         log.log("Cleaned up all resources.")
 
     def setupCallbacks(self):
