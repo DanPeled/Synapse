@@ -103,14 +103,14 @@ class TestSync(unittest.TestCase):
         data_with_deploy = "deploy:\n  device1:\n    hostname: host1\n    password: pass1\n    ip: 1.2.3.4\n"
 
         def open_side_effect(file, mode="r", *args, **kwargs):
-            if open_side_effect.counter == 0:
-                open_side_effect.counter += 1
+            if open_side_effect.counter == 0:  # pyright: ignore
+                open_side_effect.counter += 1  # pyright: ignore
                 file_object = io.StringIO(data_with_no_deploy)
                 return file_object
             else:
                 return io.StringIO(data_with_deploy)
 
-        open_side_effect.counter = 0
+        open_side_effect.counter = 0  # pyright: ignore
 
         with patch("builtins.open", side_effect=open_side_effect):
             with patch("synapse_installer.sync.distribution") as mock_dist:
