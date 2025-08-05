@@ -62,7 +62,7 @@ const initialState: BackendStateSystem.State = {
   networktable: "Synapse",
   logs: [],
   cameras: [],
-  networktablesserver: null,
+  teamnumber: 0,
 };
 
 export const BackendStateKeys = Object.keys(initialState).reduce(

@@ -12,7 +12,7 @@ export namespace BackendStateSystem {
     networktable: string;
     logs: LogMessageProto[];
     socket?: WebSocketWrapper;
-    networktablesserver: string | null;
+    teamnumber: number;
     cameras: CameraProto[];
     pipelines: Map<number, PipelineProto>;
     pipelinetypes: Map<string, PipelineTypeProto>;

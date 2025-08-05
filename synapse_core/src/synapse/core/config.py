@@ -2,8 +2,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import socket
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -19,7 +21,7 @@ class ProjectConfig:
             dictData: dict = yaml.full_load(file)
             self.hostname = dictData["hostname"]
             self.username = dictData["username"]
-            self.password = dictData["username"]
+            self.password = dictData["password"]
 
 
 @dataclass
@@ -29,14 +31,14 @@ class NetworkConfig:
 
     Attributes:
         teamNumber (int): The team number.
-        name (str): The name of the team or network.
         hostname (str): The hostname of the networked device.
-        user (str): The username for accessing the device.
-        password (str): The password for the user.
     """
 
     teamNumber: int
     name: str
+    hostname: str
+    ip: Optional[str]
+    networkInterface: Optional[str]
 
     @classmethod
     def fromJson(cls, data: dict) -> "NetworkConfig":
@@ -52,7 +54,18 @@ class NetworkConfig:
         return NetworkConfig(
             teamNumber=data.get("team_number", 0000),
             name=data.get("name", "Synapse"),
+            hostname=socket.gethostname(),
+            ip=data.get("ip", None),
+            networkInterface=data.get("interfrace"),
         )
+
+    def toJson(self) -> Dict[str, Any]:
+        return {
+            "team_number": self.teamNumber,
+            "name": self.name,
+            "ip": self.ip,
+            "interface": self.networkInterface,
+        }
 
 
 class Config:

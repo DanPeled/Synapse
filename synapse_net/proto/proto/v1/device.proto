@@ -40,3 +40,12 @@ message HardwareMetricsProto {
   // Timestamp when the metrics were last fetched (ISO 8601 or other format)
   string last_fetched = 7;
 }
+
+// Message to set network settings on a device
+message SetNetworkSettingsProto {
+  string hostname = 1; // The hostname to set for the device
+  string ip = 2; // The IP address to set for the device
+  string network_interface = 3; // The network interface to configure
+  string network_table = 4; // The network table to use for configuration
+  uint32 team_number = 5; // The team number for network configuration
+}
