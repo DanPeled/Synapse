@@ -21,11 +21,13 @@ message MessageProto {
     SetDefaultPipelineMessageProto set_default_pipeline = 10;
     int32 remove_pipeline_index = 11;
     LogMessageProto log = 12;
+    SetNetworkSettingsProto set_network_settings = 13;
   }
 
-  repeated PipelineTypeProto pipeline_type_info = 13;
+  repeated PipelineTypeProto pipeline_type_info = 14;
 }
 
+// Enum for different message types in the protocol
 enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_UNSPECIFIED = 0;
   MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1;
@@ -41,4 +43,8 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11;
   MESSAGE_TYPE_PROTO_LOG = 12;
   MESSAGE_TYPE_PROTO_SAVE = 13;
+  MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS = 14;
+  MESSAGE_TYPE_PROTO_REBOOT = 15;
+  MESSAGE_TYPE_PROTO_FORMAT = 16;
+  MESSAGE_TYPE_PROTO_RESTART_SYNAPSE = 17;
 }

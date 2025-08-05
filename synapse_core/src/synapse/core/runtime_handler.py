@@ -34,7 +34,7 @@ from ..util import resolveGenericArgument
 from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
                              CameraSettingsKeys, SynapseCamera, getCameraTable,
                              getCameraTableName)
-from .config import Config, yaml
+from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
 from .pipeline import FrameResult, Pipeline, PipelineSettings
 from .settings_api import SettingsMap
@@ -697,11 +697,22 @@ class RuntimeManager:
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
         self.isRunning: bool = True
+        self.isSetup: bool = False
+
+        self.metricsThread: Optional[threading.Thread]
+
+        self.networkSettings: NetworkConfig = NetworkConfig(
+            name="Synapse",
+            teamNumber=0000,
+            hostname="synapse",
+            ip=None,
+            networkInterface=None,
+        )
+
         self.onSettingChanged: SettingChangedCallback = Callback()
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
         self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
         self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
-        self.isSetup: bool = False
 
     def setup(self, directory: Path):
         """
@@ -715,8 +726,6 @@ class RuntimeManager:
         Args:
             directory (Path): Path to directory containing pipelines and configurations.
         """
-
-        import atexit
 
         log.log(
             MarkupColors.header(
@@ -735,8 +744,6 @@ class RuntimeManager:
         self.startMetricsThread()
 
         self.isSetup = True
-
-        atexit.register(self.cleanup)
 
     def assignDefaultPipelines(self) -> None:
         """
@@ -1209,6 +1216,7 @@ class RuntimeManager:
 
     def toDict(self) -> Dict:
         return {
+            "network": self.networkSettings.toJson(),
             "global": {
                 "camera_configs": {
                     index: config.toDict()
@@ -1243,6 +1251,10 @@ class RuntimeManager:
 
         self.cameraHandler.cleanup()
         self.isRunning = False
+        for thread in self.cameraManagementThreads:
+            thread.join()
+        if self.metricsThread:
+            self.metricsThread.join()
         log.log("Cleaned up all resources.")
 
     def setupCallbacks(self):

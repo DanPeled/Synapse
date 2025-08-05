@@ -35,6 +35,26 @@ def syncRequirements(
         transport = client.get_transport()
         assert transport is not None
 
+        # Add sudoers entry before doing anything else
+        sudoers_line = (
+            "root ALL=(ALL) NOPASSWD: "
+            "/bin/hostname, /usr/bin/hostnamectl, /sbin/ip, "
+            "/usr/bin/tee, /bin/cat, /bin/sh"
+        )
+        sudoers_file = "/etc/sudoers.d/root-custom-host-config"
+
+        setup_sudoers_cmd = (
+            f"echo '{sudoers_line}' | tee {sudoers_file} > /dev/null && "
+            f"chmod 440 {sudoers_file}"
+        )
+
+        stdin, stdout, stderr = client.exec_command(setup_sudoers_cmd)
+        err_out = stderr.read().decode()
+        if err_out.strip():
+            log.err(f"Failed to setup sudoers on {hostname}:\n{err_out}")
+        else:
+            fprint(log.MarkupColors.okgreen(f"Sudoers rule added on {hostname}"))
+
         # Get installed packages on remote device
         stdin, stdout, stderr = client.exec_command("python3 -m pip freeze")
         installed_packages = {
@@ -47,7 +67,7 @@ def syncRequirements(
             pkg_name = str(requirement).split()[0].lower()
             if pkg_name in installed_packages:
                 fprint(
-                    f"✓ {pkg_name} already installed "
+                    f"[OK] {pkg_name} already installed "
                     f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
                 )
                 continue
@@ -84,6 +104,9 @@ def sync(argv: Optional[List[str]]) -> None:
     deployConfigPath = cwd / ".synapseproject"
     with open(deployConfigPath, "r") as f:
         data: dict = yaml.full_load(f)
+
+    if data is None:
+        data = {}
 
     if "deploy" not in data:
         addDeviceConfig(deployConfigPath)

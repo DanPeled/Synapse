@@ -39,6 +39,20 @@ export interface HardwareMetricsProto {
   lastFetched: string;
 }
 
+/** Message to set network settings on a device */
+export interface SetNetworkSettingsProto {
+  /** The hostname to set for the device */
+  hostname: string;
+  /** The IP address to set for the device */
+  ip: string;
+  /** The network interface to configure */
+  networkInterface: string;
+  /** The network table to use for configuration */
+  networkTable: string;
+  /** The team number for network configuration */
+  teamNumber: number;
+}
+
 function createBaseDeviceInfoProto(): DeviceInfoProto {
   return { hostname: "", ip: "", platform: "", networkInterfaces: [] };
 }
@@ -336,6 +350,155 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     message.memory = object.memory ?? 0;
     message.uptime = object.uptime ?? 0;
     message.lastFetched = object.lastFetched ?? "";
+    return message;
+  },
+};
+
+function createBaseSetNetworkSettingsProto(): SetNetworkSettingsProto {
+  return {
+    hostname: "",
+    ip: "",
+    networkInterface: "",
+    networkTable: "",
+    teamNumber: 0,
+  };
+}
+
+export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
+  encode(
+    message: SetNetworkSettingsProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.hostname !== "") {
+      writer.uint32(10).string(message.hostname);
+    }
+    if (message.ip !== "") {
+      writer.uint32(18).string(message.ip);
+    }
+    if (message.networkInterface !== "") {
+      writer.uint32(26).string(message.networkInterface);
+    }
+    if (message.networkTable !== "") {
+      writer.uint32(34).string(message.networkTable);
+    }
+    if (message.teamNumber !== 0) {
+      writer.uint32(40).uint32(message.teamNumber);
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): SetNetworkSettingsProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetNetworkSettingsProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.hostname = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ip = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.networkInterface = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.networkTable = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.teamNumber = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetNetworkSettingsProto {
+    return {
+      hostname: isSet(object.hostname)
+        ? globalThis.String(object.hostname)
+        : "",
+      ip: isSet(object.ip) ? globalThis.String(object.ip) : "",
+      networkInterface: isSet(object.networkInterface)
+        ? globalThis.String(object.networkInterface)
+        : "",
+      networkTable: isSet(object.networkTable)
+        ? globalThis.String(object.networkTable)
+        : "",
+      teamNumber: isSet(object.teamNumber)
+        ? globalThis.Number(object.teamNumber)
+        : 0,
+    };
+  },
+
+  toJSON(message: SetNetworkSettingsProto): unknown {
+    const obj: any = {};
+    if (message.hostname !== "") {
+      obj.hostname = message.hostname;
+    }
+    if (message.ip !== "") {
+      obj.ip = message.ip;
+    }
+    if (message.networkInterface !== "") {
+      obj.networkInterface = message.networkInterface;
+    }
+    if (message.networkTable !== "") {
+      obj.networkTable = message.networkTable;
+    }
+    if (message.teamNumber !== 0) {
+      obj.teamNumber = Math.round(message.teamNumber);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetNetworkSettingsProto>, I>>(
+    base?: I,
+  ): SetNetworkSettingsProto {
+    return SetNetworkSettingsProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetNetworkSettingsProto>, I>>(
+    object: I,
+  ): SetNetworkSettingsProto {
+    const message = createBaseSetNetworkSettingsProto();
+    message.hostname = object.hostname ?? "";
+    message.ip = object.ip ?? "";
+    message.networkInterface = object.networkInterface ?? "";
+    message.networkTable = object.networkTable ?? "";
+    message.teamNumber = object.teamNumber ?? 0;
     return message;
   },
 };

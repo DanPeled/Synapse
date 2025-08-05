@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import socket
 import typing
 from typing import List, Optional, Type
 
@@ -9,6 +10,16 @@ from wpimath import geometry
 
 from .core.pipeline import Pipeline
 from .log import err
+
+
+def getIP() -> str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+    s.close()
+
+    return ip
 
 
 def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:

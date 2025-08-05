@@ -13,22 +13,27 @@ import traceback
 from pathlib import Path
 from typing import Any, List, Optional
 
+import psutil
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineProto,
                                   PipelineTypeProto,
                                   SetDefaultPipelineMessageProto,
+                                  SetNetworkSettingsProto,
                                   SetPipelineIndexMessageProto,
                                   SetPipelineNameMessageProto,
                                   SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer,
                                       createMessage)
 
+from synapse_net import devicenetworking
+
 from ..bcolors import MarkupColors
+from ..hardware.deviceactions import reboot, restartRuntime
 from ..hardware.metrics import Platform
-from ..log import err, log, logs
+from ..log import err, log, logs, missingFeature, warn
 from ..stypes import CameraID, PipelineID
-from ..util import resolveGenericArgument
+from ..util import getIP, resolveGenericArgument
 from .camera_factory import SynapseCamera, cameraToProto
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
@@ -143,6 +148,7 @@ class Synapse:
         try:
             config = Config()
             config.load(filePath=config_path)
+            self.runtime_handler.networkSettings = config.network
 
             # Load the settings from the config file
             settings: dict = config.getConfigMap()
@@ -237,21 +243,16 @@ class Synapse:
 
         @self.websocket.on(SocketEvent.kConnect)
         async def on_connect(ws):
-            import socket
-
             import synapse.hardware.metrics as metrics
 
             deviceInfo: DeviceInfoProto = DeviceInfoProto()
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-            s.connect(("8.8.8.8", 80))
-            deviceInfo.ip = s.getsockname()[0]
-            s.close()
+            deviceInfo.ip = getIP()
 
             deviceInfo.platform = (
                 metrics.Platform.getCurrentPlatform().getOSType().value
             )
-            deviceInfo.hostname = socket.gethostname()
+            deviceInfo.hostname = self.runtime_handler.networkSettings.hostname
             deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
 
             await self.websocket.sendToClient(
@@ -357,6 +358,9 @@ class Synapse:
                 err(f"Error while closing websocket: {e}")
 
             self.websocket.loop.call_soon_threadsafe(self.websocket.loop.stop)
+
+        # Only join if not current thread
+        if self.websocketThread is not threading.current_thread():
             self.websocketThread.join(timeout=5)
 
     def setupRuntimeCallbacks(self):
@@ -530,6 +534,75 @@ class Synapse:
             )
         elif msgType == MessageTypeProto.SAVE:
             self.runtime_handler.save()
+        elif msgType == MessageTypeProto.SET_NETWORK_SETTINGS:
+            networkSettings: SetNetworkSettingsProto = msgObj.set_network_settings
+            self.setNetworkSettings(networkSettings)
+        elif msgType == MessageTypeProto.REBOOT:
+            self.close()
+            reboot()
+        elif msgType == MessageTypeProto.FORMAT:
+            configFilePath = Path.cwd() / "config" / "settings.yml"
+            os.remove(configFilePath)
+            warn("Config file deleted! all settings will be lost")
+            self.close()
+            reboot()
+        elif msgType == MessageTypeProto.RESTART_SYNAPSE:
+            warn("Attempting to restart Synapse, may cause some unexpected results")
+            self.runtime_handler.isRunning = False
+            self.runtime_handler.cleanup()
+            restartRuntime()
+
+    def setNetworkSettings(self, networkSettings: SetNetworkSettingsProto) -> None:
+        if Platform.getCurrentPlatform().isLinux():
+            network_interfaces = []
+            network_interfaces.extend(psutil.net_if_addrs().keys())
+
+            missingFeature("Static IP doesn't work correctly at the moment")
+            # if (
+            #     IsValidIP(networkSettings.ip)
+            #     and networkSettings.network_interface in network_interfaces
+            # ):
+            # if devicenetworking.setStaticIP(
+            #     networkSettings.ip,
+            #     networkSettings.network_interface,
+            #     teamNumberToIP(networkSettings.team_number, 1),
+            #     prefix_length=24,
+            # ):
+            #     warn(
+            #         "Device wide changes to IP settings might require a restart before taking affect"
+            #     )
+            #
+            #     self.runtime_handler.networkSettings.ip = networkSettings.ip
+            #     self.runtime_handler.networkSettings.networkInterface = (
+            #         networkSettings.network_interface
+            #     )
+            if networkSettings.ip == "NULL":  # Don't configure static IP
+                self.runtime_handler.networkSettings.ip = None
+            else:
+                err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")
+
+            if networkSettings.hostname.__len__() > 0:
+                self.runtime_handler.networkSettings.hostname = networkSettings.hostname
+                devicenetworking.setHostname(networkSettings.hostname)
+            else:
+                err("Empty hostname isn't allowed!")
+        else:
+            missingFeature(
+                "Non-Linux systems network and system settings modification isn't supported at the time"
+            )
+
+        self.runtime_handler.networkSettings.teamNumber = networkSettings.team_number
+        self.runtime_handler.networkSettings.name = networkSettings.network_table
+        self.nt_client.NT_TABLE = networkSettings.network_table
+        warn(
+            "Changes to team number and NetworkTables config will only take affect after restarting the runtime"
+        )
+        self.runtime_handler.save()
+
+    def close(self):
+        self.runtime_handler.isRunning = False
+        self.cleanup()
+        self.runtime_handler.cleanup()
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:
@@ -537,5 +610,4 @@ class Synapse:
         s = Synapse()
         if s.init(handler, root / "config" / "settings.yml"):
             s.run()
-        s.cleanup()
-        handler.cleanup()
+        s.close()

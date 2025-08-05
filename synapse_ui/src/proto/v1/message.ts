@@ -7,7 +7,11 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { CameraProto, SetDefaultPipelineMessageProto } from "./camera";
-import { DeviceInfoProto, HardwareMetricsProto } from "./device";
+import {
+  DeviceInfoProto,
+  HardwareMetricsProto,
+  SetNetworkSettingsProto,
+} from "./device";
 import { LogMessageProto } from "./log";
 import {
   PipelineProto,
@@ -20,6 +24,7 @@ import {
 
 export const protobufPackage = "proto.v1";
 
+/** Enum for different message types in the protocol */
 export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_UNSPECIFIED = 0,
   MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1,
@@ -35,6 +40,10 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11,
   MESSAGE_TYPE_PROTO_LOG = 12,
   MESSAGE_TYPE_PROTO_SAVE = 13,
+  MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS = 14,
+  MESSAGE_TYPE_PROTO_REBOOT = 15,
+  MESSAGE_TYPE_PROTO_FORMAT = 16,
+  MESSAGE_TYPE_PROTO_RESTART_SYNAPSE = 17,
   UNRECOGNIZED = -1,
 }
 
@@ -82,6 +91,18 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 13:
     case "MESSAGE_TYPE_PROTO_SAVE":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE;
+    case 14:
+    case "MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS;
+    case 15:
+    case "MESSAGE_TYPE_PROTO_REBOOT":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_REBOOT;
+    case 16:
+    case "MESSAGE_TYPE_PROTO_FORMAT":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_FORMAT;
+    case 17:
+    case "MESSAGE_TYPE_PROTO_RESTART_SYNAPSE":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_RESTART_SYNAPSE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -119,6 +140,14 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_LOG";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE:
       return "MESSAGE_TYPE_PROTO_SAVE";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS:
+      return "MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_REBOOT:
+      return "MESSAGE_TYPE_PROTO_REBOOT";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_FORMAT:
+      return "MESSAGE_TYPE_PROTO_FORMAT";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_RESTART_SYNAPSE:
+      return "MESSAGE_TYPE_PROTO_RESTART_SYNAPSE";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -138,6 +167,7 @@ export interface MessageProto {
   setDefaultPipeline?: SetDefaultPipelineMessageProto | undefined;
   removePipelineIndex?: number | undefined;
   log?: LogMessageProto | undefined;
+  setNetworkSettings?: SetNetworkSettingsProto | undefined;
   pipelineTypeInfo: PipelineTypeProto[];
 }
 
@@ -155,6 +185,7 @@ function createBaseMessageProto(): MessageProto {
     setDefaultPipeline: undefined,
     removePipelineIndex: undefined,
     log: undefined,
+    setNetworkSettings: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -224,8 +255,14 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.log !== undefined) {
       LogMessageProto.encode(message.log, writer.uint32(98).fork()).join();
     }
+    if (message.setNetworkSettings !== undefined) {
+      SetNetworkSettingsProto.encode(
+        message.setNetworkSettings,
+        writer.uint32(106).fork(),
+      ).join();
+    }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(106).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -357,6 +394,17 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
+          message.setNetworkSettings = SetNetworkSettingsProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
           message.pipelineTypeInfo.push(
             PipelineTypeProto.decode(reader, reader.uint32()),
           );
@@ -405,6 +453,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         ? globalThis.Number(object.removePipelineIndex)
         : undefined,
       log: isSet(object.log) ? LogMessageProto.fromJSON(object.log) : undefined,
+      setNetworkSettings: isSet(object.setNetworkSettings)
+        ? SetNetworkSettingsProto.fromJSON(object.setNetworkSettings)
+        : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
         : [],
@@ -460,6 +511,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.log !== undefined) {
       obj.log = LogMessageProto.toJSON(message.log);
+    }
+    if (message.setNetworkSettings !== undefined) {
+      obj.setNetworkSettings = SetNetworkSettingsProto.toJSON(
+        message.setNetworkSettings,
+      );
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -521,6 +577,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.log =
       object.log !== undefined && object.log !== null
         ? LogMessageProto.fromPartial(object.log)
+        : undefined;
+    message.setNetworkSettings =
+      object.setNetworkSettings !== undefined &&
+      object.setNetworkSettings !== null
+        ? SetNetworkSettingsProto.fromPartial(object.setNetworkSettings)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||
