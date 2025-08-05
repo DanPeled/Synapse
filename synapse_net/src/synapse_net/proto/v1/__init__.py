@@ -28,6 +28,8 @@ class LogLevelProto(betterproto.Enum):
 
 
 class MessageTypeProto(betterproto.Enum):
+    """Enum for different message types in the protocol"""
+
     UNSPECIFIED = 0
     SEND_DEVICE_INFO = 1
     SEND_METRICS = 2
@@ -43,6 +45,10 @@ class MessageTypeProto(betterproto.Enum):
     LOG = 12
     SAVE = 13
     REPORT_CAMERA_PERFORMANCE = 14
+    SET_NETWORK_SETTINGS = 15
+    REBOOT = 16
+    FORMAT = 17
+    RESTART_SYNAPSE = 18
 
 
 @dataclass(eq=False, repr=False)
@@ -112,6 +118,17 @@ class HardwareMetricsProto(betterproto.Message):
     """
     Timestamp when the metrics were last fetched (ISO 8601 or other format)
     """
+
+
+@dataclass(eq=False, repr=False)
+class SetNetworkSettingsProto(betterproto.Message):
+    """Message to set network settings on a device"""
+
+    hostname: str = betterproto.string_field(1)
+    ip: str = betterproto.string_field(2)
+    network_interface: str = betterproto.string_field(3)
+    network_table: str = betterproto.string_field(4)
+    team_number: int = betterproto.uint32_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -230,4 +247,7 @@ class MessageProto(betterproto.Message):
     camera_performance: "CameraPerformanceProto" = betterproto.message_field(
         13, group="payload"
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(14)
+    set_network_settings: "SetNetworkSettingsProto" = betterproto.message_field(
+        14, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(15)

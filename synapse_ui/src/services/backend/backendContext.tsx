@@ -64,7 +64,7 @@ const initialState: BackendStateSystem.State = {
   logs: [],
   cameras: new Map(),
   cameraPerformance: new Map(),
-  networktablesserver: null,
+  teamnumber: 0,
 };
 
 export const BackendStateKeys = Object.keys(initialState).reduce(

@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest import mock
 
 import yaml
-from synapse_installer.deploy import (IsValidIP, _connectAndDeploy, deploy,
-                                      loadDeviceData, setupConfigFile)
+from synapse_installer.deploy import (IsValidIP, _connectAndDeploy,
+                                      addDeviceConfig, deploy, loadDeviceData)
 
 
 def test_is_valid_ip():
@@ -26,13 +26,13 @@ def test_setup_config_file_manual(mock_password, mock_text, mock_select, tmp_pat
     mock_select().ask.return_value = "Manual (Provide hostname & password)"
     mock_text.side_effect = [
         mock.Mock(ask=lambda: "my-device"),  # hostname
-        mock.Mock(ask=lambda: ""),  # nickname (blank)
+        mock.Mock(ask=lambda: "my-device"),  # nickname
         mock.Mock(ask=lambda: "192.168.1.5"),  # IP
     ]
     mock_password().ask.return_value = "pass"
 
     config_path = tmp_path / "config.yml"
-    setupConfigFile(config_path)
+    addDeviceConfig(config_path)
 
     with open(config_path) as f:
         data = yaml.safe_load(f)
@@ -98,14 +98,14 @@ def test_deploy_runs_connect_deploy(mock_connect, tmp_path, monkeypatch):
     mock_connect.assert_called_once()
 
 
-@mock.patch("synapse_installer.deploy.setupConfigFile")
+@mock.patch("synapse_installer.deploy.addDeviceConfig")
 def test_load_device_data_creates_when_missing(mock_setup, tmp_path):
     path = tmp_path / "nonexistent.yaml"
     loadDeviceData(path)
     mock_setup.assert_called_once_with(path)
 
 
-@mock.patch("synapse_installer.deploy.setupConfigFile")
+@mock.patch("synapse_installer.deploy.addDeviceConfig")
 def test_load_device_data_creates_when_empty(mock_setup, tmp_path):
     path = tmp_path / "empty.yaml"
     path.write_text("")

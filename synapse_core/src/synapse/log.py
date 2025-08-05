@@ -122,3 +122,9 @@ def warn(text: str):
         v1.LogLevelProto.WARNING,
         WebSocketServer.kInstance,
     )
+
+
+def missingFeature(text: str) -> None:
+    err(
+        f"{text}\nIf you'd like to see this feature added, feel free to open an issue on GitHub — or even better, contribute by submitting a pull request!\nGitHub repo: https://github.com/DanPeled/Synapse"
+    )

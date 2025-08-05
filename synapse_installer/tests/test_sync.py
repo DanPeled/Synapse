@@ -1,89 +1,144 @@
-# SPDX-FileCopyrightText: 2025 Dan Peled
-#
-# SPDX-License-Identifier: GPL-3.0-or-later
-
+import io
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
-from synapse_installer.sync import syncRequirements
+import synapse_installer.sync as deploy_sync
 
 
 class TestSyncRequirements(unittest.TestCase):
     @patch("paramiko.SSHClient")
-    @patch("importlib.metadata.distribution")
-    def test_skip_already_installed_packages(
-        self, mock_distribution, mock_ssh_client_cls
+    @patch("synapse_installer.sync.log.err")
+    @patch("synapse_installer.sync.fprint")
+    def test_sync_requirements_installs_missing_packages(
+        self, mock_fprint, mock_log_err, mock_ssh_client
     ):
-        # Mock distribution.requires to return a list of requirements
-        mock_distribution.return_value.requires = ["package1", "package2"]
-
-        # Setup mocks for SSHClient
+        # Setup mock SSHClient and transport
         mock_client = MagicMock()
-        mock_ssh_client_cls.return_value = mock_client
+        mock_ssh_client.return_value = mock_client
+        mock_transport = MagicMock()
+        mock_client.get_transport.return_value = mock_transport
 
-        mock_client.connect.return_value = None
-        mock_client.get_transport.return_value = True
+        # Simulate installed packages output - only package 'foo' installed
+        installed_packages_output = "foo==1.0.0\n"
+        mock_stdout = MagicMock()
+        mock_stdout.read.return_value = installed_packages_output.encode()
+        mock_stderr = MagicMock()
+        mock_stderr.read.return_value = b""
 
-        # Mock pip freeze output: package1 is installed, package2 is not
-        mock_stdout_freeze = MagicMock()
-        mock_stdout_freeze.read.return_value = b"package1==1.0.0\n"
+        # First exec_command: sudoers setup (no error)
+        mock_client.exec_command.side_effect = [
+            (MagicMock(), MagicMock(), mock_stderr),  # sudoers setup
+            (MagicMock(), mock_stdout, mock_stderr),  # pip freeze
+            # install command for package 'bar'
+            (MagicMock(), MagicMock(), MagicMock()),
+        ]
 
-        def exec_command_side_effect(cmd, *args, **kwargs):
-            if "pip freeze" in cmd:
-                return (None, mock_stdout_freeze, MagicMock())
-            else:
-                # For pip install commands: simulate empty stderr (no error)
-                mock_stderr = MagicMock()
-                mock_stderr.read.return_value = b""
-                return (None, MagicMock(), mock_stderr)
+        # Requirements: 'foo' (already installed), 'bar' (missing)
+        requirements = ["foo>=1.0", "bar==2.0"]
 
-        mock_client.exec_command.side_effect = exec_command_side_effect
+        deploy_sync.syncRequirements("host", "pass", "1.2.3.4", requirements)
 
-        # Call the function — package1 should be skipped, package2 installed
-        syncRequirements("host", "password", "1.2.3.4", ["package1", "package2"])
-
-        calls = [call[0][0] for call in mock_client.exec_command.call_args_list]
-
-        self.assertIn("pip freeze", calls[0])
-        self.assertTrue(any("pip install package2" in c for c in calls))
-        self.assertFalse(any("pip install package1" in c for c in calls[1:]))
+        # Check that fprint was called with installing message for 'bar'
+        calls = [call.args[0] for call in mock_fprint.call_args_list]
+        self.assertTrue(any("Installing bar" in c for c in calls))
 
     @patch("paramiko.SSHClient")
-    @patch("importlib.metadata.distribution")
-    def test_install_failure_logs_error(self, mock_distribution, mock_ssh_client_cls):
-        mock_distribution.return_value.requires = ["badpackage"]
+    @patch("synapse_installer.sync.log.err")
+    def test_sync_requirements_ssh_exception_logs_error(
+        self, mock_log_err, mock_ssh_client
+    ):
+        mock_ssh_client.side_effect = Exception("SSH failure")
+        deploy_sync.syncRequirements("host", "pass", "1.2.3.4", ["foo"])
+        mock_log_err.assert_called()
+        self.assertIn("SSH failure", mock_log_err.call_args[0][0])
 
-        mock_client = MagicMock()
-        mock_ssh_client_cls.return_value = mock_client
 
-        mock_client.connect.return_value = None
-        mock_client.get_transport.return_value = True
+class TestSync(unittest.TestCase):
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="deploy:\n  device1:\n    hostname: host1\n    password: pass1\n    ip: 1.2.3.4\n",
+    )
+    @patch("synapse_installer.sync.Path.exists", return_value=True)
+    @patch("synapse_installer.sync.addDeviceConfig")
+    @patch("synapse_installer.sync.distribution")
+    @patch("synapse_installer.sync.syncRequirements")
+    @patch("synapse_installer.sync.fprint")
+    def test_sync_calls_syncRequirements_with_deploy(
+        self,
+        mock_fprint,
+        mock_sync_req,
+        mock_dist,
+        mock_add_config,
+        mock_path_exists,
+        mock_file,
+    ):
+        # Setup distribution requires
+        mock_dist.return_value.requires = ["pkg1", "pkg2"]
 
-        # pip freeze empty -> no packages installed
-        mock_stdout_freeze = MagicMock()
-        mock_stdout_freeze.read.return_value = b""
+        argv = ["scriptname", "device1"]
 
-        # Simulate error on install
-        mock_stderr = MagicMock()
-        mock_stderr.read.return_value = b"ERROR: Could not install package"
+        deploy_sync.sync(argv)
 
-        def exec_command_side_effect(cmd, *args, **kwargs):
-            if "pip freeze" in cmd:
-                return (None, mock_stdout_freeze, MagicMock())
+        mock_sync_req.assert_called_once_with(
+            "host1", "pass1", "1.2.3.4", ["pkg1", "pkg2"]
+        )
+
+    @patch("synapse_installer.sync.Path.exists", return_value=False)
+    def test_sync_no_synapseproject_file_raises_assertion(self, mock_path_exists):
+        with self.assertRaises(AssertionError):
+            deploy_sync.sync(["device1"])
+
+    @patch("builtins.open", new_callable=mock_open, read_data="deploy: {}\n")
+    @patch("synapse_installer.sync.Path.exists", return_value=True)
+    @patch("synapse_installer.sync.addDeviceConfig")
+    @patch("synapse_installer.sync.fprint")
+    def test_sync_adds_device_config_if_deploy_missing(
+        self, mock_fprint, mock_add_config, mock_path_exists, mock_file
+    ):
+        argv = ["scriptname", "device1"]
+        # Simulate no 'deploy' in data on first read, then deploy added on second read
+        # mock_open cannot do multiple returns easily, so patch open to simulate this
+        data_with_no_deploy = ""
+        data_with_deploy = "deploy:\n  device1:\n    hostname: host1\n    password: pass1\n    ip: 1.2.3.4\n"
+
+        def open_side_effect(file, mode="r", *args, **kwargs):
+            if open_side_effect.counter == 0:  # pyright: ignore
+                open_side_effect.counter += 1  # pyright: ignore
+                file_object = io.StringIO(data_with_no_deploy)
+                return file_object
             else:
-                return (None, MagicMock(), mock_stderr)
+                return io.StringIO(data_with_deploy)
 
-        mock_client.exec_command.side_effect = exec_command_side_effect
+        open_side_effect.counter = 0  # pyright: ignore
 
-        with (
-            patch("synapse.log.err") as mock_log_err,
-            patch("builtins.print") as _,
-            patch("synapse_installer.deploy.fprint") as _,
-        ):
-            syncRequirements("host", "password", "1.2.3.4", ["badpackage"])
+        with patch("builtins.open", side_effect=open_side_effect):
+            with patch("synapse_installer.sync.distribution") as mock_dist:
+                with patch("synapse_installer.sync.syncRequirements") as mock_sync_req:
+                    mock_dist.return_value.requires = ["pkg1"]
+                    deploy_sync.sync(argv)
+                    mock_add_config.assert_called_once()
+                    mock_sync_req.assert_called_once_with(
+                        "host1", "pass1", "1.2.3.4", ["pkg1"]
+                    )
 
-        # No exception raised, so no call to log.err expected here
-        mock_log_err.assert_not_called()
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="deploy:\n  device2:\n    hostname: host2\n    password: pass2\n    ip: 2.3.4.5\n",
+    )
+    @patch("synapse_installer.sync.Path.exists", return_value=True)
+    @patch("synapse_installer.sync.fprint")
+    def test_sync_hostname_not_in_deploy(
+        self, mock_fprint, mock_path_exists, mock_file
+    ):
+        argv = ["scriptname", "unknown_device"]
+        deploy_sync.sync(argv)
+        mock_fprint.assert_called()
+        self.assertIn(
+            "No device named: `unknown_device` found! skipping...",
+            mock_fprint.call_args[0][0],
+        )
 
 
 if __name__ == "__main__":

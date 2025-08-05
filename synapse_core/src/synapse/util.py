@@ -12,6 +12,16 @@ from .core.pipeline import Pipeline
 from .log import err
 
 
+def getIP() -> str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+    s.close()
+
+    return ip
+
+
 def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
     """
     Converts a 2D list containing position and rotation data into a Transform3d object.

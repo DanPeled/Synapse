@@ -16,7 +16,7 @@ export namespace BackendStateSystem {
     networktable: string;
     logs: LogMessageProto[];
     socket?: WebSocketWrapper;
-    networktablesserver: string | null;
+    teamnumber: number;
     cameras: Map<CameraID, CameraProto>;
     cameraPerformance: Map<CameraID, CameraPerformanceProto>;
     pipelines: Map<PipelineID, PipelineProto>;

@@ -17,13 +17,8 @@ import {
   iconSize,
   teamColor,
 } from "@/services/style";
-import { AlertDialog } from "@/widgets/alertDialog";
 import { Button, DangerButton } from "@/widgets/button";
 import { Column, Row } from "@/widgets/containers";
-import { Dropdown } from "@/widgets/dropdown";
-import OptionSelector from "@/widgets/optionSelector";
-import TextInput from "@/widgets/textInput";
-import ToggleButton from "@/widgets/toggleButtons";
 import {
   AlertTriangle,
   ChartColumnBig,
@@ -33,184 +28,14 @@ import {
   Eye,
   Import,
   ListRestart,
-  Network,
   RotateCcw,
   Skull,
-  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProgramLogsDialog } from "./programLogsDialog";
-
-enum IPMode {
-  static = "Static",
-  dhcp = "DHCP",
-}
-
-function NetworkSettings({}) {
-  const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
-  const {
-    deviceinfo,
-    networktable,
-    setNetworktable,
-    connection,
-    networktablesserver: networkTablesServer,
-    setNetworktablesserver,
-  } = useBackendContext();
-  const [networkInterface, setNetworkInterface] = useState(
-    deviceinfo.networkInterfaces[0],
-  );
-  const [hostname, setPropHostname] = useState(deviceinfo.hostname);
-  const [ipMode, setIpMode] = useState(IPMode.dhcp.valueOf());
-  const [staticIPAddr, setStaticIPAddr] = useState(deviceinfo.ip);
-
-  const teamNumberRegex = "\\d+(\\.\\d+)?";
-  const ipAddressRegex =
-    "((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)(\\.(?!$)|$)){4}";
-  const teamNumberOrIPRegex = new RegExp(
-    `^(${teamNumberRegex}|${ipAddressRegex})$`,
-  );
-  const ipv4Regex = /^((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.|$)){4}$/;
-
-  useEffect(() => {
-    if (connection.backend) {
-      setPropHostname(deviceinfo.hostname);
-      setStaticIPAddr(deviceinfo.ip);
-      setNetworkInterface(deviceinfo.networkInterfaces.at(0) ?? "");
-    }
-  }, [deviceinfo, hostname, connection]);
-
-  return (
-    <Card
-      style={{ backgroundColor: baseCardColor, color: teamColor }}
-      className="border-gray-700 min-w-[450px]"
-    >
-      <CardHeader className="pb-0">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Network />
-          Network Settings
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Column gap="gap-3 text-lg">
-          <TextInput
-            label="Team Number / NetworkTables Server Address"
-            pattern={teamNumberOrIPRegex}
-            value={networkTablesServer ?? ""}
-            errorMessage="The NetworkTables Server Address must be a valid Team Number or IP address"
-            onChange={(val) => {
-              setNetworktablesserver(val);
-            }}
-            textSize="text-lg"
-          />
-          <TextInput
-            label="NetworkTable"
-            value={networktable}
-            onChange={(val) => {
-              setNetworktable(val);
-            }}
-            textSize="text-lg"
-          />
-          <ToggleButton
-            label="Manage Device Networking"
-            value={manageDeviceNetworking}
-            onToggleAction={(val) => {
-              setManageDeviceNetworking(val);
-            }}
-          />
-          <Row className="items-center gap-4">
-            <TextInput
-              label={
-                ipMode === IPMode.static ? "Static IP" : "Current IP (DHCP)"
-              }
-              value={staticIPAddr ?? "127.0.0.1"}
-              errorMessage="Invalid IPv4 Address"
-              onChange={(val) => {
-                setStaticIPAddr(val);
-              }}
-              pattern={ipv4Regex}
-              textSize="text-lg"
-              disabled={!manageDeviceNetworking || ipMode === IPMode.dhcp}
-            />
-            {ipMode === IPMode.static && (
-              <TextInput
-                label="/"
-                placeholder="24"
-                errorMessage="Invalid CIDR"
-                maxLength={2}
-                onChange={(_) => {}}
-                value="24"
-                textSize="text-lg"
-                disabled={
-                  !manageDeviceNetworking || ipMode === IPMode.dhcp.valueOf()
-                }
-                inputWidth="w-10"
-                allowedChars={"[0-9]"}
-              />
-            )}
-            <div className="ml-auto pr-8">
-              <OptionSelector
-                label=""
-                options={[
-                  {
-                    label: IPMode.dhcp,
-                    value: IPMode.dhcp,
-                    tooltip:
-                      "Router will automatically assign an IP address that changes across reboots",
-                  },
-                  {
-                    label: IPMode.static,
-                    value: IPMode.static,
-                    tooltip: "User-picked IP address that doesn't change",
-                  },
-                ]}
-                onChange={(val) => setIpMode(val.toString())}
-                value={ipMode}
-                disabled={!manageDeviceNetworking}
-              />
-            </div>
-          </Row>
-          <TextInput
-            label="Hostname"
-            onChange={setPropHostname}
-            disabled={!manageDeviceNetworking}
-            value={deviceinfo.hostname ?? "Unknown"}
-            textSize="text-lg"
-          />
-          <Dropdown<string>
-            label="NetworkManager Interface"
-            value={networkInterface}
-            options={deviceinfo.networkInterfaces.map((inter) => ({
-              label: inter,
-              value: inter,
-            }))}
-            onValueChange={(val) => {
-              setNetworkInterface(val);
-            }}
-            disabled={!manageDeviceNetworking}
-            textSize="text-lg"
-          />
-          <Button
-            className="mt-8"
-            onClickAction={() => {
-              // socket?.send(
-              //   createMessage("set_network_config", {
-              //     ip: ipMode == IPMode.static ? staticIPAddr : null,
-              //     networkInterface: networkInterface,
-              //     hostname: hostname,
-              //     networkTable: networktable ?? "Synapse",
-              //     networkTablesServer: networkTablesServer,
-              //   }),
-              // );
-            }}
-            disabled={!connection.backend || !manageDeviceNetworking}
-          >
-            Save
-          </Button>
-        </Column>
-      </CardContent>
-    </Card>
-  );
-}
+import { NetworkSettings } from "./network_settings";
+import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import { WebSocketWrapper } from "@/services/websocket";
 
 function DeviceInfo({}) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
@@ -304,7 +129,7 @@ function DeviceInfo({}) {
   );
 }
 
-function DangerZone() {
+function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
   return (
     <Column gap="gap-5">
       <h2 className="text-yellow-400 text-lg flex gap-2 items-center">
@@ -314,6 +139,16 @@ function DangerZone() {
         <DangerButton
           warning="Restarting Synapse will restart all runtime processes. Proceed only if necessary."
           className="w-full"
+          onClickAction={() => {
+            const payload = MessageProto.create({
+              type: MessageTypeProto.MESSAGE_TYPE_PROTO_RESTART_SYNAPSE,
+              removePipelineIndex: -1,
+            });
+
+            const binary = MessageProto.encode(payload).finish();
+            socket?.sendBinary(binary);
+          }}
+          disabled={true}
         >
           <span className="flex items-center justify-center gap-2">
             <RotateCcw size={iconSize} />
@@ -323,6 +158,15 @@ function DangerZone() {
         <DangerButton
           warning="Restarting the device will stop all processes. Make sure to save your work."
           className="w-full"
+          onClickAction={() => {
+            const payload = MessageProto.create({
+              type: MessageTypeProto.MESSAGE_TYPE_PROTO_REBOOT,
+              removePipelineIndex: -1,
+            });
+
+            const binary = MessageProto.encode(payload).finish();
+            socket?.sendBinary(binary);
+          }}
         >
           <span className="flex items-center justify-center gap-2">
             <ListRestart size={iconSize} />
@@ -332,8 +176,17 @@ function DangerZone() {
       </Row>
 
       <DangerButton
-        warning="WARNING: This action will factory reset the device and permanently delete all saved data. This cannot be undone."
+        warning="WARNING: This action will factory reset the device and permanently delete all saved data. This cannot be undone. Once this is confirmed the device will restart."
         className="w-full"
+        onClickAction={() => {
+          const payload = MessageProto.create({
+            type: MessageTypeProto.MESSAGE_TYPE_PROTO_FORMAT,
+            removePipelineIndex: -1,
+          });
+
+          const binary = MessageProto.encode(payload).finish();
+          socket?.sendBinary(binary);
+        }}
       >
         <span className="flex items-center justify-center gap-2">
           <Skull size={iconSize} />
@@ -346,7 +199,7 @@ function DangerZone() {
 
 function DeviceControls({}) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
-  const { logs } = useBackendContext();
+  const { logs, socket } = useBackendContext();
 
   return (
     <Card
@@ -392,7 +245,7 @@ function DeviceControls({}) {
               </span>
             </Button>
           </Row>
-          <DangerZone />
+          <DangerZone socket={socket} />
         </Column>
 
         <ProgramLogsDialog
