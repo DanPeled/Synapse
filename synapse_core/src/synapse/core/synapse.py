@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import psutil
-from synapse_installer.deploy import IsValidIP
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineProto,
@@ -558,26 +557,26 @@ class Synapse:
             network_interfaces = []
             network_interfaces.extend(psutil.net_if_addrs().keys())
 
-            if (
-                IsValidIP(networkSettings.ip)
-                and networkSettings.network_interface in network_interfaces
-            ):
-                missingFeature("Static IP doesn't work correctly at the moment")
-                # if devicenetworking.setStaticIP(
-                #     networkSettings.ip,
-                #     networkSettings.network_interface,
-                #     teamNumberToIP(networkSettings.team_number, 1),
-                #     prefix_length=24,
-                # ):
-                #     warn(
-                #         "Device wide changes to IP settings might require a restart before taking affect"
-                #     )
-                #
-                #     self.runtime_handler.networkSettings.ip = networkSettings.ip
-                #     self.runtime_handler.networkSettings.networkInterface = (
-                #         networkSettings.network_interface
-                #     )
-            elif networkSettings.ip == "NULL":  # Don't configure static IP
+            missingFeature("Static IP doesn't work correctly at the moment")
+            # if (
+            #     IsValidIP(networkSettings.ip)
+            #     and networkSettings.network_interface in network_interfaces
+            # ):
+            # if devicenetworking.setStaticIP(
+            #     networkSettings.ip,
+            #     networkSettings.network_interface,
+            #     teamNumberToIP(networkSettings.team_number, 1),
+            #     prefix_length=24,
+            # ):
+            #     warn(
+            #         "Device wide changes to IP settings might require a restart before taking affect"
+            #     )
+            #
+            #     self.runtime_handler.networkSettings.ip = networkSettings.ip
+            #     self.runtime_handler.networkSettings.networkInterface = (
+            #         networkSettings.network_interface
+            #     )
+            if networkSettings.ip == "NULL":  # Don't configure static IP
                 self.runtime_handler.networkSettings.ip = None
             else:
                 err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")

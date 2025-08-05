@@ -105,6 +105,9 @@ def sync(argv: Optional[List[str]]) -> None:
     with open(deployConfigPath, "r") as f:
         data: dict = yaml.full_load(f)
 
+    if data is None:
+        data = {}
+
     if "deploy" not in data:
         addDeviceConfig(deployConfigPath)
         with open(deployConfigPath, "r") as f:

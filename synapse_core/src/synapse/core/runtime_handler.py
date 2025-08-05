@@ -727,8 +727,6 @@ class RuntimeManager:
             directory (Path): Path to directory containing pipelines and configurations.
         """
 
-        import atexit
-
         log.log(
             MarkupColors.header(
                 "\n" + "=" * 20 + " Loading Pipelines & Camera Configs... " + "=" * 20
@@ -746,8 +744,6 @@ class RuntimeManager:
         self.startMetricsThread()
 
         self.isSetup = True
-
-        atexit.register(self.cleanup)
 
     def assignDefaultPipelines(self) -> None:
         """
