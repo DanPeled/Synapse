@@ -1,4 +1,5 @@
-# Synapse
+![](https://github.com/DanPeled/Synapse/blob/docs/docs/.gitbook/assets/SynapseHeader.png?raw=true)
+
 A library for running custom vision code on an FRC coprocessor.
 
 ## Features
