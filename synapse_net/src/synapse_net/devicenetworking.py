@@ -1,36 +1,105 @@
 import shutil
 import subprocess
-from typing import Optional
+import threading
+import time
+from typing import Callable, Dict, List
 
-from synapse.log import err, log
+from synapse.log import err, log, warn
+
+virtualLabel = "static"
+checkInterval = 5
+
+InterfaceName = str
 
 
-def setStaticIP(ip: str, interface: str, gateway: str, prefix_length: int = 24) -> None:
-    # BUG: doesnt work correctly at the moment, unsure why
-    try:
-        # Add IP with correct prefix length
-        subprocess.run(
-            ["sudo", "ip", "addr", "add", f"{ip}/{prefix_length}", "dev", interface],
-            check=True,
+class NetworkingManager:
+    def __init__(self):
+        self.staticIpThreads: Dict[InterfaceName, threading.Thread] = {}
+        self.threadsStatus: Dict[InterfaceName, bool] = {}
+
+    @staticmethod
+    def __runCommand(command: List[str]):
+        try:
+            subprocess.run(
+                command,
+                check=True,
+                stdout=subprocess.DEVNULL,  # Hide stdout
+                stderr=subprocess.PIPE,  # Capture stderr
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            err(f"Command failed: {e}\n{e.stderr.strip()}")
+
+    @staticmethod
+    def __interfaceIsUp(interface: InterfaceName):
+        try:
+            with open(f"/sys/class/net/{interface}/operstate") as f:
+                return f.read().strip() == "up"
+        except Exception:
+            return False
+
+    @staticmethod
+    def __ipIsConfigured(interface: InterfaceName, staticIp):
+        try:
+            output = subprocess.check_output(["ip", "addr", "show", interface])
+            return staticIp.split("/")[0].encode() in output
+        except Exception:
+            return False
+
+    @staticmethod
+    def __setStaticIp(interface: InterfaceName, staticIp):
+        if not NetworkingManager.__ipIsConfigured(interface, staticIp):
+            NetworkingManager.__runCommand(
+                ["sudo", "ip", "addr", "add", f"{staticIp}/24", "dev", interface]
+            )
+
+    @staticmethod
+    def __startDhcp(interface: InterfaceName):
+        if shutil.which("dhclient"):
+            NetworkingManager.__runCommand(["sudo", "dhclient", "-v", interface])
+        else:
+            warn(
+                "dhclient not found. DHCP will not be started unless handled externally."
+            )
+
+    @staticmethod
+    def __networkThreadLoop(
+        interface: InterfaceName, staticIp: str, run: Callable[[], bool]
+    ) -> None:
+        while run():
+            if NetworkingManager.__interfaceIsUp(interface):
+                try:
+                    NetworkingManager.__setStaticIp(interface, staticIp)
+                    NetworkingManager.__startDhcp(interface)
+                except subprocess.CalledProcessError as e:
+                    err(f"Command failed: {e}")
+            else:
+                warn(f"{interface} is down. Waiting...")
+
+            time.sleep(checkInterval)
+
+    def configureStaticIP(self, ip: str, interface: InterfaceName) -> None:
+        if interface in self.staticIpThreads:
+            self.threadsStatus[interface] = False
+            self.staticIpThreads[interface].join()
+        self.threadsStatus[interface] = True
+        self.staticIpThreads[interface] = threading.Thread(
+            target=lambda: NetworkingManager.__networkThreadLoop(
+                interface, ip, lambda: self.threadsStatus[interface]
+            )
         )
+        self.staticIpThreads[interface].start()
 
-        # Bring interface up
-        subprocess.run(["sudo", "ip", "link", "set", interface, "up"], check=True)
+    def removeStaticIPDecl(self, interface: InterfaceName) -> None:
+        if interface in self.staticIpThreads:
+            thread = self.staticIpThreads[interface]
+            self.threadsStatus[interface] = False
+            thread.join()
 
-        # Delete any existing default route
-        subprocess.run(["sudo", "ip", "route", "del", "default"], check=False)
-
-        # Add default gateway explicitly specifying interface
-        subprocess.run(
-            ["sudo", "ip", "route", "add", "default", "via", gateway, "dev", interface],
-            check=True,
-        )
-
-        log(
-            f"Static IP {ip}/{prefix_length} set on interface {interface} with gateway {gateway}"
-        )
-    except Exception as e:
-        err(f"Failed to set static IP: {e}")
+    def close(self):
+        for interface, thread in self.staticIpThreads.items():
+            self.threadsStatus[interface] = False
+            thread.join()
 
 
 def setHostname(hostname: str) -> None:
@@ -55,7 +124,7 @@ def setHostname(hostname: str) -> None:
         err(f"Failed to set hostname: {e}")
 
 
-def updateHostsFile(new_hostname):
+def updateHostsFile(new_hostname: str):
     try:
         # Read /etc/hosts using sudo
         result = subprocess.run(
@@ -83,22 +152,3 @@ def updateHostsFile(new_hostname):
 
     except Exception as e:
         err(f"Failed to update /etc/hosts: {e}")
-
-
-def getDefaultGateway() -> Optional[str]:
-    try:
-        result = subprocess.run(
-            ["ip", "route", "show", "default"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        # Example output: "default via 192.168.1.1 dev eth0 proto dhcp metric 100"
-        for line in result.stdout.splitlines():
-            parts = line.split(" ")
-            if "default" in parts and "via" in parts:
-                gatewayIndex = parts.index("via") + 1
-                return parts[gatewayIndex]
-    except Exception as e:
-        err(f"Failed to get default gateway: {e}")
-    return None
