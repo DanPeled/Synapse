@@ -137,7 +137,7 @@ export function NetworkSettings({}) {
                 ]}
                 onChange={(val) => setIpMode(val.toString())}
                 value={ipMode}
-                disabled={true}
+                disabled={!manageDeviceNetworking}
               />
             </div>
           </Row>
