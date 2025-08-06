@@ -137,7 +137,7 @@ export function NetworkSettings({}) {
                 ]}
                 onChange={(val) => setIpMode(val.toString())}
                 value={ipMode}
-                disabled={true}
+                disabled={!manageDeviceNetworking}
               />
             </div>
           </Row>
@@ -182,10 +182,6 @@ export function NetworkSettings({}) {
           >
             Save
           </Button>
-          <p>
-            DISCLAIMER: Static IP doesn`t work at the moment and thus is
-            disabled in the UI and runtime
-          </p>
         </Column>
       </CardContent>
     </Card>
