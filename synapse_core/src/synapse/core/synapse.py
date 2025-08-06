@@ -153,6 +153,14 @@ class Synapse:
             config.load(filePath=config_path)
             self.runtime_handler.networkSettings = config.network
 
+            if (
+                config.network.ip is not None
+                and config.network.networkInterface is not None
+            ):
+                self.networkingManager.configureStaticIP(
+                    config.network.ip, config.network.networkInterface
+                )
+
             # Load the settings from the config file
             settings: dict = config.getConfigMap()
             self.settings_dict = settings
