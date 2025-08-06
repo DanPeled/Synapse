@@ -1,8 +1,5 @@
 ![](https://github.com/DanPeled/Synapse/blob/docs/docs/.gitbook/assets/SynapseHeader.png?raw=true)
 
-A library for running custom vision code on an FRC coprocessor.
-
-## Features
 - **Pipeline System:** Organize and manage vision processing tasks efficiently.
 - **Multiple Camera Support:** Handle multiple camera inputs simultaneously.
 - **NetworkTables Integration:** Post vision results directly to NetworkTables for easy access in FRC dashboards.
@@ -18,24 +15,6 @@ A library for running custom vision code on an FRC coprocessor.
   - Monitoring output data and debugging visually
   Designed for intuitive interaction and minimal setup.
 
-## Installation
-### Requirements:
-- [Python 3.10](https://www.python.org/downloads/)
-
-### Development Computer Installation
-Install the runtime pip package via
-```bash 
-pip install git+https://github.com/DanPeled/Synapse
-```
-
-### CoProcessor Installation
-Coming soon...
-
-# Development
-## Getting Started
-1. Clone the repository.
-2. Install required dependencies.
-3. Deploy code onto the coprocessor
 
 ## Project Structure
 - `synapse_core`: Contains the core Python library for Synapse.
@@ -44,4 +23,4 @@ Coming soon...
 - `synapse_ui`: Contains the graphical user interface (UI) for interacting with the Synapse runtime.
 
 ## License
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GNU V3 License](LICENSE).
