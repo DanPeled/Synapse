@@ -49,16 +49,18 @@ class MessageTypeProto(betterproto.Enum):
     REBOOT = 16
     FORMAT = 17
     RESTART_SYNAPSE = 18
+    RENAME_CAMERA = 19
 
 
 @dataclass(eq=False, repr=False)
 class CameraProto(betterproto.Message):
     name: str = betterproto.string_field(1)
     stream_path: str = betterproto.string_field(2)
-    physical_connection: str = betterproto.string_field(3)
+    kind: str = betterproto.string_field(3)
     index: int = betterproto.int32_field(4)
     pipeline_index: int = betterproto.int32_field(5)
     default_pipeline: int = betterproto.int32_field(6)
+    max_fps: int = betterproto.int32_field(7)
 
 
 @dataclass(eq=False, repr=False)
@@ -73,6 +75,12 @@ class CameraPerformanceProto(betterproto.Message):
 class SetDefaultPipelineMessageProto(betterproto.Message):
     camera_index: int = betterproto.int32_field(1)
     pipeline_index: int = betterproto.int32_field(2)
+
+
+@dataclass(eq=False, repr=False)
+class RenameCameraMessageProto(betterproto.Message):
+    camera_index: int = betterproto.int32_field(1)
+    new_name: str = betterproto.string_field(2)
 
 
 @dataclass(eq=False, repr=False)
@@ -250,4 +258,7 @@ class MessageProto(betterproto.Message):
     set_network_settings: "SetNetworkSettingsProto" = betterproto.message_field(
         14, group="payload"
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(15)
+    rename_camera: "RenameCameraMessageProto" = betterproto.message_field(
+        15, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(16)

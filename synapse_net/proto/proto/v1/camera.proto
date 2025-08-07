@@ -5,10 +5,11 @@ package proto.v1;
 message CameraProto {
   string name = 1;
   string stream_path = 2;
-  string physical_connection = 3;
+  string kind = 3;
   int32 index = 4;
   int32 pipeline_index = 5;
   int32 default_pipeline = 6;
+  int32 max_fps = 7;
 }
 
 message CameraPerformanceProto {
@@ -21,4 +22,9 @@ message CameraPerformanceProto {
 message SetDefaultPipelineMessageProto {
   int32 camera_index = 1;
   int32 pipeline_index = 2;
+}
+
+message RenameCameraMessageProto {
+  int32 camera_index = 1;
+  string new_name = 2;
 }

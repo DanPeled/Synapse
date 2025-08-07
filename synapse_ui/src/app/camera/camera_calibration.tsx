@@ -111,14 +111,6 @@ function CalibrationHeader() {
           className="hover:bg-zinc-700 cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
-          Export Results
-        </Button>
-        <Button
-          size="sm"
-          style={{ color: teamColor }}
-          className="hover:bg-zinc-700 cursor-pointer"
-        >
-          <Download className="w-4 h-4 mr-2" />
           Import Results
         </Button>
       </Row>
@@ -410,7 +402,7 @@ export function CameraCalibrationModule() {
             size="sm"
             variant="outline"
             onClick={() => setShowMoreInfo(!showMoreInfo)}
-            className="flex items-center bg-zinc-900 hover:bg-zinc-700 cursor-pointer"
+            className="flex items-center bg-zinc-800 hover:bg-zinc-700 cursor-pointer border-zinc-700"
             aria-expanded={showMoreInfo}
             aria-controls="detailed-info-section"
             style={{ color: teamColor }}

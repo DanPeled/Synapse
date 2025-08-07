@@ -23,9 +23,10 @@ message MessageProto {
     LogMessageProto log = 12;
     CameraPerformanceProto camera_performance = 13;
     SetNetworkSettingsProto set_network_settings = 14;
+    RenameCameraMessageProto rename_camera = 15;
   }
 
-  repeated PipelineTypeProto pipeline_type_info = 15;
+  repeated PipelineTypeProto pipeline_type_info = 16;
 }
 
 // Enum for different message types in the protocol
@@ -49,4 +50,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_REBOOT = 16;
   MESSAGE_TYPE_PROTO_FORMAT = 17;
   MESSAGE_TYPE_PROTO_RESTART_SYNAPSE = 18;
+  MESSAGE_TYPE_PROTO_RENAME_CAMERA = 19;
 }

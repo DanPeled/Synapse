@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Iterable, Optional, TypeVar, Union, overload
+from functools import cache
+from typing import (Any, Callable, Generic, Iterable, Optional, Type, TypeVar,
+                    Union, overload)
 
 from ntcore import NetworkTable
 from synapse_net.proto.v1 import PipelineProto
@@ -136,3 +138,34 @@ def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
     )
 
     return msg
+
+
+TClass = TypeVar("TClass")
+
+
+def pipelineName(name: str) -> Callable[[Type[TClass]], Type[TClass]]:
+    def wrap(cls: Type[TClass]) -> Type[TClass]:
+        setattr(cls, "__typename", name)
+        return cls
+
+    return wrap
+
+
+def systemPipeline(
+    name: Optional[str] = None,
+) -> Callable[[Type[TClass]], Type[TClass]]:
+    def wrap(cls: Type[TClass]) -> Type[TClass]:
+        resultingName: str = name or cls.__name__
+        resultingName = f"$${resultingName}$$"
+        setattr(cls, "__typename", resultingName)
+        return cls
+
+    return wrap
+
+
+@cache
+def getPipelineTypename(pipelineType: Type[Pipeline]) -> str:
+    if hasattr(pipelineType, "__typename"):
+        return getattr(pipelineType, "__typename")
+    else:
+        return pipelineType.__name__

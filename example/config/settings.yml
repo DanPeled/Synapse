@@ -1,5 +1,4 @@
 network: { team_number: 9738, name: SynapseExample, ip: null, interface: null }
-
 global:
   camera_configs:
     0:

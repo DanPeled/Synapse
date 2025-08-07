@@ -72,9 +72,9 @@ def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:
     return [
         [translation.x, translation.y, translation.z],
         [
-            rotation.X(),  # Roll
-            rotation.Y(),  # Pitch
-            rotation.Z(),  # Yaw
+            rotation.x_degrees,  # Roll
+            rotation.y_degrees,  # Pitch
+            rotation.z_degrees,  # Yaw
         ],
     ]
 
@@ -87,12 +87,3 @@ def resolveGenericArgument(cls) -> Optional[Type]:
             if args:
                 return args[0]
     return None
-
-
-def getIP() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    s.connect(("8.8.8.8", 80))
-    ip = s.getsockname()[0]
-    s.close()
-    return ip

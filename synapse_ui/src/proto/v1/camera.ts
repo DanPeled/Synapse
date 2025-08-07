@@ -12,10 +12,11 @@ export const protobufPackage = "proto.v1";
 export interface CameraProto {
   name: string;
   streamPath: string;
-  physicalConnection: string;
+  kind: string;
   index: number;
   pipelineIndex: number;
   defaultPipeline: number;
+  maxFps: number;
 }
 
 export interface CameraPerformanceProto {
@@ -30,14 +31,20 @@ export interface SetDefaultPipelineMessageProto {
   pipelineIndex: number;
 }
 
+export interface RenameCameraMessageProto {
+  cameraIndex: number;
+  newName: string;
+}
+
 function createBaseCameraProto(): CameraProto {
   return {
     name: "",
     streamPath: "",
-    physicalConnection: "",
+    kind: "",
     index: 0,
     pipelineIndex: 0,
     defaultPipeline: 0,
+    maxFps: 0,
   };
 }
 
@@ -52,8 +59,8 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.streamPath !== "") {
       writer.uint32(18).string(message.streamPath);
     }
-    if (message.physicalConnection !== "") {
-      writer.uint32(26).string(message.physicalConnection);
+    if (message.kind !== "") {
+      writer.uint32(26).string(message.kind);
     }
     if (message.index !== 0) {
       writer.uint32(32).int32(message.index);
@@ -63,6 +70,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.defaultPipeline !== 0) {
       writer.uint32(48).int32(message.defaultPipeline);
+    }
+    if (message.maxFps !== 0) {
+      writer.uint32(56).int32(message.maxFps);
     }
     return writer;
   },
@@ -96,7 +106,7 @@ export const CameraProto: MessageFns<CameraProto> = {
             break;
           }
 
-          message.physicalConnection = reader.string();
+          message.kind = reader.string();
           continue;
         }
         case 4: {
@@ -123,6 +133,14 @@ export const CameraProto: MessageFns<CameraProto> = {
           message.defaultPipeline = reader.int32();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.maxFps = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -138,9 +156,7 @@ export const CameraProto: MessageFns<CameraProto> = {
       streamPath: isSet(object.streamPath)
         ? globalThis.String(object.streamPath)
         : "",
-      physicalConnection: isSet(object.physicalConnection)
-        ? globalThis.String(object.physicalConnection)
-        : "",
+      kind: isSet(object.kind) ? globalThis.String(object.kind) : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
       pipelineIndex: isSet(object.pipelineIndex)
         ? globalThis.Number(object.pipelineIndex)
@@ -148,6 +164,7 @@ export const CameraProto: MessageFns<CameraProto> = {
       defaultPipeline: isSet(object.defaultPipeline)
         ? globalThis.Number(object.defaultPipeline)
         : 0,
+      maxFps: isSet(object.maxFps) ? globalThis.Number(object.maxFps) : 0,
     };
   },
 
@@ -159,8 +176,8 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.streamPath !== "") {
       obj.streamPath = message.streamPath;
     }
-    if (message.physicalConnection !== "") {
-      obj.physicalConnection = message.physicalConnection;
+    if (message.kind !== "") {
+      obj.kind = message.kind;
     }
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
@@ -170,6 +187,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.defaultPipeline !== 0) {
       obj.defaultPipeline = Math.round(message.defaultPipeline);
+    }
+    if (message.maxFps !== 0) {
+      obj.maxFps = Math.round(message.maxFps);
     }
     return obj;
   },
@@ -183,10 +203,11 @@ export const CameraProto: MessageFns<CameraProto> = {
     const message = createBaseCameraProto();
     message.name = object.name ?? "";
     message.streamPath = object.streamPath ?? "";
-    message.physicalConnection = object.physicalConnection ?? "";
+    message.kind = object.kind ?? "";
     message.index = object.index ?? 0;
     message.pipelineIndex = object.pipelineIndex ?? 0;
     message.defaultPipeline = object.defaultPipeline ?? 0;
+    message.maxFps = object.maxFps ?? 0;
     return message;
   },
 };
@@ -407,6 +428,95 @@ export const SetDefaultPipelineMessageProto: MessageFns<SetDefaultPipelineMessag
       return message;
     },
   };
+
+function createBaseRenameCameraMessageProto(): RenameCameraMessageProto {
+  return { cameraIndex: 0, newName: "" };
+}
+
+export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
+  encode(
+    message: RenameCameraMessageProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.cameraIndex !== 0) {
+      writer.uint32(8).int32(message.cameraIndex);
+    }
+    if (message.newName !== "") {
+      writer.uint32(18).string(message.newName);
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): RenameCameraMessageProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenameCameraMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.cameraIndex = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.newName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenameCameraMessageProto {
+    return {
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
+      newName: isSet(object.newName) ? globalThis.String(object.newName) : "",
+    };
+  },
+
+  toJSON(message: RenameCameraMessageProto): unknown {
+    const obj: any = {};
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
+    }
+    if (message.newName !== "") {
+      obj.newName = message.newName;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(
+    base?: I,
+  ): RenameCameraMessageProto {
+    return RenameCameraMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(
+    object: I,
+  ): RenameCameraMessageProto {
+    const message = createBaseRenameCameraMessageProto();
+    message.cameraIndex = object.cameraIndex ?? 0;
+    message.newName = object.newName ?? "";
+    return message;
+  },
+};
 
 type Builtin =
   | Date

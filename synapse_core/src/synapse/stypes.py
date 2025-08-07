@@ -17,6 +17,11 @@ DataValue = Union[float, bool, int, str, List[bool], List[float], List[str], Lis
 #: An integer identifier for a specific camera.
 CameraID = int
 
+#: String static identifier for a camera
+CameraUID = str
+
+CameraName = str
+
 #: An integer identifier for a specific image processing pipeline.
 PipelineID = int
 

@@ -319,6 +319,7 @@ class Synapse:
                     self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
                         id, -1
                     ),
+                    self.runtime_handler.cameraHandler.cameraBindings[id].id,
                 )
 
                 await self.websocket.sendToAll(
@@ -391,6 +392,7 @@ class Synapse:
                 self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
                     cameraid, 0
                 ),
+                self.runtime_handler.cameraHandler.cameraBindings[cameraid].id,
             )
 
             Synapse.kInstance.websocket.sendToAllSync(
@@ -440,6 +442,9 @@ class Synapse:
                     camera,
                     pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
                     defaultPipeline=pipelineIndex,
+                    kind=self.runtime_handler.cameraHandler.cameraBindings[
+                        cameraIndex
+                    ].id,
                 )
                 msg = createMessage(MessageTypeProto.ADD_CAMERA, cameraMsg)
 
@@ -562,13 +567,17 @@ class Synapse:
             self.runtime_handler.isRunning = False
             self.runtime_handler.cleanup()
             restartRuntime()
+        elif msgType == MessageTypeProto.RENAME_CAMERA:
+            renameCameraMsg = msgObj.rename_camera
+            self.runtime_handler.cameraHandler.renameCamera(
+                renameCameraMsg.camera_index, renameCameraMsg.new_name
+            )
 
     def setNetworkSettings(self, networkSettings: SetNetworkSettingsProto) -> None:
         if Platform.getCurrentPlatform().isLinux():
             network_interfaces = []
             network_interfaces.extend(psutil.net_if_addrs().keys())
 
-            missingFeature("Static IP doesn't work correctly at the moment")
             if (
                 IsValidIP(networkSettings.ip)
                 and networkSettings.network_interface in network_interfaces

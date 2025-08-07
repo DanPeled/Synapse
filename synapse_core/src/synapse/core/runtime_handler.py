@@ -29,15 +29,16 @@ from wpimath.units import seconds, secondsToMilliseconds
 
 from ..bcolors import MarkupColors
 from ..callback import Callback
-from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
-                      PipelineTypeName)
+from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
+                      PipelineID, PipelineName, PipelineTypeName, Resolution)
 from ..util import resolveGenericArgument
 from .camera_factory import (CSCORE_TO_CV_PROPS, CalibrationData, CameraConfig,
                              CameraFactory, CameraSettingsKeys, SynapseCamera,
                              getCameraTable, getCameraTableName)
 from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
-from .pipeline import FrameResult, Pipeline, PipelineSettings
+from .pipeline import (FrameResult, Pipeline, PipelineSettings,
+                       getPipelineTypename)
 from .settings_api import SettingsMap
 
 
@@ -63,7 +64,7 @@ class PipelineLoader:
     kPipelineTypeKey: Final[str] = "type"
     kPipelineNameKey: Final[str] = "name"
     kPipelinesArrayKey: Final[str] = "pipelines"
-    kPipelineFilesQuery: Final[str] = "*_pipeline.py"
+    kPipelineFilesQuery: Final[str] = "**/*_pipeline.py"
     kInvalidPipelineIndex: Final[int] = -1
 
     def __init__(self, pipelineDirectory: Path):
@@ -112,7 +113,7 @@ class PipelineLoader:
             self.addPipeline(
                 pipelineIndex,
                 self.pipelineNames[pipelineIndex],
-                pipelineType.__name__,
+                getPipelineTypename(pipelineType),
                 settingsMap,
             )
 
@@ -191,6 +192,8 @@ class PipelineLoader:
                 Dict[str, Type[Pipeline]]: Loaded pipeline classes found in the directory.
             """
             pipelineClasses = {}
+            for file_path in directory.rglob("*_pipeline.py"):
+                print("Found:", file_path)
             for file_path in directory.rglob(PipelineLoader.kPipelineFilesQuery):
                 if file_path.name not in ignoredFiles:
                     module_name = file_path.stem
@@ -213,8 +216,10 @@ class PipelineLoader:
                                 and cls is not Pipeline
                             ):
                                 if cls.__is_enabled__:
-                                    log.log(f"Loaded {cls.__name__} pipeline")
-                                    pipelineClasses[cls.__name__] = cls
+                                    log.log(
+                                        f"Loaded {getPipelineTypename(cls)} pipeline"
+                                    )
+                                    pipelineClasses[getPipelineTypename(cls)] = cls
                     except Exception as e:
                         log.err(
                             f"while loading {file_path}: {e}\n{traceback.format_exc()}"
@@ -360,13 +365,14 @@ class CameraHandler:
         stream sizes, recording outputs, and camera configuration bindings.
         """
         self.cameras: Dict[CameraID, SynapseCamera] = {}
-        self.usbCameraInfos: Dict[str, cs.UsbCameraInfo] = {}
+        self.usbCameraInfos: Dict[CameraUID, cs.UsbCameraInfo] = {}
         self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
-        self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
+        self.streamSizes: Dict[CameraID, Resolution] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
         self.cameraBindings: Dict[CameraID, CameraConfig] = {}
-        self.onAddCamera: Callback[CameraID, str, SynapseCamera] = Callback()
-        self.cameraIds: List[str] = []
+        self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
+        self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
+        self.cameraUIDs: List[CameraUID] = []
 
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
@@ -402,7 +408,7 @@ class CameraHandler:
         found: List[int] = []
 
         for cameraIndex, cameraConfig in self.cameraBindings.items():
-            if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraIds:
+            if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraUIDs:
                 info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
                     cameraConfig.id, None
                 )
@@ -411,7 +417,7 @@ class CameraHandler:
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:
-                        self.cameraIds.append(cameraConfig.id)
+                        self.cameraUIDs.append(cameraConfig.id)
                 else:
                     log.warn(
                         f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped"
@@ -419,6 +425,16 @@ class CameraHandler:
                     continue
 
         self.scanCameras()
+
+    def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
+        if cameraID in self.cameraBindings:
+            self.cameraBindings[cameraID].name = newName
+            log.log(f"Camera #{cameraID} renamed to {newName}")
+            self.onRenameCamera.call(cameraID, newName)
+        else:
+            log.err(
+                f"Attempted to rename camera with ID {cameraID} but that camera does not exist!"
+            )
 
     def scanCameras(self) -> None:
         self.usbCameraInfos = {
@@ -450,7 +466,7 @@ class CameraHandler:
                     streamRes=self.DEFAULT_STREAM_SIZE,
                 )
 
-                if cameraConfig.id not in self.cameraIds:
+                if cameraConfig.id not in self.cameraUIDs:
                     log.log(
                         f"Found non-registered camera: {info.name} (i={info.dev}), adding automatically"
                     )
@@ -458,7 +474,7 @@ class CameraHandler:
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:
-                        self.cameraIds.append(cameraConfig.id)
+                        self.cameraUIDs.append(cameraConfig.id)
 
     def getCamera(self, cameraIndex: CameraID) -> Optional[SynapseCamera]:
         """
@@ -597,7 +613,7 @@ class CameraHandler:
                 cameraType=CameraFactory.kCameraServer,
                 cameraIndex=cameraIndex,
                 path=dev,
-                name=f"{cameraConfig.name}(#{cameraIndex})",
+                name=f"{cameraConfig.name}",
             )
             camera.setIndex(cameraIndex)
         except Exception as e:
@@ -1239,7 +1255,7 @@ class RuntimeManager:
             "global": {
                 "camera_configs": {
                     index: config.toDict()
-                    for index, config in GlobalSettings.getCameraConfigMap().items()
+                    for index, config in self.cameraHandler.cameraBindings.items()
                 }
             },
             "pipelines": {

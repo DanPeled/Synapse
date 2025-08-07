@@ -11,6 +11,7 @@ import { CameraTransformModule } from "./camera_transform";
 import { useEffect, useState } from "react";
 import { useBackendContext } from "@/services/backend/backendContext";
 import { CameraProto } from "@/proto/v1/camera";
+import { CameraConfigModule } from "./camera_config_module";
 
 export default function CameraConfigPage() {
   const { cameras } = useBackendContext();
@@ -33,7 +34,12 @@ export default function CameraConfigPage() {
     >
       <Row className="h-full" gap="gap-2" wrap={true}>
         <Column className="flex-[2] space-y-2 h-full">
-          <CameraTransformModule />
+          <CameraConfigModule
+            cameras={cameras}
+            selectedCamera={selectedCamera}
+            setSelectedCamera={setSelectedCamera}
+          />
+          {/* <CameraTransformModule /> */}
           <CameraCalibrationModule />
         </Column>
 
@@ -42,24 +48,6 @@ export default function CameraConfigPage() {
             className="items-center border-none"
             style={{ backgroundColor: baseCardColor }}
           >
-            <CardContent className="w-full items-center h-full">
-              {" "}
-              <Dropdown
-                options={
-                  (cameras
-                    ? Array.from(cameras.values()).map((cam: CameraProto) => ({
-                        label: `${cam?.name}`,
-                        value: cam,
-                      }))
-                    : []) as DropdownOption<CameraProto>[]
-                }
-                label="Camera"
-                value={selectedCamera}
-                onValueChange={(camera) => {
-                  setSelectedCamera(camera);
-                }}
-              />
-            </CardContent>
             <CameraStream stream={selectedCamera?.streamPath} />
           </Card>
           <Card

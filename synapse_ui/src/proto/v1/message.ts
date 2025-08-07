@@ -9,6 +9,7 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import {
   CameraPerformanceProto,
   CameraProto,
+  RenameCameraMessageProto,
   SetDefaultPipelineMessageProto,
 } from "./camera";
 import {
@@ -49,6 +50,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_REBOOT = 16,
   MESSAGE_TYPE_PROTO_FORMAT = 17,
   MESSAGE_TYPE_PROTO_RESTART_SYNAPSE = 18,
+  MESSAGE_TYPE_PROTO_RENAME_CAMERA = 19,
   UNRECOGNIZED = -1,
 }
 
@@ -111,6 +113,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 18:
     case "MESSAGE_TYPE_PROTO_RESTART_SYNAPSE":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_RESTART_SYNAPSE;
+    case 19:
+    case "MESSAGE_TYPE_PROTO_RENAME_CAMERA":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_RENAME_CAMERA;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -158,6 +163,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_FORMAT";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_RESTART_SYNAPSE:
       return "MESSAGE_TYPE_PROTO_RESTART_SYNAPSE";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_RENAME_CAMERA:
+      return "MESSAGE_TYPE_PROTO_RENAME_CAMERA";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -179,6 +186,7 @@ export interface MessageProto {
   log?: LogMessageProto | undefined;
   cameraPerformance?: CameraPerformanceProto | undefined;
   setNetworkSettings?: SetNetworkSettingsProto | undefined;
+  renameCamera?: RenameCameraMessageProto | undefined;
   pipelineTypeInfo: PipelineTypeProto[];
 }
 
@@ -198,6 +206,7 @@ function createBaseMessageProto(): MessageProto {
     log: undefined,
     cameraPerformance: undefined,
     setNetworkSettings: undefined,
+    renameCamera: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -279,8 +288,14 @@ export const MessageProto: MessageFns<MessageProto> = {
         writer.uint32(114).fork(),
       ).join();
     }
+    if (message.renameCamera !== undefined) {
+      RenameCameraMessageProto.encode(
+        message.renameCamera,
+        writer.uint32(122).fork(),
+      ).join();
+    }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(122).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(130).fork()).join();
     }
     return writer;
   },
@@ -434,6 +449,17 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
+          message.renameCamera = RenameCameraMessageProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
           message.pipelineTypeInfo.push(
             PipelineTypeProto.decode(reader, reader.uint32()),
           );
@@ -487,6 +513,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       setNetworkSettings: isSet(object.setNetworkSettings)
         ? SetNetworkSettingsProto.fromJSON(object.setNetworkSettings)
+        : undefined,
+      renameCamera: isSet(object.renameCamera)
+        ? RenameCameraMessageProto.fromJSON(object.renameCamera)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -553,6 +582,9 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.setNetworkSettings = SetNetworkSettingsProto.toJSON(
         message.setNetworkSettings,
       );
+    }
+    if (message.renameCamera !== undefined) {
+      obj.renameCamera = RenameCameraMessageProto.toJSON(message.renameCamera);
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -624,6 +656,10 @@ export const MessageProto: MessageFns<MessageProto> = {
       object.setNetworkSettings !== undefined &&
       object.setNetworkSettings !== null
         ? SetNetworkSettingsProto.fromPartial(object.setNetworkSettings)
+        : undefined;
+    message.renameCamera =
+      object.renameCamera !== undefined && object.renameCamera !== null
+        ? RenameCameraMessageProto.fromPartial(object.renameCamera)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||

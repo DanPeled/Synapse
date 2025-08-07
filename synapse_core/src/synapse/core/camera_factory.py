@@ -536,12 +536,14 @@ def cameraToProto(
     camera: SynapseCamera,
     pipelineIndex: PipelineID,
     defaultPipeline: PipelineID,
+    kind: str,
 ) -> CameraProto:
     return CameraProto(
         name=name,
         index=camid,
         stream_path=camera.stream,
-        physical_connection="unknown",
+        kind=kind,
         pipeline_index=pipelineIndex,
         default_pipeline=defaultPipeline,
+        max_fps=int(camera.getMaxFPS()),
     )
