@@ -2,7 +2,7 @@ network: { team_number: 9738, name: SynapseExample, ip: null, interface: null }
 global:
   camera_configs:
     0:
-      name: Monochrome
+      name: MonochromeLeft
       id: Integrated Webcam_27152
       transform:
         - [0.24637, -0.23285, 0.28899]

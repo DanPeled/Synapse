@@ -34,7 +34,7 @@ from ..bcolors import MarkupColors
 from ..hardware.deviceactions import reboot, restartRuntime
 from ..hardware.metrics import Platform
 from ..log import err, log, logs, missingFeature, warn
-from ..stypes import CameraID, PipelineID
+from ..stypes import CameraID, CameraName, PipelineID
 from ..util import getIP, resolveGenericArgument
 from .camera_factory import SynapseCamera, cameraToProto
 from .config import Config, NetworkConfig
@@ -450,6 +450,22 @@ class Synapse:
 
                 Synapse.kInstance.websocket.sendToAllSync(msg)
 
+        def onCameraRename(cameraIndex: CameraID, newName: CameraName):
+            camera = self.runtime_handler.cameraHandler.cameras[cameraIndex]
+            cameraMsg = cameraToProto(
+                cameraIndex,
+                camera.name,
+                camera,
+                pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
+                defaultPipeline=self.runtime_handler.pipelineLoader.defaultPipelineIndexes[
+                    cameraIndex
+                ],
+                kind=self.runtime_handler.cameraHandler.cameraBindings[cameraIndex].id,
+            )
+            msg = createMessage(MessageTypeProto.ADD_CAMERA, cameraMsg)
+            self.websocket.sendToAllSync(msg)
+            self.runtime_handler.save()
+
         self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
@@ -457,6 +473,7 @@ class Synapse:
         self.runtime_handler.pipelineLoader.onDefaultPipelineSet.add(
             onDefaultPipelineSet
         )
+        self.runtime_handler.cameraHandler.onRenameCamera.add(onCameraRename)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
@@ -569,6 +586,7 @@ class Synapse:
             restartRuntime()
         elif msgType == MessageTypeProto.RENAME_CAMERA:
             renameCameraMsg = msgObj.rename_camera
+
             self.runtime_handler.cameraHandler.renameCamera(
                 renameCameraMsg.camera_index, renameCameraMsg.new_name
             )

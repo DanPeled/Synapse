@@ -5,7 +5,8 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import { CameraProto } from "@/proto/v1/camera";
+import { CameraProto, RenameCameraMessageProto } from "@/proto/v1/camera";
+import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { CameraID } from "@/services/backend/dataStractures";
 import {
   baseCardColor,
@@ -13,6 +14,7 @@ import {
   hoverBg,
   teamColor,
 } from "@/services/style";
+import { WebSocketWrapper } from "@/services/websocket";
 import { Column, Row } from "@/widgets/containers";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
 import TextInput from "@/widgets/textInput";
@@ -22,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
+import assert from "assert";
 import { Ban, Check, Edit, MoreVertical, RotateCcw, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -29,10 +32,12 @@ export function CameraConfigModule({
   cameras,
   selectedCamera,
   setSelectedCamera,
+  socket,
 }: {
   cameras: Map<CameraID, CameraProto>;
   selectedCamera?: CameraProto;
   setSelectedCamera: (cam?: CameraProto) => void;
+  socket?: WebSocketWrapper;
 }) {
   const [renameCamera, setRenameCamera] = useState(false);
   const [newCameraName, setNewCameraName] = useState(selectedCamera?.name);
@@ -84,7 +89,19 @@ export function CameraConfigModule({
                   color: teamColor,
                 }}
                 onClick={() => {
-                  // TODO: rename camera
+                  assert(selectedCamera !== undefined);
+
+                  const payload = MessageProto.create({
+                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_RENAME_CAMERA,
+                    renameCamera: RenameCameraMessageProto.create({
+                      cameraIndex: selectedCamera?.index,
+                      newName: newCameraName,
+                    }),
+                  });
+
+                  const binary = MessageProto.encode(payload).finish();
+                  socket?.sendBinary(binary);
+
                   setRenameCamera(false);
                   setNewCameraName(selectedCamera?.name);
                 }}

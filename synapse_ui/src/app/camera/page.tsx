@@ -14,7 +14,7 @@ import { CameraProto } from "@/proto/v1/camera";
 import { CameraConfigModule } from "./camera_config_module";
 
 export default function CameraConfigPage() {
-  const { cameras } = useBackendContext();
+  const { cameras, socket } = useBackendContext();
   const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
     cameras.get(0),
   );
@@ -38,6 +38,7 @@ export default function CameraConfigPage() {
             cameras={cameras}
             selectedCamera={selectedCamera}
             setSelectedCamera={setSelectedCamera}
+            socket={socket}
           />
           {/* <CameraTransformModule /> */}
           <CameraCalibrationModule />

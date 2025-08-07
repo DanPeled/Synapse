@@ -429,6 +429,7 @@ class CameraHandler:
     def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
         if cameraID in self.cameraBindings:
             self.cameraBindings[cameraID].name = newName
+            self.cameras[cameraID].name = newName
             log.log(f"Camera #{cameraID} renamed to {newName}")
             self.onRenameCamera.call(cameraID, newName)
         else:

@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
@@ -153,7 +153,7 @@ def opencvToCscoreProp(prop: int) -> Optional[str]:
 
 class SynapseCamera(ABC):
     def __init__(self, name: str) -> None:
-        self.name: Final[str] = name
+        self.name: str = name
         self.stream: str = ""
 
     @classmethod
