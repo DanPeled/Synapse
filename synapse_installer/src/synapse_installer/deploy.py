@@ -2,12 +2,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import ipaddress
 import os
 import pathlib as pthl
 import sys
 import traceback
-from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
@@ -21,6 +19,8 @@ from synapse.bcolors import MarkupColors
 from .lockfile import createDirectoryZIP, createPackageZIP
 from .setup_service import (SERVICE_NAME, isServiceSetup, restartService,
                             setupServiceOnConnectedClient)
+from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
+                   DeployDeviceConfig, IsValidIP)
 
 BUILD_DIR = "build"
 
@@ -28,21 +28,6 @@ BUILD_DIR = "build"
 class SetupOptions(Enum):
     kManual = "Manual (Provide hostname & password)"
     kAutomatic = "Automatic (Find available devices)"
-
-
-@dataclass
-class DeployDeviceConfig:
-    hostname: str
-    ip: str
-    password: str
-
-
-def IsValidIP(ip_str):
-    try:
-        ipaddress.ip_address(ip_str)
-        return True
-    except ValueError:
-        return False
 
 
 def addDeviceConfig(path: pthl.Path):
@@ -197,9 +182,7 @@ def loadDeviceData(deployConfigPath: pthl.Path):
 def setupAndRunDeploy(argv: Optional[List[str]] = None):
     cwd: pthl.Path = pthl.Path(os.getcwd())
 
-    assert (cwd / ".synapseproject").exists(), (
-        "No .synpaseproject file found, are you sure you're inside of a Synapse project?"
-    )
+    assert (cwd / SYNAPSE_PROJECT_FILE).exists(), NOT_IN_SYNAPSE_PROJECT_ERR
 
     def fileShouldDeploy(f: pthl.Path):
         return (
@@ -208,7 +191,7 @@ def setupAndRunDeploy(argv: Optional[List[str]] = None):
             or f.is_relative_to(cwd / "config")
         )
 
-    deployConfigPath = cwd / ".synapseproject"
+    deployConfigPath = cwd / SYNAPSE_PROJECT_FILE
     loadDeviceData(deployConfigPath)
 
     createPackageZIP(cwd / BUILD_DIR)
