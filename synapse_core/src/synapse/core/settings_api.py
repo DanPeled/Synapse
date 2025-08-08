@@ -10,7 +10,8 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
 
 from betterproto import which_one_of
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse_net.proto.settings.v1 import (ColorConstraintProto,
+from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
+                                           ColorConstraintProto,
                                            ColorFormatProto,
                                            ConstraintConfigProto,
                                            ConstraintProto,
@@ -470,13 +471,14 @@ class StringConstraint(Constraint[str]):
 class BooleanConstraint(Constraint[bool]):
     """Constraint for boolean values"""
 
-    def __init__(self):
+    def __init__(self, renderAsButton: bool = False):
         """
         Initialize a BooleanConstraint instance.
 
         This constraint restricts values to boolean types (True or False).
         """
         super().__init__(ConstraintTypeProto.BOOLEAN)
+        self.renderAsButton = renderAsButton
 
     def validate(self, value: SettingsValue) -> ValidationResult:
         if isinstance(value, bool):
@@ -496,14 +498,19 @@ class BooleanConstraint(Constraint[bool]):
         return ValidationResult(False, "Value cannot be converted to boolean")
 
     def toDict(self) -> Dict[str, Any]:
-        return {"type": self.constraintType.value}
+        return {
+            "type": self.constraintType.value,
+            "render_as_button": self.renderAsButton,
+        }
 
     @classmethod
     def fromDict(cls, data: Dict[str, Any]) -> "BooleanConstraint":
-        return cls()
+        return cls(data["render_as_button"])
 
     def configToProto(self) -> ConstraintConfigProto:
-        return ConstraintConfigProto()
+        return ConstraintConfigProto(
+            boolean=BooleanConstraintProto(self.renderAsButton)
+        )
 
 
 TConstraintType = TypeVar("TConstraintType", bound=Constraint)

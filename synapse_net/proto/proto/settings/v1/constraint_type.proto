@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package proto.settings.v1;
 
+import "proto/settings/v1/boolean.proto";
 import "proto/settings/v1/color.proto";
 import "proto/settings/v1/enumerated.proto";
 import "proto/settings/v1/list.proto";
@@ -26,6 +27,9 @@ message ConstraintConfigProto {
 
     // Constraint for a value list
     ListConstraintProto list = 5;
+
+    // Boolean constraint
+    BooleanConstraintProto boolean = 6;
   }
 }
 

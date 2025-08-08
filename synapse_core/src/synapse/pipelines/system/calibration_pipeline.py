@@ -60,7 +60,7 @@ class CalibrationPipelineSettings(PipelineSettings):
         default="DICT_5X5_1000",
         description="Aruco dictionary type used for the Charuco board",
     )
-    take_picture = settingField(BooleanConstraint(), default=False)
+    take_picture = settingField(BooleanConstraint(renderAsButton=True), default=False)
 
 
 @systemPipeline()

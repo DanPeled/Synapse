@@ -11,6 +11,7 @@ import LabeledControl from "@/widgets/labeledControl";
 import { Button } from "@/components/ui/button";
 import { teamColor } from "./style";
 import { RefreshCcw } from "lucide-react";
+import assert from "assert";
 
 interface ControlGeneratorProps {
   setting: SettingMetaProto;
@@ -114,22 +115,42 @@ export function GenerateControl({
   const val = protoToSettingValue(value);
 
   switch (setting.constraint?.type) {
-    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN:
-      return (
-        <LabeledControl label={settingName}>
-          <ToggleButton
-            value={val as boolean}
-            onToggleAction={(val) => setValue(settingValueToProto(val))}
-            disabled={locked}
-          />
-          <ResetToDefaultButton
-            defaultValue={defaultValue}
-            setValue={setValue}
-            disabled={locked}
-          />
-        </LabeledControl>
-      );
-    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING:
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_BOOLEAN: {
+      assert(setting.constraint.constraint?.boolean !== undefined);
+
+      if (!setting.constraint.constraint?.boolean?.renderAsButton) {
+        return (
+          <LabeledControl label={settingName}>
+            <ToggleButton
+              value={val as boolean}
+              onToggleAction={(val) => setValue(settingValueToProto(val))}
+              disabled={locked}
+            />
+            <ResetToDefaultButton
+              defaultValue={defaultValue}
+              setValue={setValue}
+              disabled={locked}
+            />
+          </LabeledControl>
+        );
+      } else {
+        return (
+          <div className="w-max flex items-center justify-center mx-auto">
+            <Button
+              style={{ color: teamColor }}
+              className="hover:bg-zinc-600 cursor-pointer bg-zinc-700 w-100 text-lg"
+              onClick={() => {
+                setValue(settingValueToProto(false));
+              }}
+            >
+              {settingName}
+            </Button>
+          </div>
+        );
+      }
+      break;
+    }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING: {
       return (
         <LabeledControl label={settingName}>
           <TextInput
@@ -146,6 +167,7 @@ export function GenerateControl({
           />
         </LabeledControl>
       );
+    }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_NUMBER:
       if (setting.constraint.constraint?.numeric?.max) {
         return (
