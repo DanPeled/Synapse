@@ -7,6 +7,7 @@ from unittest import mock
 
 import pytest
 from synapse_installer.create import baseMainPy, createProject
+from synapse_installer.util import SYNAPSE_PROJECT_FILE
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ def test_create_project_basic(mock_load, mock_confirm, mock_text, fake_cwd):
     project_dir = fake_cwd / "TestProject"
 
     assert project_dir.exists()
-    assert (project_dir / ".synapseproject").exists() is True
+    assert (project_dir / SYNAPSE_PROJECT_FILE).exists() is True
     assert (project_dir / "main.py").exists() is True
     assert (project_dir / "pipelines").is_dir()
     assert (project_dir / "deploy").is_dir()

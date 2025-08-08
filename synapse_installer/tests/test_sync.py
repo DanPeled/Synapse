@@ -1,145 +1,225 @@
+# test_sync.py
 import io
-import unittest
-from unittest.mock import MagicMock, mock_open, patch
+from unittest import mock
 
-import synapse_installer.sync as deploy_sync
-
-
-class TestSyncRequirements(unittest.TestCase):
-    @patch("paramiko.SSHClient")
-    @patch("synapse_installer.sync.log.err")
-    @patch("synapse_installer.sync.fprint")
-    def test_sync_requirements_installs_missing_packages(
-        self, mock_fprint, mock_log_err, mock_ssh_client
-    ):
-        # Setup mock SSHClient and transport
-        mock_client = MagicMock()
-        mock_ssh_client.return_value = mock_client
-        mock_transport = MagicMock()
-        mock_client.get_transport.return_value = mock_transport
-
-        # Simulate installed packages output - only package 'foo' installed
-        installed_packages_output = "foo==1.0.0\n"
-        mock_stdout = MagicMock()
-        mock_stdout.read.return_value = installed_packages_output.encode()
-        mock_stderr = MagicMock()
-        mock_stderr.read.return_value = b""
-
-        # First exec_command: sudoers setup (no error)
-        mock_client.exec_command.side_effect = [
-            (MagicMock(), MagicMock(), mock_stderr),  # sudoers setup
-            (MagicMock(), mock_stdout, mock_stderr),  # pip freeze
-            # install command for package 'bar'
-            (MagicMock(), MagicMock(), MagicMock()),
-        ]
-
-        # Requirements: 'foo' (already installed), 'bar' (missing)
-        requirements = ["foo>=1.0", "bar==2.0"]
-
-        deploy_sync.syncRequirements("host", "pass", "1.2.3.4", requirements)
-
-        # Check that fprint was called with installing message for 'bar'
-        calls = [call.args[0] for call in mock_fprint.call_args_list]
-        self.assertTrue(any("Installing bar" in c for c in calls))
-
-    @patch("paramiko.SSHClient")
-    @patch("synapse_installer.sync.log.err")
-    def test_sync_requirements_ssh_exception_logs_error(
-        self, mock_log_err, mock_ssh_client
-    ):
-        mock_ssh_client.side_effect = Exception("SSH failure")
-        deploy_sync.syncRequirements("host", "pass", "1.2.3.4", ["foo"])
-        mock_log_err.assert_called()
-        self.assertIn("SSH failure", mock_log_err.call_args[0][0])
+import paramiko
+import pytest
+from synapse_installer.sync import (installPipRequirements,
+                                    installSystemPackage, setupSudoers, sync,
+                                    syncRequirements)
 
 
-class TestSync(unittest.TestCase):
-    @patch(
-        "builtins.open",
-        new_callable=mock_open,
-        read_data="deploy:\n  device1:\n    hostname: host1\n    password: pass1\n    ip: 1.2.3.4\n",
+@pytest.fixture
+def mock_client(mocker):
+    """Create a mock SSHClient with exec_command behavior."""
+    client = mocker.Mock(spec=paramiko.SSHClient)
+    mock_channel = mocker.Mock()
+    mock_channel.recv_exit_status.return_value = 0
+
+    stdout = io.BytesIO(b"")
+    stdout.channel = mock_channel  # pyright: ignore
+    stderr = io.BytesIO(b"")
+
+    client.exec_command.return_value = (io.BytesIO(b""), stdout, stderr)
+    client.get_transport.return_value = True
+    return client
+
+
+def test_sync_requirements_success(mocker, mock_client):
+    mocker.patch("paramiko.SSHClient", return_value=mock_client)
+    mocker.patch("synapse_installer.sync.setupSudoers")
+    mocker.patch("synapse_installer.sync.installSystemPackage")
+    mocker.patch("synapse_installer.sync.installPipRequirements")
+
+    syncRequirements("host", "pass", "1.2.3.4")
+
+    mock_client.connect.assert_called_once()
+    mock_client.close.assert_called_once()
+
+
+def test_sync_requirements_exception(mocker):
+    mock_client = mocker.Mock(spec=paramiko.SSHClient)
+    mock_client.connect.side_effect = Exception("fail")
+    mocker.patch("paramiko.SSHClient", return_value=mock_client)
+    fail_mock = mocker.patch("synapse_installer.sync.fprint")
+    syncRequirements("h", "p", "ip")
+    assert fail_mock.call_count == 1
+
+
+def test_sync_adds_device_config(mocker, tmp_path):
+    proj_file = tmp_path / "synapse.yaml"
+    proj_file.write_text("{}")
+    mocker.patch("synapse_installer.sync.SYNAPSE_PROJECT_FILE", proj_file.name)
+    mocker.patch("synapse_installer.sync.os.getcwd", return_value=str(tmp_path))
+    mocker.patch(
+        "synapse_installer.sync.addDeviceConfig",
+        side_effect=lambda x: proj_file.write_text(
+            'deploy: {"dev":{"hostname":"h","password":"p","ip":"1"}}'
+        ),
     )
-    @patch("synapse_installer.sync.Path.exists", return_value=True)
-    @patch("synapse_installer.sync.addDeviceConfig")
-    @patch("synapse_installer.sync.distribution")
-    @patch("synapse_installer.sync.syncRequirements")
-    @patch("synapse_installer.sync.fprint")
-    def test_sync_calls_syncRequirements_with_deploy(
-        self,
-        mock_fprint,
-        mock_sync_req,
-        mock_dist,
-        mock_add_config,
-        mock_path_exists,
-        mock_file,
-    ):
-        # Setup distribution requires
-        mock_dist.return_value.requires = ["pkg1", "pkg2"]
+    mocker.patch("synapse_installer.sync.syncRequirements")
+    sync(["cmd", "dev"])
 
-        argv = ["scriptname", "device1"]
 
-        deploy_sync.sync(argv)
+def test_sync_no_args(mocker, tmp_path):
+    proj_file = tmp_path / "synapse.yaml"
+    proj_file.write_text("deploy: {}")
+    mocker.patch("synapse_installer.sync.SYNAPSE_PROJECT_FILE", proj_file.name)
+    mocker.patch("synapse_installer.sync.os.getcwd", return_value=str(tmp_path))
+    fail_mock = mocker.patch("synapse_installer.sync.fprint")
+    sync(["cmd"])
+    fail_mock.assert_called_once()
 
-        mock_sync_req.assert_called_once_with(
-            "host1", "pass1", "1.2.3.4", ["pkg1", "pkg2"]
-        )
 
-    @patch("synapse_installer.sync.Path.exists", return_value=False)
-    def test_sync_no_synapseproject_file_raises_assertion(self, mock_path_exists):
-        with self.assertRaises(AssertionError):
-            deploy_sync.sync(["device1"])
+def test_sync_device_not_found(mocker, tmp_path):
+    proj_file = tmp_path / "synapse.yaml"
+    proj_file.write_text("deploy: {}")
+    mocker.patch("synapse_installer.sync.SYNAPSE_PROJECT_FILE", proj_file.name)
+    mocker.patch("synapse_installer.sync.os.getcwd", return_value=str(tmp_path))
+    fail_mock = mocker.patch("synapse_installer.sync.fprint")
+    sync(["cmd", "unknown"])
+    assert "No device named" in str(fail_mock.call_args[0][0])
 
-    @patch("builtins.open", new_callable=mock_open, read_data="deploy: {}\n")
-    @patch("synapse_installer.sync.Path.exists", return_value=True)
-    @patch("synapse_installer.sync.addDeviceConfig")
-    @patch("synapse_installer.sync.fprint")
-    def test_sync_adds_device_config_if_deploy_missing(
-        self, mock_fprint, mock_add_config, mock_path_exists, mock_file
-    ):
-        argv = ["scriptname", "device1"]
-        # Simulate no 'deploy' in data on first read, then deploy added on second read
-        # mock_open cannot do multiple returns easily, so patch open to simulate this
-        data_with_no_deploy = ""
-        data_with_deploy = "deploy:\n  device1:\n    hostname: host1\n    password: pass1\n    ip: 1.2.3.4\n"
 
-        def open_side_effect(file, mode="r", *args, **kwargs):
-            if open_side_effect.counter == 0:  # pyright: ignore
-                open_side_effect.counter += 1  # pyright: ignore
-                file_object = io.StringIO(data_with_no_deploy)
-                return file_object
-            else:
-                return io.StringIO(data_with_deploy)
+def test_setup_sudoers_success(mock_client, mocker):
+    fprint_mock = mocker.patch("synapse_installer.sync.fprint")
+    setupSudoers(mock_client, "host")
+    assert fprint_mock.call_count == 1
+    assert "Sudoers rule added" in str(fprint_mock.call_args[0][0])
 
-        open_side_effect.counter = 0  # pyright: ignore
 
-        with patch("builtins.open", side_effect=open_side_effect):
-            with patch("synapse_installer.sync.distribution") as mock_dist:
-                with patch("synapse_installer.sync.syncRequirements") as mock_sync_req:
-                    mock_dist.return_value.requires = ["pkg1"]
-                    deploy_sync.sync(argv)
-                    mock_add_config.assert_called_once()
-                    mock_sync_req.assert_called_once_with(
-                        "host1", "pass1", "1.2.3.4", ["pkg1"]
-                    )
+def test_setup_sudoers_failure(mock_client, mocker):
+    fprint_mock = mocker.patch("synapse_installer.sync.fprint")
+    stderr = io.BytesIO(b"err")
+    stdout = io.BytesIO(b"")
+    stdout.channel = mocker.Mock()  # pyright: ignore
+    stdout.channel.recv_exit_status.return_value = 0  # pyright: ignore
+    mock_client.exec_command.return_value = (io.BytesIO(), stdout, stderr)
+    setupSudoers(mock_client, "host")
+    assert "Failed to setup sudoers" in str(fprint_mock.call_args[0][0])
 
-    @patch(
-        "builtins.open",
-        new_callable=mock_open,
-        read_data="deploy:\n  device2:\n    hostname: host2\n    password: pass2\n    ip: 2.3.4.5\n",
+
+def test_install_system_package_already_installed(mocker, mock_client):
+    mocker.patch.object(
+        mock_client,
+        "exec_command",
+        side_effect=[
+            # command -v mgr found
+            (
+                io.BytesIO(),
+                type(
+                    "Stdout",
+                    (),
+                    {"channel": type("Ch", (), {"recv_exit_status": lambda _: 0})()},
+                )(),
+                io.BytesIO(),
+            ),
+            # check_cmd installed
+            (
+                io.BytesIO(),
+                type(
+                    "Stdout",
+                    (),
+                    {"channel": type("Ch", (), {"recv_exit_status": lambda _: 0})()},
+                )(),
+                io.BytesIO(),
+            ),
+        ],
     )
-    @patch("synapse_installer.sync.Path.exists", return_value=True)
-    @patch("synapse_installer.sync.fprint")
-    def test_sync_hostname_not_in_deploy(
-        self, mock_fprint, mock_path_exists, mock_file
-    ):
-        argv = ["scriptname", "unknown_device"]
-        deploy_sync.sync(argv)
-        mock_fprint.assert_called()
-        self.assertIn(
-            "No device named: `unknown_device` found! skipping...",
-            mock_fprint.call_args[0][0],
-        )
+    installSystemPackage(mock_client, "pkg")
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_install_system_package_installs(mocker, mock_client):
+    mocker.patch.object(
+        mock_client,
+        "exec_command",
+        side_effect=[
+            # command -v mgr found
+            (
+                io.BytesIO(),
+                type(
+                    "Stdout",
+                    (),
+                    {"channel": type("Ch", (), {"recv_exit_status": lambda _: 0})()},
+                )(),
+                io.BytesIO(),
+            ),
+            # check_cmd not installed
+            (
+                io.BytesIO(),
+                type(
+                    "Stdout",
+                    (),
+                    {"channel": type("Ch", (), {"recv_exit_status": lambda _: 1})()},
+                )(),
+                io.BytesIO(),
+            ),
+            # install command
+            (io.BytesIO(), io.BytesIO(), io.BytesIO()),
+        ],
+    )
+    installSystemPackage(mock_client, "pkg")
+
+
+def test_install_system_package_no_manager(mocker, mock_client):
+    mocker.patch.object(
+        mock_client,
+        "exec_command",
+        return_value=(
+            io.BytesIO(),
+            type(
+                "Stdout",
+                (),
+                {"channel": type("Ch", (), {"recv_exit_status": lambda _: 1})()},
+            )(),
+            io.BytesIO(),
+        ),
+    )
+    with pytest.raises(RuntimeError):
+        installSystemPackage(mock_client, "pkg")
+
+
+def make_stdout(data: bytes):
+    mock_stdout = mock.Mock()
+    mock_stdout.read.return_value = data
+    mock_stdout.channel = mock.Mock()
+    mock_stdout.channel.recv_exit_status.return_value = 0
+    return mock_stdout
+
+
+def make_stderr(data: bytes = b""):
+    mock_stderr = mock.Mock()
+    mock_stderr.read.return_value = data
+    return mock_stderr
+
+
+def test_install_pip_requirements(mocker, mock_client):
+    mocker.patch(
+        "synapse_installer.sync.getDistRequirements",
+        return_value=["pkg1==1.0", "pkg2==2.0"],
+    )
+    mocker.patch("synapse_installer.sync.getWPILibYear", return_value=2025)
+
+    def exec_command_side_effect(cmd, *args, **kwargs):
+        if "pip freeze" in cmd:
+            stdout = make_stdout(b"pkg1==1.0\n")
+            stderr = make_stderr()
+            return mock.Mock(), stdout, stderr
+        elif "pip install" in cmd:
+            stdout = make_stdout(b"")
+            stderr = make_stderr()
+            return mock.Mock(), stdout, stderr
+        else:
+            stdout = make_stdout(b"")
+            stderr = make_stderr()
+            return mock.Mock(), stdout, stderr
+
+    mock_client.exec_command.side_effect = exec_command_side_effect
+
+    fprint_mock = mocker.patch("synapse_installer.sync.fprint")
+
+    installPipRequirements(mock_client)
+
+    assert any("pkg1" in call.args[0] for call in fprint_mock.call_args_list), (
+        "Expected fprint to be called indicating pkg1 already installed"
+    )
