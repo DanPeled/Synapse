@@ -9,7 +9,7 @@ WPILIB_VERSION = "2025.2.1.1"
 modules = {
     "synapse_net": "synapse_net/src",
     "synapse_installer": "synapse_installer/src",
-    "": "synapse_core/src",
+    "synapse": "synapse_core/src",
     "synapse_ui": "synapse_ui/out",
 }
 
