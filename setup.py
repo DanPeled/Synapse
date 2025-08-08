@@ -87,6 +87,7 @@ setup(
         "dev": [
             "pytest",
             "pytest-asyncio",
+            "pytest-mock",
             "ruff",
             "isort",
             "pyright",
