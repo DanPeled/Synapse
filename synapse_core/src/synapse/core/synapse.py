@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import psutil
-from synapse_installer.deploy import IsValidIP
+from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from synapse_installer.deploy import addDeviceConfig
 
+from .util import NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE
+
 COMMAND_ARGV_IDX = 1
 
 HELP_TEXT = """
@@ -90,12 +92,10 @@ def main():
         sync(argv[1:])
         setupAndRunDeploy(argv[1:])
     elif cmd == "device":
-        configFilePath = Path.cwd() / ".synapseproject"
+        configFilePath = Path.cwd() / SYNAPSE_PROJECT_FILE
 
         if not configFilePath.exists():
-            print(
-                "No .synapseproject file found! Are you sure you're inside a Synapse project?"
-            )
+            print(NOT_IN_SYNAPSE_PROJECT_ERR)
             return
 
         if len(argv) <= 2 or argv[2] in ("-h", "--help"):

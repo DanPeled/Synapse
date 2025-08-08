@@ -4,7 +4,13 @@
 
 from setuptools import find_packages, setup
 
-WPILIB_VERSION = "2025.2.1.1"
+version_vars = {}
+with open("synapse_core/src/synapse/__version__.py") as f:
+    exec(f.read(), version_vars)
+
+SYNAPSE_VERSION = version_vars["SYNAPSE_VERSION"]
+WPILIB_VERSION = version_vars["WPILIB_VERSION"]
+
 
 modules = {
     "synapse_net": "synapse_net/src",
@@ -50,7 +56,7 @@ for name, path in modules.items():
 
 setup(
     name="synapsefrc",
-    version="0.1.0",
+    version=SYNAPSE_VERSION,
     packages=allModules,
     package_dir=moduleDirs,
     python_requires=">=3.9, <3.12",
