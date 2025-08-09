@@ -41,3 +41,4 @@
 
 * [Troubleshooting](additional-resources/troubleshooting.md)
 * [NetworkTables API](additional-resources/networktables-api.md)
+* [Known Issues](additional-resources/known-issues.md)
