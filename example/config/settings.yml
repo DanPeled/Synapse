@@ -19,13 +19,13 @@ pipelines:
     type: ApriltagPipeline
     settings:
       {
-        brightness: 100.0,
+        brightness: 50.0,
         exposure: 20.0,
         fieldpose: true,
         gain: 50.0,
         num_threads: 4.0,
         orientation: 180,
-        resolution: 1080x1920,
+        resolution: 1024x768,
         saturation: 10.0,
         sharpness: 50.0,
         stick_to_ground: true,

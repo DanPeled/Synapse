@@ -32,9 +32,9 @@ from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
                       PipelineID, PipelineName, PipelineTypeName, Resolution)
 from ..util import resolveGenericArgument
-from .camera_factory import (CSCORE_TO_CV_PROPS, CalibrationData, CameraConfig,
-                             CameraFactory, CameraSettingsKeys, SynapseCamera,
-                             getCameraTable, getCameraTableName)
+from .camera_factory import (CalibrationData, CameraConfig, CameraFactory,
+                             CameraSettingsKeys, SynapseCamera, getCameraTable,
+                             getCameraTableName)
 from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
 from .pipeline import (FrameResult, Pipeline, PipelineSettings,
@@ -192,8 +192,6 @@ class PipelineLoader:
                 Dict[str, Type[Pipeline]]: Loaded pipeline classes found in the directory.
             """
             pipelineClasses = {}
-            for file_path in directory.rglob("*_pipeline.py"):
-                print("Found:", file_path)
             for file_path in directory.rglob(PipelineLoader.kPipelineFilesQuery):
                 if file_path.name not in ignoredFiles:
                     module_name = file_path.stem
@@ -662,20 +660,12 @@ class CameraHandler:
         """
         updated_settings = {}
         for settingName in settings.keys():
-            if settingName in CSCORE_TO_CV_PROPS.keys():
-                setting_value = settings.get(settingName)
-                if setting_value is not None:
-                    camera.setProperty(
-                        prop=settingName,
-                        value=setting_value,
-                    )
-
-        if {"width", "height"}.issubset(settings):
-            camera.setVideoMode(
-                width=int(settings["width"]),
-                height=int(settings["height"]),
-                fps=1000,
-            )
+            setting_value = settings.get(settingName)
+            if setting_value is not None:
+                camera.setProperty(
+                    prop=settingName,
+                    value=setting_value,
+                )
 
         return updated_settings
 
@@ -910,13 +900,9 @@ class RuntimeManager:
             self.pipelineBindings[cameraIndex]
         ).setSetting(prop, value)
 
-        if prop in CSCORE_TO_CV_PROPS.keys():
-            camera = self.cameraHandler.getCamera(cameraIndex)
-            if camera is not None:
-                camera.setProperty(
-                    prop=prop,
-                    value=int(value),
-                )
+        camera = self.cameraHandler.getCamera(cameraIndex)
+        if camera is not None:
+            camera.setProperty(prop=prop, value=value)
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 

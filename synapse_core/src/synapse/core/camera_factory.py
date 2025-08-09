@@ -197,6 +197,9 @@ class SynapseCamera(ABC):
     def getResolution(self) -> Size: ...
 
     @abstractmethod
+    def getSupportedResolutions(self) -> List[Size]: ...
+
+    @abstractmethod
     def getPropertyMeta(self) -> Optional[PropertMetaDict]: ...
 
     @abstractmethod
@@ -282,6 +285,9 @@ class OpenCvCamera(SynapseCamera):
             inst.cap = cv2.VideoCapture(path, cv2.CAP_V4L2)
 
         return inst
+
+    def getSupportedResolutions(self) -> List[Size]:
+        return [self.getResolution()]
 
     def getPropertyMeta(self) -> Optional[PropertMetaDict]:
         return None
@@ -447,8 +453,13 @@ class CsCoreCamera(SynapseCamera):
             VideoSource.ConnectionStrategy.kConnectionForceClose
         )
 
-    def setProperty(self, prop: str, value: Union[int, float]) -> None:
-        if prop in self._properties:
+    def setProperty(self, prop: str, value: Union[int, float, str]) -> None:
+        if prop == "resolution" and isinstance(value, str):
+            resolution = value.split("x")
+            width = int(resolution[0])
+            height = int(resolution[1])
+            self.setVideoMode(int(self.getMaxFPS()), width, height)
+        elif prop in self._properties:
             meta = self.propertyMeta[prop]
             value = int(np.clip(value, meta["min"], meta["max"]))
             self._properties[prop].set(value)
@@ -505,6 +516,12 @@ class CsCoreCamera(SynapseCamera):
 
     def getMaxFPS(self) -> float:
         return self.camera.getVideoMode().fps
+
+    def getSupportedResolutions(self) -> List[Size]:
+        resolutions = []
+        for videomode in self._validVideoModes:
+            resolutions.append((videomode.width, videomode.height))
+        return resolutions
 
 
 class CameraFactory:

@@ -970,7 +970,21 @@ class PipelineSettings(SettingsCollection):
         description="Rotates the image orientation (0, 90, 180, 270 degrees).",
     )
     resolution = settingField(
-        EnumeratedConstraint(options=["1080x1920"]),
+        EnumeratedConstraint(
+            options=[
+                "1080x1920",
+                "1640x1232",
+                "1296x972",
+                "1280x960",
+                "1280x720",
+                "1024x768",
+                "800x600",
+                "640x480",
+                "640x360",
+                "320x240",
+                "320x180",
+            ]
+        ),
         default="1080x1920",
         category=kCameraPropsCategory,
         description="Camera Resolution",
