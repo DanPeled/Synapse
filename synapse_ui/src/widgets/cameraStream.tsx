@@ -3,8 +3,15 @@ import { baseCardColor, teamColor } from "@/services/style";
 import { Eye, Fullscreen } from "lucide-react";
 import { darken } from "polished";
 import { Row } from "./containers";
+import { cn } from "@/lib/utils";
 
-export function CameraStream({ stream }: { stream: string | undefined }) {
+export function CameraStream({
+  stream,
+  maxWidth = "max-w-[435px]",
+}: {
+  stream: string | undefined;
+  maxWidth?: string;
+}) {
   const [loaded, setLoaded] = useState(false);
   const [contextPos, setContextPos] = useState<{ x: number; y: number } | null>(
     null,
@@ -18,7 +25,7 @@ export function CameraStream({ stream }: { stream: string | undefined }) {
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setContextPos({ x: e.clientX, y: e.clientY });
+    // setContextPos({ x: e.clientX, y: e.clientY });
   };
 
   const handleFullscreen = () => {
@@ -47,7 +54,10 @@ export function CameraStream({ stream }: { stream: string | undefined }) {
 
   return (
     <div
-      className="aspect-[3/2] w-full max-w-[435px] flex flex-col items-center justify-center rounded-lg border border-zinc-700"
+      className={cn(
+        "aspect-[3/2] w-full flex flex-col items-center justify-center rounded-lg border border-zinc-700",
+        maxWidth,
+      )}
       style={{
         maxHeight: "290px",
         height: "auto",

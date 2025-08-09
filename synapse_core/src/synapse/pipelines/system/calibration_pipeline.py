@@ -1,12 +1,22 @@
-from typing import Optional, Sequence
+from typing import List, NamedTuple, Optional, Sequence
 
 import cv2
+import numpy as np
+from cv2.aruco import Dictionary
 from cv2.typing import MatLike
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import systemPipeline
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse.stypes import Frame
+
+
+class CalibrationResult(NamedTuple):
+    mean_error: float
+    camera_matrix: np.ndarray
+    dist_coeffs: np.ndarray
+    rvecs: Sequence[MatLike]
+    tvecs: Sequence[MatLike]
 
 
 class CalibrationPipelineSettings(PipelineSettings):
@@ -73,13 +83,14 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
 
         self.detector_params = cv2.aruco.DetectorParameters()
 
-        self.all_corners = []
-        self.all_ids = []
-        self.all_imgs = 0
+        self.all_corners: List = []
+        self.all_ids: List = []
+        self.all_imgs: int = 0
 
         self.camera_matrix = None
         self.dist_coeffs = None
         self.calibrated = False
+        self.imageSize: Optional[List] = None
 
     def _update_board(self):
         squares_x = self.getSetting(self.settings.squares_x)
@@ -107,7 +118,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
 
         self._last_settings = current_settings
 
-        self.aruco_dict = cv2.aruco.getPredefinedDictionary(
+        self.aruco_dict: Dictionary = cv2.aruco.getPredefinedDictionary(
             getattr(cv2.aruco, aruco_dict_name)
         )
         self.charuco_board = cv2.aruco.CharucoBoard(
@@ -121,101 +132,83 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
     def processFrame(self, img, timestamp: float) -> Frame:
         self._update_board()
 
-        if not self.getSetting(self.settings.take_picture):
-            return img
-
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         corners, ids, _ = cv2.aruco.detectMarkers(
-            gray, self.aruco_dict, parameters=self.detector_params
+            image=gray, dictionary=self.aruco_dict
         )
 
-        if ids is not None and len(ids) > 0:
-            img = cv2.aruco.drawDetectedMarkers(img, corners, ids)
+        img = cv2.aruco.drawDetectedMarkers(image=img, corners=corners)
 
-        retval: Optional[int] = None
-        charuco_corners: Optional[Sequence[MatLike]] = None
-        charuco_ids: Optional[MatLike] = None
         if ids is not None and len(ids) > 0:
-            retval, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
-                markerCorners=corners,
-                markerIds=ids,
-                image=gray,
-                board=self.charuco_board,
+            response, charuco_corners, charuco_ids = (
+                cv2.aruco.interpolateCornersCharuco(
+                    markerCorners=corners,
+                    markerIds=ids,
+                    image=gray,
+                    board=self.charuco_board,
+                )
             )
 
-            if charuco_corners is not None and charuco_ids is not None:
-                img = cv2.aruco.drawDetectedMarkers(
-                    img,
-                    borderColor=(100, 100, 100),
-                    corners=charuco_corners,
-                    ids=charuco_ids,
+            if response > 20:
+                start_x = 10
+                start_y = img.shape[0] - 30
+
+                # Define points for checkmark
+                pt1 = (start_x, start_y)
+                pt2 = (start_x + 10, start_y + 15)
+                pt3 = (start_x + 30, start_y - 10)
+
+                check_color = (0, 255, 0)  # Green
+                thickness = 5
+
+                cv2.line(img, pt1, pt2, check_color, thickness)
+                cv2.line(img, pt2, pt3, check_color, thickness)
+
+                if self.getSetting(self.settings.take_picture):
+                    self.all_corners.append(charuco_corners)
+                    self.all_ids.append(charuco_ids)
+                    self.all_imgs += 1
+
+                img = cv2.aruco.drawDetectedCornersCharuco(
+                    image=img, charucoCorners=charuco_corners, charucoIds=charuco_ids
                 )
 
-        total_corners = (self.getSetting(self.settings.squares_x) - 1) * (
-            self.getSetting(self.settings.squares_y) - 1
-        )
-        min_corners_required = int(total_corners * 0.7)
+                if not self.imageSize:
+                    self.imageSize = gray.shape[::-1]
 
-        if retval is not None and retval >= min_corners_required:
-            self.all_corners.append(charuco_corners)
-            self.all_ids.append(charuco_ids)
-            self.all_imgs += 1
+        if self.all_imgs > self.getSetting(self.settings.calibration_images_count):
+            if self.imageSize:
+                criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 100, 1e-6)
+                flags = 0
 
-            ...
+                # TODO: send stop calibration
 
-        # Visual feedback text
-        text = f"Corners detected: {retval if retval is not None else 0} / {total_corners} (min {min_corners_required})"
-        cv2.putText(
-            img,
-            text,
-            org=(10, 30),
-            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale=0.7,
-            color=(0, 255, 0)
-            if retval and retval >= min_corners_required
-            else (0, 0, 255),
-            thickness=2,
-            lineType=cv2.LINE_AA,
-        )
+                retval, cameraMatrix, distCoeffs, rvecs, tvecs = (
+                    cv2.aruco.calibrateCameraCharuco(
+                        self.all_corners,  # List[np.ndarray]
+                        self.all_ids,  # List[np.ndarray]
+                        self.charuco_board,  # CharucoBoard object
+                        self.imageSize,  # Tuple[int, int]
+                        np.eye(3),  # cameraMatrix initial guess
+                        np.zeros((5, 1)),  # distCoeffs initial guess
+                        flags=flags,
+                        criteria=criteria,
+                    )
+                )
 
-        if self.all_imgs >= self.getSetting(self.settings.calibration_images_count):
-            self._calibrate_camera(gray.shape[::-1])
-            self.calibrated = True
-            print("Calibration completed!")
+                result = CalibrationResult(
+                    mean_error=retval,
+                    camera_matrix=cameraMatrix,
+                    dist_coeffs=distCoeffs,
+                    rvecs=rvecs,
+                    tvecs=tvecs,
+                )
 
-            self.all_corners = []
-            self.all_ids = []
-            self.all_imgs = 0
-            self.setSetting(self.settings.take_picture, False)
+                # TODO: send calibration results
+
+                self.all_imgs = 0
+                self.all_corners = []
+                self.all_ids = []
 
         return img
-
-    def _calibrate_camera(self, image_size):
-        (
-            ret,
-            camera_matrix,
-            dist_coeffs,
-            rvecs,
-            tvecs,
-            std_intrinsics,
-            std_extrinsics,
-            per_view_errors,
-        ) = cv2.aruco.calibrateCameraCharucoExtended(
-            charucoCorners=self.all_corners,
-            charucoIds=self.all_ids,
-            board=self.charuco_board,
-            imageSize=image_size,
-            cameraMatrix=cv2.UMat(),
-            distCoeffs=cv2.UMat(),
-            flags=0,
-            criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6),
-        )
-
-        if ret:
-            self.camera_matrix = camera_matrix
-            self.dist_coeffs = dist_coeffs
-            print("Camera matrix:\n", camera_matrix)
-            print("Distortion coefficients:\n", dist_coeffs)
-        else:
-            print("Calibration failed.")

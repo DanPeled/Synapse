@@ -57,7 +57,7 @@ export function PipelineConfigControl({
           setValue={(val) => {
             if (hasSettingValue(val)) {
               setTimeout(() => {
-                if (selectedPipeline) {
+                if (selectedPipeline !== undefined) {
                   const oldPipelines = pipelines;
 
                   const newSettingsValues = {

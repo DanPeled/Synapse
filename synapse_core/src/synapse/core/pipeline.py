@@ -99,6 +99,8 @@ class Pipeline(ABC, Generic[TSettingsType]):
     def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
         if isinstance(setting, str):
             self.settings.getAPI().setValue(setting, value)
+        elif isinstance(setting, Setting):
+            self.setSetting(setting.key, value)
 
     def __getOrCreateBuilder(self, key: str) -> SendableBuilder:
         """

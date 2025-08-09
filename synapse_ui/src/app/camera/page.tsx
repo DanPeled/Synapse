@@ -41,7 +41,10 @@ export default function CameraConfigPage() {
             socket={socket}
           />
           {/* <CameraTransformModule /> */}
-          <CameraCalibrationModule />
+          <CameraCalibrationModule
+            selectedCamera={selectedCamera}
+            socket={socket}
+          />
         </Column>
 
         <Column className="flex-auto space-y-2 h-full min-w-[500px]">

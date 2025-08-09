@@ -1074,7 +1074,13 @@ class RuntimeManager:
                 processed_frame: Frame = frame
 
                 if pipeline is not None:
-                    result = pipeline.processFrame(frame, loop_start)
+                    result = None
+                    try:
+                        result = pipeline.processFrame(frame, loop_start)
+                    except Exception as e:
+                        log.err(
+                            f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for camera #{cameraIndex}: {e}\n{traceback.format_exc()}"
+                        )
                     frame = self.handleResults(result, cameraIndex)
                     if frame is not None:
                         processed_frame = frame

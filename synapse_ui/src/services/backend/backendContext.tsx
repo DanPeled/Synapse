@@ -216,6 +216,8 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               pipeline.name = setPipelineNameMSG.name;
               const newPipelines = new Map(stateRef.current.pipelines);
               newPipelines.set(setPipelineNameMSG.pipelineIndex, pipeline);
+
+              stateRef.current.pipelines = newPipelines;
               setters.setPipelines(newPipelines);
             }
             break;

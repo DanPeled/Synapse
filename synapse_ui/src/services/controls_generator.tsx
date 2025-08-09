@@ -140,7 +140,7 @@ export function GenerateControl({
               style={{ color: teamColor }}
               className="hover:bg-zinc-600 cursor-pointer bg-zinc-700 w-100 text-lg"
               onClick={() => {
-                setValue(settingValueToProto(false));
+                setValue(SettingValueProto.create({ boolValue: true }));
               }}
             >
               {settingName}
