@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { SettingValueProto } from "@/proto/settings/v1/value";
-import { CameraProto } from "@/proto/v1/camera";
+import { CalibrationDataProto, CameraProto } from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
   PipelineProto,
@@ -21,7 +21,7 @@ import { WebSocketWrapper } from "@/services/websocket";
 import { AlertDialog } from "@/widgets/alertDialog";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
-import { Barcode, Camera, X } from "lucide-react";
+import { Barcode, Camera, LoaderPinwheel, X } from "lucide-react";
 import { JSX, useEffect, useState } from "react";
 
 function setCalibrationPipeline(
@@ -87,6 +87,26 @@ export function CalibrationDialog({
   const [selectedPipeline, setSelectedPipeline] = useState<
     PipelineProto | undefined
   >(undefined);
+
+  const [resolutonCalibrationData, setResolutionCalibrationData] = useState<
+    CalibrationDataProto | undefined
+  >();
+
+  const { calibrationdata, calibrating } = useBackendContext();
+
+  useEffect(() => {
+    if (camera) {
+      const cameraCalibrations = calibrationdata.get(camera.index);
+      cameraCalibrations?.forEach((calib) => {
+        if (
+          calib.resolution ==
+          selectedPipeline?.settingsValues["resolution"].stringValue
+        ) {
+          setResolutionCalibrationData(calib);
+        }
+      });
+    }
+  }, [calibrationdata]);
 
   function setSetting(
     val: SettingValueProto,
@@ -225,6 +245,17 @@ export function CalibrationDialog({
               const setPipelineBinary =
                 MessageProto.encode(setPipelinePayload).finish();
               socket?.sendBinary(setPipelineBinary);
+
+              const deletePipelinePayload = MessageProto.create({
+                type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
+                removePipelineIndex: 9999,
+              });
+
+              const removePipelineBinary = MessageProto.encode(
+                deletePipelinePayload,
+              ).finish();
+
+              socket?.sendBinary(removePipelineBinary);
             }
 
             setVisible(false);
@@ -253,6 +284,13 @@ export function CalibrationDialog({
               <p className="text-sm select-none">Configure camera parameters</p>
             </div>
           )}
+          <div className="items-center">
+            {calibrating ? (
+              <LoaderPinwheel className="w-16 h-16" color={teamColor} />
+            ) : camera ? (
+              <p></p>
+            ) : undefined}
+          </div>
         </Column>
 
         <Column className="flex-1 items-center space-y-10">

@@ -7,6 +7,7 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import {
+  CalibrationDataProto,
   CameraPerformanceProto,
   CameraProto,
   RenameCameraMessageProto,
@@ -51,6 +52,8 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_FORMAT = 17,
   MESSAGE_TYPE_PROTO_RESTART_SYNAPSE = 18,
   MESSAGE_TYPE_PROTO_RENAME_CAMERA = 19,
+  MESSAGE_TYPE_PROTO_CALIBRATING = 20,
+  MESSAGE_TYPE_PROTO_CALIBRATION_DATA = 21,
   UNRECOGNIZED = -1,
 }
 
@@ -116,6 +119,12 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 19:
     case "MESSAGE_TYPE_PROTO_RENAME_CAMERA":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_RENAME_CAMERA;
+    case 20:
+    case "MESSAGE_TYPE_PROTO_CALIBRATING":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATING;
+    case 21:
+    case "MESSAGE_TYPE_PROTO_CALIBRATION_DATA":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -165,6 +174,10 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_RESTART_SYNAPSE";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_RENAME_CAMERA:
       return "MESSAGE_TYPE_PROTO_RENAME_CAMERA";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATING:
+      return "MESSAGE_TYPE_PROTO_CALIBRATING";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA:
+      return "MESSAGE_TYPE_PROTO_CALIBRATION_DATA";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -187,6 +200,7 @@ export interface MessageProto {
   cameraPerformance?: CameraPerformanceProto | undefined;
   setNetworkSettings?: SetNetworkSettingsProto | undefined;
   renameCamera?: RenameCameraMessageProto | undefined;
+  calibrationData?: CalibrationDataProto | undefined;
   pipelineTypeInfo: PipelineTypeProto[];
 }
 
@@ -207,6 +221,7 @@ function createBaseMessageProto(): MessageProto {
     cameraPerformance: undefined,
     setNetworkSettings: undefined,
     renameCamera: undefined,
+    calibrationData: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -292,6 +307,12 @@ export const MessageProto: MessageFns<MessageProto> = {
       RenameCameraMessageProto.encode(
         message.renameCamera,
         writer.uint32(122).fork(),
+      ).join();
+    }
+    if (message.calibrationData !== undefined) {
+      CalibrationDataProto.encode(
+        message.calibrationData,
+        writer.uint32(138).fork(),
       ).join();
     }
     for (const v of message.pipelineTypeInfo) {
@@ -455,6 +476,17 @@ export const MessageProto: MessageFns<MessageProto> = {
           );
           continue;
         }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.calibrationData = CalibrationDataProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
         case 16: {
           if (tag !== 130) {
             break;
@@ -516,6 +548,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       renameCamera: isSet(object.renameCamera)
         ? RenameCameraMessageProto.fromJSON(object.renameCamera)
+        : undefined,
+      calibrationData: isSet(object.calibrationData)
+        ? CalibrationDataProto.fromJSON(object.calibrationData)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -585,6 +620,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.renameCamera !== undefined) {
       obj.renameCamera = RenameCameraMessageProto.toJSON(message.renameCamera);
+    }
+    if (message.calibrationData !== undefined) {
+      obj.calibrationData = CalibrationDataProto.toJSON(
+        message.calibrationData,
+      );
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -660,6 +700,10 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.renameCamera =
       object.renameCamera !== undefined && object.renameCamera !== null
         ? RenameCameraMessageProto.fromPartial(object.renameCamera)
+        : undefined;
+    message.calibrationData =
+      object.calibrationData !== undefined && object.calibrationData !== null
+        ? CalibrationDataProto.fromPartial(object.calibrationData)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||

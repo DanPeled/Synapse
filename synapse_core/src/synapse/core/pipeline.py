@@ -169,5 +169,7 @@ def systemPipeline(
 def getPipelineTypename(pipelineType: Type[Pipeline]) -> str:
     if hasattr(pipelineType, "__typename"):
         return getattr(pipelineType, "__typename")
-    else:
+    elif hasattr(pipelineType, "__name__"):
         return pipelineType.__name__
+    else:
+        return str(pipelineType)

@@ -28,3 +28,11 @@ message RenameCameraMessageProto {
   int32 camera_index = 1;
   string new_name = 2;
 }
+
+message CalibrationDataProto {
+  int32 camera_index = 1;
+  float mean_error = 2;
+  string resolution = 3;
+  repeated float camera_matrix = 4;
+  repeated float dist_coeffs = 5;
+}

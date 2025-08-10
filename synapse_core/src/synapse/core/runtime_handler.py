@@ -32,9 +32,8 @@ from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
                       PipelineID, PipelineName, PipelineTypeName, Resolution)
 from ..util import resolveGenericArgument
-from .camera_factory import (CalibrationData, CameraConfig, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
+                             SynapseCamera, getCameraTable, getCameraTableName)
 from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
 from .pipeline import (FrameResult, Pipeline, PipelineSettings,
@@ -455,13 +454,7 @@ class CameraHandler:
                     id=f"{info.name}_{info.productId}",
                     transform=Transform3d(),
                     defaultPipeline=0,
-                    calibration={
-                        "1920x1080": CalibrationData(
-                            matrix=np.eye(3).tolist(),
-                            distCoeff=np.zeros(5).tolist(),
-                            measuredRes=(1920, 1080),
-                        )
-                    },
+                    calibration={},
                     streamRes=self.DEFAULT_STREAM_SIZE,
                 )
 
@@ -1255,6 +1248,10 @@ class RuntimeManager:
                 key: pipeline.toDict(self.pipelineLoader.pipelineTypeNames[key])
                 for key, pipeline in (
                     self.pipelineLoader.pipelineInstanceBindings.items()
+                )
+                if not (
+                    getPipelineTypename(type(pipeline)).startswith("$$")
+                    and getPipelineTypename(type(pipeline)).endswith("$$")
                 )
             },
         }

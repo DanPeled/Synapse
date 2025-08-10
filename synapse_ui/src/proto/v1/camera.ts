@@ -36,6 +36,14 @@ export interface RenameCameraMessageProto {
   newName: string;
 }
 
+export interface CalibrationDataProto {
+  cameraIndex: number;
+  meanError: number;
+  resolution: string;
+  cameraMatrix: number[];
+  distCoeffs: number[];
+}
+
 function createBaseCameraProto(): CameraProto {
   return {
     name: "",
@@ -514,6 +522,181 @@ export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
     const message = createBaseRenameCameraMessageProto();
     message.cameraIndex = object.cameraIndex ?? 0;
     message.newName = object.newName ?? "";
+    return message;
+  },
+};
+
+function createBaseCalibrationDataProto(): CalibrationDataProto {
+  return {
+    cameraIndex: 0,
+    meanError: 0,
+    resolution: "",
+    cameraMatrix: [],
+    distCoeffs: [],
+  };
+}
+
+export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
+  encode(
+    message: CalibrationDataProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.cameraIndex !== 0) {
+      writer.uint32(8).int32(message.cameraIndex);
+    }
+    if (message.meanError !== 0) {
+      writer.uint32(21).float(message.meanError);
+    }
+    if (message.resolution !== "") {
+      writer.uint32(26).string(message.resolution);
+    }
+    writer.uint32(34).fork();
+    for (const v of message.cameraMatrix) {
+      writer.float(v);
+    }
+    writer.join();
+    writer.uint32(42).fork();
+    for (const v of message.distCoeffs) {
+      writer.float(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CalibrationDataProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCalibrationDataProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.cameraIndex = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 21) {
+            break;
+          }
+
+          message.meanError = reader.float();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.resolution = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag === 37) {
+            message.cameraMatrix.push(reader.float());
+
+            continue;
+          }
+
+          if (tag === 34) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.cameraMatrix.push(reader.float());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 5: {
+          if (tag === 45) {
+            message.distCoeffs.push(reader.float());
+
+            continue;
+          }
+
+          if (tag === 42) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.distCoeffs.push(reader.float());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CalibrationDataProto {
+    return {
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
+      meanError: isSet(object.meanError)
+        ? globalThis.Number(object.meanError)
+        : 0,
+      resolution: isSet(object.resolution)
+        ? globalThis.String(object.resolution)
+        : "",
+      cameraMatrix: globalThis.Array.isArray(object?.cameraMatrix)
+        ? object.cameraMatrix.map((e: any) => globalThis.Number(e))
+        : [],
+      distCoeffs: globalThis.Array.isArray(object?.distCoeffs)
+        ? object.distCoeffs.map((e: any) => globalThis.Number(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CalibrationDataProto): unknown {
+    const obj: any = {};
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
+    }
+    if (message.meanError !== 0) {
+      obj.meanError = message.meanError;
+    }
+    if (message.resolution !== "") {
+      obj.resolution = message.resolution;
+    }
+    if (message.cameraMatrix?.length) {
+      obj.cameraMatrix = message.cameraMatrix;
+    }
+    if (message.distCoeffs?.length) {
+      obj.distCoeffs = message.distCoeffs;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(
+    base?: I,
+  ): CalibrationDataProto {
+    return CalibrationDataProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(
+    object: I,
+  ): CalibrationDataProto {
+    const message = createBaseCalibrationDataProto();
+    message.cameraIndex = object.cameraIndex ?? 0;
+    message.meanError = object.meanError ?? 0;
+    message.resolution = object.resolution ?? "";
+    message.cameraMatrix = object.cameraMatrix?.map((e) => e) || [];
+    message.distCoeffs = object.distCoeffs?.map((e) => e) || [];
     return message;
   },
 };

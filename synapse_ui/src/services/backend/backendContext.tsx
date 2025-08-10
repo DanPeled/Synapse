@@ -21,7 +21,6 @@ import {
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
-import { Camera } from "three/src/Three.Core.js";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -45,7 +44,7 @@ const initialState: BackendStateSystem.State = {
     hostname: "Unknown",
     ip: "127.0.0.1",
     platform: "Unknown",
-    networkInterfaces: ["eth0"],
+    networkInterfaces: [],
   },
   hardwaremetrics: {
     cpuTemp: 0,
@@ -64,6 +63,8 @@ const initialState: BackendStateSystem.State = {
   logs: [],
   cameras: new Map(),
   cameraPerformance: new Map(),
+  calibrationdata: new Map(),
+  calibrating: false,
   teamnumber: 0,
 };
 
@@ -246,6 +247,36 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             setters.setCameraPerformance(reports);
             stateRef.current.cameraPerformance = reports;
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATING: {
+            setters.setCalibrating(true);
+            stateRef.current.calibrating = true;
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA: {
+            const calibData = messageObj.calibrationData!;
+            const calibrationMap = new Map(stateRef.current.calibrationdata);
+
+            if (calibrationMap.has(calibData.cameraIndex)) {
+              // Append to the existing array
+              calibrationMap
+                .get(calibData.cameraIndex)!
+                .set(calibData.resolution, calibData);
+            } else {
+              // Create a new array with this entry
+              calibrationMap.set(
+                calibData.cameraIndex,
+                new Map([[calibData.resolution, calibData]]),
+              );
+            }
+
+            setters.setCalibrationdata(calibrationMap);
+            stateRef.current.calibrationdata = calibrationMap;
+
+            setters.setCalibrating(false);
+            stateRef.current.calibrating = false;
+
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {

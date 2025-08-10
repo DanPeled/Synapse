@@ -5,10 +5,14 @@ import numpy as np
 from cv2.aruco import Dictionary
 from cv2.typing import MatLike
 from synapse import Pipeline, PipelineSettings
+from synapse.core import Synapse
+from synapse.core.camera_factory import CalibrationData
 from synapse.core.pipeline import systemPipeline
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse.stypes import Frame
+from synapse_net.proto.v1 import (CalibrationDataProto, MessageProto,
+                                  MessageTypeProto)
 
 
 class CalibrationResult(NamedTuple):
@@ -170,6 +174,8 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
                     self.all_ids.append(charuco_ids)
                     self.all_imgs += 1
 
+                    self.setSetting(self.settings.take_picture, False)
+
                 img = cv2.aruco.drawDetectedCornersCharuco(
                     image=img, charucoCorners=charuco_corners, charucoIds=charuco_ids
                 )
@@ -177,38 +183,70 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
                 if not self.imageSize:
                     self.imageSize = gray.shape[::-1]
 
-        if self.all_imgs > self.getSetting(self.settings.calibration_images_count):
+        if (
+            self.all_imgs > self.getSetting(self.settings.calibration_images_count)
+            and not self.calibrated
+        ):
             if self.imageSize:
                 criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 100, 1e-6)
                 flags = 0
 
-                # TODO: send stop calibration
+                Synapse.kInstance.websocket.sendToAllSync(
+                    MessageProto(
+                        type=MessageTypeProto.CALIBRATING, remove_pipeline_index=-1
+                    ).SerializeToString()
+                )
 
-                retval, cameraMatrix, distCoeffs, rvecs, tvecs = (
+                retval, cameraMatrix, distCoeffs, _, _ = (
                     cv2.aruco.calibrateCameraCharuco(
                         self.all_corners,  # List[np.ndarray]
                         self.all_ids,  # List[np.ndarray]
                         self.charuco_board,  # CharucoBoard object
                         self.imageSize,  # Tuple[int, int]
-                        np.eye(3),  # cameraMatrix initial guess
-                        np.zeros((5, 1)),  # distCoeffs initial guess
+                        np.empty((0, 0)),  # cameraMatrix initial guess
+                        np.empty((0, 0)),  # distCoeffs initial guess
                         flags=flags,
                         criteria=criteria,
                     )
                 )
 
-                result = CalibrationResult(
-                    mean_error=retval,
-                    camera_matrix=cameraMatrix,
-                    dist_coeffs=distCoeffs,
-                    rvecs=rvecs,
-                    tvecs=tvecs,
+                flattenedMatrix = cameraMatrix.flatten().tolist()
+                flattendDistCoeffs = distCoeffs.flatten().tolist()
+
+                Synapse.kInstance.websocket.sendToAllSync(
+                    MessageProto(
+                        type=MessageTypeProto.CALIBRATION_DATA,
+                        calibration_data=CalibrationDataProto(
+                            camera_index=self.cameraIndex,
+                            mean_error=retval,
+                            camera_matrix=flattenedMatrix,
+                            dist_coeffs=flattendDistCoeffs,
+                            resolution=self.getSetting(self.settings.resolution),
+                        ),
+                    ).SerializeToString()
                 )
 
-                # TODO: send calibration results
+                resolution = self.getSetting(self.settings.resolution).split("x")
+                width = int(resolution[0])
+                height = int(resolution[1])
+
+                Synapse.kInstance.runtime_handler.cameraHandler.cameraBindings[
+                    self.cameraIndex
+                ].calibration[
+                    self.getSetting(self.settings.resolution)
+                ] = CalibrationData(
+                    matrix=cameraMatrix.flatten().tolist(),
+                    distCoeff=distCoeffs.flatten().tolist(),
+                    measuredRes=(width, height),
+                    meanErr=retval,
+                )
+
+                Synapse.kInstance.runtime_handler.save()
 
                 self.all_imgs = 0
                 self.all_corners = []
                 self.all_ids = []
+
+                self.calibrated = True
 
         return img

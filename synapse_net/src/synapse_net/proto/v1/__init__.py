@@ -50,6 +50,8 @@ class MessageTypeProto(betterproto.Enum):
     FORMAT = 17
     RESTART_SYNAPSE = 18
     RENAME_CAMERA = 19
+    CALIBRATING = 20
+    CALIBRATION_DATA = 21
 
 
 @dataclass(eq=False, repr=False)
@@ -81,6 +83,15 @@ class SetDefaultPipelineMessageProto(betterproto.Message):
 class RenameCameraMessageProto(betterproto.Message):
     camera_index: int = betterproto.int32_field(1)
     new_name: str = betterproto.string_field(2)
+
+
+@dataclass(eq=False, repr=False)
+class CalibrationDataProto(betterproto.Message):
+    camera_index: int = betterproto.int32_field(1)
+    mean_error: float = betterproto.float_field(2)
+    resolution: str = betterproto.string_field(3)
+    camera_matrix: List[float] = betterproto.float_field(4)
+    dist_coeffs: List[float] = betterproto.float_field(5)
 
 
 @dataclass(eq=False, repr=False)
@@ -260,5 +271,8 @@ class MessageProto(betterproto.Message):
     )
     rename_camera: "RenameCameraMessageProto" = betterproto.message_field(
         15, group="payload"
+    )
+    calibration_data: "CalibrationDataProto" = betterproto.message_field(
+        17, group="payload"
     )
     pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(16)

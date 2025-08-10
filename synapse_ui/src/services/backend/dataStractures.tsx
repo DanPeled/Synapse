@@ -1,6 +1,10 @@
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { WebSocketWrapper } from "../websocket";
-import { CameraPerformanceProto, CameraProto } from "@/proto/v1/camera";
+import {
+  CalibrationDataProto,
+  CameraPerformanceProto,
+  CameraProto,
+} from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { LogMessageProto } from "@/proto/v1/log";
 
@@ -21,6 +25,8 @@ export namespace BackendStateSystem {
     cameraPerformance: Map<CameraID, CameraPerformanceProto>;
     pipelines: Map<PipelineID, PipelineProto>;
     pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
+    calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
+    calibrating: boolean;
   }
 
   // Define action types with a discriminated union

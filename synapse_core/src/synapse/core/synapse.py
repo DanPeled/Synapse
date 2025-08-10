@@ -326,6 +326,18 @@ class Synapse:
                     createMessage(MessageTypeProto.ADD_CAMERA, msg)
                 )
 
+            for id, config in self.runtime_handler.cameraHandler.cameraBindings.items():
+                calibrations = config.calibration
+
+                for calib in calibrations.values():
+                    calibProto = calib.toProto(id)
+                    await self.websocket.sendToAll(
+                        MessageProto(
+                            type=MessageTypeProto.CALIBRATION_DATA,
+                            calibration_data=calibProto,
+                        ).SerializeToString()
+                    )
+
             for log_ in logs:
                 msg = createMessage(MessageTypeProto.LOG, log_)
                 await self.websocket.sendToAll(msg)

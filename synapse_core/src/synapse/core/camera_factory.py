@@ -20,7 +20,7 @@ from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import warn
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import CameraProto
+from synapse_net.proto.v1 import CalibrationDataProto, CameraProto
 from wpimath import geometry
 
 from ..stypes import CameraID, Frame, PipelineID, Resolution
@@ -68,8 +68,9 @@ def getCameraTableName(cameraIndex: CameraID) -> str:
 
 @dataclass
 class CalibrationData:
-    matrix: List[List[float]]
+    matrix: List[float]
     distCoeff: List[float]
+    meanErr: float
     measuredRes: Resolution
 
     def toDict(self) -> Dict[str, Any]:
@@ -77,6 +78,7 @@ class CalibrationData:
             CameraConfigKey.kMatrix.value: self.matrix,
             CameraConfigKey.kDistCoeff.value: self.distCoeff,
             CameraConfigKey.kMeasuredRes.value: self.measuredRes,
+            "mean_err": self.meanErr,
         }
 
     @staticmethod
@@ -85,6 +87,16 @@ class CalibrationData:
             matrix=data[CameraConfigKey.kMatrix.value],
             distCoeff=data[CameraConfigKey.kDistCoeff.value],
             measuredRes=data[CameraConfigKey.kMeasuredRes.value],
+            meanErr=data["mean_err"],
+        )
+
+    def toProto(self, cameraIndex: CameraID) -> CalibrationDataProto:
+        return CalibrationDataProto(
+            camera_index=cameraIndex,
+            mean_error=self.meanErr,
+            resolution="x".join([str(dim) for dim in self.measuredRes]),
+            camera_matrix=self.matrix,
+            dist_coeffs=self.distCoeff,
         )
 
 
@@ -104,21 +116,28 @@ class CameraConfig:
             CameraConfigKey.kTransform.value: transform3dToList(self.transform),
             CameraConfigKey.kDefaultPipeline.value: self.defaultPipeline,
             CameraConfigKey.kStreamRes.value: list(self.streamRes),
-            CameraConfigKey.kCalibration.value: self.calibration,
+            CameraConfigKey.kCalibration.value: {
+                resolution: calib.toDict()
+                for resolution, calib in self.calibration.items()
+            },
         }
 
     @staticmethod
     def fromDict(data: Dict[str, Any]) -> "CameraConfig":
+        print(data.get(CameraConfigKey.kCalibration.value))
+
+        calib = {
+            key: CalibrationData.fromDict(calib)
+            for key, calib in data.get(CameraConfigKey.kCalibration.value, {}).items()
+        }
+
         return CameraConfig(
             name=data[CameraConfigKey.kName.value],
             id=data[CameraConfigKey.kPath.value],
             streamRes=data[CameraConfigKey.kStreamRes.value],
             transform=listToTransform3d(data[CameraConfigKey.kTransform.value]),
             defaultPipeline=data[CameraConfigKey.kDefaultPipeline.value],
-            calibration={
-                key: CalibrationData.fromDict(calib)
-                for key, calib in data.get(CameraConfigKey.kCalibration.value, {})
-            },
+            calibration=calib,
         )
 
 
