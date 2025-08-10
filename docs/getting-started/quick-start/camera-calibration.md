@@ -12,15 +12,14 @@ _Even if you're not using AprilTag detection, camera calibration can be used for
 
 ## Print The Calibration Board
 
-You can download the calibration target from the [Calib.db](https://calibdb.net/board.png) site or directly from the **Cameras** tab on your coprocessor (coming soon).
+You can download the calibration target from the [Calib.io](https://calib.io/pages/camera-calibration-pattern-generator) site or directly from the **Cameras** tab on your coprocessor (coming soon).
 
 Use the following settings for the **Charuco** board:
 
 * **Board Type:** Charuco
-* **Tag Family:** 4x4
-* **Pattern Spacing:** 1.00 inch
-* **Marker Size:** 0.75 inch
-* **Board Size:** 8x8
+* **Tag Family:** 5x5
+* **Checker Width:** 15 mm
+* **Board Size:** 8x11 (Rows x Columns)
 
 ## Prepare The Calibration Board
 
@@ -30,6 +29,12 @@ Use the following settings for the **Charuco** board:
   Make sure the board is perfectly flat—no bends or wrinkles. Any distortion can throw off your calibration.
 
 ## Calibrate Your Camera
+
+{% hint style="success" %}
+When calibrating, the check mark appears on the camera view once the runtime detects enough tags to capture an image. To ensure the best results, only take pictures when this check mark is visible.
+
+<h4 align="center"><img src="../../.gitbook/assets/calibrating.png" alt=""></h4>
+{% endhint %}
 
 * **Take lots of photos:**\
   Aim for _at least_ 50 good shots for reliable calibration. You can get by with 12, but the results may not be great.
@@ -45,3 +50,7 @@ Use the following settings for the **Charuco** board:
 Calibration can also be handled offline without the coprocessor if you still have access to the camera.
 
 External sites such as [Calib.db](https://calibdb.net/) can be used in order to calibrate outside of the Synapse runtime.
+
+{% hint style="info" %}
+This is not supported currently by the UI but the data from the calibration can be written manually into the config file of the project
+{% endhint %}
