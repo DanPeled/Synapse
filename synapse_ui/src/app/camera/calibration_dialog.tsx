@@ -214,7 +214,6 @@ export function CalibrationDialog({
   useEffect(() => {
     setSelectedPipelineType(pipelinetypes.get("$$CalibrationPipeline$$"));
     setSelectedPipeline(pipelines.get(9999));
-    console.log(pipelines);
     generateControls();
   }, [pipelines, visible, camera]);
 

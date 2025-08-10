@@ -344,11 +344,18 @@ export function CameraAndPipelineControls({
               setRequestedPipelineType(val);
               setChangePipelineTypeDialogVisible(true);
             }}
-            options={Array.from(pipelinetypes.entries()).map(([_, type]) => ({
-              label: type.type,
-              value: type,
-              key: type.type,
-            }))}
+            options={Array.from(pipelinetypes.values())
+              .filter((type: PipelineTypeProto) => {
+                console.log(type.type);
+                return !(
+                  type.type.startsWith("$$") && type.type.endsWith("$$")
+                );
+              })
+              .map((type) => ({
+                label: type.type,
+                value: type,
+                key: type.type,
+              }))}
           />
           <div className="h-6" />
           <div className="flex justify-center items-center">

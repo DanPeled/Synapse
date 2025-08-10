@@ -111,7 +111,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (selectedCamera) {
-      console.log(cameraPerformance);
       setSelectedCameraPerformance(cameraPerformance.get(selectedCamera.index));
     }
   }, [cameraPerformance]);

@@ -312,24 +312,28 @@ export function CameraCalibrationModule({
         />
 
         {/* More Info Toggle Button below Select Resolution */}
-        <div className="flex justify-center mt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowMoreInfo(!showMoreInfo)}
-            className="flex items-center bg-zinc-800 hover:bg-zinc-700 cursor-pointer border-zinc-700"
-            aria-expanded={showMoreInfo}
-            aria-controls="detailed-info-section"
-            style={{ color: teamColor }}
-          >
-            {showMoreInfo ? "Hide Details & Actions" : "Show Details & Actions"}
-            {showMoreInfo ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
+        {selectedResolutionData !== undefined && (
+          <div className="flex justify-center mt-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowMoreInfo(!showMoreInfo)}
+              className="flex items-center bg-zinc-800 hover:bg-zinc-700 cursor-pointer border-zinc-700"
+              aria-expanded={showMoreInfo}
+              aria-controls="detailed-info-section"
+              style={{ color: teamColor }}
+            >
+              {showMoreInfo
+                ? "Hide Details & Actions"
+                : "Show Details & Actions"}
+              {showMoreInfo ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+        )}
 
         {/* Collapsible Detailed Info Section */}
         <div

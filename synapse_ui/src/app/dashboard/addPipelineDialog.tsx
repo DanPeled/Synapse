@@ -67,7 +67,12 @@ export function AddPipelineDialog({
           textSize="text-xl"
           value={pipelineType}
           onValueChange={setPipelineType}
-          options={Array.from(pipelineTypes.values()).map((type) => ({
+          options={Array.from(
+            pipelineTypes.values().filter((type: PipelineTypeProto) => {
+              console.log(type.type);
+              return !(type.type.startsWith("$$") && type.type.endsWith("$$"));
+            }),
+          ).map((type) => ({
             label: type.type,
             value: type,
           }))}
