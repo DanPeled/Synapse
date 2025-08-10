@@ -20,7 +20,7 @@
 * [UI Interaction](usage/built-in-pipelines/README.md)
   * [Pipeline Settings](usage/built-in-pipelines/pipeline-settings.md)
   * [Camera Calibration](usage/built-in-pipelines/camera-calibration.md)
-  * [Network Settings](usage/built-in-pipelines/network-settings.md)
+  * [Settings Page](usage/built-in-pipelines/settings-page.md)
 * [Built In Pipelines](usage/built-in-pipelines-1/README.md)
   * [Apriltag Detection](usage/built-in-pipelines-1/apriltag-detection.md)
   * [Color Detection](usage/built-in-pipelines-1/color-detection.md)
