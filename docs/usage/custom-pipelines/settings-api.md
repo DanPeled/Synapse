@@ -78,7 +78,7 @@ This Constraint will be rendered as a Slider if both min and max values where pr
 
 ### Boolean Constraint
 
-The `BooleanConstraint` describes a boolean value, and will be rendered as a toggle button.
+The `BooleanConstraint` describes a boolean value, and will be rendered as a toggle button, or a button if set to render as one.
 
 <figure><img src="../../.gitbook/assets/BooleanValue.png" alt=""><figcaption></figcaption></figure>
 
