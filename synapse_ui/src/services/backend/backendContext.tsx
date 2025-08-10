@@ -41,6 +41,7 @@ const initialState: BackendStateSystem.State = {
   pipelines: new Map(),
   pipelinetypes: new Map(),
   deviceinfo: {
+    version: "Unknown",
     hostname: "Unknown",
     ip: "127.0.0.1",
     platform: "Unknown",

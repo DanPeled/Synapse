@@ -257,13 +257,15 @@ class Synapse:
         async def on_connect(ws):
             import synapse.hardware.metrics as metrics
 
-            deviceInfo: DeviceInfoProto = DeviceInfoProto()
-            deviceInfo.ip = getIP()
+            from ..__version__ import SYNAPSE_VERSION
 
-            deviceInfo.platform = (
-                metrics.Platform.getCurrentPlatform().getOSType().value
+            deviceInfo: DeviceInfoProto = DeviceInfoProto(
+                ip=getIP(),
+                version=SYNAPSE_VERSION,
+                platform=metrics.Platform.getCurrentPlatform().getOSType().value,
+                hostname=self.runtime_handler.networkSettings.hostname,
             )
-            deviceInfo.hostname = self.runtime_handler.networkSettings.hostname
+
             deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
 
             await self.websocket.sendToClient(

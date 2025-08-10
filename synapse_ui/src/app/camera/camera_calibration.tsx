@@ -322,7 +322,7 @@ export function CameraCalibrationModule({
             aria-controls="detailed-info-section"
             style={{ color: teamColor }}
           >
-            {showMoreInfo ? "Hide Details" : "Show Details"}
+            {showMoreInfo ? "Hide Details & Actions" : "Show Details & Actions"}
             {showMoreInfo ? (
               <ChevronUp className="w-4 h-4" />
             ) : (

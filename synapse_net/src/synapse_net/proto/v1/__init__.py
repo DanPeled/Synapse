@@ -113,16 +113,19 @@ class RemoveCalibrationDataMessageProto(betterproto.Message):
 class DeviceInfoProto(betterproto.Message):
     """Information about a device's network and system identification"""
 
-    hostname: str = betterproto.string_field(1)
+    version: str = betterproto.string_field(1)
+    """The version of the Synapse runtime"""
+
+    hostname: str = betterproto.string_field(2)
     """The device's hostname"""
 
-    ip: str = betterproto.string_field(2)
+    ip: str = betterproto.string_field(3)
     """The IP address of the device"""
 
-    platform: str = betterproto.string_field(3)
+    platform: str = betterproto.string_field(4)
     """The platform or operating system (e.g., "linux", "windows")"""
 
-    network_interfaces: List[str] = betterproto.string_field(4)
+    network_interfaces: List[str] = betterproto.string_field(5)
     """List of network interfaces available on the device"""
 
 

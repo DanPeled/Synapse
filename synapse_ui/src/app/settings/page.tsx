@@ -72,7 +72,9 @@ function DeviceInfo({}) {
             </TableHeader>
             <TableBody>
               <TableRow className="hover:bg-transparent">
-                <TableCell className="text-center">Unknown</TableCell>
+                <TableCell className="text-center">
+                  {deviceinfo.version ?? "Unknown"}
+                </TableCell>
                 <TableCell className="text-center">
                   {deviceinfo.platform}
                 </TableCell>

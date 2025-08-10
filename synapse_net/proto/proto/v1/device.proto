@@ -4,17 +4,20 @@ package proto.v1;
 
 // Information about a device's network and system identification
 message DeviceInfoProto {
+  // The version of the Synapse runtime
+  string version = 1;
+
   // The device's hostname
-  string hostname = 1;
+  string hostname = 2;
 
   // The IP address of the device
-  string ip = 2;
+  string ip = 3;
 
   // The platform or operating system (e.g., "linux", "windows")
-  string platform = 3;
+  string platform = 4;
 
   // List of network interfaces available on the device
-  repeated string network_interfaces = 4;
+  repeated string network_interfaces = 5;
 }
 
 // Metrics related to the hardware status of a device
