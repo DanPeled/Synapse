@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package proto.v1;
 
+// Represents a camera in the system
 message CameraProto {
   string name = 1;
   string stream_path = 2;
@@ -12,6 +13,7 @@ message CameraProto {
   int32 max_fps = 7;
 }
 
+// Performance metrics for a camera
 message CameraPerformanceProto {
   float latency_capture = 1;
   float latency_process = 2;
@@ -35,4 +37,9 @@ message CalibrationDataProto {
   string resolution = 3;
   repeated float camera_matrix = 4;
   repeated float dist_coeffs = 5;
+}
+
+message RemoveCalibrationDataMessageProto {
+  int32 camera_index = 1;
+  string resolution = 2;
 }

@@ -10,6 +10,7 @@ import {
   CalibrationDataProto,
   CameraPerformanceProto,
   CameraProto,
+  RemoveCalibrationDataMessageProto,
   RenameCameraMessageProto,
   SetDefaultPipelineMessageProto,
 } from "./camera";
@@ -54,6 +55,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_RENAME_CAMERA = 19,
   MESSAGE_TYPE_PROTO_CALIBRATING = 20,
   MESSAGE_TYPE_PROTO_CALIBRATION_DATA = 21,
+  MESSAGE_TYPE_PROTO_DELETE_CALIBRATION = 22,
   UNRECOGNIZED = -1,
 }
 
@@ -125,6 +127,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 21:
     case "MESSAGE_TYPE_PROTO_CALIBRATION_DATA":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA;
+    case 22:
+    case "MESSAGE_TYPE_PROTO_DELETE_CALIBRATION":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_CALIBRATION;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -178,29 +183,51 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_CALIBRATING";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA:
       return "MESSAGE_TYPE_PROTO_CALIBRATION_DATA";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_CALIBRATION:
+      return "MESSAGE_TYPE_PROTO_DELETE_CALIBRATION";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
 }
 
+/** Main message structure for communication */
 export interface MessageProto {
+  /** Type of the message, indicating what kind of data it contains */
   type: MessageTypeProto;
+  /** Information about the device */
   deviceInfo?: DeviceInfoProto | undefined;
+  /** Metrics related to hardware performance */
   hardwareMetrics?: HardwareMetricsProto | undefined;
+  /** Information about the camera */
   cameraInfo?: CameraProto | undefined;
+  /** Information about the pipeline */
   pipelineInfo?: PipelineProto | undefined;
+  /** Message to set the type for a pipeline */
   setPipelineType?: SetPipelineTypeMessageProto | undefined;
+  /** Message to set a setting for a pipeline */
   setPipelineSetting?: SetPipleineSettingMessageProto | undefined;
+  /** Message to set the index of a pipeline */
   setPipelineIndex?: SetPipelineIndexMessageProto | undefined;
+  /** Message to set the name of a pipeline */
   setPipelineName?: SetPipelineNameMessageProto | undefined;
+  /** Message to set the default pipeline */
   setDefaultPipeline?: SetDefaultPipelineMessageProto | undefined;
+  /** Index of the pipeline to be removed */
   removePipelineIndex?: number | undefined;
+  /** Log message containing log data */
   log?: LogMessageProto | undefined;
+  /** Performance data for a camera */
   cameraPerformance?: CameraPerformanceProto | undefined;
+  /** Message to set network settings */
   setNetworkSettings?: SetNetworkSettingsProto | undefined;
+  /** Message to rename a camera */
   renameCamera?: RenameCameraMessageProto | undefined;
+  /** Calibration data for a camera */
   calibrationData?: CalibrationDataProto | undefined;
+  /** Message to delete calibration data */
+  deleteCalibration?: RemoveCalibrationDataMessageProto | undefined;
+  /** List of pipeline types available in the system */
   pipelineTypeInfo: PipelineTypeProto[];
 }
 
@@ -222,6 +249,7 @@ function createBaseMessageProto(): MessageProto {
     setNetworkSettings: undefined,
     renameCamera: undefined,
     calibrationData: undefined,
+    deleteCalibration: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -312,11 +340,17 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.calibrationData !== undefined) {
       CalibrationDataProto.encode(
         message.calibrationData,
+        writer.uint32(130).fork(),
+      ).join();
+    }
+    if (message.deleteCalibration !== undefined) {
+      RemoveCalibrationDataMessageProto.encode(
+        message.deleteCalibration,
         writer.uint32(138).fork(),
       ).join();
     }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(130).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(146).fork()).join();
     }
     return writer;
   },
@@ -476,8 +510,8 @@ export const MessageProto: MessageFns<MessageProto> = {
           );
           continue;
         }
-        case 17: {
-          if (tag !== 138) {
+        case 16: {
+          if (tag !== 130) {
             break;
           }
 
@@ -487,8 +521,19 @@ export const MessageProto: MessageFns<MessageProto> = {
           );
           continue;
         }
-        case 16: {
-          if (tag !== 130) {
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.deleteCalibration = RemoveCalibrationDataMessageProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 18: {
+          if (tag !== 146) {
             break;
           }
 
@@ -551,6 +596,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       calibrationData: isSet(object.calibrationData)
         ? CalibrationDataProto.fromJSON(object.calibrationData)
+        : undefined,
+      deleteCalibration: isSet(object.deleteCalibration)
+        ? RemoveCalibrationDataMessageProto.fromJSON(object.deleteCalibration)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -624,6 +672,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     if (message.calibrationData !== undefined) {
       obj.calibrationData = CalibrationDataProto.toJSON(
         message.calibrationData,
+      );
+    }
+    if (message.deleteCalibration !== undefined) {
+      obj.deleteCalibration = RemoveCalibrationDataMessageProto.toJSON(
+        message.deleteCalibration,
       );
     }
     if (message.pipelineTypeInfo?.length) {
@@ -704,6 +757,13 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.calibrationData =
       object.calibrationData !== undefined && object.calibrationData !== null
         ? CalibrationDataProto.fromPartial(object.calibrationData)
+        : undefined;
+    message.deleteCalibration =
+      object.deleteCalibration !== undefined &&
+      object.deleteCalibration !== null
+        ? RemoveCalibrationDataMessageProto.fromPartial(
+            object.deleteCalibration,
+          )
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||
