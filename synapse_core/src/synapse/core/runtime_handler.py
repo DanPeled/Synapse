@@ -366,7 +366,7 @@ class CameraHandler:
         self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
         self.streamSizes: Dict[CameraID, Resolution] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
-        self.cameraBindings: Dict[CameraID, CameraConfig] = {}
+        self.cameraConfigBindings: Dict[CameraID, CameraConfig] = {}
         self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
         self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
         self.cameraUIDs: List[CameraUID] = []
@@ -396,7 +396,7 @@ class CameraHandler:
         Retrieves camera configuration from global settings and attempts to add
         each configured camera to the handler.
         """
-        self.cameraBindings = GlobalSettings.getCameraConfigMap()
+        self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
         self.usbCameraInfos = {
             f"{info.name}_{info.productId}": info
             for info in cs.UsbCamera.enumerateUsbCameras()
@@ -404,7 +404,7 @@ class CameraHandler:
 
         found: List[int] = []
 
-        for cameraIndex, cameraConfig in self.cameraBindings.items():
+        for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
             if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraUIDs:
                 info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
                     cameraConfig.id, None
@@ -424,8 +424,8 @@ class CameraHandler:
         self.scanCameras()
 
     def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
-        if cameraID in self.cameraBindings:
-            self.cameraBindings[cameraID].name = newName
+        if cameraID in self.cameraConfigBindings:
+            self.cameraConfigBindings[cameraID].name = newName
             self.cameras[cameraID].name = newName
             log.log(f"Camera #{cameraID} renamed to {newName}")
             self.onRenameCamera.call(cameraID, newName)
@@ -1241,7 +1241,7 @@ class RuntimeManager:
             "global": {
                 "camera_configs": {
                     index: config.toDict()
-                    for index, config in self.cameraHandler.cameraBindings.items()
+                    for index, config in self.cameraHandler.cameraConfigBindings.items()
                 }
             },
             "pipelines": {

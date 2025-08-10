@@ -25,7 +25,7 @@ from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   SetPipelineIndexMessageProto,
                                   SetPipelineNameMessageProto,
                                   SetPipleineSettingMessageProto)
-from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
 
 from synapse_net import devicenetworking
@@ -319,14 +319,17 @@ class Synapse:
                     self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
                         id, -1
                     ),
-                    self.runtime_handler.cameraHandler.cameraBindings[id].id,
+                    self.runtime_handler.cameraHandler.cameraConfigBindings[id].id,
                 )
 
                 await self.websocket.sendToAll(
                     createMessage(MessageTypeProto.ADD_CAMERA, msg)
                 )
 
-            for id, config in self.runtime_handler.cameraHandler.cameraBindings.items():
+            for (
+                id,
+                config,
+            ) in self.runtime_handler.cameraHandler.cameraConfigBindings.items():
                 calibrations = config.calibration
 
                 for calib in calibrations.values():
@@ -404,7 +407,7 @@ class Synapse:
                 self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
                     cameraid, 0
                 ),
-                self.runtime_handler.cameraHandler.cameraBindings[cameraid].id,
+                self.runtime_handler.cameraHandler.cameraConfigBindings[cameraid].id,
             )
 
             Synapse.kInstance.websocket.sendToAllSync(
@@ -454,7 +457,7 @@ class Synapse:
                     camera,
                     pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
                     defaultPipeline=pipelineIndex,
-                    kind=self.runtime_handler.cameraHandler.cameraBindings[
+                    kind=self.runtime_handler.cameraHandler.cameraConfigBindings[
                         cameraIndex
                     ].id,
                 )
@@ -472,7 +475,9 @@ class Synapse:
                 defaultPipeline=self.runtime_handler.pipelineLoader.defaultPipelineIndexes[
                     cameraIndex
                 ],
-                kind=self.runtime_handler.cameraHandler.cameraBindings[cameraIndex].id,
+                kind=self.runtime_handler.cameraHandler.cameraConfigBindings[
+                    cameraIndex
+                ].id,
             )
             msg = createMessage(MessageTypeProto.ADD_CAMERA, cameraMsg)
             self.websocket.sendToAllSync(msg)
@@ -492,6 +497,7 @@ class Synapse:
         msgType = msgObj.type
 
         if msgType == MessageTypeProto.SET_SETTING:
+            assert_set(msgObj.set_pipeline_setting)
             setSettigMSG: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
             pipeline: Optional[Pipeline] = (
                 self.runtime_handler.pipelineLoader.getPipeline(
@@ -504,12 +510,14 @@ class Synapse:
                 pipeline.setSetting(setSettigMSG.setting, val)
                 self.runtime_handler.updateSetting(setSettigMSG.setting, 0, val)
         elif msgType == MessageTypeProto.SET_PIPELINE_INDEX:
+            assert_set(msgObj.set_pipeline_index)
             setPipeIndexMSG: SetPipelineIndexMessageProto = msgObj.set_pipeline_index
             self.runtime_handler.setPipelineByIndex(
                 cameraIndex=setPipeIndexMSG.camera_index,
                 pipelineIndex=setPipeIndexMSG.pipeline_index,
             )
         elif msgType == MessageTypeProto.SET_PIPELINE_NAME:
+            assert_set(msgObj.set_pipeline_name)
             setPipelineNameMsg: SetPipelineNameMessageProto = msgObj.set_pipeline_name
             pipeline: Optional[Pipeline] = (
                 self.runtime_handler.pipelineLoader.getPipeline(
@@ -536,6 +544,7 @@ class Synapse:
                     f'Attempted name modification ("{setPipelineNameMsg.name}") for non-existing pipeline in index: {setPipelineNameMsg.pipeline_index}'
                 )
         elif msgType == MessageTypeProto.ADD_PIPELINE:
+            assert_set(msgObj.pipeline_info)
             addPipelineMsg: PipelineProto = msgObj.pipeline_info
             if addPipelineMsg.type is not None and (
                 addPipelineMsg.type
@@ -567,9 +576,11 @@ class Synapse:
                     f"Cannot add pipeline of type {addPipelineMsg.type}, it is an invalid typename"
                 )
         elif msgType == MessageTypeProto.DELETE_PIPELINE:
+            assert_set(msgObj.remove_pipeline_index)
             removePipelineIndex: int = msgObj.remove_pipeline_index
             self.runtime_handler.pipelineLoader.removePipeline(removePipelineIndex)
         elif msgType == MessageTypeProto.SET_DEFAULT_PIPELINE:
+            assert_set(msgObj.set_default_pipeline)
             defaultPipelineMsg: SetDefaultPipelineMessageProto = (
                 msgObj.set_default_pipeline
             )
@@ -580,6 +591,7 @@ class Synapse:
         elif msgType == MessageTypeProto.SAVE:
             self.runtime_handler.save()
         elif msgType == MessageTypeProto.SET_NETWORK_SETTINGS:
+            assert_set(msgObj.set_network_settings)
             networkSettings: SetNetworkSettingsProto = msgObj.set_network_settings
             self.setNetworkSettings(networkSettings)
         elif msgType == MessageTypeProto.REBOOT:
@@ -597,11 +609,25 @@ class Synapse:
             self.runtime_handler.cleanup()
             restartRuntime()
         elif msgType == MessageTypeProto.RENAME_CAMERA:
+            assert_set(msgObj.rename_camera)
             renameCameraMsg = msgObj.rename_camera
 
             self.runtime_handler.cameraHandler.renameCamera(
                 renameCameraMsg.camera_index, renameCameraMsg.new_name
             )
+        elif msgType == MessageTypeProto.DELETE_CALIBRATION:
+            assert_set(msgObj.delete_calibration)
+            deleteCalibrationMsg = msgObj.delete_calibration
+
+            if (
+                deleteCalibrationMsg.camera_index
+                in self.runtime_handler.cameraHandler.cameraConfigBindings
+            ):
+                self.runtime_handler.cameraHandler.cameraConfigBindings[
+                    deleteCalibrationMsg.camera_index
+                ].calibration.pop(deleteCalibrationMsg.resolution)
+
+                # TODO Send back delete message to let the client know its been deleted
 
     def setNetworkSettings(self, networkSettings: SetNetworkSettingsProto) -> None:
         if Platform.getCurrentPlatform().isLinux():

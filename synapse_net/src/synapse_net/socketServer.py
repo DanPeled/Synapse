@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import asyncio
+import inspect
 import traceback
 from dataclasses import fields
 from enum import Enum
@@ -123,3 +124,32 @@ class WebSocketServer:
                 self._server = await self._server
             self._server.close()
             await self._server.wait_closed()
+
+
+def assert_set(value: Any) -> Any:
+    if value is not None:
+        return value
+
+    var_name = "<unknown>"
+
+    try:
+        frame = inspect.currentframe()
+        if frame is not None:
+            caller_frame = frame.f_back
+            if caller_frame is not None:
+                frame_info = inspect.getframeinfo(caller_frame)
+                code_context = frame_info.code_context
+                if code_context:
+                    line = code_context[0].strip()
+                    # Extract argument inside assert_set(...)
+                    start = line.find("assert_set(")
+                    if start != -1:
+                        start += len("assert_set(")
+                        end = line.find(")", start)
+                        if end != -1:
+                            var_name = line[start:end].strip()
+    except Exception:
+        # Any unexpected error just fallback silently
+        pass
+
+    raise AssertionError(f"Value '{var_name}' is None")

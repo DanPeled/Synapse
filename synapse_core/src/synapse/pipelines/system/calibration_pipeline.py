@@ -234,7 +234,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
                 width = int(resolution[0])
                 height = int(resolution[1])
 
-                Synapse.kInstance.runtime_handler.cameraHandler.cameraBindings[
+                Synapse.kInstance.runtime_handler.cameraHandler.cameraConfigBindings[
                     self.cameraIndex
                 ].calibration[
                     self.getSetting(self.settings.resolution)

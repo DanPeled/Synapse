@@ -26,7 +26,9 @@ from wpimath import geometry
 from ..stypes import CameraID, Frame, PipelineID, Resolution
 from ..util import listToTransform3d, transform3dToList
 
-PropertMetaDict = Dict[str, Dict[str, Union[int, float]]]
+PropName = str
+PropertMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
+ResolutionString = str
 
 
 class CameraPropKeys(Enum):
@@ -78,7 +80,7 @@ class CalibrationData:
             CameraConfigKey.kMatrix.value: self.matrix,
             CameraConfigKey.kDistCoeff.value: self.distCoeff,
             CameraConfigKey.kMeasuredRes.value: self.measuredRes,
-            "mean_err": self.meanErr,
+            CameraConfigKey.kMeanErr.value: self.meanErr,
         }
 
     @staticmethod
@@ -87,7 +89,7 @@ class CalibrationData:
             matrix=data[CameraConfigKey.kMatrix.value],
             distCoeff=data[CameraConfigKey.kDistCoeff.value],
             measuredRes=data[CameraConfigKey.kMeasuredRes.value],
-            meanErr=data["mean_err"],
+            meanErr=data[CameraConfigKey.kMeanErr.value],
         )
 
     def toProto(self, cameraIndex: CameraID) -> CalibrationDataProto:
@@ -105,7 +107,7 @@ class CameraConfig:
     name: str
     id: str
     transform: geometry.Transform3d
-    calibration: Dict[str, CalibrationData]
+    calibration: Dict[ResolutionString, CalibrationData]
     defaultPipeline: int
     streamRes: Resolution
 
@@ -151,6 +153,7 @@ class CameraConfigKey(Enum):
     kStreamRes = "stream_res"
     kTransform = "transform"
     kCalibration = "calibration"
+    kMeanErr = "mean_err"
 
 
 @cache
