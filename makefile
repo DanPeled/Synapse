@@ -69,4 +69,4 @@ test:
 # Build Python and UI
 build:
 	make install
-	python setup.py sdist bdist_wheel
+	python3 setup.py sdist bdist_wheel
