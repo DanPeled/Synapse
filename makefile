@@ -68,6 +68,5 @@ test:
 
 # Build Python and UI
 build:
-	make generate_buf
 	make install
 	python3 -m build .
