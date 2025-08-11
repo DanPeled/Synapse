@@ -22,7 +22,7 @@ import { AlertDialog } from "@/widgets/alertDialog";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
 import { Barcode, Camera, LoaderPinwheel, X } from "lucide-react";
-import { JSX, useEffect, useState } from "react";
+import { JSX, useEffect, useRef, useState } from "react";
 
 function setCalibrationPipeline(
   socket?: WebSocketWrapper,
@@ -72,6 +72,8 @@ export function CalibrationDialog({
     number | undefined
   >(undefined);
 
+  const prevCalibratingRef = useRef<boolean>(false);
+
   const [cameraControls, setCameraControls] = useState<
     (JSX.Element | undefined)[]
   >([]);
@@ -97,8 +99,17 @@ export function CalibrationDialog({
     pipelines,
     pipelinetypes,
     connection,
-    setPipelines,
   } = useBackendContext();
+
+  useEffect(() => {
+    if (prevCalibratingRef.current === true && calibrating === false) {
+      console.log("Calibration just finished!");
+      if (camera !== undefined) {
+        close(camera);
+      }
+    }
+    prevCalibratingRef.current = calibrating;
+  }, [calibrating]);
 
   useEffect(() => {
     if (camera) {
@@ -245,10 +256,41 @@ export function CalibrationDialog({
   }, [visible]);
 
   useEffect(() => {
+    if (calibrating) {
+    }
+  }, [calibrating]);
+
+  useEffect(() => {
     setSelectedPipelineType(pipelinetypes.get("$$CalibrationPipeline$$"));
     setSelectedPipeline(pipelines.get(9999));
     generateControls();
   }, [pipelines, visible, camera]);
+
+  function close(camera: CameraProto) {
+    const setPipelinePayload = MessageProto.create({
+      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
+      setPipelineIndex: SetPipelineIndexMessageProto.create({
+        cameraIndex: camera.index,
+        pipelineIndex: prevPipelineIndex,
+      }),
+    });
+
+    const setPipelineBinary = MessageProto.encode(setPipelinePayload).finish();
+    socket?.sendBinary(setPipelineBinary);
+
+    const deletePipelinePayload = MessageProto.create({
+      type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
+      removePipelineIndex: 9999,
+    });
+
+    const removePipelineBinary = MessageProto.encode(
+      deletePipelinePayload,
+    ).finish();
+
+    socket?.sendBinary(removePipelineBinary);
+
+    setVisible(false);
+  }
 
   return (
     <AlertDialog
@@ -266,31 +308,8 @@ export function CalibrationDialog({
               camera &&
               camera.pipelineIndex !== prevPipelineIndex
             ) {
-              const setPipelinePayload = MessageProto.create({
-                type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
-                setPipelineIndex: SetPipelineIndexMessageProto.create({
-                  cameraIndex: camera.index,
-                  pipelineIndex: prevPipelineIndex,
-                }),
-              });
-
-              const setPipelineBinary =
-                MessageProto.encode(setPipelinePayload).finish();
-              socket?.sendBinary(setPipelineBinary);
-
-              const deletePipelinePayload = MessageProto.create({
-                type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
-                removePipelineIndex: 9999,
-              });
-
-              const removePipelineBinary = MessageProto.encode(
-                deletePipelinePayload,
-              ).finish();
-
-              socket?.sendBinary(removePipelineBinary);
+              close(camera);
             }
-
-            setVisible(false);
           }}
           className="w-auto cursor-pointer hover:bg-zinc-600 bg-zinc-700"
           style={{ color: teamColor }}
