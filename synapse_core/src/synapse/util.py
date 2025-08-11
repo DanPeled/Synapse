@@ -15,11 +15,16 @@ from .log import err
 def getIP() -> str:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    s.connect(("8.8.8.8", 80))
-    ip = s.getsockname()[0]
+    ip: Optional[str] = None
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except OSError:
+        ip = "127.0.0.1"
+
     s.close()
 
-    return ip
+    return ip or "127.0.0.1"
 
 
 def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:

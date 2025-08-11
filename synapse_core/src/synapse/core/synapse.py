@@ -500,17 +500,25 @@ class Synapse:
 
         if msgType == MessageTypeProto.SET_SETTING:
             assert_set(msgObj.set_pipeline_setting)
-            setSettigMSG: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
+            setSettingMSG: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
+
             pipeline: Optional[Pipeline] = (
                 self.runtime_handler.pipelineLoader.getPipeline(
-                    setSettigMSG.pipeline_index
+                    setSettingMSG.pipeline_index
                 )
             )
 
             if pipeline is not None:
-                val = protoToSettingValue(setSettigMSG.value)
-                pipeline.setSetting(setSettigMSG.setting, val)
-                self.runtime_handler.updateSetting(setSettigMSG.setting, 0, val)
+                val = protoToSettingValue(setSettingMSG.value)
+                pipeline.setSetting(setSettingMSG.setting, val)
+                for (
+                    cameraid,
+                    pipelineid,
+                ) in self.runtime_handler.pipelineBindings.items():
+                    if pipelineid == setSettingMSG.pipeline_index:
+                        self.runtime_handler.updateSetting(
+                            setSettingMSG.setting, cameraid, val
+                        )
         elif msgType == MessageTypeProto.SET_PIPELINE_INDEX:
             assert_set(msgObj.set_pipeline_index)
             setPipeIndexMSG: SetPipelineIndexMessageProto = msgObj.set_pipeline_index

@@ -135,7 +135,6 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
             markerLength=marker_length,
             dictionary=self.aruco_dict,
         )
-        print(f"Updated Charuco board and dictionary: {current_settings}")
 
     def processFrame(self, img, timestamp: float) -> Frame:
         self._update_board()
@@ -146,7 +145,34 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
             image=gray, dictionary=self.aruco_dict
         )
 
-        img = cv2.aruco.drawDetectedMarkers(image=img, corners=corners)
+        total_pics = self.getSetting(self.settings.calibration_images_count)
+        pics_taken = self.all_imgs
+        pics_left = max(total_pics - pics_taken, 0)
+
+        # Prepare text
+        text = f"Pictures left: {pics_left} / {total_pics}"
+
+        # Choose font, scale, color, thickness
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.7
+        color = (0, 255, 255)  # Yellow for visibility
+        thickness = 2
+        position = (10, 30)  # Top-left corner, with some margin
+
+        # Put text on image
+        img = cv2.putText(
+            img, text, position, font, font_scale, color, thickness, cv2.LINE_AA
+        )
+
+        img = cv2.aruco.drawDetectedMarkers(
+            image=img,
+            corners=corners,
+            borderColor=(
+                0,
+                255,
+                0,
+            ),
+        )
 
         if ids is not None and len(ids) > 0:
             response, charuco_corners, charuco_ids = (
@@ -158,7 +184,14 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
                 )
             )
 
-            if response > 20:
+            min_ratio = 0.5  # require at least 50% of corners
+            total_corners = (
+                self.charuco_board.getChessboardSize()[0]
+                * self.charuco_board.getChessboardSize()[1]
+            )
+            required_corners = int(total_corners * min_ratio)
+
+            if response >= required_corners:
                 start_x = 10
                 start_y = img.shape[0] - 30
 

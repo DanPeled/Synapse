@@ -346,7 +346,6 @@ export function CameraAndPipelineControls({
             }}
             options={Array.from(pipelinetypes.values())
               .filter((type: PipelineTypeProto) => {
-                console.log(type.type);
                 return !(
                   type.type.startsWith("$$") && type.type.endsWith("$$")
                 );

@@ -168,6 +168,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
+            if tag.getId() < 0 or tag.getId() > max(self.fmap.fieldMap.keys()):
+                return gray
             tagPoseEstimate: apriltag.AprilTagPoseEstimate = self.estimateTagPose(tag)
 
             tagRelativePose: Transform3d = (
@@ -324,7 +326,9 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
             calibrationData = camConfig.calibration
             currRes = self.getSetting(self.settings.resolution)
             if currRes in calibrationData:
-                return calibrationData[currRes].matrix
+                lst = calibrationData[currRes].matrix
+                matrix = [lst[i : i + 3] for i in range(0, 9, 3)]
+                return matrix
             else:
                 return None
         else:

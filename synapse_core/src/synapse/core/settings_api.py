@@ -990,6 +990,9 @@ class PipelineSettings(SettingsCollection):
         description="Camera Resolution",
     )
 
+    def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
+        return super().setSetting(setting, value)
+
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
     scalar_field = which_one_of(proto, "scalar_value")

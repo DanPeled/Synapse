@@ -123,7 +123,9 @@ export function CameraConfigModule({
                 label="Camera"
                 value={selectedCamera}
                 onValueChange={(camera) => {
-                  setSelectedCamera(camera);
+                  if (camera !== undefined) {
+                    setSelectedCamera(camera);
+                  }
                 }}
               />
               <CameraActions

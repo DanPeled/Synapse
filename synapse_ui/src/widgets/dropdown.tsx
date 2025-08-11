@@ -41,7 +41,7 @@ export function Dropdown<T>({
     valueToString.set(opt.value, str);
   });
 
-  const selectedKey = valueToString.get(value);
+  const selectedKey = valueToString.has(value) ? valueToString.get(value)! : "";
 
   return (
     <div

@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import faulthandler
 import importlib.util
 import os
 import threading
@@ -697,12 +698,14 @@ class RuntimeManager:
         :param pipelineDirectory: Root directory to search for pipeline files
         """
 
+        faulthandler.enable()
         self.pipelineLoader: PipelineLoader = PipelineLoader(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
         self.isRunning: bool = True
         self.isSetup: bool = False
+        self.lastLatencyReportTime: float = time.time()
 
         self.metricsThread: Optional[threading.Thread]
 
@@ -718,6 +721,14 @@ class RuntimeManager:
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
         self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
         self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
+
+        def onAddCamera(cameraID: CameraID, name: str, camera: SynapseCamera):
+            thread = threading.Thread(target=self.processCamera, args=(cameraID,))
+            thread.daemon = True
+            thread.start()
+            self.cameraManagementThreads.append(thread)
+
+        self.cameraHandler.onAddCamera.add(onAddCamera)
 
     def setup(self, directory: Path):
         """
@@ -1022,83 +1033,74 @@ class RuntimeManager:
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
 
+    def processCamera(self, cameraIndex: CameraID):
+        camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
+
+        log.log(f"Started Camera #{cameraIndex} loop")
+
+        while self.isRunning:
+            maxFps = camera.getMaxFPS()
+            frame_time = 1.0 / float(maxFps)
+            loop_start = Timer.getFPGATimestamp()
+
+            ret, frame = camera.grabFrame()
+            captureLatency = Timer.getFPGATimestamp() - loop_start
+            if not ret or frame is None:
+                continue
+
+            frame = self.fixtureFrame(cameraIndex, frame)
+
+            process_start = Timer.getFPGATimestamp()
+
+            pipeline = self.pipelineLoader.getPipeline(
+                self.pipelineBindings.get(cameraIndex, -1)
+            )
+
+            processed_frame: Frame = frame
+
+            if pipeline is not None:
+                result = None
+                try:
+                    result = pipeline.processFrame(frame, loop_start)
+                except Exception as e:
+                    log.err(
+                        f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for camera #{cameraIndex}: {e}\n{traceback.format_exc()}"
+                    )
+                frame = self.handleResults(result, cameraIndex)
+                if frame is not None:
+                    processed_frame = frame
+
+            processLatency = Timer.getFPGATimestamp() - process_start
+
+            # Sleep to enforce max FPS
+            elapsed = Timer.getFPGATimestamp() - loop_start
+            remaining = frame_time - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
+            loop_end = Timer.getFPGATimestamp()
+            total_loop_time = loop_end - loop_start
+
+            fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
+            self.sendLatency(cameraIndex, captureLatency, processLatency, fps)
+
+            # Overlay FPS on the frame
+            cv2.putText(
+                processed_frame,
+                f"{int(fps)}",
+                FPSView.position,
+                FPSView.font,
+                FPSView.fontScale,
+                FPSView.color,
+                FPSView.thickness,
+                lineType=cv2.LINE_8,
+            )
+
+            self.cameraHandler.publishFrame(processed_frame, camera)
+
     def run(self):
         """
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
-
-        def processCamera(cameraIndex: CameraID):
-            camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
-
-            log.log(f"Started Camera #{cameraIndex} loop")
-
-            while self.isRunning:
-                maxFps = camera.getMaxFPS()
-                frame_time = 1.0 / float(maxFps)
-                loop_start = Timer.getFPGATimestamp()
-
-                ret, frame = camera.grabFrame()
-                captureLatency = Timer.getFPGATimestamp() - loop_start
-                if not ret or frame is None:
-                    continue
-
-                frame = self.fixtureFrame(cameraIndex, frame)
-
-                process_start = Timer.getFPGATimestamp()
-
-                pipeline = self.pipelineLoader.getPipeline(
-                    self.pipelineBindings.get(cameraIndex, -1)
-                )
-
-                processed_frame: Frame = frame
-
-                if pipeline is not None:
-                    result = None
-                    try:
-                        result = pipeline.processFrame(frame, loop_start)
-                    except Exception as e:
-                        log.err(
-                            f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for camera #{cameraIndex}: {e}\n{traceback.format_exc()}"
-                        )
-                    frame = self.handleResults(result, cameraIndex)
-                    if frame is not None:
-                        processed_frame = frame
-
-                processLatency = Timer.getFPGATimestamp() - process_start
-
-                # Sleep to enforce max FPS
-                elapsed = Timer.getFPGATimestamp() - loop_start
-                remaining = frame_time - elapsed
-                if remaining > 0:
-                    time.sleep(remaining)
-                loop_end = Timer.getFPGATimestamp()
-                total_loop_time = loop_end - loop_start
-
-                fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
-                self.sendLatency(cameraIndex, captureLatency, processLatency, fps)
-
-                # Overlay FPS on the frame
-                cv2.putText(
-                    processed_frame,
-                    f"{int(fps)}",
-                    FPSView.position,
-                    FPSView.font,
-                    FPSView.fontScale,
-                    FPSView.color,
-                    FPSView.thickness,
-                    lineType=cv2.LINE_8,
-                )
-
-                self.cameraHandler.publishFrame(processed_frame, camera)
-
-        def initThreads():
-            for cameraIndex in self.cameraHandler.cameras.keys():
-                thread = threading.Thread(target=processCamera, args=(cameraIndex,))
-                thread.daemon = True
-                thread.start()
-                self.cameraManagementThreads.append(thread)
-
-        initThreads()
 
         log.log(
             MarkupColors.header(
@@ -1154,6 +1156,12 @@ class RuntimeManager:
         processingLatency: seconds,
         fps: float,
     ) -> None:
+        current_time = time.time()
+        if current_time - self.lastLatencyReportTime < 1.0:
+            return  # Skip sending
+
+        self.lastLatencyReportTime = current_time
+
         cameraTable = getCameraTable(cameraIndex)
         cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
         cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
@@ -1163,9 +1171,10 @@ class RuntimeManager:
                 createMessage(
                     MessageTypeProto.REPORT_CAMERA_PERFORMANCE,
                     CameraPerformanceProto(
-                        secondsToMilliseconds(captureLatency),
-                        secondsToMilliseconds(processingLatency),
-                        int(fps),
+                        latency_capture=secondsToMilliseconds(captureLatency),
+                        latency_process=secondsToMilliseconds(processingLatency),
+                        fps=int(fps),
+                        camera_index=cameraIndex,
                     ),
                 )
             )
@@ -1226,10 +1235,14 @@ class RuntimeManager:
         return np.clip(image * 255, 0, 255).astype(np.uint8)
 
     def fixtureFrame(self, cameraIndex: CameraID, frame: Frame) -> Frame:
-        if cameraIndex in self.pipelineBindings:
-            settings = self.pipelineLoader.pipelineSettings[
+        if (
+            cameraIndex in self.pipelineBindings
+            and self.pipelineBindings[cameraIndex]
+            in self.pipelineLoader.pipelineInstanceBindings
+        ):
+            settings = self.pipelineLoader.pipelineInstanceBindings[
                 self.pipelineBindings[cameraIndex]
-            ]
+            ].settings
             frame = self.rotateCameraBySettings(settings, frame)
             # frame = self.fixBlackLevelOffset(settings, frame)
 

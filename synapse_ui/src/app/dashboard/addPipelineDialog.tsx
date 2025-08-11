@@ -69,7 +69,6 @@ export function AddPipelineDialog({
           onValueChange={setPipelineType}
           options={Array.from(
             pipelineTypes.values().filter((type: PipelineTypeProto) => {
-              console.log(type.type);
               return !(type.type.startsWith("$$") && type.type.endsWith("$$"));
             }),
           ).map((type) => ({

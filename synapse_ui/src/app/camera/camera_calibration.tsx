@@ -8,7 +8,13 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Download, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  RefreshCw,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  Trash,
+} from "lucide-react";
 import { Row } from "@/widgets/containers";
 import { baseCardColor, teamColor } from "@/services/style";
 import { CalibrationDialog } from "./calibration_dialog";
@@ -313,7 +319,19 @@ export function CameraCalibrationModule({
 
         {/* More Info Toggle Button below Select Resolution */}
         {selectedResolutionData !== undefined && (
-          <div className="flex justify-center mt-2">
+          <div className="flex justify-center mt-2 flex-col gap-4">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {}}
+              className="flex items-center bg-zinc-800 hover:bg-zinc-700 cursor-pointer border-zinc-700"
+              aria-expanded={showMoreInfo}
+              aria-controls="detailed-info-section"
+              style={{ color: teamColor }}
+            >
+              <Trash /> Delete Calibration Data for{" "}
+              {selectedResolutionData.resolution}
+            </Button>
             <Button
               size="sm"
               variant="outline"

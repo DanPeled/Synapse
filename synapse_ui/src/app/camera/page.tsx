@@ -14,12 +14,17 @@ import { CameraConfigModule } from "./camera_config_module";
 export default function CameraConfigPage() {
   const { cameras, socket } = useBackendContext();
   const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
-    cameras.get(0),
+    undefined,
   );
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState<
+    number | undefined
+  >(0);
 
   useEffect(() => {
-    setSelectedCamera(cameras.get(0));
-  }, [cameras]);
+    if (selectedCameraIndex !== undefined) {
+      setSelectedCamera(cameras.get(selectedCameraIndex));
+    }
+  }, [cameras, selectedCameraIndex]);
 
   useEffect(() => {
     document.title = "Synapse Client";
@@ -35,7 +40,7 @@ export default function CameraConfigPage() {
           <CameraConfigModule
             cameras={cameras}
             selectedCamera={selectedCamera}
-            setSelectedCamera={setSelectedCamera}
+            setSelectedCamera={(cam) => setSelectedCameraIndex(cam?.index)}
             socket={socket}
           />
           {/* <CameraTransformModule /> */}

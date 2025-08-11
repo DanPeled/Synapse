@@ -21,6 +21,7 @@ import {
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
+import assert from "assert";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -47,6 +48,7 @@ const initialState: BackendStateSystem.State = {
     platform: "Unknown",
     networkInterfaces: [],
   },
+  stateRef: undefined,
   hardwaremetrics: {
     cpuTemp: 0,
     cpuUsage: 0,
@@ -63,7 +65,7 @@ const initialState: BackendStateSystem.State = {
   networktable: "Synapse",
   logs: [],
   cameras: new Map(),
-  cameraPerformance: new Map(),
+  cameraperformance: new Map(),
   calibrationdata: new Map(),
   calibrating: false,
   teamnumber: 0,
@@ -192,6 +194,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const newCamerasList = new Map(stateRef.current.cameras);
             newCamerasList.set(camera.index, camera);
             setters.setCameras(newCamerasList);
+            stateRef.current.cameras = newCamerasList;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
@@ -243,11 +246,11 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE: {
             const report = messageObj.cameraPerformance!;
-            const reports = new Map(stateRef.current.cameraPerformance);
+            const reports = new Map(stateRef.current.cameraperformance);
             reports.set(report.cameraIndex, report);
 
-            setters.setCameraPerformance(reports);
-            stateRef.current.cameraPerformance = reports;
+            setters.setCameraperformance(reports);
+            stateRef.current.cameraperformance = reports;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATING: {
@@ -281,7 +284,19 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {
-            // TODO: handle change from external source (NT)
+            assert(messageObj.setPipelineSetting !== undefined);
+            const setSettingMsg = messageObj.setPipelineSetting!;
+            const newPipelines = new Map(stateRef.current.pipelines);
+
+            const pipeline = newPipelines.get(setSettingMsg.pipelineIndex);
+
+            if (pipeline && setSettingMsg.value) {
+              pipeline.settingsValues[setSettingMsg.setting] =
+                setSettingMsg.value;
+              newPipelines.set(pipeline?.index, pipeline);
+              stateRef.current.pipelines = newPipelines;
+            }
+
             break;
           }
           default:
@@ -301,7 +316,12 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
   return (
     <BackendContextContext.Provider
-      value={{ ...state, ...setters, socket: socket.current }}
+      value={{
+        ...state,
+        ...setters,
+        socket: socket.current,
+        stateRef: stateRef,
+      }}
     >
       {children}
     </BackendContextContext.Provider>

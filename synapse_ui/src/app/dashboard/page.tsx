@@ -73,7 +73,7 @@ export default function Dashboard() {
     socket,
     setPipelines,
     pipelinetypes,
-    cameraPerformance,
+    cameraperformance: cameraPerformance,
   } = useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
   const [selectedPipelineType, setSelectedPipelineType] = useState(

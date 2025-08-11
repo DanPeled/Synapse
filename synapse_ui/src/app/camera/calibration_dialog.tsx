@@ -79,8 +79,6 @@ export function CalibrationDialog({
     (JSX.Element | undefined)[]
   >([]);
 
-  const { pipelines, pipelinetypes, connection, setPipelines } =
-    useBackendContext();
   const [selectedPipelineType, setSelectedPipelineType] = useState<
     PipelineTypeProto | undefined
   >(undefined);
@@ -92,7 +90,15 @@ export function CalibrationDialog({
     CalibrationDataProto | undefined
   >();
 
-  const { calibrationdata, calibrating } = useBackendContext();
+  const {
+    stateRef,
+    calibrationdata,
+    calibrating,
+    pipelines,
+    pipelinetypes,
+    connection,
+    setPipelines,
+  } = useBackendContext();
 
   useEffect(() => {
     if (camera) {
@@ -107,6 +113,30 @@ export function CalibrationDialog({
       });
     }
   }, [calibrationdata]);
+
+  useEffect(() => {
+    generateControls();
+  }, [selectedPipelineType, selectedPipeline]);
+
+  useEffect(() => {
+    if (visible) {
+      const pipelineIndex = 9999;
+      const pipeline = pipelines.get(pipelineIndex);
+
+      if (pipeline) {
+        setSelectedPipeline(pipeline);
+
+        const type = pipelinetypes.get("$$CalibrationPipeline$$");
+        if (type) {
+          setSelectedPipelineType(type);
+        } else {
+          console.warn("Pipeline type not found for", pipeline.type);
+        }
+      } else {
+        console.warn("No valid pipeline found for camera", camera);
+      }
+    }
+  }, [pipelines, pipelinetypes, camera, visible]);
 
   function setSetting(
     val: SettingValueProto,
@@ -123,7 +153,7 @@ export function CalibrationDialog({
         const payload = MessageProto.create({
           type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
           setPipelineSetting: SetPipleineSettingMessageProto.create({
-            pipelineIndex: pipeline.index,
+            pipelineIndex: 9999,
             value: val,
             setting: setting,
           }),
@@ -168,13 +198,17 @@ export function CalibrationDialog({
 
                   const newPipelines = new Map(oldPipelines);
                   newPipelines.set(selectedPipeline.index, updatedPipeline);
-                  setPipelines(newPipelines);
+                  // setPipelines(newPipelines);
+
+                  if (stateRef) {
+                    stateRef.current.pipelines = newPipelines;
+                  }
                 }
-              }, 0);
+              }, 10);
 
               setTimeout(() => {
                 setSetting(val, setting.name, selectedPipeline, socket);
-              }, 0);
+              }, 10);
             }
           }}
           value={
@@ -186,12 +220,11 @@ export function CalibrationDialog({
           locked={false}
         />
       );
-      if (setting.name !== "orientation") {
-        if (setting.category === "Camera Properties") {
-          cameraItems.push(control);
-        } else {
-          pipelineItems.push(control);
-        }
+
+      if (setting.category === "Camera Properties") {
+        cameraItems.push(control);
+      } else {
+        pipelineItems.push(control);
       }
     });
 
@@ -272,17 +305,21 @@ export function CalibrationDialog({
       <Row className="mt-4 w-full" gap="gap-10" style={{ color: teamColor }}>
         <Column className="flex-1" style={{ color: teamColor }}>
           <h1 className="text-xl" style={{ color: teamColor }}>
-            Camera Config:
+            Camera #{camera?.index} Config:
           </h1>
-          {cameraControls.length > 0 ? (
-            <div className="space-y-2 pr-4">{cameraControls}</div>
-          ) : (
-            <div className="text-center" style={{ color: teamColor }}>
-              <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
-              <p className="select-none">Camera Settings</p>
-              <p className="text-sm select-none">Configure camera parameters</p>
-            </div>
-          )}
+          {!calibrating ? (
+            cameraControls.length > 0 ? (
+              <div className="space-y-2 pr-4">{cameraControls}</div>
+            ) : (
+              <div className="text-center" style={{ color: teamColor }}>
+                <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                <p className="select-none">Camera Settings</p>
+                <p className="text-sm select-none">
+                  Configure camera parameters
+                </p>
+              </div>
+            )
+          ) : undefined}
           <div className="items-center">
             {calibrating ? (
               <LoaderPinwheel className="w-16 h-16" color={teamColor} />
@@ -293,21 +330,23 @@ export function CalibrationDialog({
         </Column>
 
         <Column className="flex-1 items-center space-y-10">
-          <CameraStream stream={camera?.streamPath} maxWidth="max-w-[600px]" />
-          {pipelineControls.length > 0 ? (
-            <div className="space-y-2">{pipelineControls}</div>
-          ) : (
-            <div
-              className="text-center items-center"
-              style={{ color: teamColor }}
-            >
-              <Barcode className="w-16 h-16 mx-auto mb-2 opacity-50" />
-              <p className="select-none">Calibration Settings</p>
-              <p className="text-sm select-none">
-                Configure calibration parameters
-              </p>
-            </div>
-          )}
+          <CameraStream stream={camera?.streamPath} maxWidth="max-w-[500px]" />
+          {!calibrating ? (
+            pipelineControls.length > 0 ? (
+              <div className="space-y-2">{pipelineControls}</div>
+            ) : (
+              <div
+                className="text-center items-center"
+                style={{ color: teamColor }}
+              >
+                <Barcode className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                <p className="select-none">Calibration Settings</p>
+                <p className="text-sm select-none">
+                  Configure calibration parameters
+                </p>
+              </div>
+            )
+          ) : undefined}
         </Column>
       </Row>
     </AlertDialog>

@@ -126,8 +126,6 @@ class CameraConfig:
 
     @staticmethod
     def fromDict(data: Dict[str, Any]) -> "CameraConfig":
-        print(data.get(CameraConfigKey.kCalibration.value))
-
         calib = {
             key: CalibrationData.fromDict(calib)
             for key, calib in data.get(CameraConfigKey.kCalibration.value, {}).items()
@@ -373,6 +371,7 @@ class CsCoreCamera(SynapseCamera):
         )
         self._running: bool = False
         self._thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()  # Add this
 
     @classmethod
     def create(
@@ -432,17 +431,18 @@ class CsCoreCamera(SynapseCamera):
         while not self.isConnected():
             time.sleep(0.1)
         while self._running:
-            result = self.sink.grabFrame(self.frameBuffer)
+            with self._lock:  # Protect frame operations
+                result = self.sink.grabFrame(self.frameBuffer)
             if len(result) > 0:
                 ret, frame = result
                 hasFrame = ret != 0
                 if hasFrame:
-                    frame_copy = frame.copy()  # Make a deep copy
+                    frame_copy = frame.copy()  # no lock needed here; copying is safe
                     try:
                         self._frameQueue.put_nowait((hasFrame, frame_copy))
                     except queue.Full:
                         try:
-                            self._frameQueue.get_nowait()  # drop oldest frame
+                            self._frameQueue.get_nowait()
                         except queue.Empty:
                             pass
                         self._frameQueue.put_nowait((hasFrame, frame_copy))
@@ -458,10 +458,11 @@ class CsCoreCamera(SynapseCamera):
                 )  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        try:
-            return self._frameQueue.get_nowait()
-        except queue.Empty:
-            return False, None
+        with self._lock:  # Protect frame buffer access
+            try:
+                return self._frameQueue.get_nowait()
+            except queue.Empty:
+                return False, None
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()

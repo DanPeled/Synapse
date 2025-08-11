@@ -7,6 +7,7 @@ import {
 } from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { LogMessageProto } from "@/proto/v1/log";
+import { RefObject } from "react";
 
 export type CameraID = number;
 export type PipelineID = number;
@@ -20,9 +21,10 @@ export namespace BackendStateSystem {
     networktable: string;
     logs: LogMessageProto[];
     socket?: WebSocketWrapper;
+    stateRef?: RefObject<State>;
     teamnumber: number;
     cameras: Map<CameraID, CameraProto>;
-    cameraPerformance: Map<CameraID, CameraPerformanceProto>;
+    cameraperformance: Map<CameraID, CameraPerformanceProto>;
     pipelines: Map<PipelineID, PipelineProto>;
     pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
     calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
