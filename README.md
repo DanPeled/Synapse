@@ -15,6 +15,8 @@
   - Monitoring output data and debugging visually
   Designed for intuitive interaction and minimal setup.
 
+[Documentation](https://danpeled.gitbook.io/synapse/)
+[Discord Server](https://discord.gg/zHJRV8Stj3)
 
 ## Project Structure
 - `synapse_core`: Contains the core Python library for Synapse.
