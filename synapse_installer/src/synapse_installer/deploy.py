@@ -1,9 +1,11 @@
-import ipaddress
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import os
 import pathlib as pthl
 import sys
 import traceback
-from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
@@ -17,6 +19,8 @@ from synapse.bcolors import MarkupColors
 from .lockfile import createDirectoryZIP, createPackageZIP
 from .setup_service import (SERVICE_NAME, isServiceSetup, restartService,
                             setupServiceOnConnectedClient)
+from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
+                   DeployDeviceConfig, IsValidIP)
 
 BUILD_DIR = "build"
 
@@ -26,67 +30,61 @@ class SetupOptions(Enum):
     kAutomatic = "Automatic (Find available devices)"
 
 
-@dataclass
-class DeployDeviceConfig:
-    hostname: str
-    ip: str
-    password: str
-
-
-def IsValidIP(ip_str):
-    try:
-        ipaddress.ip_address(ip_str)
-        return True
-    except ValueError:
-        return False
-
-
-def setupConfigFile(path: pthl.Path):
-    print("Deploy config doesn't exist, creating...")
+def addDeviceConfig(path: pthl.Path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     baseFile = {}
     if path.exists():
         with open(path, "r") as f:
             baseFile = yaml.full_load(f) or {}
-    with open(path, "w") as f:
-        answer = questionary.select(
-            "Choose setup mode:",
-            choices=[
-                SetupOptions.kManual.value,
-                SetupOptions.kAutomatic.value,
-            ],
+    answer = questionary.select(
+        "Choose setup mode:",
+        choices=[
+            SetupOptions.kManual.value,
+            SetupOptions.kAutomatic.value,
+        ],
+    ).ask()
+
+    if answer == SetupOptions.kManual.value:
+        hostname = questionary.text("What's your device's hostname?").ask()
+        if hostname is None:
+            return
+
+        deviceNickname = questionary.text(
+            f"Device Nickname (Leave blank for `{hostname}`)", default=hostname
         ).ask()
 
-        if answer == SetupOptions.kManual.value:
-            hostname = questionary.text("What's your device's hostname?").ask()
-            deviceNickname = (
-                questionary.text(f"Device Nickname (Leave blank for `{hostname}`").ask()
-                or hostname
+        while deviceNickname in baseFile.get("deploy", {}):
+            print(
+                f"Device with nickname `{deviceNickname} already exists! Please provide another one`"
             )
+            deviceNickname = questionary.text(
+                f"Device Nickname (Leave blank for `{hostname}`)", default=hostname
+            ).ask()
 
-            ip: Optional[str] = None
-            while True:
-                ip = questionary.text("What's your device's IP address?").ask()
-                if ip is None:
-                    return
-                if IsValidIP(ip):
-                    break
-                else:
-                    print(
-                        "Invalid IP address. Please enter a valid IPv4 or IPv6 address."
-                    )
-            password = questionary.password("What's the password to your device?").ask()
+        ip: Optional[str] = None
+        while True:
+            ip = questionary.text("What's your device's IP address?").ask()
+            if ip is None:
+                return
+            if IsValidIP(ip):
+                break
+            else:
+                print("Invalid IP address. Please enter a valid IPv4 or IPv6 address.")
 
-            baseFile["deploy"] = {
-                deviceNickname: DeployDeviceConfig(
-                    hostname=hostname, ip=ip, password=password
-                ).__dict__
-            }
+        password = questionary.password("What's the password to your device?").ask()
 
-            yaml.dump(
-                baseFile,
-                f,
-            )
+        if "deploy" not in baseFile:
+            baseFile["deploy"] = {}
+
+        baseFile["deploy"][deviceNickname] = DeployDeviceConfig(
+            hostname=hostname, ip=ip, password=password
+        ).__dict__
+
+    with open(path, "w") as f:
+        yaml.dump(
+            baseFile,
+            f,
+        )
 
 
 def _connectAndDeploy(
@@ -146,7 +144,7 @@ def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
         data: dict = yaml.full_load(f)
 
     if "deploy" not in data:
-        setupConfigFile(path)
+        addDeviceConfig(path)
         with open(path, "r") as f:
             data: dict = yaml.full_load(f) or {"deploy": {}}
 
@@ -178,18 +176,13 @@ def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
 
 
 def loadDeviceData(deployConfigPath: pthl.Path):
-    if not deployConfigPath.exists():
-        setupConfigFile(deployConfigPath)
-    elif os.path.getsize(deployConfigPath) == 0:
-        setupConfigFile(deployConfigPath)
+    addDeviceConfig(deployConfigPath)
 
 
 def setupAndRunDeploy(argv: Optional[List[str]] = None):
     cwd: pthl.Path = pthl.Path(os.getcwd())
 
-    assert (cwd / ".synapseproject").exists(), (
-        "No .synpaseproject file found, are you sure you're inside of a Synapse project?"
-    )
+    assert (cwd / SYNAPSE_PROJECT_FILE).exists(), NOT_IN_SYNAPSE_PROJECT_ERR
 
     def fileShouldDeploy(f: pthl.Path):
         return (
@@ -198,7 +191,7 @@ def setupAndRunDeploy(argv: Optional[List[str]] = None):
             or f.is_relative_to(cwd / "config")
         )
 
-    deployConfigPath = cwd / ".synapseproject"
+    deployConfigPath = cwd / SYNAPSE_PROJECT_FILE
     loadDeviceData(deployConfigPath)
 
     createPackageZIP(cwd / BUILD_DIR)

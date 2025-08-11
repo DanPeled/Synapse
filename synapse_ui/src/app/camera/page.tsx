@@ -4,23 +4,27 @@ import { Column, Row } from "@/widgets/containers";
 import { CameraCalibrationModule } from "./camera_calibration";
 import { background, baseCardColor, teamColor } from "@/services/style";
 import { CameraStream } from "@/widgets/cameraStream";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dropdown, DropdownOption } from "@/widgets/dropdown";
+import { Card } from "@/components/ui/card";
 import { Placeholder } from "@/widgets/placeholder";
-import { CameraTransformModule } from "./camera_transform";
 import { useEffect, useState } from "react";
 import { useBackendContext } from "@/services/backend/backendContext";
 import { CameraProto } from "@/proto/v1/camera";
+import { CameraConfigModule } from "./camera_config_module";
 
 export default function CameraConfigPage() {
-  const { cameras } = useBackendContext();
+  const { cameras, socket } = useBackendContext();
   const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
-    cameras[0],
+    undefined,
   );
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState<
+    number | undefined
+  >(0);
 
   useEffect(() => {
-    setSelectedCamera(cameras.at(0));
-  }, [cameras]);
+    if (selectedCameraIndex !== undefined) {
+      setSelectedCamera(cameras.get(selectedCameraIndex));
+    }
+  }, [cameras, selectedCameraIndex]);
 
   useEffect(() => {
     document.title = "Synapse Client";
@@ -33,8 +37,17 @@ export default function CameraConfigPage() {
     >
       <Row className="h-full" gap="gap-2" wrap={true}>
         <Column className="flex-[2] space-y-2 h-full">
-          <CameraTransformModule />
-          <CameraCalibrationModule />
+          <CameraConfigModule
+            cameras={cameras}
+            selectedCamera={selectedCamera}
+            setSelectedCamera={(cam) => setSelectedCameraIndex(cam?.index)}
+            socket={socket}
+          />
+          {/* <CameraTransformModule /> */}
+          <CameraCalibrationModule
+            selectedCamera={selectedCamera}
+            socket={socket}
+          />
         </Column>
 
         <Column className="flex-auto space-y-2 h-full min-w-[500px]">
@@ -42,24 +55,6 @@ export default function CameraConfigPage() {
             className="items-center border-none"
             style={{ backgroundColor: baseCardColor }}
           >
-            <CardContent className="w-full items-center h-full">
-              {" "}
-              <Dropdown
-                options={
-                  (cameras
-                    ? cameras.map((cam) => ({
-                        label: `${cam?.name}`,
-                        value: cam,
-                      }))
-                    : []) as DropdownOption<CameraProto>[]
-                }
-                label="Camera"
-                value={selectedCamera}
-                onValueChange={(camera) => {
-                  setSelectedCamera(camera);
-                }}
-              />
-            </CardContent>
             <CameraStream stream={selectedCamera?.streamPath} />
           </Card>
           <Card

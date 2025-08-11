@@ -1,30 +1,49 @@
+network: { team_number: 9738, name: SynapseExample, ip: null, interface: null }
 global:
   camera_configs:
     0:
-      name: Monochrome
+      name: MonochromeLeft
       id: Integrated Webcam_27152
       transform:
-      - [0.24637, -0.23285, 0.28899]
-      - [-0.032463124087094536, 0.06981317007977317, 0.4354596483725851]
+        - [0.24637, -0.23285, 0.28899]
+        - [
+            -3.012310822900386e-09,
+            6.478087791183619e-09,
+            4.0407072597507856e-08,
+          ]
       default_pipeline: 0
-      matrix:
-      - [940.7360710926395, 0, 615.5884770322365]
-      - [0, 939.9932393907364, 328.53938300868]
-      - [0.0, 0.0, 1.0]
-      distCoeffs:
-      - [0.054834081023049625, -0.15994111706817074, -0.0017587106009926158, -0.0014671022483263552,
-        0.049742166267499596]
-      measured_res: [1280, 720]
       stream_res: [320, 180]
+      calibration: {}
 pipelines:
   0:
     type: ApriltagPipeline
-    settings: {brightness: 100.0, exposure: 20.0, fieldpose: true, gain: 50.0, num_threads: 4.0,
-      orientation: 180, resolution: 1080x1920, saturation: 10.0, sharpness: 50.0,
-      stick_to_ground: true, tag_family: tag36h11, tag_size: 0.1651, verbosity: 1}
+    settings:
+      {
+        brightness: 50.0,
+        exposure: 20.0,
+        fieldpose: true,
+        gain: 50.0,
+        num_threads: 4.0,
+        orientation: 180,
+        resolution: 1024x768,
+        saturation: 10.0,
+        sharpness: 50.0,
+        stick_to_ground: true,
+        tag_family: tag36h11,
+        tag_size: 0.1651,
+        verbosity: 1,
+      }
     name: FieldPose
   1:
     type: ColorPipeline
-    settings: {brightness: 100.0, exposure: 20.0, gain: 50.0, orientation: 0, resolution: 1080x1920,
-      saturation: 50.0, sharpness: 50.0}
+    settings:
+      {
+        brightness: 100.0,
+        exposure: 20.0,
+        gain: 50.0,
+        orientation: 0,
+        resolution: 1080x1920,
+        saturation: 50.0,
+        sharpness: 50.0,
+      }
     name: Cheese

@@ -1,4 +1,8 @@
-from typing import List, Union
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from typing import List, Tuple, Union
 
 from cv2 import Mat
 from numpy import ndarray
@@ -13,6 +17,11 @@ DataValue = Union[float, bool, int, str, List[bool], List[float], List[str], Lis
 #: An integer identifier for a specific camera.
 CameraID = int
 
+#: String static identifier for a camera
+CameraUID = str
+
+CameraName = str
+
 #: An integer identifier for a specific image processing pipeline.
 PipelineID = int
 
@@ -20,3 +29,5 @@ PipelineID = int
 PipelineName = str
 
 PipelineTypeName = str
+
+Resolution = Tuple[int, int]

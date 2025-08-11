@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -9,72 +9,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { RefreshCw, Download, ChevronUp, ChevronDown, X } from "lucide-react";
+  RefreshCw,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  Trash,
+} from "lucide-react";
 import { Row } from "@/widgets/containers";
 import { baseCardColor, teamColor } from "@/services/style";
-import { AlertDialog } from "@/widgets/alertDialog";
-
-// --- Calibration Data ---
-const calibrationData = {
-  timestamp: "2024-01-15 14:30:22",
-  resolutionResults: [
-    {
-      resolution: "1920x1080",
-      successful: 14,
-      meanError: 0.298,
-      maxError: 0.756,
-      rmsError: 0.334,
-      status: "excellent",
-      cameraMatrix: { fx: 1234.56, fy: 1235.78, cx: 960.12, cy: 540.34 },
-      distortionCoefficients: {
-        k1: -0.2841,
-        k2: 0.1024,
-        p1: -0.0012,
-        p2: 0.0008,
-        k3: -0.0234,
-      },
-    },
-    {
-      resolution: "1280x720",
-      successful: 12,
-      meanError: 0.312,
-      maxError: 0.623,
-      rmsError: 0.341,
-      status: "good",
-      cameraMatrix: { fx: 823.04, fy: 823.85, cx: 640.08, cy: 360.23 },
-      distortionCoefficients: {
-        k1: -0.2856,
-        k2: 0.1031,
-        p1: -0.0011,
-        p2: 0.0009,
-        k3: -0.0241,
-      },
-    },
-    {
-      resolution: "640x480",
-      successful: 16,
-      meanError: 0.421,
-      maxError: 0.892,
-      rmsError: 0.456,
-      status: "acceptable",
-      cameraMatrix: { fx: 617.28, fy: 617.89, cx: 320.06, cy: 240.17 },
-      distortionCoefficients: {
-        k1: -0.2923,
-        k2: 0.1087,
-        p1: -0.0015,
-        p2: 0.0012,
-        k3: -0.0267,
-      },
-    },
-  ],
-};
+import { CalibrationDialog } from "./calibration_dialog";
+import { CalibrationDataProto, CameraProto } from "@/proto/v1/camera";
+import { WebSocketWrapper } from "@/services/websocket";
+import { useBackendContext } from "@/services/backend/backendContext";
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -111,14 +57,6 @@ function CalibrationHeader() {
           className="hover:bg-zinc-700 cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
-          Export Results
-        </Button>
-        <Button
-          size="sm"
-          style={{ color: teamColor }}
-          className="hover:bg-zinc-700 cursor-pointer"
-        >
-          <Download className="w-4 h-4 mr-2" />
           Import Results
         </Button>
       </Row>
@@ -130,10 +68,14 @@ function ResolutionSelector({
   resolutions,
   selected,
   onSelect,
+  selectedCamera,
+  socket,
 }: {
-  resolutions: typeof calibrationData.resolutionResults;
-  selected: (typeof calibrationData.resolutionResults)[number];
-  onSelect: (res: (typeof calibrationData.resolutionResults)[number]) => void;
+  resolutions: string[];
+  selected?: CalibrationDataProto;
+  onSelect: (res: string) => void;
+  selectedCamera?: CameraProto;
+  socket?: WebSocketWrapper;
 }) {
   const [calibrateResolutionVisible, setCalibrateResolutionVisible] =
     useState(false);
@@ -148,22 +90,19 @@ function ResolutionSelector({
       </CardHeader>
       <CardContent className="pt-0">
         <Row className="items-center gap-2">
-          {resolutions.map((result, index) => (
+          {resolutions.map((resolution) => (
             <Button
-              key={index}
-              onClick={() => onSelect(result)}
+              key={resolution}
+              onClick={() => onSelect(resolution)}
               className={`${
-                selected.resolution === result.resolution
+                selected?.resolution === resolution
                   ? "bg-stone-600 hover:bg-stone-500"
                   : "border-gray-600 bg-gray-700 hover:bg-gray-600 hover:border-zinc-700"
               } cursor-pointer`}
             >
-              {result.resolution}
-              <Badge
-                className={`ml-2 ${getStatusColor(result.status)}`}
-                variant="secondary"
-              >
-                {result.status}
+              {resolution}
+              <Badge className={`ml-2`} variant="secondary">
+                {/* {status} */}
               </Badge>
             </Button>
           ))}
@@ -181,31 +120,19 @@ function ResolutionSelector({
           </Button>
         </Row>
 
-        <AlertDialog
+        <CalibrationDialog
           visible={calibrateResolutionVisible}
-          onClose={() => setCalibrateResolutionVisible(false)}
-          className="w-[80vw] h-[80vh]"
-        >
-          <Button
-            onClick={() => setCalibrateResolutionVisible(false)}
-            className="w-auto cursor-pointer hover:bg-zinc-700"
-          >
-            <span className="flex items-center justify-center gap-2">
-              <X />
-              Close
-            </span>
-          </Button>
-        </AlertDialog>
+          setVisible={setCalibrateResolutionVisible}
+          initialResolution={selected?.resolution}
+          camera={selectedCamera}
+          socket={socket}
+        />
       </CardContent>
     </Card>
   );
 }
 
-function CameraMatrixCard({
-  data,
-}: {
-  data: (typeof calibrationData.resolutionResults)[number];
-}) {
+function CameraMatrixCard({ data }: { data: CalibrationDataProto }) {
   return (
     <Card className="bg-zinc-900 border-gray-700" style={{ color: teamColor }}>
       <CardHeader>
@@ -216,12 +143,28 @@ function CameraMatrixCard({
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-4 font-mono text-sm mb-4">
-          <MatrixCell label="fx" value={data.cameraMatrix.fx} color="blue" />
+          <MatrixCell
+            label="fx"
+            value={data.cameraMatrix.at(0) ?? 0}
+            color="blue"
+          />
           <MatrixCell label="0" value={0} />
-          <MatrixCell label="cx" value={data.cameraMatrix.cx} color="green" />
+          <MatrixCell
+            label="cx"
+            value={data.cameraMatrix.at(2) ?? 0}
+            color="green"
+          />
           <MatrixCell label="0" value={0} />
-          <MatrixCell label="fy" value={data.cameraMatrix.fy} color="blue" />
-          <MatrixCell label="cy" value={data.cameraMatrix.cy} color="green" />
+          <MatrixCell
+            label="fy"
+            value={data.cameraMatrix.at(4) ?? 0}
+            color="blue"
+          />
+          <MatrixCell
+            label="cy"
+            value={data.cameraMatrix.at(5) ?? 0}
+            color="green"
+          />
           <MatrixCell label="0" value={0} />
           <MatrixCell label="0" value={0} />
           <MatrixCell label="1" value={1} />
@@ -276,11 +219,7 @@ function MatrixCell({
   );
 }
 
-function DistortionCoefficientsCard({
-  data,
-}: {
-  data: (typeof calibrationData.resolutionResults)[number];
-}) {
+function DistortionCoefficientsCard({ data }: { data: CalibrationDataProto }) {
   return (
     <Card className="bg-zinc-900 border-gray-700" style={{ color: teamColor }}>
       <CardHeader>
@@ -292,7 +231,7 @@ function DistortionCoefficientsCard({
       <CardContent>
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3">
-            {Object.entries(data.distortionCoefficients).map(([key, value]) => (
+            {Object.entries(data.distCoeffs).map(([key, value]) => (
               <div
                 key={key}
                 className="flex items-center justify-between p-3 bg-gray-700 rounded border border-gray-600 
@@ -321,68 +260,30 @@ function DistortionCoefficientsCard({
   );
 }
 
-function ResolutionComparisonTable({
-  resolutions,
-  selected,
+export function CameraCalibrationModule({
+  selectedCamera,
+  socket,
 }: {
-  resolutions: typeof calibrationData.resolutionResults;
-  selected: string;
+  selectedCamera?: CameraProto;
+  socket?: WebSocketWrapper;
 }) {
-  return (
-    <Card className="bg-zinc-900 border-gray-700" style={{ color: teamColor }}>
-      <CardHeader>
-        <CardTitle>Parameter Comparison Across Resolutions</CardTitle>
-        <CardDescription>
-          Compare focal lengths and principal points
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table className="border-gray-700 items-center">
-          <TableHeader>
-            <TableRow className="border-gray-700 bg-zinc-800 hover:bg-zinc-800">
-              <TableHead>Resolution</TableHead>
-              <TableHead>fx</TableHead>
-              <TableHead>fy</TableHead>
-              <TableHead>cx</TableHead>
-              <TableHead>cy</TableHead>
-              <TableHead>Aspect Ratio</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {resolutions.map((result, index) => (
-              <TableRow
-                key={index}
-                className={`border-gray-700 ${selected === result.resolution ? "bg-rose-900" : ""} hover:bg-`}
-              >
-                <TableCell className="font-mono">{result.resolution}</TableCell>
-                <TableCell className="font-mono">
-                  {result.cameraMatrix.fx.toFixed(2)}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {result.cameraMatrix.fy.toFixed(2)}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {result.cameraMatrix.cx.toFixed(2)}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {result.cameraMatrix.cy.toFixed(2)}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {(result.cameraMatrix.fx / result.cameraMatrix.fy).toFixed(4)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
-}
+  const [selectedResolutionData, setSelectedResolutionData] = useState<
+    CalibrationDataProto | undefined
+  >(undefined);
 
-export function CameraCalibrationModule() {
-  const [selectedResolutionData, setSelectedResolutionData] = useState(
-    calibrationData.resolutionResults[0],
+  const [resolutions, setResolutions] = useState<string[] | undefined>(
+    undefined,
   );
+
+  const { calibrationdata } = useBackendContext();
+
+  useEffect(() => {
+    if (selectedCamera) {
+      const calibrations =
+        calibrationdata.get(selectedCamera.index) ?? new Map();
+      setResolutions(Array.from(calibrations.keys()));
+    }
+  }, [selectedCamera, calibrationdata]);
 
   const [showMoreInfo, setShowMoreInfo] = useState(false);
 
@@ -399,30 +300,58 @@ export function CameraCalibrationModule() {
         <CalibrationHeader />
 
         <ResolutionSelector
-          resolutions={calibrationData.resolutionResults}
+          resolutions={resolutions ?? []}
           selected={selectedResolutionData}
-          onSelect={setSelectedResolutionData}
+          onSelect={(resolution: string) => {
+            if (selectedCamera) {
+              const data = calibrationdata
+                .get(selectedCamera.index)
+                ?.get(resolution);
+
+              if (data) {
+                setSelectedResolutionData(data);
+              }
+            }
+          }}
+          selectedCamera={selectedCamera}
+          socket={socket}
         />
 
         {/* More Info Toggle Button below Select Resolution */}
-        <div className="flex justify-center mt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowMoreInfo(!showMoreInfo)}
-            className="flex items-center bg-zinc-900 hover:bg-zinc-700 cursor-pointer"
-            aria-expanded={showMoreInfo}
-            aria-controls="detailed-info-section"
-            style={{ color: teamColor }}
-          >
-            {showMoreInfo ? "Hide Details" : "Show Details"}
-            {showMoreInfo ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
+        {selectedResolutionData !== undefined && (
+          <div className="flex justify-center mt-2 flex-col gap-4">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {}}
+              className="flex items-center bg-zinc-800 hover:bg-zinc-700 cursor-pointer border-zinc-700"
+              aria-expanded={showMoreInfo}
+              aria-controls="detailed-info-section"
+              style={{ color: teamColor }}
+            >
+              <Trash /> Delete Calibration Data for{" "}
+              {selectedResolutionData.resolution}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowMoreInfo(!showMoreInfo)}
+              className="flex items-center bg-zinc-800 hover:bg-zinc-700 cursor-pointer border-zinc-700"
+              aria-expanded={showMoreInfo}
+              aria-controls="detailed-info-section"
+              style={{ color: teamColor }}
+            >
+              {showMoreInfo
+                ? "Hide Details & Actions"
+                : "Show Details & Actions"}
+              {showMoreInfo ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+        )}
 
         {/* Collapsible Detailed Info Section */}
         <div
@@ -431,14 +360,15 @@ export function CameraCalibrationModule() {
                       ${showMoreInfo ? "max-h-[2000px] opacity-100 space-y-2" : "max-h-0 opacity-0 p-0"}`}
           style={{ color: teamColor }}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <CameraMatrixCard data={selectedResolutionData} />
-            <DistortionCoefficientsCard data={selectedResolutionData} />
-          </div>
-          <ResolutionComparisonTable
-            resolutions={calibrationData.resolutionResults}
-            selected={selectedResolutionData.resolution}
-          />
+          {selectedResolutionData && (
+            <>
+              {" "}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <CameraMatrixCard data={selectedResolutionData} />
+                <DistortionCoefficientsCard data={selectedResolutionData} />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -1,8 +1,17 @@
 import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
 import { WebSocketWrapper } from "../websocket";
-import { CameraProto } from "@/proto/v1/camera";
+import {
+  CalibrationDataProto,
+  CameraPerformanceProto,
+  CameraProto,
+} from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { LogMessageProto } from "@/proto/v1/log";
+import { RefObject } from "react";
+
+export type CameraID = number;
+export type PipelineID = number;
+export type PipelineTypename = string;
 
 export namespace BackendStateSystem {
   export interface State {
@@ -12,10 +21,14 @@ export namespace BackendStateSystem {
     networktable: string;
     logs: LogMessageProto[];
     socket?: WebSocketWrapper;
-    networktablesserver: string | null;
-    cameras: CameraProto[];
-    pipelines: Map<number, PipelineProto>;
-    pipelinetypes: Map<string, PipelineTypeProto>;
+    stateRef?: RefObject<State>;
+    teamnumber: number;
+    cameras: Map<CameraID, CameraProto>;
+    cameraperformance: Map<CameraID, CameraPerformanceProto>;
+    pipelines: Map<PipelineID, PipelineProto>;
+    pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
+    calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
+    calibrating: boolean;
   }
 
   // Define action types with a discriminated union

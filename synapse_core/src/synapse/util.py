@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import socket
 import typing
 from typing import List, Optional, Type
 
@@ -5,6 +10,21 @@ from wpimath import geometry
 
 from .core.pipeline import Pipeline
 from .log import err
+
+
+def getIP() -> str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    ip: Optional[str] = None
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except OSError:
+        ip = "127.0.0.1"
+
+    s.close()
+
+    return ip or "127.0.0.1"
 
 
 def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
@@ -57,9 +77,9 @@ def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:
     return [
         [translation.x, translation.y, translation.z],
         [
-            rotation.X(),  # Roll
-            rotation.Y(),  # Pitch
-            rotation.Z(),  # Yaw
+            rotation.x_degrees,  # Roll
+            rotation.y_degrees,  # Pitch
+            rotation.z_degrees,  # Yaw
         ],
     ]
 

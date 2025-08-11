@@ -151,6 +151,7 @@ export function DangerButton({
   onClickAction,
   children,
   className,
+  disabled = false,
   ...props
 }: {
   enabledColors?: ColorConfig;
@@ -159,6 +160,7 @@ export function DangerButton({
   onClickAction?: () => void;
   className?: string;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -182,6 +184,7 @@ export function DangerButton({
         disabledColors={disabledColors}
         onClickAction={handleClick}
         className={className}
+        disabled={disabled}
         {...props}
       >
         {children}

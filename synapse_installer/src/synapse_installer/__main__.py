@@ -1,4 +1,13 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import sys
+from pathlib import Path
+
+from synapse_installer.deploy import addDeviceConfig
+
+from .util import NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE
 
 COMMAND_ARGV_IDX = 1
 
@@ -10,6 +19,7 @@ Commands:
   deploy       Deploy the project
   sync         Sync files or data
   install      Run sync then deploy
+  device       Device actions (e.g. `add`)
 
 Use `<python> -m synapse_installer <command> -h` for more information on a command.
 """
@@ -81,6 +91,25 @@ def main():
 
         sync(argv[1:])
         setupAndRunDeploy(argv[1:])
+    elif cmd == "device":
+        configFilePath = Path.cwd() / SYNAPSE_PROJECT_FILE
+
+        if not configFilePath.exists():
+            print(NOT_IN_SYNAPSE_PROJECT_ERR)
+            return
+
+        if len(argv) <= 2 or argv[2] in ("-h", "--help"):
+            print(
+                "Usage: <python> -m synapse_installer device add\nAdd a device to the project."
+            )
+            return
+
+        deviceAction = argv[2]
+        if deviceAction == "add":
+            addDeviceConfig(configFilePath)
+        else:
+            print(f"Unknown device action: `{deviceAction}`! Only `add` is supported.")
+
     else:
         print(f"Unknown command: `{cmd}`!\n{HELP_TEXT}")
 

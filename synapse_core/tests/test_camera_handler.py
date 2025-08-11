@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -27,17 +31,6 @@ class TestCameraHandler(unittest.TestCase):
             self.handler.publishFrame(frame, camera)
             self.handler.streamOutputs[0].putFrame.assert_called_with(frame)
             self.handler.recordingOutputs[0].write.assert_called_with(frame)
-
-    def test_cleanup_closes_resources(self):
-        mock_record = MagicMock()
-        mock_camera = MagicMock()
-
-        self.handler.recordingOutputs = {0: mock_record}
-        self.handler.cameras = {0: mock_camera}
-
-        self.handler.cleanup()
-        mock_record.release.assert_called_once()
-        mock_camera.close.assert_called_once()
 
 
 if __name__ == "__main__":

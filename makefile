@@ -1,4 +1,4 @@
-.PHONY: clean install build install_buf generate_buf format clean_buf_out
+.PHONY: clean install build generate_buf format clean_buf_out
 
 # Detect platform
 IS_WINDOWS := $(findstring Windows_NT, $(OS))
@@ -45,7 +45,11 @@ generate_buf:
 		$(CD) .. &\
 		make install
 
+license:
+	shopt -s globstar; python3 -m reuse annotate --license GPL-3.0-or-later --copyright "Dan Peled" **/*.py
+
 format:
+	make license
 	@echo Ruff format...
 	@python3 -m ruff format . >$(NULL) 2>&1 || echo ruff format failed
 	@echo Isort format...

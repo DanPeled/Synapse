@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { BooleanConstraintProto } from "./boolean";
 import { ColorConstraintProto } from "./color";
 import { EnumeratedConstraintProto } from "./enumerated";
 import { ListConstraintProto } from "./list";
@@ -103,6 +104,8 @@ export interface ConstraintConfigProto {
   string?: StringConstraintProto | undefined;
   /** Constraint for a value list */
   list?: ListConstraintProto | undefined;
+  /** Boolean constraint */
+  boolean?: BooleanConstraintProto | undefined;
 }
 
 function createBaseConstraintConfigProto(): ConstraintConfigProto {
@@ -112,6 +115,7 @@ function createBaseConstraintConfigProto(): ConstraintConfigProto {
     color: undefined,
     string: undefined,
     list: undefined,
+    boolean: undefined,
   };
 }
 
@@ -146,6 +150,12 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     }
     if (message.list !== undefined) {
       ListConstraintProto.encode(message.list, writer.uint32(42).fork()).join();
+    }
+    if (message.boolean !== undefined) {
+      BooleanConstraintProto.encode(
+        message.boolean,
+        writer.uint32(50).fork(),
+      ).join();
     }
     return writer;
   },
@@ -210,6 +220,17 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
           message.list = ListConstraintProto.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.boolean = BooleanConstraintProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -236,6 +257,9 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
       list: isSet(object.list)
         ? ListConstraintProto.fromJSON(object.list)
         : undefined,
+      boolean: isSet(object.boolean)
+        ? BooleanConstraintProto.fromJSON(object.boolean)
+        : undefined,
     };
   },
 
@@ -255,6 +279,9 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     }
     if (message.list !== undefined) {
       obj.list = ListConstraintProto.toJSON(message.list);
+    }
+    if (message.boolean !== undefined) {
+      obj.boolean = BooleanConstraintProto.toJSON(message.boolean);
     }
     return obj;
   },
@@ -287,6 +314,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     message.list =
       object.list !== undefined && object.list !== null
         ? ListConstraintProto.fromPartial(object.list)
+        : undefined;
+    message.boolean =
+      object.boolean !== undefined && object.boolean !== null
+        ? BooleanConstraintProto.fromPartial(object.boolean)
         : undefined;
     return message;
   },

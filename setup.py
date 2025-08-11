@@ -1,11 +1,21 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from setuptools import find_packages, setup
 
-WPILIB_VERSION = "2025.2.1.1"
+version_vars = {}
+with open("synapse_core/src/synapse/__version__.py") as f:
+    exec(f.read(), version_vars)
+
+SYNAPSE_VERSION = version_vars["SYNAPSE_VERSION"]
+WPILIB_VERSION = version_vars["WPILIB_VERSION"]
+
 
 modules = {
     "synapse_net": "synapse_net/src",
     "synapse_installer": "synapse_installer/src",
-    "": "synapse_core/src",
+    "synapse": "synapse_core/src",
     "synapse_ui": "synapse_ui/out",
 }
 
@@ -46,7 +56,7 @@ for name, path in modules.items():
 
 setup(
     name="synapsefrc",
-    version="0.1.0",
+    version=SYNAPSE_VERSION,
     packages=allModules,
     package_dir=moduleDirs,
     python_requires=">=3.9, <3.12",
@@ -67,6 +77,7 @@ setup(
         synapseInstallerDep("scp>=0.15.0"),
         synapseInstallerDep("questionary"),
         synapseInstallerDep("tqdm"),
+        synapseInstallerDep("toml"),
         hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),
@@ -76,10 +87,12 @@ setup(
         "dev": [
             "pytest",
             "pytest-asyncio",
+            "pytest-mock",
             "ruff",
             "isort",
             "pyright",
             "build",
+            "reuse",
         ]
     },
     include_package_data=True,

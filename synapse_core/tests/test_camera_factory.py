@@ -1,9 +1,14 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import unittest
 from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
 import synapse.core.camera_factory
+from cscore import VideoMode
 from synapse.core.camera_factory import CsCoreCamera
 
 
@@ -22,22 +27,6 @@ class TestUtilityFunctions(unittest.TestCase):
             synapse.core.camera_factory.opencvToCscoreProp(cv2.CAP_PROP_CONTRAST),
             "contrast",
         )
-
-
-class TestCameraConfig(unittest.TestCase):
-    def test_camera_config_creation(self):
-        transform = MagicMock()
-        config = synapse.core.camera_factory.CameraConfig(
-            name="cam",
-            id="mock_123",
-            transform=transform,
-            defaultPipeline=1,
-            matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            distCoeff=[0.1, 0.01],
-            measuredRes=(640, 480),
-            streamRes=(320, 240),
-        )
-        self.assertEqual(config.name, "cam")
 
 
 class TestOpenCvCamera(unittest.TestCase):
@@ -81,6 +70,7 @@ class TestCsCoreCamera(unittest.TestCase):
     @patch("synapse.core.camera_factory.CameraServer.getVideo")
     def test_create_with_usb_index(self, mock_get_video, mock_usb_camera):
         camera_instance = MagicMock()
+        camera_instance.getVideoMode.return_value = VideoMode()
         mock_usb_camera.return_value = camera_instance
         mock_get_video.return_value = MagicMock()
         camera_instance.enumerateProperties.return_value = []

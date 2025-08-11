@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import queue
 import socket
 import threading
@@ -6,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
@@ -15,13 +19,16 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse.log import warn
-from synapse.stypes import CameraID, Frame, PipelineID
-from synapse.util import transform3dToList
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import CameraProto
+from synapse_net.proto.v1 import CalibrationDataProto, CameraProto
 from wpimath import geometry
 
-PropertMetaDict = Dict[str, Dict[str, Union[int, float]]]
+from ..stypes import CameraID, Frame, PipelineID, Resolution
+from ..util import listToTransform3d, transform3dToList
+
+PropName = str
+PropertMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
+ResolutionString = str
 
 
 class CameraPropKeys(Enum):
@@ -62,15 +69,47 @@ def getCameraTableName(cameraIndex: CameraID) -> str:
 
 
 @dataclass
+class CalibrationData:
+    matrix: List[float]
+    distCoeff: List[float]
+    meanErr: float
+    measuredRes: Resolution
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            CameraConfigKey.kMatrix.value: self.matrix,
+            CameraConfigKey.kDistCoeff.value: self.distCoeff,
+            CameraConfigKey.kMeasuredRes.value: self.measuredRes,
+            CameraConfigKey.kMeanErr.value: self.meanErr,
+        }
+
+    @staticmethod
+    def fromDict(data: Dict[str, Any]) -> "CalibrationData":
+        return CalibrationData(
+            matrix=data[CameraConfigKey.kMatrix.value],
+            distCoeff=data[CameraConfigKey.kDistCoeff.value],
+            measuredRes=data[CameraConfigKey.kMeasuredRes.value],
+            meanErr=data[CameraConfigKey.kMeanErr.value],
+        )
+
+    def toProto(self, cameraIndex: CameraID) -> CalibrationDataProto:
+        return CalibrationDataProto(
+            camera_index=cameraIndex,
+            mean_error=self.meanErr,
+            resolution="x".join([str(dim) for dim in self.measuredRes]),
+            camera_matrix=self.matrix,
+            dist_coeffs=self.distCoeff,
+        )
+
+
+@dataclass
 class CameraConfig:
     name: str
     id: str
     transform: geometry.Transform3d
+    calibration: Dict[ResolutionString, CalibrationData]
     defaultPipeline: int
-    matrix: List[List[float]]
-    distCoeff: List[float]
-    measuredRes: Tuple[int, int]
-    streamRes: Tuple[int, int]
+    streamRes: Resolution
 
     def toDict(self) -> Dict[str, Any]:
         return {
@@ -78,11 +117,28 @@ class CameraConfig:
             CameraConfigKey.kPath.value: self.id,
             CameraConfigKey.kTransform.value: transform3dToList(self.transform),
             CameraConfigKey.kDefaultPipeline.value: self.defaultPipeline,
-            CameraConfigKey.kMatrix.value: self.matrix,
-            CameraConfigKey.kDistCoeff.value: list(self.distCoeff),
-            CameraConfigKey.kMeasuredRes.value: list(self.measuredRes),
             CameraConfigKey.kStreamRes.value: list(self.streamRes),
+            CameraConfigKey.kCalibration.value: {
+                resolution: calib.toDict()
+                for resolution, calib in self.calibration.items()
+            },
         }
+
+    @staticmethod
+    def fromDict(data: Dict[str, Any]) -> "CameraConfig":
+        calib = {
+            key: CalibrationData.fromDict(calib)
+            for key, calib in data.get(CameraConfigKey.kCalibration.value, {}).items()
+        }
+
+        return CameraConfig(
+            name=data[CameraConfigKey.kName.value],
+            id=data[CameraConfigKey.kPath.value],
+            streamRes=data[CameraConfigKey.kStreamRes.value],
+            transform=listToTransform3d(data[CameraConfigKey.kTransform.value]),
+            defaultPipeline=data[CameraConfigKey.kDefaultPipeline.value],
+            calibration=calib,
+        )
 
 
 class CameraConfigKey(Enum):
@@ -94,6 +150,8 @@ class CameraConfigKey(Enum):
     kMeasuredRes = "measured_res"
     kStreamRes = "stream_res"
     kTransform = "transform"
+    kCalibration = "calibration"
+    kMeanErr = "mean_err"
 
 
 @cache
@@ -115,7 +173,7 @@ def opencvToCscoreProp(prop: int) -> Optional[str]:
 
 class SynapseCamera(ABC):
     def __init__(self, name: str) -> None:
-        self.name: Final[str] = name
+        self.name: str = name
         self.stream: str = ""
 
     @classmethod
@@ -157,6 +215,9 @@ class SynapseCamera(ABC):
 
     @abstractmethod
     def getResolution(self) -> Size: ...
+
+    @abstractmethod
+    def getSupportedResolutions(self) -> List[Size]: ...
 
     @abstractmethod
     def getPropertyMeta(self) -> Optional[PropertMetaDict]: ...
@@ -245,6 +306,9 @@ class OpenCvCamera(SynapseCamera):
 
         return inst
 
+    def getSupportedResolutions(self) -> List[Size]:
+        return [self.getResolution()]
+
     def getPropertyMeta(self) -> Optional[PropertMetaDict]:
         return None
 
@@ -307,6 +371,7 @@ class CsCoreCamera(SynapseCamera):
         )
         self._running: bool = False
         self._thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()  # Add this
 
     @classmethod
     def create(
@@ -366,17 +431,18 @@ class CsCoreCamera(SynapseCamera):
         while not self.isConnected():
             time.sleep(0.1)
         while self._running:
-            result = self.sink.grabFrame(self.frameBuffer)
+            with self._lock:  # Protect frame operations
+                result = self.sink.grabFrame(self.frameBuffer)
             if len(result) > 0:
                 ret, frame = result
                 hasFrame = ret != 0
                 if hasFrame:
-                    frame_copy = frame.copy()  # Make a deep copy
+                    frame_copy = frame.copy()  # no lock needed here; copying is safe
                     try:
                         self._frameQueue.put_nowait((hasFrame, frame_copy))
                     except queue.Full:
                         try:
-                            self._frameQueue.get_nowait()  # drop oldest frame
+                            self._frameQueue.get_nowait()
                         except queue.Empty:
                             pass
                         self._frameQueue.put_nowait((hasFrame, frame_copy))
@@ -388,14 +454,15 @@ class CsCoreCamera(SynapseCamera):
         if self.isConnected():
             if self.camera.getVideoMode().fps > 0:
                 time.sleep(
-                    1.0 / self.camera.getActualFPS() / 2.0
+                    1.0 / self.camera.getVideoMode().fps / 2.0
                 )  # Half the expected frame interval
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        try:
-            return self._frameQueue.get_nowait()
-        except queue.Empty:
-            return False, None
+        with self._lock:  # Protect frame buffer access
+            try:
+                return self._frameQueue.get_nowait()
+            except queue.Empty:
+                return False, None
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()
@@ -409,8 +476,13 @@ class CsCoreCamera(SynapseCamera):
             VideoSource.ConnectionStrategy.kConnectionForceClose
         )
 
-    def setProperty(self, prop: str, value: Union[int, float]) -> None:
-        if prop in self._properties:
+    def setProperty(self, prop: str, value: Union[int, float, str]) -> None:
+        if prop == "resolution" and isinstance(value, str):
+            resolution = value.split("x")
+            width = int(resolution[0])
+            height = int(resolution[1])
+            self.setVideoMode(int(self.getMaxFPS()), width, height)
+        elif prop in self._properties:
             meta = self.propertyMeta[prop]
             value = int(np.clip(value, meta["min"], meta["max"]))
             self._properties[prop].set(value)
@@ -461,12 +533,18 @@ class CsCoreCamera(SynapseCamera):
             f"Camera default settings will be used."
         )
 
-    def getResolution(self) -> Tuple[int, int]:
+    def getResolution(self) -> Resolution:
         videoMode = self.camera.getVideoMode()
         return (videoMode.width, videoMode.height)
 
     def getMaxFPS(self) -> float:
         return self.camera.getVideoMode().fps
+
+    def getSupportedResolutions(self) -> List[Size]:
+        resolutions = []
+        for videomode in self._validVideoModes:
+            resolutions.append((videomode.width, videomode.height))
+        return resolutions
 
 
 class CameraFactory:
@@ -498,12 +576,14 @@ def cameraToProto(
     camera: SynapseCamera,
     pipelineIndex: PipelineID,
     defaultPipeline: PipelineID,
+    kind: str,
 ) -> CameraProto:
     return CameraProto(
         name=name,
         index=camid,
         stream_path=camera.stream,
-        physical_connection="unknown",
+        kind=kind,
         pipeline_index=pipelineIndex,
         default_pipeline=defaultPipeline,
+        max_fps=int(camera.getMaxFPS()),
     )

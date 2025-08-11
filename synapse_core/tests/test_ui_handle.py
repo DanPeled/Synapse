@@ -1,6 +1,8 @@
-import subprocess
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 from synapse.core.synapse import UIHandle
@@ -16,42 +18,6 @@ class TestUIHandle(unittest.TestCase):
     def test_is_pid_running_false(self, mock_kill):
         self.assertFalse(UIHandle.isPIDRunning(1234))
         mock_kill.assert_called_with(1234, 0)
-
-    @patch("subprocess.Popen")
-    @patch("os.kill")
-    @patch("builtins.open", new_callable=mock_open, read_data="5678")
-    @patch("pathlib.Path.touch")
-    @patch("pathlib.Path.exists", return_value=False)
-    @patch("importlib.util.find_spec")
-    def test_start_ui_creates_file_and_starts_process(
-        self,
-        mock_find_spec,
-        mock_exists,
-        mock_touch,
-        mock_open_file,
-        mock_kill,
-        mock_popen,
-    ):
-        mock_spec = MagicMock()
-        mock_spec.origin = "/fake/path/synapse_ui/__init__.py"
-        mock_find_spec.return_value = mock_spec
-        mock_proc = MagicMock()
-        mock_proc.pid = 9876
-        mock_popen.return_value = mock_proc
-
-        UIHandle.startUI()
-
-        mock_find_spec.assert_called_with("synapse_ui")
-        mock_touch.assert_called()
-        mock_open_file.assert_called_with(Path("./.uistart"), "r+")
-        mock_kill.assert_called_with(5678, 1)
-        mock_popen.assert_called_with(
-            ["serve", "."],
-            cwd=Path("/fake/path/synapse_ui"),
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
 
     @patch("subprocess.Popen")
     @patch("builtins.open", new_callable=mock_open, read_data="invalid")
