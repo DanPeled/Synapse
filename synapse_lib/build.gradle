@@ -129,3 +129,19 @@ apply from: 'publish.gradle'
 wrapper {
     gradleVersion '8.11'
 }
+
+tasks.named('spotlessGroovyGradle') {
+    dependsOn tasks.named('javadoc')
+}
+
+tasks.named('spotlessJava') {
+    dependsOn tasks.named('javadoc')
+}
+
+tasks.named('spotlessMisc') {
+    dependsOn tasks.named('javadoc')
+}
+
+tasks.named('spotlessXml') {
+    dependsOn tasks.named('javadoc')
+}
