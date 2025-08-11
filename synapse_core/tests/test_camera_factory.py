@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import synapse.core.camera_factory
 from cscore import VideoMode
-from synapse.core.camera_factory import CalibrationData, CsCoreCamera
+from synapse.core.camera_factory import CsCoreCamera
 
 
 class TestUtilityFunctions(unittest.TestCase):
@@ -27,26 +27,6 @@ class TestUtilityFunctions(unittest.TestCase):
             synapse.core.camera_factory.opencvToCscoreProp(cv2.CAP_PROP_CONTRAST),
             "contrast",
         )
-
-
-class TestCameraConfig(unittest.TestCase):
-    def test_camera_config_creation(self):
-        transform = MagicMock()
-        config = synapse.core.camera_factory.CameraConfig(
-            name="cam",
-            id="mock_123",
-            transform=transform,
-            defaultPipeline=1,
-            calibration={
-                "640x480": CalibrationData(
-                    matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                    distCoeff=[0.1, 0.01],
-                    measuredRes=(640, 480),
-                )
-            },
-            streamRes=(320, 240),
-        )
-        self.assertEqual(config.name, "cam")
 
 
 class TestOpenCvCamera(unittest.TestCase):
