@@ -149,15 +149,15 @@ task vendordepJson() {
     }
 }
 
-task vendordepJsonZip(type: Zip) {
-    destinationDirectory = outputsFolder
-    archiveBaseName = templateVendorFile
-
-    from("$buildDir/repos/$templateVendorFile") {
-        into '/'
-    }
-    dependsOn vendordepJson
-}
+// task vendordepJsonZip(type: Zip) {
+//     destinationDirectory = outputsFolder
+//     archiveBaseName = templateVendorFile
+//
+//     from("$buildDir/repos/$templateVendorFile") {
+//         into '/'
+//     }
+//     dependsOn vendordepJson
+// }
 
 artifacts {
     archives sourcesJar
@@ -170,12 +170,12 @@ artifacts {
 addTaskToCopyAllOutputs(outputSourcesJar)
 addTaskToCopyAllOutputs(outputJavadocJar)
 addTaskToCopyAllOutputs(outputJar)
-addTaskToCopyAllOutputs(vendordepJsonZip)
+// addTaskToCopyAllOutputs(vendordepJsonZip)
 
 build.dependsOn outputSourcesJar
 build.dependsOn outputJavadocJar
 build.dependsOn outputJar
-build.dependsOn vendordepJsonZip
+// build.dependsOn vendordepJsonZip
 
 libraryBuild.dependsOn build
 
@@ -234,7 +234,7 @@ model {
             }
 
             vendordep(MavenPublication) {
-                artifact vendordepJsonZip
+                // artifact vendordepJsonZip
 
                 artifactId = "${baseArtifactId}-vendordep"
                 groupId artifactGroupId
