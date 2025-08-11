@@ -2,21 +2,44 @@ syntax = "proto3";
 
 package proto.v1;
 
+// Represents a camera in the system
 message CameraProto {
   string name = 1;
   string stream_path = 2;
-  string physical_connection = 3;
+  string kind = 3;
   int32 index = 4;
   int32 pipeline_index = 5;
   int32 default_pipeline = 6;
+  int32 max_fps = 7;
 }
 
-message LatencyStatusProto {
-  int64 latency_capture = 1;
-  int64 latency_process = 2;
+// Performance metrics for a camera
+message CameraPerformanceProto {
+  float latency_capture = 1;
+  float latency_process = 2;
+  int64 fps = 3;
+  int32 camera_index = 4;
 }
 
 message SetDefaultPipelineMessageProto {
   int32 camera_index = 1;
   int32 pipeline_index = 2;
+}
+
+message RenameCameraMessageProto {
+  int32 camera_index = 1;
+  string new_name = 2;
+}
+
+message CalibrationDataProto {
+  int32 camera_index = 1;
+  float mean_error = 2;
+  string resolution = 3;
+  repeated float camera_matrix = 4;
+  repeated float dist_coeffs = 5;
+}
+
+message RemoveCalibrationDataMessageProto {
+  int32 camera_index = 1;
+  string resolution = 2;
 }

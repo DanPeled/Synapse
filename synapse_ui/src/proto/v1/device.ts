@@ -11,6 +11,8 @@ export const protobufPackage = "proto.v1";
 
 /** Information about a device's network and system identification */
 export interface DeviceInfoProto {
+  /** The version of the Synapse runtime */
+  version: string;
   /** The device's hostname */
   hostname: string;
   /** The IP address of the device */
@@ -54,7 +56,13 @@ export interface SetNetworkSettingsProto {
 }
 
 function createBaseDeviceInfoProto(): DeviceInfoProto {
-  return { hostname: "", ip: "", platform: "", networkInterfaces: [] };
+  return {
+    version: "",
+    hostname: "",
+    ip: "",
+    platform: "",
+    networkInterfaces: [],
+  };
 }
 
 export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
@@ -62,17 +70,20 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
     message: DeviceInfoProto,
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
+    if (message.version !== "") {
+      writer.uint32(10).string(message.version);
+    }
     if (message.hostname !== "") {
-      writer.uint32(10).string(message.hostname);
+      writer.uint32(18).string(message.hostname);
     }
     if (message.ip !== "") {
-      writer.uint32(18).string(message.ip);
+      writer.uint32(26).string(message.ip);
     }
     if (message.platform !== "") {
-      writer.uint32(26).string(message.platform);
+      writer.uint32(34).string(message.platform);
     }
     for (const v of message.networkInterfaces) {
-      writer.uint32(34).string(v!);
+      writer.uint32(42).string(v!);
     }
     return writer;
   },
@@ -90,7 +101,7 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
             break;
           }
 
-          message.hostname = reader.string();
+          message.version = reader.string();
           continue;
         }
         case 2: {
@@ -98,7 +109,7 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
             break;
           }
 
-          message.ip = reader.string();
+          message.hostname = reader.string();
           continue;
         }
         case 3: {
@@ -106,11 +117,19 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
             break;
           }
 
-          message.platform = reader.string();
+          message.ip = reader.string();
           continue;
         }
         case 4: {
           if (tag !== 34) {
+            break;
+          }
+
+          message.platform = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
@@ -128,6 +147,7 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
 
   fromJSON(object: any): DeviceInfoProto {
     return {
+      version: isSet(object.version) ? globalThis.String(object.version) : "",
       hostname: isSet(object.hostname)
         ? globalThis.String(object.hostname)
         : "",
@@ -143,6 +163,9 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
 
   toJSON(message: DeviceInfoProto): unknown {
     const obj: any = {};
+    if (message.version !== "") {
+      obj.version = message.version;
+    }
     if (message.hostname !== "") {
       obj.hostname = message.hostname;
     }
@@ -167,6 +190,7 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
     object: I,
   ): DeviceInfoProto {
     const message = createBaseDeviceInfoProto();
+    message.version = object.version ?? "";
     message.hostname = object.hostname ?? "";
     message.ip = object.ip ?? "";
     message.platform = object.platform ?? "";

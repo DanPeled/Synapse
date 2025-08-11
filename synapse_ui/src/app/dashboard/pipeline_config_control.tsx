@@ -57,7 +57,7 @@ export function PipelineConfigControl({
           setValue={(val) => {
             if (hasSettingValue(val)) {
               setTimeout(() => {
-                if (selectedPipeline) {
+                if (selectedPipeline !== undefined) {
                   const oldPipelines = pipelines;
 
                   const newSettingsValues = {
@@ -122,7 +122,7 @@ export function PipelineConfigControl({
           style={{ color: teamColor }}
         >
           <TabsList
-            className="grid w-full grid-cols-3 border-gray-600 rounded-xl gap-2"
+            className="grid w-full grid-cols-2 border-gray-600 rounded-xl gap-2"
             style={{ backgroundColor: baseCardColor }}
           >
             <TabsTrigger
@@ -137,12 +137,12 @@ export function PipelineConfigControl({
             >
               {selectedPipelineType?.type ?? "Pipeline"}
             </TabsTrigger>
-            <TabsTrigger
-              value="output"
-              className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
-            >
-              Output
-            </TabsTrigger>
+            {/* <TabsTrigger */}
+            {/*   value="output" */}
+            {/*   className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer" */}
+            {/* > */}
+            {/*   Output */}
+            {/* </TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="input" className="p-6 space-y-6">
@@ -177,15 +177,15 @@ export function PipelineConfigControl({
             </div>
           </TabsContent>
 
-          <TabsContent value="output" className="p-6">
-            <div className="text-center" style={{ color: teamColor }}>
-              <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" />
-              <p className="select-none">Output Configuration</p>
-              <p className="text-sm select-none">
-                Configure output streams and data
-              </p>
-            </div>
-          </TabsContent>
+          {/* <TabsContent value="output" className="p-6"> */}
+          {/*   <div className="text-center" style={{ color: teamColor }}> */}
+          {/*     <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" /> */}
+          {/*     <p className="select-none">Output Configuration</p> */}
+          {/*     <p className="text-sm select-none"> */}
+          {/*       Configure output streams and data */}
+          {/*     </p> */}
+          {/*   </div> */}
+          {/* </TabsContent> */}
         </Tabs>
       </CardHeader>
     </Card>

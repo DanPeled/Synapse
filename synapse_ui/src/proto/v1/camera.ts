@@ -9,18 +9,23 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.v1";
 
+/** Represents a camera in the system */
 export interface CameraProto {
   name: string;
   streamPath: string;
-  physicalConnection: string;
+  kind: string;
   index: number;
   pipelineIndex: number;
   defaultPipeline: number;
+  maxFps: number;
 }
 
-export interface LatencyStatusProto {
+/** Performance metrics for a camera */
+export interface CameraPerformanceProto {
   latencyCapture: number;
   latencyProcess: number;
+  fps: number;
+  cameraIndex: number;
 }
 
 export interface SetDefaultPipelineMessageProto {
@@ -28,14 +33,33 @@ export interface SetDefaultPipelineMessageProto {
   pipelineIndex: number;
 }
 
+export interface RenameCameraMessageProto {
+  cameraIndex: number;
+  newName: string;
+}
+
+export interface CalibrationDataProto {
+  cameraIndex: number;
+  meanError: number;
+  resolution: string;
+  cameraMatrix: number[];
+  distCoeffs: number[];
+}
+
+export interface RemoveCalibrationDataMessageProto {
+  cameraIndex: number;
+  resolution: string;
+}
+
 function createBaseCameraProto(): CameraProto {
   return {
     name: "",
     streamPath: "",
-    physicalConnection: "",
+    kind: "",
     index: 0,
     pipelineIndex: 0,
     defaultPipeline: 0,
+    maxFps: 0,
   };
 }
 
@@ -50,8 +74,8 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.streamPath !== "") {
       writer.uint32(18).string(message.streamPath);
     }
-    if (message.physicalConnection !== "") {
-      writer.uint32(26).string(message.physicalConnection);
+    if (message.kind !== "") {
+      writer.uint32(26).string(message.kind);
     }
     if (message.index !== 0) {
       writer.uint32(32).int32(message.index);
@@ -61,6 +85,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.defaultPipeline !== 0) {
       writer.uint32(48).int32(message.defaultPipeline);
+    }
+    if (message.maxFps !== 0) {
+      writer.uint32(56).int32(message.maxFps);
     }
     return writer;
   },
@@ -94,7 +121,7 @@ export const CameraProto: MessageFns<CameraProto> = {
             break;
           }
 
-          message.physicalConnection = reader.string();
+          message.kind = reader.string();
           continue;
         }
         case 4: {
@@ -121,6 +148,14 @@ export const CameraProto: MessageFns<CameraProto> = {
           message.defaultPipeline = reader.int32();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.maxFps = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -136,9 +171,7 @@ export const CameraProto: MessageFns<CameraProto> = {
       streamPath: isSet(object.streamPath)
         ? globalThis.String(object.streamPath)
         : "",
-      physicalConnection: isSet(object.physicalConnection)
-        ? globalThis.String(object.physicalConnection)
-        : "",
+      kind: isSet(object.kind) ? globalThis.String(object.kind) : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
       pipelineIndex: isSet(object.pipelineIndex)
         ? globalThis.Number(object.pipelineIndex)
@@ -146,6 +179,7 @@ export const CameraProto: MessageFns<CameraProto> = {
       defaultPipeline: isSet(object.defaultPipeline)
         ? globalThis.Number(object.defaultPipeline)
         : 0,
+      maxFps: isSet(object.maxFps) ? globalThis.Number(object.maxFps) : 0,
     };
   },
 
@@ -157,8 +191,8 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.streamPath !== "") {
       obj.streamPath = message.streamPath;
     }
-    if (message.physicalConnection !== "") {
-      obj.physicalConnection = message.physicalConnection;
+    if (message.kind !== "") {
+      obj.kind = message.kind;
     }
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
@@ -168,6 +202,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.defaultPipeline !== 0) {
       obj.defaultPipeline = Math.round(message.defaultPipeline);
+    }
+    if (message.maxFps !== 0) {
+      obj.maxFps = Math.round(message.maxFps);
     }
     return obj;
   },
@@ -181,28 +218,35 @@ export const CameraProto: MessageFns<CameraProto> = {
     const message = createBaseCameraProto();
     message.name = object.name ?? "";
     message.streamPath = object.streamPath ?? "";
-    message.physicalConnection = object.physicalConnection ?? "";
+    message.kind = object.kind ?? "";
     message.index = object.index ?? 0;
     message.pipelineIndex = object.pipelineIndex ?? 0;
     message.defaultPipeline = object.defaultPipeline ?? 0;
+    message.maxFps = object.maxFps ?? 0;
     return message;
   },
 };
 
-function createBaseLatencyStatusProto(): LatencyStatusProto {
-  return { latencyCapture: 0, latencyProcess: 0 };
+function createBaseCameraPerformanceProto(): CameraPerformanceProto {
+  return { latencyCapture: 0, latencyProcess: 0, fps: 0, cameraIndex: 0 };
 }
 
-export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
+export const CameraPerformanceProto: MessageFns<CameraPerformanceProto> = {
   encode(
-    message: LatencyStatusProto,
+    message: CameraPerformanceProto,
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
     if (message.latencyCapture !== 0) {
-      writer.uint32(8).int64(message.latencyCapture);
+      writer.uint32(13).float(message.latencyCapture);
     }
     if (message.latencyProcess !== 0) {
-      writer.uint32(16).int64(message.latencyProcess);
+      writer.uint32(21).float(message.latencyProcess);
+    }
+    if (message.fps !== 0) {
+      writer.uint32(24).int64(message.fps);
+    }
+    if (message.cameraIndex !== 0) {
+      writer.uint32(32).int32(message.cameraIndex);
     }
     return writer;
   },
@@ -210,28 +254,44 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
   decode(
     input: BinaryReader | Uint8Array,
     length?: number,
-  ): LatencyStatusProto {
+  ): CameraPerformanceProto {
     const reader =
       input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLatencyStatusProto();
+    const message = createBaseCameraPerformanceProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 8) {
+          if (tag !== 13) {
             break;
           }
 
-          message.latencyCapture = longToNumber(reader.int64());
+          message.latencyCapture = reader.float();
           continue;
         }
         case 2: {
-          if (tag !== 16) {
+          if (tag !== 21) {
             break;
           }
 
-          message.latencyProcess = longToNumber(reader.int64());
+          message.latencyProcess = reader.float();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.fps = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.cameraIndex = reader.int32();
           continue;
         }
       }
@@ -243,7 +303,7 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
     return message;
   },
 
-  fromJSON(object: any): LatencyStatusProto {
+  fromJSON(object: any): CameraPerformanceProto {
     return {
       latencyCapture: isSet(object.latencyCapture)
         ? globalThis.Number(object.latencyCapture)
@@ -251,31 +311,43 @@ export const LatencyStatusProto: MessageFns<LatencyStatusProto> = {
       latencyProcess: isSet(object.latencyProcess)
         ? globalThis.Number(object.latencyProcess)
         : 0,
+      fps: isSet(object.fps) ? globalThis.Number(object.fps) : 0,
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
     };
   },
 
-  toJSON(message: LatencyStatusProto): unknown {
+  toJSON(message: CameraPerformanceProto): unknown {
     const obj: any = {};
     if (message.latencyCapture !== 0) {
-      obj.latencyCapture = Math.round(message.latencyCapture);
+      obj.latencyCapture = message.latencyCapture;
     }
     if (message.latencyProcess !== 0) {
-      obj.latencyProcess = Math.round(message.latencyProcess);
+      obj.latencyProcess = message.latencyProcess;
+    }
+    if (message.fps !== 0) {
+      obj.fps = Math.round(message.fps);
+    }
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(
+  create<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(
     base?: I,
-  ): LatencyStatusProto {
-    return LatencyStatusProto.fromPartial(base ?? ({} as any));
+  ): CameraPerformanceProto {
+    return CameraPerformanceProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<LatencyStatusProto>, I>>(
+  fromPartial<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(
     object: I,
-  ): LatencyStatusProto {
-    const message = createBaseLatencyStatusProto();
+  ): CameraPerformanceProto {
+    const message = createBaseCameraPerformanceProto();
     message.latencyCapture = object.latencyCapture ?? 0;
     message.latencyProcess = object.latencyProcess ?? 0;
+    message.fps = object.fps ?? 0;
+    message.cameraIndex = object.cameraIndex ?? 0;
     return message;
   },
 };
@@ -368,6 +440,362 @@ export const SetDefaultPipelineMessageProto: MessageFns<SetDefaultPipelineMessag
       const message = createBaseSetDefaultPipelineMessageProto();
       message.cameraIndex = object.cameraIndex ?? 0;
       message.pipelineIndex = object.pipelineIndex ?? 0;
+      return message;
+    },
+  };
+
+function createBaseRenameCameraMessageProto(): RenameCameraMessageProto {
+  return { cameraIndex: 0, newName: "" };
+}
+
+export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
+  encode(
+    message: RenameCameraMessageProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.cameraIndex !== 0) {
+      writer.uint32(8).int32(message.cameraIndex);
+    }
+    if (message.newName !== "") {
+      writer.uint32(18).string(message.newName);
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): RenameCameraMessageProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenameCameraMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.cameraIndex = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.newName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenameCameraMessageProto {
+    return {
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
+      newName: isSet(object.newName) ? globalThis.String(object.newName) : "",
+    };
+  },
+
+  toJSON(message: RenameCameraMessageProto): unknown {
+    const obj: any = {};
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
+    }
+    if (message.newName !== "") {
+      obj.newName = message.newName;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(
+    base?: I,
+  ): RenameCameraMessageProto {
+    return RenameCameraMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(
+    object: I,
+  ): RenameCameraMessageProto {
+    const message = createBaseRenameCameraMessageProto();
+    message.cameraIndex = object.cameraIndex ?? 0;
+    message.newName = object.newName ?? "";
+    return message;
+  },
+};
+
+function createBaseCalibrationDataProto(): CalibrationDataProto {
+  return {
+    cameraIndex: 0,
+    meanError: 0,
+    resolution: "",
+    cameraMatrix: [],
+    distCoeffs: [],
+  };
+}
+
+export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
+  encode(
+    message: CalibrationDataProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.cameraIndex !== 0) {
+      writer.uint32(8).int32(message.cameraIndex);
+    }
+    if (message.meanError !== 0) {
+      writer.uint32(21).float(message.meanError);
+    }
+    if (message.resolution !== "") {
+      writer.uint32(26).string(message.resolution);
+    }
+    writer.uint32(34).fork();
+    for (const v of message.cameraMatrix) {
+      writer.float(v);
+    }
+    writer.join();
+    writer.uint32(42).fork();
+    for (const v of message.distCoeffs) {
+      writer.float(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CalibrationDataProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCalibrationDataProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.cameraIndex = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 21) {
+            break;
+          }
+
+          message.meanError = reader.float();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.resolution = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag === 37) {
+            message.cameraMatrix.push(reader.float());
+
+            continue;
+          }
+
+          if (tag === 34) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.cameraMatrix.push(reader.float());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 5: {
+          if (tag === 45) {
+            message.distCoeffs.push(reader.float());
+
+            continue;
+          }
+
+          if (tag === 42) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.distCoeffs.push(reader.float());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CalibrationDataProto {
+    return {
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
+      meanError: isSet(object.meanError)
+        ? globalThis.Number(object.meanError)
+        : 0,
+      resolution: isSet(object.resolution)
+        ? globalThis.String(object.resolution)
+        : "",
+      cameraMatrix: globalThis.Array.isArray(object?.cameraMatrix)
+        ? object.cameraMatrix.map((e: any) => globalThis.Number(e))
+        : [],
+      distCoeffs: globalThis.Array.isArray(object?.distCoeffs)
+        ? object.distCoeffs.map((e: any) => globalThis.Number(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CalibrationDataProto): unknown {
+    const obj: any = {};
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
+    }
+    if (message.meanError !== 0) {
+      obj.meanError = message.meanError;
+    }
+    if (message.resolution !== "") {
+      obj.resolution = message.resolution;
+    }
+    if (message.cameraMatrix?.length) {
+      obj.cameraMatrix = message.cameraMatrix;
+    }
+    if (message.distCoeffs?.length) {
+      obj.distCoeffs = message.distCoeffs;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(
+    base?: I,
+  ): CalibrationDataProto {
+    return CalibrationDataProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(
+    object: I,
+  ): CalibrationDataProto {
+    const message = createBaseCalibrationDataProto();
+    message.cameraIndex = object.cameraIndex ?? 0;
+    message.meanError = object.meanError ?? 0;
+    message.resolution = object.resolution ?? "";
+    message.cameraMatrix = object.cameraMatrix?.map((e) => e) || [];
+    message.distCoeffs = object.distCoeffs?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseRemoveCalibrationDataMessageProto(): RemoveCalibrationDataMessageProto {
+  return { cameraIndex: 0, resolution: "" };
+}
+
+export const RemoveCalibrationDataMessageProto: MessageFns<RemoveCalibrationDataMessageProto> =
+  {
+    encode(
+      message: RemoveCalibrationDataMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.cameraIndex !== 0) {
+        writer.uint32(8).int32(message.cameraIndex);
+      }
+      if (message.resolution !== "") {
+        writer.uint32(18).string(message.resolution);
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): RemoveCalibrationDataMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRemoveCalibrationDataMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.resolution = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): RemoveCalibrationDataMessageProto {
+      return {
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+        resolution: isSet(object.resolution)
+          ? globalThis.String(object.resolution)
+          : "",
+      };
+    },
+
+    toJSON(message: RemoveCalibrationDataMessageProto): unknown {
+      const obj: any = {};
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      if (message.resolution !== "") {
+        obj.resolution = message.resolution;
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<RemoveCalibrationDataMessageProto>, I>>(
+      base?: I,
+    ): RemoveCalibrationDataMessageProto {
+      return RemoveCalibrationDataMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<
+      I extends Exact<DeepPartial<RemoveCalibrationDataMessageProto>, I>,
+    >(object: I): RemoveCalibrationDataMessageProto {
+      const message = createBaseRemoveCalibrationDataMessageProto();
+      message.cameraIndex = object.cameraIndex ?? 0;
+      message.resolution = object.resolution ?? "";
       return message;
     },
   };

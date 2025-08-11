@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import faulthandler
 import importlib.util
 import os
 import threading
@@ -20,23 +21,24 @@ import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType)
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import HardwareMetricsProto, MessageTypeProto
+from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
+                                  MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.geometry import Transform3d
-from wpimath.units import seconds
+from wpimath.units import seconds, secondsToMilliseconds
 
 from ..bcolors import MarkupColors
 from ..callback import Callback
-from ..stypes import (CameraID, DataValue, Frame, PipelineID, PipelineName,
-                      PipelineTypeName)
+from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
+                      PipelineID, PipelineName, PipelineTypeName, Resolution)
 from ..util import resolveGenericArgument
-from .camera_factory import (CSCORE_TO_CV_PROPS, CameraConfig, CameraFactory,
-                             CameraSettingsKeys, SynapseCamera, getCameraTable,
-                             getCameraTableName)
+from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
+                             SynapseCamera, getCameraTable, getCameraTableName)
 from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
-from .pipeline import FrameResult, Pipeline, PipelineSettings
+from .pipeline import (FrameResult, Pipeline, PipelineSettings,
+                       getPipelineTypename)
 from .settings_api import SettingsMap
 
 
@@ -62,7 +64,7 @@ class PipelineLoader:
     kPipelineTypeKey: Final[str] = "type"
     kPipelineNameKey: Final[str] = "name"
     kPipelinesArrayKey: Final[str] = "pipelines"
-    kPipelineFilesQuery: Final[str] = "*_pipeline.py"
+    kPipelineFilesQuery: Final[str] = "**/*_pipeline.py"
     kInvalidPipelineIndex: Final[int] = -1
 
     def __init__(self, pipelineDirectory: Path):
@@ -111,7 +113,7 @@ class PipelineLoader:
             self.addPipeline(
                 pipelineIndex,
                 self.pipelineNames[pipelineIndex],
-                pipelineType.__name__,
+                getPipelineTypename(pipelineType),
                 settingsMap,
             )
 
@@ -212,8 +214,10 @@ class PipelineLoader:
                                 and cls is not Pipeline
                             ):
                                 if cls.__is_enabled__:
-                                    log.log(f"Loaded {cls.__name__} pipeline")
-                                    pipelineClasses[cls.__name__] = cls
+                                    log.log(
+                                        f"Loaded {getPipelineTypename(cls)} pipeline"
+                                    )
+                                    pipelineClasses[getPipelineTypename(cls)] = cls
                     except Exception as e:
                         log.err(
                             f"while loading {file_path}: {e}\n{traceback.format_exc()}"
@@ -359,13 +363,14 @@ class CameraHandler:
         stream sizes, recording outputs, and camera configuration bindings.
         """
         self.cameras: Dict[CameraID, SynapseCamera] = {}
-        self.usbCameraInfos: Dict[str, cs.UsbCameraInfo] = {}
+        self.usbCameraInfos: Dict[CameraUID, cs.UsbCameraInfo] = {}
         self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
-        self.streamSizes: Dict[CameraID, Tuple[int, int]] = {}
+        self.streamSizes: Dict[CameraID, Resolution] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
-        self.cameraBindings: Dict[CameraID, CameraConfig] = {}
-        self.onAddCamera: Callback[CameraID, str, SynapseCamera] = Callback()
-        self.cameraIds: List[str] = []
+        self.cameraConfigBindings: Dict[CameraID, CameraConfig] = {}
+        self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
+        self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
+        self.cameraUIDs: List[CameraUID] = []
 
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
@@ -392,7 +397,7 @@ class CameraHandler:
         Retrieves camera configuration from global settings and attempts to add
         each configured camera to the handler.
         """
-        self.cameraBindings = GlobalSettings.getCameraConfigMap()
+        self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
         self.usbCameraInfos = {
             f"{info.name}_{info.productId}": info
             for info in cs.UsbCamera.enumerateUsbCameras()
@@ -400,8 +405,8 @@ class CameraHandler:
 
         found: List[int] = []
 
-        for cameraIndex, cameraConfig in self.cameraBindings.items():
-            if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraIds:
+        for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
+            if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraUIDs:
                 info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
                     cameraConfig.id, None
                 )
@@ -410,7 +415,7 @@ class CameraHandler:
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:
-                        self.cameraIds.append(cameraConfig.id)
+                        self.cameraUIDs.append(cameraConfig.id)
                 else:
                     log.warn(
                         f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped"
@@ -418,6 +423,17 @@ class CameraHandler:
                     continue
 
         self.scanCameras()
+
+    def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
+        if cameraID in self.cameraConfigBindings:
+            self.cameraConfigBindings[cameraID].name = newName
+            self.cameras[cameraID].name = newName
+            log.log(f"Camera #{cameraID} renamed to {newName}")
+            self.onRenameCamera.call(cameraID, newName)
+        else:
+            log.err(
+                f"Attempted to rename camera with ID {cameraID} but that camera does not exist!"
+            )
 
     def scanCameras(self) -> None:
         self.usbCameraInfos = {
@@ -439,13 +455,11 @@ class CameraHandler:
                     id=f"{info.name}_{info.productId}",
                     transform=Transform3d(),
                     defaultPipeline=0,
-                    matrix=np.eye(3).tolist(),
-                    distCoeff=[0] * 5,
-                    measuredRes=(1920, 1080),
+                    calibration={},
                     streamRes=self.DEFAULT_STREAM_SIZE,
                 )
 
-                if cameraConfig.id not in self.cameraIds:
+                if cameraConfig.id not in self.cameraUIDs:
                     log.log(
                         f"Found non-registered camera: {info.name} (i={info.dev}), adding automatically"
                     )
@@ -453,7 +467,7 @@ class CameraHandler:
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:
-                        self.cameraIds.append(cameraConfig.id)
+                        self.cameraUIDs.append(cameraConfig.id)
 
     def getCamera(self, cameraIndex: CameraID) -> Optional[SynapseCamera]:
         """
@@ -592,7 +606,7 @@ class CameraHandler:
                 cameraType=CameraFactory.kCameraServer,
                 cameraIndex=cameraIndex,
                 path=dev,
-                name=f"{cameraConfig.name}(#{cameraIndex})",
+                name=f"{cameraConfig.name}",
             )
             camera.setIndex(cameraIndex)
         except Exception as e:
@@ -640,20 +654,12 @@ class CameraHandler:
         """
         updated_settings = {}
         for settingName in settings.keys():
-            if settingName in CSCORE_TO_CV_PROPS.keys():
-                setting_value = settings.get(settingName)
-                if setting_value is not None:
-                    camera.setProperty(
-                        prop=settingName,
-                        value=setting_value,
-                    )
-
-        if {"width", "height"}.issubset(settings):
-            camera.setVideoMode(
-                width=int(settings["width"]),
-                height=int(settings["height"]),
-                fps=1000,
-            )
+            setting_value = settings.get(settingName)
+            if setting_value is not None:
+                camera.setProperty(
+                    prop=settingName,
+                    value=setting_value,
+                )
 
         return updated_settings
 
@@ -692,12 +698,14 @@ class RuntimeManager:
         :param pipelineDirectory: Root directory to search for pipeline files
         """
 
+        faulthandler.enable()
         self.pipelineLoader: PipelineLoader = PipelineLoader(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
         self.isRunning: bool = True
         self.isSetup: bool = False
+        self.lastLatencyReportTime: float = time.time()
 
         self.metricsThread: Optional[threading.Thread]
 
@@ -713,6 +721,14 @@ class RuntimeManager:
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
         self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
         self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
+
+        def onAddCamera(cameraID: CameraID, name: str, camera: SynapseCamera):
+            thread = threading.Thread(target=self.processCamera, args=(cameraID,))
+            thread.daemon = True
+            thread.start()
+            self.cameraManagementThreads.append(thread)
+
+        self.cameraHandler.onAddCamera.add(onAddCamera)
 
     def setup(self, directory: Path):
         """
@@ -888,13 +904,9 @@ class RuntimeManager:
             self.pipelineBindings[cameraIndex]
         ).setSetting(prop, value)
 
-        if prop in CSCORE_TO_CV_PROPS.keys():
-            camera = self.cameraHandler.getCamera(cameraIndex)
-            if camera is not None:
-                camera.setProperty(
-                    prop=prop,
-                    value=int(value),
-                )
+        camera = self.cameraHandler.getCamera(cameraIndex)
+        if camera is not None:
+            camera.setProperty(prop=prop, value=value)
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 
@@ -1021,79 +1033,74 @@ class RuntimeManager:
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
 
+    def processCamera(self, cameraIndex: CameraID):
+        camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
+
+        log.log(f"Started Camera #{cameraIndex} loop")
+
+        while self.isRunning:
+            maxFps = camera.getMaxFPS()
+            frame_time = 1.0 / float(maxFps)
+            loop_start = Timer.getFPGATimestamp()
+
+            ret, frame = camera.grabFrame()
+            captureLatency = Timer.getFPGATimestamp() - loop_start
+            if not ret or frame is None:
+                continue
+
+            frame = self.fixtureFrame(cameraIndex, frame)
+
+            process_start = Timer.getFPGATimestamp()
+
+            pipeline = self.pipelineLoader.getPipeline(
+                self.pipelineBindings.get(cameraIndex, -1)
+            )
+
+            processed_frame: Frame = frame
+
+            if pipeline is not None:
+                result = None
+                try:
+                    result = pipeline.processFrame(frame, loop_start)
+                except Exception as e:
+                    log.err(
+                        f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for camera #{cameraIndex}: {e}\n{traceback.format_exc()}"
+                    )
+                frame = self.handleResults(result, cameraIndex)
+                if frame is not None:
+                    processed_frame = frame
+
+            processLatency = Timer.getFPGATimestamp() - process_start
+
+            # Sleep to enforce max FPS
+            elapsed = Timer.getFPGATimestamp() - loop_start
+            remaining = frame_time - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
+            loop_end = Timer.getFPGATimestamp()
+            total_loop_time = loop_end - loop_start
+
+            fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
+            self.sendLatency(cameraIndex, captureLatency, processLatency, fps)
+
+            # Overlay FPS on the frame
+            cv2.putText(
+                processed_frame,
+                f"{int(fps)}",
+                FPSView.position,
+                FPSView.font,
+                FPSView.fontScale,
+                FPSView.color,
+                FPSView.thickness,
+                lineType=cv2.LINE_8,
+            )
+
+            self.cameraHandler.publishFrame(processed_frame, camera)
+
     def run(self):
         """
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
-
-        def processCamera(cameraIndex: CameraID):
-            camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
-
-            log.log(f"Started Camera #{cameraIndex} loop")
-
-            while self.isRunning:
-                maxFps = camera.getMaxFPS()
-                frame_time = 1.0 / float(maxFps)
-                loop_start = Timer.getFPGATimestamp()
-
-                ret, frame = camera.grabFrame()
-                captureLatency = Timer.getFPGATimestamp() - loop_start
-                if not ret or frame is None:
-                    continue
-
-                frame = self.fixtureFrame(cameraIndex, frame)
-
-                process_start = Timer.getFPGATimestamp()
-
-                pipeline = self.pipelineLoader.getPipeline(
-                    self.pipelineBindings.get(cameraIndex, -1)
-                )
-
-                processed_frame: Frame = frame
-
-                if pipeline is not None:
-                    result = pipeline.processFrame(frame, loop_start)
-                    frame = self.handleResults(result, cameraIndex)
-                    if frame is not None:
-                        processed_frame = frame
-
-                processLatency = Timer.getFPGATimestamp() - process_start
-                total_time = Timer.getFPGATimestamp() - loop_start
-                fps = 1.0 / total_time if total_time > 0 else 0
-                self.sendLatency(cameraIndex, captureLatency, processLatency)
-
-                # Sleep to enforce max FPS
-                elapsed = Timer.getFPGATimestamp() - loop_start
-                remaining = frame_time - elapsed
-                if remaining > 0:
-                    time.sleep(remaining)
-                loop_end = Timer.getFPGATimestamp()
-                total_loop_time = loop_end - loop_start
-
-                fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
-
-                # Overlay FPS on the frame
-                cv2.putText(
-                    processed_frame,
-                    f"{int(fps)}",
-                    FPSView.position,
-                    FPSView.font,
-                    FPSView.fontScale,
-                    FPSView.color,
-                    FPSView.thickness,
-                    lineType=cv2.LINE_8,
-                )
-
-                self.cameraHandler.publishFrame(processed_frame, camera)
-
-        def initThreads():
-            for cameraIndex in self.cameraHandler.cameras.keys():
-                thread = threading.Thread(target=processCamera, args=(cameraIndex,))
-                thread.daemon = True
-                thread.start()
-                self.cameraManagementThreads.append(thread)
-
-        initThreads()
 
         log.log(
             MarkupColors.header(
@@ -1143,11 +1150,34 @@ class RuntimeManager:
                     return var
 
     def sendLatency(
-        self, cameraIndex: CameraID, captureLatency: seconds, processingLatency: seconds
+        self,
+        cameraIndex: CameraID,
+        captureLatency: seconds,
+        processingLatency: seconds,
+        fps: float,
     ) -> None:
+        current_time = time.time()
+        if current_time - self.lastLatencyReportTime < 1.0:
+            return  # Skip sending
+
+        self.lastLatencyReportTime = current_time
+
         cameraTable = getCameraTable(cameraIndex)
         cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
         cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
+
+        if WebSocketServer.kInstance is not None:
+            WebSocketServer.kInstance.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.REPORT_CAMERA_PERFORMANCE,
+                    CameraPerformanceProto(
+                        latency_capture=secondsToMilliseconds(captureLatency),
+                        latency_process=secondsToMilliseconds(processingLatency),
+                        fps=int(fps),
+                        camera_index=cameraIndex,
+                    ),
+                )
+            )
 
     def setupNetworkTables(self) -> None:
         for cameraIndex, camera in self.cameraHandler.cameras.items():
@@ -1205,10 +1235,14 @@ class RuntimeManager:
         return np.clip(image * 255, 0, 255).astype(np.uint8)
 
     def fixtureFrame(self, cameraIndex: CameraID, frame: Frame) -> Frame:
-        if cameraIndex in self.pipelineBindings:
-            settings = self.pipelineLoader.pipelineSettings[
+        if (
+            cameraIndex in self.pipelineBindings
+            and self.pipelineBindings[cameraIndex]
+            in self.pipelineLoader.pipelineInstanceBindings
+        ):
+            settings = self.pipelineLoader.pipelineInstanceBindings[
                 self.pipelineBindings[cameraIndex]
-            ]
+            ].settings
             frame = self.rotateCameraBySettings(settings, frame)
             # frame = self.fixBlackLevelOffset(settings, frame)
 
@@ -1220,13 +1254,17 @@ class RuntimeManager:
             "global": {
                 "camera_configs": {
                     index: config.toDict()
-                    for index, config in GlobalSettings.getCameraConfigMap().items()
+                    for index, config in self.cameraHandler.cameraConfigBindings.items()
                 }
             },
             "pipelines": {
                 key: pipeline.toDict(self.pipelineLoader.pipelineTypeNames[key])
                 for key, pipeline in (
                     self.pipelineLoader.pipelineInstanceBindings.items()
+                )
+                if not (
+                    getPipelineTypename(type(pipeline)).startswith("$$")
+                    and getPipelineTypename(type(pipeline)).endswith("$$")
                 )
             },
         }
@@ -1239,9 +1277,15 @@ class RuntimeManager:
             indent=2,  # control indentation
             width=80,  # wrap width for long lists
         )
-
-        with open(Path(os.getcwd()) / "config" / "settings.yml", "w") as f:
+        savefile = Path(os.getcwd()) / "config" / "settings.yml"
+        with open(savefile, "w") as f:
             f.write(y)
+
+        log.log(
+            MarkupColors.bold(
+                MarkupColors.okblue(f"Saved into {savefile.absolute().__str__()}")
+            )
+        )
 
     def cleanup(self) -> None:
         """

@@ -37,8 +37,8 @@ import { AddPipelineDialog } from "./addPipelineDialog";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
 import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
-import { Placeholder } from "@/widgets/placeholder";
 import TextInput from "@/widgets/textInput";
+import { CameraID } from "@/services/backend/dataStractures";
 
 interface CameraAndPipelineControlsProps {
   setSelectedPipeline: (val?: PipelineProto) => void;
@@ -47,7 +47,7 @@ interface CameraAndPipelineControlsProps {
   setSelectedPipelineType: (val?: PipelineTypeProto) => void;
   selectedCamera: CameraProto | undefined;
   setSelectedCamera: (cam?: CameraProto) => void;
-  cameras: CameraProto[];
+  cameras: Map<CameraID, CameraProto>;
   socket?: WebSocketWrapper;
   pipelines: Map<number, PipelineProto>;
   setpipelines: (pipeline: Map<number, PipelineProto>) => void;
@@ -104,7 +104,7 @@ export function CameraAndPipelineControls({
                 setSelectedCamera(val);
               }}
               label="Camera"
-              options={cameras.map((cam) => ({
+              options={Array.from(cameras?.values() ?? []).map((cam) => ({
                 label: <span>{cam.name}</span>,
                 value: cam,
                 key: cam.name,
@@ -344,11 +344,17 @@ export function CameraAndPipelineControls({
               setRequestedPipelineType(val);
               setChangePipelineTypeDialogVisible(true);
             }}
-            options={Array.from(pipelinetypes.entries()).map(([_, type]) => ({
-              label: type.type,
-              value: type,
-              key: type.type,
-            }))}
+            options={Array.from(pipelinetypes.values())
+              .filter((type: PipelineTypeProto) => {
+                return !(
+                  type.type.startsWith("$$") && type.type.endsWith("$$")
+                );
+              })
+              .map((type) => ({
+                label: type.type,
+                value: type,
+                key: type.type,
+              }))}
           />
           <div className="h-6" />
           <div className="flex justify-center items-center">

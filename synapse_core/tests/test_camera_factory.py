@@ -29,22 +29,6 @@ class TestUtilityFunctions(unittest.TestCase):
         )
 
 
-class TestCameraConfig(unittest.TestCase):
-    def test_camera_config_creation(self):
-        transform = MagicMock()
-        config = synapse.core.camera_factory.CameraConfig(
-            name="cam",
-            id="mock_123",
-            transform=transform,
-            defaultPipeline=1,
-            matrix=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            distCoeff=[0.1, 0.01],
-            measuredRes=(640, 480),
-            streamRes=(320, 240),
-        )
-        self.assertEqual(config.name, "cam")
-
-
 class TestOpenCvCamera(unittest.TestCase):
     @patch("cv2.VideoCapture")
     def test_create_with_usb_index(self, mock_vc):

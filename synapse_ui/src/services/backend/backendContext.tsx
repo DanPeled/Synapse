@@ -21,6 +21,7 @@ import {
 import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
+import assert from "assert";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -41,11 +42,13 @@ const initialState: BackendStateSystem.State = {
   pipelines: new Map(),
   pipelinetypes: new Map(),
   deviceinfo: {
+    version: "Unknown",
     hostname: "Unknown",
     ip: "127.0.0.1",
     platform: "Unknown",
-    networkInterfaces: ["eth0"],
+    networkInterfaces: [],
   },
+  stateRef: undefined,
   hardwaremetrics: {
     cpuTemp: 0,
     cpuUsage: 0,
@@ -61,7 +64,10 @@ const initialState: BackendStateSystem.State = {
   },
   networktable: "Synapse",
   logs: [],
-  cameras: [],
+  cameras: new Map(),
+  cameraperformance: new Map(),
+  calibrationdata: new Map(),
+  calibrating: false,
   teamnumber: 0,
 };
 
@@ -185,24 +191,20 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_CAMERA: {
             const camera: CameraProto = messageObj.cameraInfo!;
-            let newCamerasList = [...stateRef.current.cameras, camera];
-            newCamerasList = newCamerasList.sort(
-              (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
-            );
+            const newCamerasList = new Map(stateRef.current.cameras);
+            newCamerasList.set(camera.index, camera);
             setters.setCameras(newCamerasList);
+            stateRef.current.cameras = newCamerasList;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
             const msg = messageObj.setPipelineIndex!;
-            const camera = stateRef.current.cameras.at(msg.cameraIndex);
+            const camera = stateRef.current.cameras.get(msg.cameraIndex);
 
             if (camera) {
               camera.pipelineIndex = msg.pipelineIndex;
-              let newCamerasList = [...stateRef.current.cameras];
-              newCamerasList[camera.index] = camera;
-              newCamerasList = newCamerasList.sort(
-                (a, b) => (a?.index ?? 0) - (b?.index ?? 0),
-              );
+              const newCamerasList = new Map(stateRef.current.cameras);
+              newCamerasList.set(camera.index, camera);
               setters.setCameras(newCamerasList);
             }
             break;
@@ -219,6 +221,8 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               pipeline.name = setPipelineNameMSG.name;
               const newPipelines = new Map(stateRef.current.pipelines);
               newPipelines.set(setPipelineNameMSG.pipelineIndex, pipeline);
+
+              stateRef.current.pipelines = newPipelines;
               setters.setPipelines(newPipelines);
             }
             break;
@@ -240,8 +244,59 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             }
             break;
           }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE: {
+            const report = messageObj.cameraPerformance!;
+            const reports = new Map(stateRef.current.cameraperformance);
+            reports.set(report.cameraIndex, report);
+
+            setters.setCameraperformance(reports);
+            stateRef.current.cameraperformance = reports;
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATING: {
+            setters.setCalibrating(true);
+            stateRef.current.calibrating = true;
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA: {
+            const calibData = messageObj.calibrationData!;
+            const calibrationMap = new Map(stateRef.current.calibrationdata);
+
+            if (calibrationMap.has(calibData.cameraIndex)) {
+              // Append to the existing array
+              calibrationMap
+                .get(calibData.cameraIndex)!
+                .set(calibData.resolution, calibData);
+            } else {
+              // Create a new array with this entry
+              calibrationMap.set(
+                calibData.cameraIndex,
+                new Map([[calibData.resolution, calibData]]),
+              );
+            }
+
+            setters.setCalibrationdata(calibrationMap);
+            stateRef.current.calibrationdata = calibrationMap;
+
+            setters.setCalibrating(false);
+            stateRef.current.calibrating = false;
+
+            break;
+          }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {
-            // TODO: handle change from external source (NT)
+            assert(messageObj.setPipelineSetting !== undefined);
+            const setSettingMsg = messageObj.setPipelineSetting!;
+            const newPipelines = new Map(stateRef.current.pipelines);
+
+            const pipeline = newPipelines.get(setSettingMsg.pipelineIndex);
+
+            if (pipeline && setSettingMsg.value) {
+              pipeline.settingsValues[setSettingMsg.setting] =
+                setSettingMsg.value;
+              newPipelines.set(pipeline?.index, pipeline);
+              stateRef.current.pipelines = newPipelines;
+            }
+
             break;
           }
           default:
@@ -261,7 +316,12 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
   return (
     <BackendContextContext.Provider
-      value={{ ...state, ...setters, socket: socket.current }}
+      value={{
+        ...state,
+        ...setters,
+        socket: socket.current,
+        stateRef: stateRef,
+      }}
     >
       {children}
     </BackendContextContext.Provider>
