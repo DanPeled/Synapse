@@ -24,6 +24,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -41,6 +49,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.gradle/caches
+          key: ubuntu-latest-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile') }}
+          restore-keys: |
+            ubuntu-latest-gradle-
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
