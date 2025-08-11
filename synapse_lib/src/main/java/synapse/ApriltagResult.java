@@ -6,13 +6,6 @@ import java.util.Optional;
 /** Represents the result of an AprilTag detection, including pose estimation and metadata. */
 @RegisterSynapseResult(type = "apriltag")
 public class ApriltagResult {
-  /**
-   * Default constructor for the {@link ApriltagResult} class.
-   *
-   * <p>This constructor should not be used directly.
-   */
-  public ApriltagResult() {}
-
   /** Timestamp of the detection. */
   @JsonProperty("timestamp")
   private double timestamp;
@@ -116,14 +109,62 @@ public class ApriltagResult {
     return m_tagPoseEstimate;
   }
 
+  /**
+   * Constructs an ApriltagResult instance.
+   *
+   * @param timestamp Timestamp of the detection.
+   * @param tagID Optional tag ID.
+   * @param hamming Optional hamming distance.
+   * @param center Optional center coordinates.
+   * @param robotPose_fieldSpace Estimated robot pose in field space.
+   * @param m_tagPoseEstimate Estimated camera pose in tag space.
+   * @param robotPose_tagSpace Estimated robot pose in tag space.
+   */
+  public ApriltagResult(
+      double timestamp,
+      Optional<Integer> tagID,
+      Optional<Double> hamming,
+      Optional<double[]> center,
+      double[] robotPose_fieldSpace,
+      ApriltagPoseEstimate m_tagPoseEstimate,
+      double[] robotPose_tagSpace) {
+    this.timestamp = timestamp;
+    this.tagID = tagID;
+    this.hamming = hamming;
+    this.center = center;
+    this.robotPose_fieldSpace = robotPose_fieldSpace;
+    this.m_tagPoseEstimate = m_tagPoseEstimate;
+    this.robotPose_tagSpace = robotPose_tagSpace;
+  }
+
+  /**
+   * Specifies the verbosity level for AprilTag processing output. Controls the amount of
+   * information logged or displayed during detection.
+   */
   public static enum ApriltagVerbosity {
+
+    /** Only pose information will be output. This is the minimal verbosity setting. */
     kPoseOnly(0),
+
+    /** Includes detailed information about the detected tags. */
     kTagDetails(1),
+
+    /** Includes detailed tag detection data, such as corner detections. */
     kTagDetectionData(2),
+
+    /**
+     * Outputs all available debug and detection information. This is the maximum verbosity level.
+     */
     kAll(3);
 
+    /** The integer level representing verbosity */
     public final int level;
 
+    /**
+     * Constructs a verbosity level with the given integer representation.
+     *
+     * @param level the verbosity level as an integer
+     */
     ApriltagVerbosity(int level) {
       this.level = level;
     }
