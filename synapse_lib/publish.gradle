@@ -151,7 +151,7 @@ task vendordepJson() {
 
 task vendordepJsonZip(type: Zip) {
     destinationDirectory = outputsFolder
-    archiveBaseName = "SynapseBridge"
+    archiveBaseName = templateVendorFile
 
     from("$buildDir/repos/$templateVendorFile") {
         into '/'
