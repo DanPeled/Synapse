@@ -79,7 +79,11 @@ export default function Dashboard() {
   const [selectedPipelineType, setSelectedPipelineType] = useState(
     Array.from(pipelinetypes.values()).at(0)!,
   );
-  const [selectedCamera, setSelectedCamera] = useState(cameras.get(0));
+
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
+  const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
+    undefined,
+  );
   const [locked, setLocked] = useState(false);
   const [selectedCameraPerformance, setSelectedCameraPerformance] = useState<
     CameraPerformanceProto | undefined
@@ -110,14 +114,12 @@ export default function Dashboard() {
   }, [pipelines, pipelinetypes, selectedCamera]);
 
   useEffect(() => {
-    if (selectedCamera) {
-      setSelectedCameraPerformance(cameraPerformance.get(selectedCamera.index));
-    }
+    setSelectedCameraPerformance(cameraPerformance.get(selectedCameraIndex));
   }, [cameraPerformance]);
 
   useEffect(() => {
     if (Array.from(cameras.keys()).length > 0) {
-      setSelectedCamera(CameraProto.create(cameras.get(0)));
+      setSelectedCamera(CameraProto.create(cameras.get(selectedCameraIndex)));
     }
   }, [cameras]);
 
@@ -142,7 +144,7 @@ export default function Dashboard() {
           <Row gap="gap-2" className="h-full">
             <Column className="flex-[2] space-y-2 h-full">
               <CameraView
-                selectedCamera={selectedCamera}
+                selectedCamera={cameras.get(selectedCameraIndex)}
                 cameraPerformance={selectedCameraPerformance}
               />
               <PipelineConfigControl
@@ -230,8 +232,10 @@ export default function Dashboard() {
                 }}
                 selectedPipelineType={selectedPipelineType}
                 cameras={cameras}
-                setSelectedCamera={setSelectedCamera}
-                selectedCamera={selectedCamera}
+                setSelectedCamera={(cam) => {
+                  setSelectedCameraIndex(cam?.index ?? 0);
+                }}
+                selectedCamera={cameras.get(selectedCameraIndex)}
               />
               <SaveActionsDialog
                 locked={locked}
