@@ -404,6 +404,13 @@ where to find the applicable terms.
 form of a separately written license, or stated as exceptions;
 the above requirements apply either way.
 
+If you modify this Program, or any covered work, by linking or
+combining it with NVIDIA Corporation's libraries from the NVIDIA CUDA
+Toolkit and the NVIDIA CUDA Deep Neural Network library (or a
+modified version of those libraries), containing parts covered by the
+terms of the respective license agreement, the licensors of this
+Program grant you additional permission to convey the resulting work.
+
   8. Termination.
 
   You may not propagate or modify a covered work except as expressly
