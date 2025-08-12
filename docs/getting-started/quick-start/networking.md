@@ -26,14 +26,10 @@ We _STRONGLY_ recommends the usage of a network switch on your robot. This is be
 {% endtab %}
 {% endtabs %}
 
-## Network Hostame
-
-Coming soon...
-
-## Robot Networking
-
-coming soon...
+{% hint style="info" %}
+In order to configure robot communication and network identity for the coprocessor, read [#network-settings](../../usage/built-in-pipelines/settings-page.md#network-settings "mention")
+{% endhint %}
 
 ## Camera Stream Ports
 
-coming soon...
+All of the camera stream ports start at port `1180` and go up from there, and the HTTP address for them would be https://`<deviceip>:118X/?action=stream`
