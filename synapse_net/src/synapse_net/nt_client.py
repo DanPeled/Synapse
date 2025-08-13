@@ -6,8 +6,11 @@ import time
 from functools import lru_cache
 from typing import Optional
 
-from ntcore import Event, EventFlags, NetworkTableInstance
+from ntcore import ConnectionInfo, Event, EventFlags, NetworkTableInstance
+from synapse.callback import Callback
 from synapse.log import log, warn
+
+RemoteConnectionIP = str
 
 
 @lru_cache
@@ -30,6 +33,8 @@ class NtClient:
     """
     TABLE: str = ""
     INSTANCE: Optional["NtClient"] = None
+    onConnect: Callback[RemoteConnectionIP] = Callback()
+    onDisconnect: Callback[RemoteConnectionIP] = Callback()
 
     def setup(self, teamNumber: int, name: str, isServer: bool, isSim: bool) -> bool:
         """
@@ -68,15 +73,22 @@ class NtClient:
 
         def connectionListener(event: Event):
             if event.is_(EventFlags.kConnected):
-                log(f"Connected to NetworkTables server ({event.data.remote_ip})")  # pyright: ignore
-            if event.is_(EventFlags.kDisconnected):
-                log(
-                    f"Disconnected from NetworkTables server {event.data.remote_ip}"  # pyright: ignore
-                )
+                assert isinstance(event.data, ConnectionInfo)
+
+                log(f"Connected to NetworkTables server ({event.data.remote_ip})")
+                NtClient.onConnect.call(event.data.remote_ip)
+            elif event.is_(EventFlags.kDisconnected):
+                assert isinstance(event.data, ConnectionInfo)
+
+                log(f"Disconnected from NetworkTables server {event.data.remote_ip}")
+                NtClient.onDisconnect.call(event.data.remote_ip)
 
         NetworkTableInstance.getDefault().addConnectionListener(
             True, connectionListener
         )
+
+        if self.server is not None:
+            self.server.addConnectionListener(True, connectionListener)
 
         while not self.nt_inst.isConnected():
             curr = time.time() - start_time

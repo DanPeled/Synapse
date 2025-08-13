@@ -19,8 +19,8 @@ import cv2
 import numpy as np
 import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType)
-from synapse_net.nt_client import NtClient
+                    NetworkTableType, ValueEventData)
+from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
                                   MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
@@ -32,7 +32,7 @@ from ..bcolors import MarkupColors
 from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
                       PipelineID, PipelineName, PipelineTypeName, Resolution)
-from ..util import resolveGenericArgument
+from ..util import getIP, resolveGenericArgument
 from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
                              SynapseCamera, getCameraTable, getCameraTableName)
 from .config import Config, NetworkConfig, yaml
@@ -56,6 +56,13 @@ class FPSView:
     thickness = 2
     color = (0, 256, 0)
     position = (10, 30)
+
+
+def sendWebUIIP():
+    if NtClient.INSTANCE is not None:
+        NtClient.INSTANCE.nt_inst.getTable(NtClient.INSTANCE.NT_TABLE).getEntry(
+            "web_ui"
+        ).setString(f"https://{getIP()}:3000")
 
 
 class PipelineLoader:
@@ -758,6 +765,7 @@ class RuntimeManager:
         self.setupNetworkTables()
 
         self.startMetricsThread()
+        sendWebUIIP()
 
         self.isSetup = True
 
@@ -883,7 +891,9 @@ class RuntimeManager:
             )
 
             def updateSettingListener(event: Event, cameraIndex=cameraIndex):
-                prop: str = event.data.topic.getName().split("/")[-1]  # pyright: ignore
+                assert isinstance(event.data, ValueEventData)
+
+                prop: str = event.data.topic.getName().split("/")[-1]
                 value: Any = self.getEventDataValue(event)
                 self.updateSetting(prop, cameraIndex, value)
 
@@ -928,9 +938,10 @@ class RuntimeManager:
         Returns:
             DataValue: The parsed value from the event.
         """
-        topic = event.data.topic  # pyright: ignore
+        assert isinstance(event.data, ValueEventData)
+        topic = event.data.topic
         topic_type = topic.getType()
-        value = event.data.value  # pyright: ignore
+        value = event.data.value
 
         if topic_type == NetworkTableType.kBoolean:
             return value.getBoolean()
@@ -1189,7 +1200,9 @@ class RuntimeManager:
                 )
 
             def updateNTPipelineListener(event: Event):
-                pipelineIndex = event.data.value.getInteger()  # pyright: ignore
+                assert isinstance(event.data, ValueEventData)
+
+                pipelineIndex = event.data.value.getInteger()
 
                 self.onPipelineChangedFromNT.call(pipelineIndex, cameraIndex)
 
@@ -1326,4 +1339,8 @@ class RuntimeManager:
                         cameraid, self.pipelineLoader.kInvalidPipelineIndex
                     )  # Will result in the camera not processing any pipeline
 
+        def onConnect(_: RemoteConnectionIP) -> None:
+            sendWebUIIP()
+
         self.pipelineLoader.onRemovePipeline.add(onRemovePipeline)
+        NtClient.onConnect.add(onConnect)
