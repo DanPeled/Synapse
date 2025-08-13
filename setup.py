@@ -85,6 +85,8 @@ setup(
     ],
     extras_require={
         "dev": [
+            "wheel",
+            "setuptools",
             "pytest",
             "pytest-asyncio",
             "pytest-mock",

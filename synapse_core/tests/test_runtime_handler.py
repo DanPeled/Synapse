@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
+from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult
 from synapse.core.runtime_handler import RuntimeManager
@@ -70,6 +71,7 @@ class TestRuntimeManager(unittest.TestCase):
         mock_event = MagicMock()
         type_prop = PropertyMock(return_value="Boolean")
         value = MagicMock(getBoolean=MagicMock(return_value=True))
+        mock_event.data.__class__ = ValueEventData
         mock_event.data.topic.getType = type_prop
         mock_event.data.value = value
 
