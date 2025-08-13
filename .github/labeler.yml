@@ -39,6 +39,14 @@ ProtoBuf:
             "synapse_core/src/synapse/core/settings_api.py",
           ]
 
+"runtime management":
+  - changed-files:
+      - any-glob-to-any-file:
+          [
+            "synapse_core/src/synapse/core/runtime_handler.py",
+            "synapse_core/src/synapse/core/synapse.py",
+          ]
+
 tests:
   - changed-files:
       - any-glob-to-any-file: ["**/tests/**"]
