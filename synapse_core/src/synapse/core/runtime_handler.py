@@ -533,23 +533,6 @@ class CameraHandler:
             height=self.getStreamRes(cameraIndex)[1],
         )
 
-    def createRecordingOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
-        """
-        Creates recording outputs for the specified camera indices if all cameras exist.
-
-        Args:
-            cameraIndecies (List[CameraID]): List of camera indices to generate outputs for.
-
-        Returns:
-            Dict[CameraID, cv2.VideoWriter]: Mapping from camera ID to the video writer object.
-        """
-        return cv2.VideoWriter(
-            log.LOG_FILE + ".avi",
-            cv2.VideoWriter.fourcc("M", "J", "P", "G"),
-            30,
-            self.cameras[cameraIndex].getResolution(),
-        )
-
     @cache
     def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
         """
@@ -574,6 +557,18 @@ class CameraHandler:
         Returns:
             cv2.VideoWriter: The associated video writer.
         """
+        if cameraIndex in self.recordingOutputs:
+            return self.recordingOutputs[cameraIndex]
+        fourcc = cv2.VideoWriter.fourcc(*"MJPG")
+
+        height, width = self.streamSizes[cameraIndex]
+
+        self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
+            filename=f"records/{NtClient.NT_TABLE}_{str(int(time.time() * 1_000))}.avi",
+            fourcc=fourcc,
+            fps=20.0,
+            frameSize=(height, width),
+        )
         return self.recordingOutputs[cameraIndex]
 
     def publishFrame(self, frame: Frame, camera: SynapseCamera) -> None:
@@ -586,14 +581,26 @@ class CameraHandler:
             camera (SynapseCamera): The camera that produced the frame.
         """
         if frame is not None:
+            # Resize for display/output
             resized_frame = cv2.resize(
                 frame,
                 self.streamSizes[camera.cameraIndex],
                 interpolation=cv2.INTER_AREA,
             )
             self.getOutput(camera.cameraIndex).putFrame(resized_frame)
-            if camera.getSetting("record", False):
-                self.getRecordOutput(camera.cameraIndex).write(frame)
+
+            # Write to MJPEG AVI if recording
+            if camera.record:
+                videoWriter = self.getRecordOutput(camera.cameraIndex)
+                videoWriter.write(
+                    cv2.resize(frame, self.streamSizes[camera.cameraIndex])
+                )
+            elif (
+                camera.cameraIndex in self.recordingOutputs
+                and self.recordingOutputs[camera.cameraIndex].isOpened()
+            ):
+                videoWriter = self.recordingOutputs.pop(camera.cameraIndex)
+                videoWriter.release()
 
     def addCamera(
         self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
@@ -631,7 +638,6 @@ class CameraHandler:
 
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
-            self.recordingOutputs[cameraIndex] = self.createRecordingOutput(cameraIndex)
             self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
 
             self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
