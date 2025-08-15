@@ -16,7 +16,8 @@
 
 ## Usage
 
-* [Project Management](usage/project-management.md)
+* [Project Management](usage/project-management/README.md)
+  * [Setting up CI for a Synapse Project using GitHub Actions](usage/project-management/setting-up-ci-for-a-synapse-project-using-github-actions.md)
 * [UI Interaction](usage/built-in-pipelines/README.md)
   * [Pipeline Settings](usage/built-in-pipelines/pipeline-settings.md)
   * [Camera Page](usage/built-in-pipelines/camera-page.md)

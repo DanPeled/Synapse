@@ -23,7 +23,7 @@ The recommended software in order to image a device's Operating system into a st
 
 ### Device Install
 
-First, you will need to have a local project set-up, please read [#development-computer-installation](installing-software.md#development-computer-installation "mention") and [project-management.md](../usage/project-management.md "mention").
+First, you will need to have a local project set-up, please read [#development-computer-installation](installing-software.md#development-computer-installation "mention") and [project-management](../usage/project-management/ "mention").
 
 Now, you will need to have the coprocessor connected to the same internet access point (with internet access) as your development computer.
 
@@ -37,7 +37,7 @@ ip a
 
 This will show you the device's IP address below the interface subsection.
 
-Now, we need to configure our deployment device [#adding-processors](../usage/project-management.md#adding-processors "mention").
+Now, we need to configure our deployment device [#adding-processors](../usage/project-management/#adding-processors "mention").
 
 Finally, we can call the installation command:
 
@@ -58,4 +58,4 @@ pip install synapsefrc
 {% endcode %}
 
 This will be enough in order to be able to use the library on your local machine!\
-In order to create a project, read [project-management.md](../usage/project-management.md "mention")
+In order to create a project, read [project-management](../usage/project-management/ "mention")
