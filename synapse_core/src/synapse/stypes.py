@@ -31,3 +31,6 @@ PipelineName = str
 PipelineTypeName = str
 
 Resolution = Tuple[int, int]
+
+RecordingFilename = str
+RecordingStatus = bool

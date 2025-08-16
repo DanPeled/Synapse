@@ -8,6 +8,7 @@ import os
 import threading
 import time
 import traceback
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
@@ -31,7 +32,8 @@ from wpimath.units import seconds, secondsToMilliseconds
 from ..bcolors import MarkupColors
 from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
-                      PipelineID, PipelineName, PipelineTypeName, Resolution)
+                      PipelineID, PipelineName, PipelineTypeName,
+                      RecordingFilename, RecordingStatus, Resolution)
 from ..util import getIP, resolveGenericArgument
 from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
                              SynapseCamera, getCameraTable, getCameraTableName)
@@ -373,7 +375,14 @@ class CameraHandler:
         self.usbCameraInfos: Dict[CameraUID, cs.UsbCameraInfo] = {}
         self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
         self.streamSizes: Dict[CameraID, Resolution] = {}
+
+        self.recordFileNames: Dict[CameraID, RecordingFilename] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
+        self.recordingStatus: Dict[CameraID, RecordingStatus] = {}
+        self.onRecordingStatusChanged: Callback[
+            CameraID, RecordingStatus, RecordingFilename
+        ] = Callback()
+
         self.cameraConfigBindings: Dict[CameraID, CameraConfig] = {}
         self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
         self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
@@ -382,11 +391,27 @@ class CameraHandler:
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
 
+    def setRecordingStatus(
+        self, cameraIndex: CameraID, status: RecordingStatus
+    ) -> None:
+        if cameraIndex not in self.cameras:
+            log.warn(
+                f"Attempted to set recording status on undefined camera #{cameraIndex}\n"
+                "This status call will take affect once the camera has been added"
+            )
+        self.recordingStatus[cameraIndex] = status
+        self.onRecordingStatusChanged.call(
+            cameraIndex,
+            status,
+            self.recordFileNames.get(cameraIndex, "Unknown filename"),
+        )
+
     def setup(self) -> None:
         """
         Sets up the camera system by creating cameras, generating output streams,
         and initializing recording outputs.
         """
+        os.makedirs("records", exist_ok=True)
         self.createCameras()
 
         def cameraScanAction():
@@ -533,23 +558,6 @@ class CameraHandler:
             height=self.getStreamRes(cameraIndex)[1],
         )
 
-    def createRecordingOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
-        """
-        Creates recording outputs for the specified camera indices if all cameras exist.
-
-        Args:
-            cameraIndecies (List[CameraID]): List of camera indices to generate outputs for.
-
-        Returns:
-            Dict[CameraID, cv2.VideoWriter]: Mapping from camera ID to the video writer object.
-        """
-        return cv2.VideoWriter(
-            log.LOG_FILE + ".avi",
-            cv2.VideoWriter.fourcc("M", "J", "P", "G"),
-            30,
-            self.cameras[cameraIndex].getResolution(),
-        )
-
     @cache
     def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
         """
@@ -574,6 +582,24 @@ class CameraHandler:
         Returns:
             cv2.VideoWriter: The associated video writer.
         """
+        if cameraIndex in self.recordingOutputs:
+            return self.recordingOutputs[cameraIndex]
+        fourcc = cv2.VideoWriter.fourcc(*"MJPG")
+
+        height, width = self.streamSizes[cameraIndex]
+
+        filename = f"records/{NtClient.NT_TABLE}_{uuid.uuid4().hex}.avi"
+
+        self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
+            filename=filename,
+            fourcc=fourcc,
+            fps=20.0,
+            frameSize=(height, width),
+        )
+
+        log.log(f"Started recording camera #{cameraIndex} to {filename}")
+        self.recordFileNames[cameraIndex] = filename
+
         return self.recordingOutputs[cameraIndex]
 
     def publishFrame(self, frame: Frame, camera: SynapseCamera) -> None:
@@ -586,14 +612,26 @@ class CameraHandler:
             camera (SynapseCamera): The camera that produced the frame.
         """
         if frame is not None:
+            # Resize for display/output
             resized_frame = cv2.resize(
                 frame,
                 self.streamSizes[camera.cameraIndex],
                 interpolation=cv2.INTER_AREA,
             )
             self.getOutput(camera.cameraIndex).putFrame(resized_frame)
-            if camera.getSetting("record", False):
-                self.getRecordOutput(camera.cameraIndex).write(frame)
+
+            # Write to MJPEG AVI if recording
+            if self.recordingStatus[camera.cameraIndex]:
+                videoWriter = self.getRecordOutput(camera.cameraIndex)
+                videoWriter.write(
+                    cv2.resize(frame, self.streamSizes[camera.cameraIndex])
+                )
+            elif camera.cameraIndex in self.recordingOutputs:
+                log.log(
+                    f"Written Camera #{camera.cameraIndex} recording to {self.recordFileNames[camera.cameraIndex]}"
+                )
+                videoWriter = self.recordingOutputs.pop(camera.cameraIndex)
+                videoWriter.release()
 
     def addCamera(
         self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
@@ -631,8 +669,8 @@ class CameraHandler:
 
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
-            self.recordingOutputs[cameraIndex] = self.createRecordingOutput(cameraIndex)
             self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
+            self.setRecordingStatus(cameraIndex, False)
 
             self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
 
@@ -760,6 +798,7 @@ class RuntimeManager:
 
         self.cameraHandler.setup()
         self.pipelineLoader.setup(directory)
+
         self.assignDefaultPipelines()
 
         self.setupNetworkTables()
@@ -1215,6 +1254,15 @@ class RuntimeManager:
             )
 
             entry.setInteger(self.pipelineLoader.defaultPipelineIndexes[cameraIndex])
+        for cameraIndex, status in self.cameraHandler.recordingStatus.items():
+            camera = self.cameraHandler.getCamera(cameraIndex)
+            assert camera is not None
+
+            entry = camera.getSettingEntry("record")
+
+            assert entry is not None
+
+            entry.setBoolean(status)
 
     def rotateCameraBySettings(self, settings: PipelineSettings, frame: Frame) -> Frame:
         orientation = settings.getSetting(PipelineSettings.orientation.key)
@@ -1342,5 +1390,22 @@ class RuntimeManager:
         def onConnect(_: RemoteConnectionIP) -> None:
             sendWebUIIP()
 
+        def onAddCamera(
+            cameraIndex: CameraID, name: CameraName, camera: SynapseCamera
+        ) -> None:
+            def listener(event, cameraIndex: CameraID = cameraIndex) -> None:
+                value = self.getEventDataValue(event)
+                assert isinstance(value, bool)
+
+                self.cameraHandler.setRecordingStatus(cameraIndex, value)
+
+            entry = camera.getSettingEntry(CameraSettingsKeys.kRecord.value)
+            assert entry is not None
+
+            NetworkTableInstance.getDefault().addListener(
+                entry, EventFlags.kValueRemote, listener
+            )
+
+        self.cameraHandler.onAddCamera.add(onAddCamera)
         self.pipelineLoader.onRemovePipeline.add(onRemovePipeline)
         NtClient.onConnect.add(onConnect)

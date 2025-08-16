@@ -43,3 +43,8 @@ message RemoveCalibrationDataMessageProto {
   int32 camera_index = 1;
   string resolution = 2;
 }
+
+message SetCameraRecordingStatusMessageProto {
+  bool record = 1; // true to start recording, false to stop
+  int32 camera_index = 2; // Index of the camera to set recording status
+}

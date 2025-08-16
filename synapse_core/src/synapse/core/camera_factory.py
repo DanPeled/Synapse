@@ -247,39 +247,6 @@ class SynapseCamera(ABC):
             entry: NetworkTableEntry = table.getEntry(key)
             entry.setValue(value)
 
-    @property
-    def viewID(self) -> str:
-        entry = self.getSettingEntry(CameraSettingsKeys.kViewID.value)
-        if entry is not None:
-            return entry.getString("")
-        return ""
-
-    @viewID.setter
-    def viewID(self, value: str) -> None:
-        self.setSetting(CameraSettingsKeys.kViewID.value, value)
-
-    @property
-    def record(self) -> bool:
-        entry = self.getSettingEntry(CameraSettingsKeys.kRecord.value)
-        if entry is not None:
-            return entry.getBoolean(False)
-        return False
-
-    @record.setter
-    def record(self, value: bool) -> None:
-        self.setSetting(CameraSettingsKeys.kViewID.value, value)
-
-    @property
-    def pipeline(self) -> int:
-        entry = self.getSettingEntry(CameraSettingsKeys.kPipeline.value)
-        if entry is not None:
-            return entry.getInteger(0)
-        return 0
-
-    @pipeline.setter
-    def pipeline(self, value: int) -> None:
-        self.setSetting(CameraSettingsKeys.kPipeline.value, value)
-
 
 class OpenCvCamera(SynapseCamera):
     def __init__(self, name: str) -> None:

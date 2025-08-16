@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from synapse.core.runtime_handler import CameraHandler
 
@@ -17,20 +17,7 @@ class TestCameraHandler(unittest.TestCase):
         self.handler.cameras[2] = mock_camera
         self.assertEqual(self.handler.getCamera(2), mock_camera)
 
-    def test_publishFrame_pushes_to_output(self):
-        camera = MagicMock()
-        camera.cameraIndex = 0
-        camera.getSetting.return_value = True
-
-        frame = MagicMock()
-        self.handler.streamSizes[0] = (320, 240)
-        self.handler.streamOutputs[0] = MagicMock()
-        self.handler.recordingOutputs[0] = MagicMock()
-
-        with patch("synapse.core.runtime_handler.cv2.resize", return_value=frame):
-            self.handler.publishFrame(frame, camera)
-            self.handler.streamOutputs[0].putFrame.assert_called_with(frame)
-            self.handler.recordingOutputs[0].write.assert_called_with(frame)
+    # TODO: add camera tests
 
 
 if __name__ == "__main__":

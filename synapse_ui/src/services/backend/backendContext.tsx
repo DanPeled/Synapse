@@ -67,6 +67,7 @@ const initialState: BackendStateSystem.State = {
   cameras: new Map(),
   cameraperformance: new Map(),
   calibrationdata: new Map(),
+  recordingstatuses: new Map(),
   calibrating: false,
   teamnumber: 0,
 };
@@ -296,6 +297,17 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               newPipelines.set(pipeline?.index, pipeline);
               stateRef.current.pipelines = newPipelines;
             }
+
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS: {
+            assert(messageObj.setCameraRecordingStatus !== undefined);
+            const setstatusmsg = messageObj.setCameraRecordingStatus;
+            const statusMap = new Map(stateRef.current.recordingstatuses);
+            statusMap.set(setstatusmsg.cameraIndex, setstatusmsg.record);
+
+            setters.setRecordingstatuses(statusMap);
+            stateRef.current.recordingstatuses = statusMap;
 
             break;
           }

@@ -15,7 +15,11 @@ import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
 import { Activity, Camera } from "lucide-react";
 // import { CameraStepControl } from "./camera_step_control";
-import { CameraPerformanceProto, CameraProto } from "@/proto/v1/camera";
+import {
+  CameraPerformanceProto,
+  CameraProto,
+  SetCameraRecordingStatusMessageProto,
+} from "@/proto/v1/camera";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
   SetPipelineIndexMessageProto,
@@ -74,11 +78,14 @@ export default function Dashboard() {
     setPipelines,
     pipelinetypes,
     cameraperformance: cameraPerformance,
+    recordingstatuses,
   } = useBackendContext();
   const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
   const [selectedPipelineType, setSelectedPipelineType] = useState(
     Array.from(pipelinetypes.values()).at(0)!,
   );
+  const [selectedCameraRecordingStatus, setSelectedCameraRecordingStatus] =
+    useState(false);
 
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
@@ -122,6 +129,14 @@ export default function Dashboard() {
       setSelectedCamera(CameraProto.create(cameras.get(selectedCameraIndex)));
     }
   }, [cameras]);
+
+  useEffect(() => {
+    if (selectedCamera !== undefined) {
+      setSelectedCameraRecordingStatus(
+        recordingstatuses.get(selectedCamera?.index) ?? false,
+      );
+    }
+  }, [selectedCamera, recordingstatuses]);
 
   useEffect(() => {
     document.title = "Synapse Client";
@@ -248,6 +263,22 @@ export default function Dashboard() {
 
                   const binary = MessageProto.encode(payload).finish();
                   socket?.sendBinary(binary);
+                }}
+                recordingStatus={selectedCameraRecordingStatus}
+                setRecordingStatus={(status: boolean) => {
+                  if (selectedCamera !== undefined) {
+                    const payload = MessageProto.create({
+                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS,
+                      setCameraRecordingStatus:
+                        SetCameraRecordingStatusMessageProto.create({
+                          cameraIndex: selectedCamera.index,
+                          record: status,
+                        }),
+                    });
+
+                    const binary = MessageProto.encode(payload).finish();
+                    socket?.sendBinary(binary);
+                  }
                 }}
               />
               <ResultsView />

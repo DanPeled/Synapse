@@ -57,6 +57,7 @@ class MessageTypeProto(betterproto.Enum):
     CALIBRATING = 20
     CALIBRATION_DATA = 21
     DELETE_CALIBRATION = 22
+    SET_CAMERA_RECORDING_STATUS = 23
 
 
 @dataclass(eq=False, repr=False)
@@ -107,6 +108,12 @@ class CalibrationDataProto(betterproto.Message):
 class RemoveCalibrationDataMessageProto(betterproto.Message):
     camera_index: int = betterproto.int32_field(1)
     resolution: str = betterproto.string_field(2)
+
+
+@dataclass(eq=False, repr=False)
+class SetCameraRecordingStatusMessageProto(betterproto.Message):
+    record: bool = betterproto.bool_field(1)
+    camera_index: int = betterproto.int32_field(2)
 
 
 @dataclass(eq=False, repr=False)
@@ -296,4 +303,7 @@ class MessageProto(betterproto.Message):
     delete_calibration: "RemoveCalibrationDataMessageProto" = betterproto.message_field(
         17, group="payload"
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(18)
+    set_camera_recording_status: "SetCameraRecordingStatusMessageProto" = (
+        betterproto.message_field(18, group="payload")
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(19)
