@@ -20,6 +20,7 @@ from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineProto,
                                   PipelineTypeProto,
+                                  SetCameraRecordingStatusMessageProto,
                                   SetDefaultPipelineMessageProto,
                                   SetNetworkSettingsProto,
                                   SetPipelineIndexMessageProto,
@@ -34,7 +35,8 @@ from ..bcolors import MarkupColors
 from ..hardware.deviceactions import reboot, restartRuntime
 from ..hardware.metrics import Platform
 from ..log import err, log, logs, missingFeature, warn
-from ..stypes import CameraID, CameraName, PipelineID
+from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
+                      RecordingStatus)
 from ..util import getIP, resolveGenericArgument
 from .camera_factory import SynapseCamera, cameraToProto
 from .config import Config, NetworkConfig
@@ -485,6 +487,18 @@ class Synapse:
             self.websocket.sendToAllSync(msg)
             self.runtime_handler.save()
 
+        def onCameraRecordingStatusChanged(
+            cameraIndex: CameraID, status: RecordingStatus, filename: RecordingFilename
+        ) -> None:
+            msg = createMessage(
+                MessageTypeProto.SET_CAMERA_RECORDING_STATUS,
+                SetCameraRecordingStatusMessageProto(
+                    record=status, camera_index=cameraIndex
+                ),
+            )
+
+            self.websocket.sendToAllSync(msg)
+
         self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
@@ -493,6 +507,9 @@ class Synapse:
             onDefaultPipelineSet
         )
         self.runtime_handler.cameraHandler.onRenameCamera.add(onCameraRename)
+        self.runtime_handler.cameraHandler.onRecordingStatusChanged.add(
+            onCameraRecordingStatusChanged
+        )
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
@@ -638,6 +655,14 @@ class Synapse:
                 ].calibration.pop(deleteCalibrationMsg.resolution)
 
                 # TODO Send back delete message to let the client know its been deleted
+        elif msgType == MessageTypeProto.SET_CAMERA_RECORDING_STATUS:
+            assert_set(msgObj.set_camera_recording_status)
+
+            setRecordingStatusMsg = msgObj.set_camera_recording_status
+
+            self.runtime_handler.cameraHandler.setRecordingStatus(
+                setRecordingStatusMsg.camera_index, setRecordingStatusMsg.record
+            )
 
     def setNetworkSettings(self, networkSettings: SetNetworkSettingsProto) -> None:
         if Platform.getCurrentPlatform().isLinux():

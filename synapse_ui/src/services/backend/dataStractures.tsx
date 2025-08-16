@@ -28,6 +28,7 @@ export namespace BackendStateSystem {
     pipelines: Map<PipelineID, PipelineProto>;
     pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
     calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
+    recordingstatuses: Map<CameraID, boolean>;
     calibrating: boolean;
   }
 

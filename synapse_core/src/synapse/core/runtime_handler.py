@@ -32,7 +32,8 @@ from wpimath.units import seconds, secondsToMilliseconds
 from ..bcolors import MarkupColors
 from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, DataValue, Frame,
-                      PipelineID, PipelineName, PipelineTypeName, Resolution)
+                      PipelineID, PipelineName, PipelineTypeName,
+                      RecordingFilename, RecordingStatus, Resolution)
 from ..util import getIP, resolveGenericArgument
 from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
                              SynapseCamera, getCameraTable, getCameraTableName)
@@ -375,9 +376,12 @@ class CameraHandler:
         self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
         self.streamSizes: Dict[CameraID, Resolution] = {}
 
-        self.recordFileNames: Dict[CameraID, str] = {}
+        self.recordFileNames: Dict[CameraID, RecordingFilename] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
-        self.recordingStatus: Dict[CameraID, bool] = {}
+        self.recordingStatus: Dict[CameraID, RecordingStatus] = {}
+        self.onRecordingStatusChanged: Callback[
+            CameraID, RecordingStatus, RecordingFilename
+        ] = Callback()
 
         self.cameraConfigBindings: Dict[CameraID, CameraConfig] = {}
         self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
@@ -386,6 +390,21 @@ class CameraHandler:
 
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
+
+    def setRecordingStatus(
+        self, cameraIndex: CameraID, status: RecordingStatus
+    ) -> None:
+        if cameraIndex not in self.cameras:
+            log.warn(
+                f"Attempted to set recording status on undefined camera #{cameraIndex}\n"
+                "This status call will take affect once the camera has been added"
+            )
+        self.recordingStatus[cameraIndex] = status
+        self.onRecordingStatusChanged.call(
+            cameraIndex,
+            status,
+            self.recordFileNames.get(cameraIndex, "Unknown filename"),
+        )
 
     def setup(self) -> None:
         """
@@ -651,7 +670,7 @@ class CameraHandler:
         if camera.isConnected():
             self.cameras[cameraIndex] = camera
             self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
-            self.recordingStatus[cameraIndex] = False
+            self.setRecordingStatus(cameraIndex, False)
 
             self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
 
@@ -1374,11 +1393,11 @@ class RuntimeManager:
         def onAddCamera(
             cameraIndex: CameraID, name: CameraName, camera: SynapseCamera
         ) -> None:
-            def listener(event) -> None:
+            def listener(event, cameraIndex: CameraID = cameraIndex) -> None:
                 value = self.getEventDataValue(event)
                 assert isinstance(value, bool)
 
-                self.cameraHandler.recordingStatus[cameraIndex] = value
+                self.cameraHandler.setRecordingStatus(cameraIndex, value)
 
             entry = camera.getSettingEntry(CameraSettingsKeys.kRecord.value)
             assert entry is not None

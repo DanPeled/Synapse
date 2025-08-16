@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Row } from "@/widgets/containers";
-import { Lock, Save, Unlock } from "lucide-react";
+import { Lock, Save, Unlock, Video, VideoOff } from "lucide-react";
 import { ReactNode } from "react";
 
 export function ActionButton({
@@ -35,10 +35,14 @@ export function SaveActionsDialog({
   locked,
   setLocked,
   save,
+  recordingStatus,
+  setRecordingStatus,
 }: {
   locked: boolean;
   setLocked: (locked: boolean) => void;
   save: () => void;
+  recordingStatus: boolean;
+  setRecordingStatus: (status: boolean) => void;
 }) {
   return (
     <Card
@@ -63,6 +67,19 @@ export function SaveActionsDialog({
               text="Lock"
               icon={<Lock className="size-10" />}
               onClick={() => setLocked(true)}
+            />
+          )}
+          {recordingStatus ? (
+            <ActionButton
+              text="Stop Recording"
+              icon={<VideoOff className="size-10" />}
+              onClick={() => setRecordingStatus(false)}
+            />
+          ) : (
+            <ActionButton
+              text="Record"
+              icon={<Video className="size-10" />}
+              onClick={() => setRecordingStatus(true)}
             />
           )}
         </Row>
