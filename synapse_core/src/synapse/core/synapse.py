@@ -16,11 +16,12 @@ from typing import Any, List, Optional
 import psutil
 from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
-from synapse_net.nt_client import NtClient
+from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineProto,
                                   PipelineTypeProto,
                                   SetCameraRecordingStatusMessageProto,
+                                  SetConnectionInfoProto,
                                   SetDefaultPipelineMessageProto,
                                   SetNetworkSettingsProto,
                                   SetPipelineIndexMessageProto,
@@ -104,6 +105,7 @@ class Synapse:
         self.isRunning: bool = False
         self.runtime_handler: RuntimeManager
         self.networkingManager = NetworkingManager()
+        self.nt_client: NtClient = NtClient()
 
     def init(
         self,
@@ -209,7 +211,6 @@ class Synapse:
         Returns:
             bool: True if NetworkTables was successfully initialized, False otherwise.
         """
-        self.nt_client = NtClient()
         setup_good = self.nt_client.setup(
             teamNumber=settings.teamNumber,
             name=settings.name,
@@ -260,6 +261,18 @@ class Synapse:
             import synapse.hardware.metrics as metrics
 
             from ..__version__ import SYNAPSE_VERSION
+
+            if self.nt_client:
+                connectionDetails = SetConnectionInfoProto(
+                    connected_to_networktables=self.nt_client.nt_inst.isConnected()
+                )
+
+                await self.websocket.sendToClient(
+                    ws,
+                    createMessage(
+                        MessageTypeProto.SET_DEVICE_CONNECTION_STATUS, connectionDetails
+                    ),
+                )
 
             deviceInfo: DeviceInfoProto = DeviceInfoProto(
                 ip=getIP(),
@@ -499,6 +512,24 @@ class Synapse:
 
             self.websocket.sendToAllSync(msg)
 
+        def onConnect(ip: RemoteConnectionIP) -> None:
+            connectionDetails = SetConnectionInfoProto(connected_to_networktables=True)
+
+            self.websocket.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.SET_DEVICE_CONNECTION_STATUS, connectionDetails
+                ),
+            )
+
+        def onDisconnect(ip: RemoteConnectionIP) -> None:
+            connectionDetails = SetConnectionInfoProto(connected_to_networktables=False)
+
+            self.websocket.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.SET_DEVICE_CONNECTION_STATUS, connectionDetails
+                ),
+            )
+
         self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
@@ -510,6 +541,8 @@ class Synapse:
         self.runtime_handler.cameraHandler.onRecordingStatusChanged.add(
             onCameraRecordingStatusChanged
         )
+        self.nt_client.onConnect.add(onConnect)
+        self.nt_client.onDisconnect.add(onDisconnect)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)

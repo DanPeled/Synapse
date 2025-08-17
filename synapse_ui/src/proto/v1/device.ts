@@ -23,6 +23,12 @@ export interface DeviceInfoProto {
   networkInterfaces: string[];
 }
 
+/** Message to set the connection information for a device */
+export interface SetConnectionInfoProto {
+  /** Indicates if the device is connected to NetworkTables */
+  connectedToNetworktables: boolean;
+}
+
 /** Metrics related to the hardware status of a device */
 export interface HardwareMetricsProto {
   /** CPU temperature in degrees Celsius */
@@ -195,6 +201,79 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
     message.ip = object.ip ?? "";
     message.platform = object.platform ?? "";
     message.networkInterfaces = object.networkInterfaces?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseSetConnectionInfoProto(): SetConnectionInfoProto {
+  return { connectedToNetworktables: false };
+}
+
+export const SetConnectionInfoProto: MessageFns<SetConnectionInfoProto> = {
+  encode(
+    message: SetConnectionInfoProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.connectedToNetworktables !== false) {
+      writer.uint32(8).bool(message.connectedToNetworktables);
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): SetConnectionInfoProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetConnectionInfoProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.connectedToNetworktables = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetConnectionInfoProto {
+    return {
+      connectedToNetworktables: isSet(object.connectedToNetworktables)
+        ? globalThis.Boolean(object.connectedToNetworktables)
+        : false,
+    };
+  },
+
+  toJSON(message: SetConnectionInfoProto): unknown {
+    const obj: any = {};
+    if (message.connectedToNetworktables !== false) {
+      obj.connectedToNetworktables = message.connectedToNetworktables;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetConnectionInfoProto>, I>>(
+    base?: I,
+  ): SetConnectionInfoProto {
+    return SetConnectionInfoProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetConnectionInfoProto>, I>>(
+    object: I,
+  ): SetConnectionInfoProto {
+    const message = createBaseSetConnectionInfoProto();
+    message.connectedToNetworktables = object.connectedToNetworktables ?? false;
     return message;
   },
 };

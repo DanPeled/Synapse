@@ -159,6 +159,20 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         const messageObj = MessageProto.decode(uint8Array);
         // console.log(messageObj);
         switch (messageObj.type) {
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS: {
+            assert(messageObj.setConnectionInfo !== undefined);
+            const connectionInfo = messageObj.setConnectionInfo;
+
+            setters.setConnection({
+              backend: socket.current?.isConnected() ?? false,
+              networktables: connectionInfo.connectedToNetworktables,
+            });
+
+            stateRef.current.connection.networktables =
+              connectionInfo.connectedToNetworktables;
+
+            break;
+          }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO: {
             const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
 

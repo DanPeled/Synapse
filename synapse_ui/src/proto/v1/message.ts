@@ -18,6 +18,7 @@ import {
 import {
   DeviceInfoProto,
   HardwareMetricsProto,
+  SetConnectionInfoProto,
   SetNetworkSettingsProto,
 } from "./device";
 import { LogMessageProto } from "./log";
@@ -58,6 +59,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_CALIBRATION_DATA = 21,
   MESSAGE_TYPE_PROTO_DELETE_CALIBRATION = 22,
   MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS = 23,
+  MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24,
   UNRECOGNIZED = -1,
 }
 
@@ -135,6 +137,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 23:
     case "MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS;
+    case 24:
+    case "MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -192,6 +197,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_DELETE_CALIBRATION";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS:
       return "MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS:
+      return "MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -236,6 +243,8 @@ export interface MessageProto {
   deleteCalibration?: RemoveCalibrationDataMessageProto | undefined;
   /** Message to set camera recording status */
   setCameraRecordingStatus?: SetCameraRecordingStatusMessageProto | undefined;
+  /** Message to set connection information for the device */
+  setConnectionInfo?: SetConnectionInfoProto | undefined;
   /** List of pipeline types available in the system */
   pipelineTypeInfo: PipelineTypeProto[];
 }
@@ -260,6 +269,7 @@ function createBaseMessageProto(): MessageProto {
     calibrationData: undefined,
     deleteCalibration: undefined,
     setCameraRecordingStatus: undefined,
+    setConnectionInfo: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -365,8 +375,14 @@ export const MessageProto: MessageFns<MessageProto> = {
         writer.uint32(146).fork(),
       ).join();
     }
+    if (message.setConnectionInfo !== undefined) {
+      SetConnectionInfoProto.encode(
+        message.setConnectionInfo,
+        writer.uint32(154).fork(),
+      ).join();
+    }
     for (const v of message.pipelineTypeInfo) {
-      PipelineTypeProto.encode(v!, writer.uint32(154).fork()).join();
+      PipelineTypeProto.encode(v!, writer.uint32(162).fork()).join();
     }
     return writer;
   },
@@ -565,6 +581,17 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
+          message.setConnectionInfo = SetConnectionInfoProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
           message.pipelineTypeInfo.push(
             PipelineTypeProto.decode(reader, reader.uint32()),
           );
@@ -632,6 +659,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         ? SetCameraRecordingStatusMessageProto.fromJSON(
             object.setCameraRecordingStatus,
           )
+        : undefined,
+      setConnectionInfo: isSet(object.setConnectionInfo)
+        ? SetConnectionInfoProto.fromJSON(object.setConnectionInfo)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -717,6 +747,11 @@ export const MessageProto: MessageFns<MessageProto> = {
         SetCameraRecordingStatusMessageProto.toJSON(
           message.setCameraRecordingStatus,
         );
+    }
+    if (message.setConnectionInfo !== undefined) {
+      obj.setConnectionInfo = SetConnectionInfoProto.toJSON(
+        message.setConnectionInfo,
+      );
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -810,6 +845,11 @@ export const MessageProto: MessageFns<MessageProto> = {
         ? SetCameraRecordingStatusMessageProto.fromPartial(
             object.setCameraRecordingStatus,
           )
+        : undefined;
+    message.setConnectionInfo =
+      object.setConnectionInfo !== undefined &&
+      object.setConnectionInfo !== null
+        ? SetConnectionInfoProto.fromPartial(object.setConnectionInfo)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||

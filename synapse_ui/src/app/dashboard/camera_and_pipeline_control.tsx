@@ -7,7 +7,6 @@ import {
   Trash2,
   MoreVertical,
   Star,
-  Check,
   Ban,
 } from "lucide-react";
 import {
@@ -29,7 +28,6 @@ import {
   PipelineTypeProto,
   SetPipelineNameMessageProto,
 } from "@/proto/v1/pipeline";
-import ToggleButton from "@/widgets/toggleButtons";
 import { Card, CardContent } from "@/components/ui/card";
 import { CameraProto, SetDefaultPipelineMessageProto } from "@/proto/v1/camera";
 import { WebSocketWrapper } from "@/services/websocket";
@@ -67,8 +65,6 @@ export function CameraAndPipelineControls({
   setpipelines,
   pipelinetypes,
 }: CameraAndPipelineControlsProps) {
-  const [ignoreNetworkTablePipeline, setIgnoreNetworkTablePipeline] =
-    useState(false);
   const [addPipelineDialogVisible, setAddPipelineDialogVisible] =
     useState(false);
   const [changePipelineTypeDialogVisible, setChangePipelineTypeDialogVisible] =
@@ -95,7 +91,7 @@ export function CameraAndPipelineControls({
         style={{ backgroundColor: baseCardColor, color: teamColor }}
         className="border-gray-700"
       >
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-3">
           {/* Camera Selection */}
           <div className="space-y-0">
             <Dropdown
@@ -168,7 +164,6 @@ export function CameraAndPipelineControls({
                 <Dropdown
                   label="Pipeline"
                   value={selectedPipeline}
-                  disabled={!ignoreNetworkTablePipeline}
                   onValueChange={(val) => setSelectedPipeline(val)}
                   options={Array.from(pipelines.entries()).map(
                     ([index, pipeline]) => ({
@@ -356,15 +351,6 @@ export function CameraAndPipelineControls({
                 key: type.type,
               }))}
           />
-          <div className="h-6" />
-          <div className="flex justify-center items-center">
-            <ToggleButton
-              label="Ignore NetworkTables Pipeline"
-              value={ignoreNetworkTablePipeline}
-              onToggleAction={setIgnoreNetworkTablePipeline}
-              tooltip="Toggle to ignore using the pipeline ID from the NetworkTable entry"
-            />
-          </div>
         </CardContent>
       </Card>
       {addPipelineDialogVisible && (
