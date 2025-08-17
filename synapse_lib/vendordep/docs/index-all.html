@@ -110,9 +110,13 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Returns the second possible pose estimate.</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#getRecordingStatus()" class="member-name-link">getRecordingStatus()</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Gets the current recording status of the camera.</div>
+</dd>
 <dt><a href="synapse/SynapseCamera.html#getResults(java.lang.Class)" class="member-name-link">getResults(Class&lt;T&gt;)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">Retrieves detection results of a given type.</div>
+<div class="block">Retrieves detection results of a given type from the default "results" key.</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#getResults(java.lang.String,java.lang.Class)" class="member-name-link">getResults(String, Class&lt;T&gt;)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
@@ -171,15 +175,19 @@ loadScripts(document, 'script');</script>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#kPipelineTopic" class="member-name-link">kPipelineTopic</a> - Static variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">The topic for pipeline-related data *</div>
+<div class="block">The topic for pipeline-related data</div>
 </dd>
 <dt><a href="synapse/ApriltagResult.ApriltagVerbosity.html#kPoseOnly" class="member-name-link">kPoseOnly</a> - Enum constant in enum class synapse.<a href="synapse/ApriltagResult.ApriltagVerbosity.html" title="enum class in synapse">ApriltagResult.ApriltagVerbosity</a></dt>
 <dd>
 <div class="block">Only pose information will be output.</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#kRecordStatusTopic" class="member-name-link">kRecordStatusTopic</a> - Static variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">The topic for recording status</div>
+</dd>
 <dt><a href="synapse/SynapseCamera.html#kSynapseTable" class="member-name-link">kSynapseTable</a> - Static variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">The name of the Synapse table in the NetworkTables *</div>
+<div class="block">The name of the Synapse table in the NetworkTables</div>
 </dd>
 <dt><a href="synapse/ApriltagResult.ApriltagVerbosity.html#kTagDetails" class="member-name-link">kTagDetails</a> - Enum constant in enum class synapse.<a href="synapse/ApriltagResult.ApriltagVerbosity.html" title="enum class in synapse">ApriltagResult.ApriltagVerbosity</a></dt>
 <dd>
@@ -211,29 +219,13 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Sets the camera pipeline.</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#setRecordStatus(boolean)" class="member-name-link">setRecordStatus(boolean)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Sets the recording status of the camera.</div>
+</dd>
 <dt><a href="synapse/SynapseCamera.html#setSetting(java.lang.String,double)" class="member-name-link">setSetting(String, double)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Sets a double setting value in the camera's settings table.</div>
-</dd>
-<dt><a href="synapse/SynapseCamera.html#setSetting(java.lang.String,double%5B%5D)" class="member-name-link">setSetting(String, double[])</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
-<dd>
-<div class="block">Sets a double array setting value in the camera's settings table.</div>
-</dd>
-<dt><a href="synapse/SynapseCamera.html#setSetting(java.lang.String,long)" class="member-name-link">setSetting(String, long)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
-<dd>
-<div class="block">Sets an integer setting value in the camera's settings table.</div>
-</dd>
-<dt><a href="synapse/SynapseCamera.html#setSetting(java.lang.String,long%5B%5D)" class="member-name-link">setSetting(String, long[])</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
-<dd>
-<div class="block">Sets an integer array setting value in the camera's settings table.</div>
-</dd>
-<dt><a href="synapse/SynapseCamera.html#setSetting(java.lang.String,java.lang.String)" class="member-name-link">setSetting(String, String)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
-<dd>
-<div class="block">Sets a string setting value in the camera's settings table.</div>
-</dd>
-<dt><a href="synapse/SynapseCamera.html#setSetting(java.lang.String,java.lang.String%5B%5D)" class="member-name-link">setSetting(String, String[])</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
-<dd>
-<div class="block">Sets a string array setting value in the camera's settings table.</div>
 </dd>
 <dt><a href="synapse/package-summary.html">synapse</a> - package synapse</dt>
 <dd>&nbsp;</dd>
