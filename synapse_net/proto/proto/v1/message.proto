@@ -27,9 +27,10 @@ message MessageProto { // Main message structure for communication
     CalibrationDataProto calibration_data = 16; // Calibration data for a camera
     RemoveCalibrationDataMessageProto delete_calibration = 17; // Message to delete calibration data
     SetCameraRecordingStatusMessageProto set_camera_recording_status = 18; // Message to set camera recording status
+    SetConnectionInfoProto set_connection_info = 19; // Message to set connection information for the device
   }
 
-  repeated PipelineTypeProto pipeline_type_info = 19; // List of pipeline types available in the system
+  repeated PipelineTypeProto pipeline_type_info = 20; // List of pipeline types available in the system
 }
 
 // Enum for different message types in the protocol
@@ -58,4 +59,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_CALIBRATION_DATA = 21;
   MESSAGE_TYPE_PROTO_DELETE_CALIBRATION = 22;
   MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS = 23;
+  MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24;
 }

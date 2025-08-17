@@ -20,6 +20,11 @@ message DeviceInfoProto {
   repeated string network_interfaces = 5;
 }
 
+// Message to set the connection information for a device
+message SetConnectionInfoProto {
+  bool connected_to_networktables = 1; // Indicates if the device is connected to NetworkTables
+}
+
 // Metrics related to the hardware status of a device
 message HardwareMetricsProto {
   // CPU temperature in degrees Celsius

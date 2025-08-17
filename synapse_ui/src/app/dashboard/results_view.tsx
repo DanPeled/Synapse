@@ -6,7 +6,7 @@ export function ResultsView() {
   return (
     <Card
       style={{ backgroundColor: baseCardColor }}
-      className="border-gray-700 h-full flex flex-col"
+      className="border-gray-700 min-h-0 flex flex-col"
     >
       <CardHeader></CardHeader>
       <CardContent

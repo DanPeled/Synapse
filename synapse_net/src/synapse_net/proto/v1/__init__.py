@@ -58,6 +58,7 @@ class MessageTypeProto(betterproto.Enum):
     CALIBRATION_DATA = 21
     DELETE_CALIBRATION = 22
     SET_CAMERA_RECORDING_STATUS = 23
+    SET_DEVICE_CONNECTION_STATUS = 24
 
 
 @dataclass(eq=False, repr=False)
@@ -134,6 +135,13 @@ class DeviceInfoProto(betterproto.Message):
 
     network_interfaces: List[str] = betterproto.string_field(5)
     """List of network interfaces available on the device"""
+
+
+@dataclass(eq=False, repr=False)
+class SetConnectionInfoProto(betterproto.Message):
+    """Message to set the connection information for a device"""
+
+    connected_to_networktables: bool = betterproto.bool_field(1)
 
 
 @dataclass(eq=False, repr=False)
@@ -306,4 +314,7 @@ class MessageProto(betterproto.Message):
     set_camera_recording_status: "SetCameraRecordingStatusMessageProto" = (
         betterproto.message_field(18, group="payload")
     )
-    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(19)
+    set_connection_info: "SetConnectionInfoProto" = betterproto.message_field(
+        19, group="payload"
+    )
+    pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(20)
