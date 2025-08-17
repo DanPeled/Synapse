@@ -2,13 +2,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# test_sync.py
 import io
+import re
 from unittest import mock
 
 import paramiko
 import pytest
-from synapse_installer.sync import (installPipRequirements,
+from synapse_installer.sync import (installNpmPackage, installPipRequirements,
                                     installSystemPackage, setupSudoers, sync,
                                     syncRequirements)
 
@@ -108,7 +108,6 @@ def test_install_system_package_already_installed(mocker, mock_client):
         mock_client,
         "exec_command",
         side_effect=[
-            # command -v mgr found
             (
                 io.BytesIO(),
                 type(
@@ -118,7 +117,6 @@ def test_install_system_package_already_installed(mocker, mock_client):
                 )(),
                 io.BytesIO(),
             ),
-            # check_cmd installed
             (
                 io.BytesIO(),
                 type(
@@ -138,7 +136,6 @@ def test_install_system_package_installs(mocker, mock_client):
         mock_client,
         "exec_command",
         side_effect=[
-            # command -v mgr found
             (
                 io.BytesIO(),
                 type(
@@ -148,7 +145,6 @@ def test_install_system_package_installs(mocker, mock_client):
                 )(),
                 io.BytesIO(),
             ),
-            # check_cmd not installed
             (
                 io.BytesIO(),
                 type(
@@ -158,7 +154,6 @@ def test_install_system_package_installs(mocker, mock_client):
                 )(),
                 io.BytesIO(),
             ),
-            # install command
             (io.BytesIO(), io.BytesIO(), io.BytesIO()),
         ],
     )
@@ -227,3 +222,101 @@ def test_install_pip_requirements(mocker, mock_client):
     assert any("pkg1" in call.args[0] for call in fprint_mock.call_args_list), (
         "Expected fprint to be called indicating pkg1 already installed"
     )
+
+
+def test_install_npm_package_already_installed(mocker):
+    client = mocker.Mock(spec=paramiko.SSHClient)
+    stdout = mock.Mock()
+    stdout.channel = mock.Mock()
+    stdout.channel.recv_exit_status.return_value = 0
+    client.exec_command.return_value = (mock.Mock(), stdout, mock.Mock())
+
+    _ = mocker.patch("synapse_installer.sync.fprint")
+    installNpmPackage(client, "serve")
+    # should not fail
+    assert True
+
+
+def test_install_npm_package_installs_success(mocker):
+    client = mocker.Mock(spec=paramiko.SSHClient)
+    stdout_not_installed = mock.Mock()
+    stdout_not_installed.channel = mock.Mock()
+    stdout_not_installed.channel.recv_exit_status.return_value = 1
+
+    stderr_install = mock.Mock()
+    stderr_install.read.return_value = b""
+
+    client.exec_command.side_effect = [
+        (mock.Mock(), stdout_not_installed, mock.Mock()),  # npm list
+        (mock.Mock(), mock.Mock(), stderr_install),  # npm install
+    ]
+
+    fprint_mock = mocker.patch("synapse_installer.sync.fprint")
+    installNpmPackage(client, "serve")
+    assert any(
+        "installed successfully" in str(call.args[0])
+        for call in fprint_mock.call_args_list
+    )
+
+
+def test_install_npm_package_installs_failure(mocker):
+    client = mocker.Mock(spec=paramiko.SSHClient)
+    stdout_not_installed = mock.Mock()
+    stdout_not_installed.channel = mock.Mock()
+    stdout_not_installed.channel.recv_exit_status.return_value = 1
+
+    stderr_install = mock.Mock()
+    stderr_install.read.return_value = b"some error"
+
+    client.exec_command.side_effect = [
+        (mock.Mock(), stdout_not_installed, mock.Mock()),  # npm list
+        (mock.Mock(), mock.Mock(), stderr_install),  # npm install
+    ]
+
+    fprint_mock = mocker.patch("synapse_installer.sync.fprint")
+    installNpmPackage(client, "serve")
+    assert any(
+        "npm install failed" in str(call.args[0]) for call in fprint_mock.call_args_list
+    )
+
+
+def test_install_pip_requirements_partial_installed(mocker):
+    client = mocker.Mock(spec=paramiko.SSHClient)
+    mocker.patch(
+        "synapse_installer.sync.getDistRequirements",
+        return_value=["pkg1==1.0", "pkg2==2.0"],
+    )
+    mocker.patch("synapse_installer.sync.getWPILibYear", return_value=2025)
+
+    def exec_command_side_effect(cmd, *args, **kwargs):
+        if "pip freeze" in cmd:
+            stdout = mock.Mock()
+            stdout.read.return_value = b"pkg1==1.0\n"
+            stdout.channel = mock.Mock()
+            stdout.channel.recv_exit_status.return_value = 0
+            return mock.Mock(), stdout, mock.Mock()
+        elif "pip install" in cmd:
+            stdout = mock.Mock()
+            stdout.read.return_value = b""
+            stdout.channel = mock.Mock()
+            stdout.channel.recv_exit_status.return_value = 0
+            return mock.Mock(), stdout, mock.Mock()
+        else:
+            stdout = mock.Mock()
+            stdout.read.return_value = b""
+            stdout.channel = mock.Mock()
+            return mock.Mock(), stdout, mock.Mock()
+
+    client.exec_command.side_effect = exec_command_side_effect
+    fprint_mock = mocker.patch("synapse_installer.sync.fprint")
+
+    installPipRequirements(client)
+
+    def strip_ansi(s: str) -> str:
+        ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+        return ansi_escape.sub("", s)
+
+    calls = [strip_ansi(str(call.args[0])) for call in fprint_mock.call_args_list]
+
+    assert any("pkg1 already installed" in c for c in calls)
+    assert any("Installing pkg2" in c for c in calls)
