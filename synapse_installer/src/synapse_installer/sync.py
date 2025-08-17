@@ -41,6 +41,8 @@ def syncRequirements(hostname: str, password: str, ip: str) -> None:
 
         setupSudoers(client, hostname)
         installSystemPackage(client, "libopencv-dev")
+        installSystemPackage(client, "npm")
+        installNpmPackage(client, "serve", True)
         installPipRequirements(client)
 
         client.close()
@@ -153,19 +155,49 @@ def installSystemPackage(client, package: str, use_sudo: bool = True) -> None:
     raise RuntimeError("No supported package manager found")
 
 
+def installNpmPackage(
+    client: paramiko.SSHClient, package: str, global_install: bool = True
+) -> None:
+    """Install an npm package globally on the remote device if not already installed."""
+    check_cmd = f"npm list -g {package} >/dev/null 2>&1"
+    install_cmd = f"npm install {'-g ' if global_install else ''}{package}"
+
+    stdin, stdout, stderr = client.exec_command(check_cmd)
+    if stdout.channel.recv_exit_status() == 0:
+        print(f"npm package '{package}' is already installed.")
+        return
+
+    print(f"Installing npm package '{package}'...")
+    stdin, stdout, stderr = client.exec_command(install_cmd)
+    err = stderr.read().decode()
+    if err.strip():
+        fprint(log.MarkupColors.fail(f"npm install failed for {package}:\n{err}"))
+    else:
+        fprint(
+            log.MarkupColors.okgreen(f"npm package '{package}' installed successfully.")
+        )
+
+
 def installPipRequirements(client: paramiko.SSHClient) -> None:
     requirements = getDistRequirements()
     # Get installed packages on remote device
     stdin, stdout, stderr = client.exec_command("python3 -m pip freeze")
-    installed_packages = {
-        line.strip().split("==")[0].lower()
-        for line in stdout.read().decode().splitlines()
-        if "==" in line
-    }
+    installed_packages = {}
+    for line in stdout.read().decode().splitlines():
+        if "==" in line:
+            name, ver = line.strip().split("==", 1)
+            installed_packages[name.lower()] = ver
 
     for i, requirement in enumerate(requirements, start=1):
-        pkg_name = str(requirement).split()[0].lower()
-        if pkg_name in installed_packages:
+        if "==" in requirement:
+            pkg_name, req_ver = requirement.split("==", 1)
+        else:
+            pkg_name, req_ver = requirement, None
+
+        pkg_name = pkg_name.lower()
+        installed_ver = installed_packages.get(pkg_name)
+
+        if installed_ver is not None and (req_ver is None or installed_ver == req_ver):
             fprint(
                 f"[OK] {pkg_name} already installed "
                 f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
@@ -177,12 +209,15 @@ def installPipRequirements(client: paramiko.SSHClient) -> None:
             f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
         )
 
-        stdin, stdout, stderr = client.exec_command(
-            f"python3 -m pip install {str(requirement)} "
-            f"--extra-index-url=https://wpilib.jfrog.io/artifactory/api/pypi/wpilib-python-release-{getWPILibYear()}/simple/ "
-            f"--break-system-packages --upgrade-strategy only-if-needed"
-        )
+        cmd = f"python3 -m pip install {requirement} "
+        if getWPILibYear():
+            cmd += (
+                f"--extra-index-url=https://wpilib.jfrog.io/artifactory/api/pypi/"
+                f"wpilib-python-release-{getWPILibYear()}/simple/ "
+            )
+        cmd += "--break-system-packages --upgrade-strategy only-if-needed"
 
+        stdin, stdout, stderr = client.exec_command(cmd)
         err = stderr.read().decode()
         if err.strip():
             fprint(log.MarkupColors.fail(f"Install for {pkg_name} failed!\n{err}"))
