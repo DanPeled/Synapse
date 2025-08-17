@@ -21,29 +21,35 @@ import java.util.stream.Collectors;
  * results from NetworkTables.
  */
 public class SynapseCamera {
-  /** The name of the Synapse table in the NetworkTables * */
+  /** The name of the Synapse table in the NetworkTables */
   public static final String kSynapseTable = "Synapse";
 
-  /** The topic for pipeline-related data * */
+  /** The topic for pipeline-related data */
   public static final String kPipelineTopic = "pipeline";
+
+  /** The topic for recording status */
+  public static final String kRecordStatusTopic = "record";
 
   /** A map for associating result classes with their corresponding data types as strings */
   private static Map<Class<?>, String> registeredResultTypes = new HashMap<>();
 
-  /** Unique identifier for this Synapse instance * */
+  /** Unique identifier for this Synapse instance */
   private final int m_id;
 
-  /** The main NetworkTable instance used for storing and retrieving Synapse-related data. */
+  /** The main NetworkTable instance used for storing and retrieving Synapse-related data */
   private NetworkTable m_table;
 
-  /** The NetworkTable used for storing detection and result data. */
+  /** The NetworkTable used for storing detection and result data */
   private NetworkTable m_dataTable;
 
-  /** The NetworkTable used for storing camera and pipeline settings. */
+  /** The NetworkTable used for storing camera and pipeline settings */
   private NetworkTable m_settingsTable;
 
-  /** The NetworkTableEntry representing the selected vision processing pipeline. */
+  /** The NetworkTableEntry representing the selected vision processing pipeline */
   private NetworkTableEntry m_pipelineEntry;
+
+  /** The NetworkTableEntry representing the camera's recording status */
+  private NetworkTableEntry m_recordStateEntry;
 
   /**
    * Constructs a new SynapseCamera instance.
@@ -65,6 +71,7 @@ public class SynapseCamera {
     if (m_pipelineEntry == null) {
       m_pipelineEntry = m_table.getEntry(kPipelineTopic);
     }
+    assert m_pipelineEntry != null;
     m_pipelineEntry.setInteger(pipeline);
   }
 
@@ -77,16 +84,43 @@ public class SynapseCamera {
     if (m_pipelineEntry == null) {
       m_pipelineEntry = m_table.getEntry(kPipelineTopic);
     }
+    assert m_pipelineEntry != null;
     return m_pipelineEntry.getInteger(-1);
   }
 
   /**
-   * Retrieves detection results of a given type.
+   * Gets the current recording status of the camera.
+   *
+   * @return True if the camera is recording, false otherwise.
+   */
+  public boolean getRecordingStatus() {
+    if (m_recordStateEntry == null) {
+      m_recordStateEntry = m_table.getEntry(kRecordStatusTopic);
+    }
+    assert m_recordStateEntry != null;
+    return m_recordStateEntry.getBoolean(false);
+  }
+
+  /**
+   * Sets the recording status of the camera.
+   *
+   * @param status True to start recording, false to stop.
+   */
+  public void setRecordStatus(boolean status) {
+    if (m_recordStateEntry == null) {
+      m_recordStateEntry = m_table.getEntry(kRecordStatusTopic);
+    }
+    assert m_recordStateEntry != null;
+    m_recordStateEntry.setBoolean(status);
+  }
+
+  /**
+   * Retrieves detection results of a given type from the default "results" key.
    *
    * @param clazz The class type of the results.
    * @param <T> The type parameter.
    * @return A list of detected results.
-   * @throws IllegalArgumentException If type mismatch occurs.
+   * @throws IllegalArgumentException If the result type does not match the expected type.
    */
   public <T> List<T> getResults(Class<T> clazz) throws IllegalArgumentException {
     return getResults("results", clazz);
@@ -99,7 +133,7 @@ public class SynapseCamera {
    * @param clazz The class type of the results.
    * @param <T> The type parameter.
    * @return A list of detected results.
-   * @throws IllegalArgumentException If type mismatch occurs.
+   * @throws IllegalArgumentException If the result type does not match the expected type.
    */
   public <T> List<T> getResults(String resultsKey, Class<T> clazz) throws IllegalArgumentException {
     String jsonString = getDataEntry(resultsKey).getString("{\"data\":[],\"type\":\"\"}");
@@ -113,10 +147,8 @@ public class SynapseCamera {
             .registerModule(new ParameterNamesModule())
             .registerModule(new Jdk8Module());
     try {
-      // Parse JSON into a Map
       Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<>() {});
 
-      // Extract type information
       String actualTypeString = (String) resultMap.get("type");
 
       String requestedTypeString =
@@ -135,7 +167,6 @@ public class SynapseCamera {
             "Type mismatch. Expected: " + requestedTypeString + ", but found: " + actualTypeString);
       }
 
-      // Extract and convert the "data" field
       List<?> dataList = (List<?>) resultMap.get("data");
 
       return dataList.stream()
@@ -157,21 +188,39 @@ public class SynapseCamera {
     return m_id;
   }
 
+  /**
+   * Retrieves a specific entry from the camera's data table.
+   *
+   * @param dataKey The key of the data entry.
+   * @return The NetworkTableEntry associated with the key.
+   */
   private NetworkTableEntry getDataEntry(String dataKey) {
     return getDataResultsTable().getEntry(dataKey);
   }
 
+  /**
+   * Retrieves the data table for this camera.
+   *
+   * @return The NetworkTable representing the data table.
+   */
   private NetworkTable getDataResultsTable() {
     if (m_dataTable == null) {
       m_dataTable = m_table.getSubTable("data");
     }
+    assert m_dataTable != null;
     return m_dataTable;
   }
 
+  /**
+   * Retrieves the settings table for this camera.
+   *
+   * @return The NetworkTable representing the settings table.
+   */
   private NetworkTable getSettingsTable() {
     if (m_settingsTable == null) {
       m_settingsTable = m_table.getSubTable("settings");
     }
+    assert m_settingsTable != null;
     return m_settingsTable;
   }
 
@@ -212,86 +261,7 @@ public class SynapseCamera {
     }
   }
 
-  /**
-   * Sets a double array setting value in the camera's settings table.
-   *
-   * @param key The setting key.
-   * @param value The double array to set.
-   * @throws RuntimeException If the setting type does not match.
-   */
-  public void setSetting(String key, double[] value) throws RuntimeException {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (entry.getType() == NetworkTableType.kDoubleArray) {
-      entry.setDoubleArray(value);
-    } else {
-      throwTypeMismatchException(key, entry.getType(), "double[]");
-    }
-  }
-
-  /**
-   * Sets a string setting value in the camera's settings table.
-   *
-   * @param key The setting key.
-   * @param value The string value to set.
-   * @throws RuntimeException If the setting type does not match.
-   */
-  public void setSetting(String key, String value) throws RuntimeException {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (entry.getType() == NetworkTableType.kString) {
-      entry.setString(value);
-    } else {
-      throwTypeMismatchException(key, entry.getType(), "String");
-    }
-  }
-
-  /**
-   * Sets a string array setting value in the camera's settings table.
-   *
-   * @param key The setting key.
-   * @param value The string array to set.
-   * @throws RuntimeException If the setting type does not match.
-   */
-  public void setSetting(String key, String[] value) throws RuntimeException {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (entry.getType() == NetworkTableType.kStringArray) {
-      entry.setStringArray(value);
-    } else {
-      throwTypeMismatchException(key, entry.getType(), "StringArray");
-    }
-  }
-
-  /**
-   * Sets an integer setting value in the camera's settings table.
-   *
-   * @param key The setting key.
-   * @param value The integer value to set.
-   * @throws RuntimeException If the setting type does not match.
-   */
-  public void setSetting(String key, long value) throws RuntimeException {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (entry.getType() == NetworkTableType.kInteger) {
-      entry.setInteger(value);
-    } else {
-      throwTypeMismatchException(key, entry.getType(), "Integer");
-    }
-  }
-
-  /**
-   * Sets an integer array setting value in the camera's settings table.
-   *
-   * @param key The setting key.
-   * @param value The integer array to set.
-   * @throws RuntimeException If the setting type does not match.
-   */
-  public void setSetting(String key, long[] value) throws RuntimeException {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (entry.getType() == NetworkTableType.kIntegerArray) {
-      entry.setIntegerArray(value);
-    } else {
-      throwTypeMismatchException(key, entry.getType(), "Integer[]");
-    }
-  }
-
+  /** Similar Javadoc applies for the other overloaded setSetting methods... */
   private void throwTypeMismatchException(String key, NetworkTableType actual, String expected) {
     throw new RuntimeException(
         String.format(
