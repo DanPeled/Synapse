@@ -68,6 +68,7 @@ const initialState: BackendStateSystem.State = {
   cameraperformance: new Map(),
   calibrationdata: new Map(),
   recordingstatuses: new Map(),
+  pipelineresults: new Map(),
   calibrating: false,
   teamnumber: 0,
 };
@@ -196,6 +197,11 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const pipelines = stateRef.current.pipelines;
             pipelines.set(pipeline.index, pipeline);
             setters.setPipelines(pipelines);
+
+            const results = new Map(stateRef.current.pipelineresults);
+            results.set(pipeline.index, new Map());
+            setters.setPipelineresults(results);
+
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES: {
@@ -322,6 +328,27 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             setters.setRecordingstatuses(statusMap);
             stateRef.current.recordingstatuses = statusMap;
+
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT: {
+            assert(messageObj.pipelineResult !== undefined);
+            const pipelineResult = messageObj.pipelineResult;
+
+            const results = new Map(stateRef.current.pipelineresults);
+
+            if (!results.has(pipelineResult.pipelineIndex)) {
+              results.set(pipelineResult.pipelineIndex, new Map());
+            }
+
+            assert(results.has(pipelineResult.pipelineIndex));
+
+            results
+              .get(pipelineResult.pipelineIndex)!
+              .set(pipelineResult.key, pipelineResult);
+
+            setters.setPipelineresults(results);
+            stateRef.current.pipelineresults = results;
 
             break;
           }

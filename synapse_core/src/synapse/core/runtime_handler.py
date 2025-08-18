@@ -21,6 +21,7 @@ import numpy as np
 import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
                     NetworkTableType, ValueEventData)
+from synapse.core.pipeline import PipelineResult
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
                                   MessageTypeProto)
@@ -39,8 +40,8 @@ from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
                              SynapseCamera, getCameraTable, getCameraTableName)
 from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
-from .pipeline import (FrameResult, Pipeline, PipelineSettings,
-                       getPipelineTypename)
+from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
+                       PipelineSettings, getPipelineTypename)
 from .settings_api import SettingsMap
 
 
@@ -171,6 +172,7 @@ class PipelineLoader:
             settingsInst = settingsType(settings)
             currPipeline = pipelineType(settings=settingsInst)
             currPipeline.name = name
+            currPipeline.pipelineIndex = index
 
             self.pipelineInstanceBindings[index] = currPipeline
             self.pipelineNames[index] = name
@@ -1169,10 +1171,28 @@ class RuntimeManager:
                 continue
 
     def handleResults(
-        self, frames: FrameResult, cameraIndex: CameraID
+        self, result: PipelineProcessFrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        if frames is not None:
-            return self.handleFramePublishing(frames, cameraIndex)
+        if result is None:
+            return None
+
+        pipelineResult = None
+        if isinstance(result, tuple):
+            pipelineResult, frames = result
+        elif isinstance(result, PipelineResult):
+            pipelineResult = result
+            frames = None  # or however you want to handle missing frames
+        elif isinstance(result, Frame):
+            pipelineResult = None
+            frames = result
+        else:
+            log.err(f"Unexpected type: {type(result)}")
+            return
+
+        if pipelineResult is not None:
+            ...  # TODO send results to NT & Socket
+
+        return self.handleFramePublishing(frames, cameraIndex)
 
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID

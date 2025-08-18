@@ -14,7 +14,7 @@ import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
-from synapse.core.pipeline import Pipeline
+from synapse.core.pipeline import FrameResult, Pipeline, PipelineResult
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, PipelineSettings,
                                        settingField)
@@ -31,7 +31,7 @@ class RobotPoseEstimate:
 
 
 @dataclass
-class ApriltagResult:
+class ApriltagResult(PipelineResult):
     detection: apriltag.AprilTagDetection
     timestamp: float
     robotPoseEstimate: RobotPoseEstimate
@@ -92,7 +92,7 @@ class ApriltagPipelineSettings(PipelineSettings):
     num_threads = settingField(NumberConstraint(minValue=1, maxValue=6), default=1)
 
 
-class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
+class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
@@ -153,7 +153,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     ) -> apriltag.AprilTagPoseEstimate:
         return self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
 
-    def processFrame(self, img, timestamp: float) -> Optional[Frame]:
+    def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 

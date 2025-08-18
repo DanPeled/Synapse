@@ -4,29 +4,46 @@
 
 from abc import ABC, abstractmethod
 from functools import cache
-from typing import (Any, Callable, Generic, Iterable, Optional, Type, TypeVar,
-                    Union, overload)
+from typing import (Any, Callable, Generic, Iterable, Optional, Tuple, Type,
+                    TypeVar, Union, overload)
 
 from ntcore import NetworkTable
-from synapse_net.proto.v1 import PipelineProto
-from wpilib import SendableBuilderImpl
-from wpiutil import Sendable, SendableBuilder
+from synapse.log import createMessage
+from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
+                                  PipelineResultProto)
+from synapse_net.socketServer import WebSocketServer
 
-from ..stypes import CameraID, Frame
+from ..stypes import CameraID, Frame, PipelineID
+from .results_api import PipelineResult
 from .settings_api import (PipelineSettings, Setting, SettingsAPI,
                            SettingsValue, TConstraintType, TSettingValueType,
                            settingValueToProto)
 
-FrameResult = Optional[Union[Iterable[Frame], Frame]]
+FrameResult = Optional[Frame]
+
+
+def isFrameResult(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, Frame):
+        return True
+    if isinstance(value, Iterable):
+        return all(isinstance(f, Frame) for f in value)
+    return False
+
 
 TSettingsType = TypeVar("TSettingsType", bound=PipelineSettings)
+TResultType = TypeVar("TResultType", bound=PipelineResult)
+
+ResultWithFrameResult = Tuple[TResultType, FrameResult]
+
+PipelineProcessFrameResult = Union[ResultWithFrameResult, TResultType, FrameResult]
 
 
-class Pipeline(ABC, Generic[TSettingsType]):
+class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     __is_enabled__ = True
     VALID_ENTRY_TYPES = Any
     nt_table: Optional[NetworkTable] = None
-    builder_cache: dict[str, SendableBuilder] = {}
 
     @abstractmethod
     def __init__(
@@ -40,6 +57,7 @@ class Pipeline(ABC, Generic[TSettingsType]):
         """
         self.settings = settings
         self.cameraIndex = -1
+        self.pipelineIndex: PipelineID
         self.name: str = "new pipeline"
 
     def bind(self, cameraIndex: CameraID):
@@ -51,7 +69,7 @@ class Pipeline(ABC, Generic[TSettingsType]):
         self.cameraIndex = cameraIndex
 
     @abstractmethod
-    def processFrame(self, img, timestamp: float) -> FrameResult:
+    def processFrame(self, img, timestamp: float) -> PipelineProcessFrameResult:
         """
         Abstract method that processes a single frame.
 
@@ -68,12 +86,20 @@ class Pipeline(ABC, Generic[TSettingsType]):
         :param value: The value to store.
         """
         if self.nt_table is not None:
-            if isinstance(value, Sendable):
-                builder = self.__getOrCreateBuilder(key)
-                value.initSendable(builder)
-                builder.update()
-            else:
-                self.nt_table.getSubTable("data").putValue(key, value)
+            self.nt_table.getSubTable("data").putValue(key, value)
+
+        if WebSocketServer.kInstance is not None:
+            WebSocketServer.kInstance.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.SET_PIPELINE_RESULT,
+                    PipelineResultProto(
+                        is_msgpack=False,
+                        key=key,
+                        value=settingValueToProto(value),
+                        pipeline_index=self.pipelineIndex,
+                    ),
+                )
+            )
 
     @overload
     def getSetting(self, setting: str) -> Optional[Any]: ...
@@ -101,21 +127,6 @@ class Pipeline(ABC, Generic[TSettingsType]):
             self.settings.getAPI().setValue(setting, value)
         elif isinstance(setting, Setting):
             self.setSetting(setting.key, value)
-
-    def __getOrCreateBuilder(self, key: str) -> SendableBuilder:
-        """
-        Retrieves a cached builder for the given key, or creates and caches a new one.
-
-        :param key: The key associated with the builder.
-        :return: A SendableBuilder instance.
-        """
-        if key not in self.builder_cache and self.nt_table is not None:
-            sub_table = self.nt_table.getSubTable(f"data/{key}")
-            builder = SendableBuilderImpl()
-            builder.setTable(sub_table)
-            builder.startListeners()
-            self.builder_cache[key] = builder
-        return self.builder_cache[key]
 
     def toDict(self, type: str) -> dict:
         return {"type": type, "settings": self.settings.toDict(), "name": self.name}

@@ -5,13 +5,18 @@ import {
   CameraPerformanceProto,
   CameraProto,
 } from "@/proto/v1/camera";
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import {
+  PipelineProto,
+  PipelineResultProto,
+  PipelineTypeProto,
+} from "@/proto/v1/pipeline";
 import { LogMessageProto } from "@/proto/v1/log";
 import { RefObject } from "react";
 
 export type CameraID = number;
 export type PipelineID = number;
 export type PipelineTypename = string;
+export type PipelineResultMap = Map<string, PipelineResultProto>;
 
 export namespace BackendStateSystem {
   export interface State {
@@ -26,6 +31,7 @@ export namespace BackendStateSystem {
     cameras: Map<CameraID, CameraProto>;
     cameraperformance: Map<CameraID, CameraPerformanceProto>;
     pipelines: Map<PipelineID, PipelineProto>;
+    pipelineresults: Map<PipelineID, PipelineResultMap>;
     pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
     calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
     recordingstatuses: Map<CameraID, boolean>;

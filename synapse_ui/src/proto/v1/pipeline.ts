@@ -64,6 +64,18 @@ export interface SetPipelineNameMessageProto {
   name: string;
 }
 
+/** Represents the result of a pipeline execution, including whether it's in MsgPack format */
+export interface PipelineResultProto {
+  /** Indicates if the result is in MsgPack format */
+  isMsgpack: boolean;
+  /** Key to identify the result */
+  key: string;
+  /** The index of the pipeline instance this result belongs to */
+  pipelineIndex: number;
+  /** The value of the result */
+  value: SettingValueProto | undefined;
+}
+
 function createBasePipelineTypeProto(): PipelineTypeProto {
   return { type: "", settings: [] };
 }
@@ -779,6 +791,134 @@ export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto
       return message;
     },
   };
+
+function createBasePipelineResultProto(): PipelineResultProto {
+  return { isMsgpack: false, key: "", pipelineIndex: 0, value: undefined };
+}
+
+export const PipelineResultProto: MessageFns<PipelineResultProto> = {
+  encode(
+    message: PipelineResultProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.isMsgpack !== false) {
+      writer.uint32(8).bool(message.isMsgpack);
+    }
+    if (message.key !== "") {
+      writer.uint32(18).string(message.key);
+    }
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(24).int32(message.pipelineIndex);
+    }
+    if (message.value !== undefined) {
+      SettingValueProto.encode(message.value, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): PipelineResultProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePipelineResultProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.isMsgpack = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pipelineIndex = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PipelineResultProto {
+    return {
+      isMsgpack: isSet(object.isMsgpack)
+        ? globalThis.Boolean(object.isMsgpack)
+        : false,
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      pipelineIndex: isSet(object.pipelineIndex)
+        ? globalThis.Number(object.pipelineIndex)
+        : 0,
+      value: isSet(object.value)
+        ? SettingValueProto.fromJSON(object.value)
+        : undefined,
+    };
+  },
+
+  toJSON(message: PipelineResultProto): unknown {
+    const obj: any = {};
+    if (message.isMsgpack !== false) {
+      obj.isMsgpack = message.isMsgpack;
+    }
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    if (message.value !== undefined) {
+      obj.value = SettingValueProto.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PipelineResultProto>, I>>(
+    base?: I,
+  ): PipelineResultProto {
+    return PipelineResultProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PipelineResultProto>, I>>(
+    object: I,
+  ): PipelineResultProto {
+    const message = createBasePipelineResultProto();
+    message.isMsgpack = object.isMsgpack ?? false;
+    message.key = object.key ?? "";
+    message.pipelineIndex = object.pipelineIndex ?? 0;
+    message.value =
+      object.value !== undefined && object.value !== null
+        ? SettingValueProto.fromPartial(object.value)
+        : undefined;
+    return message;
+  },
+};
 
 type Builtin =
   | Date

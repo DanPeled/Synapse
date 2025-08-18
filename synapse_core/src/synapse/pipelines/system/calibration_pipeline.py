@@ -11,10 +11,9 @@ from cv2.typing import MatLike
 from synapse import Pipeline, PipelineSettings
 from synapse.core import Synapse
 from synapse.core.camera_factory import CalibrationData
-from synapse.core.pipeline import systemPipeline
+from synapse.core.pipeline import FrameResult, PipelineResult, systemPipeline
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
-from synapse.stypes import Frame
 from synapse_net.proto.v1 import (CalibrationDataProto, MessageProto,
                                   MessageTypeProto)
 
@@ -82,7 +81,7 @@ class CalibrationPipelineSettings(PipelineSettings):
 
 
 @systemPipeline()
-class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
+class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult]):
     def __init__(self, settings: CalibrationPipelineSettings):
         super().__init__(settings)
 
@@ -136,7 +135,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings]):
             dictionary=self.aruco_dict,
         )
 
-    def processFrame(self, img, timestamp: float) -> Frame:
+    def processFrame(self, img, timestamp: float) -> FrameResult:
         self._update_board()
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
