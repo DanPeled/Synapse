@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
-from synapse.core.pipeline import FrameResult
+from synapse.core.pipeline import FrameResult, PipelineResult
 from synapse.core.runtime_handler import RuntimeManager
 
 
-class DummyPipeline(Pipeline[PipelineSettings]):
+class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):
     __is_enabled__ = True
 
     def __init__(self, settings: PipelineSettings):

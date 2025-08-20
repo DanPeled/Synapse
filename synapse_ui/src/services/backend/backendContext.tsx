@@ -156,7 +156,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           duration: 2000,
           id: "backend-connect",
           style: {
-            backgroundColor: toastColor,
             color: teamColor,
             border: "none",
           },
@@ -168,11 +167,14 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           payload: { ...stateRef.current.connection, backend: false },
         });
         if (wasConnected) {
+          setters.setConnection({
+            backend: false,
+            networktables: false,
+          });
           toast.warning("Disconnected from backend", {
             duration: 2000,
             id: "backend-disconnect",
             style: {
-              backgroundColor: toastColor,
               color: "yellow",
               border: "none",
             },
@@ -202,7 +204,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
                 duration: 2000,
                 id: "networktables",
                 style: {
-                  backgroundColor: toastColor,
                   color: "yellow",
                   border: "none",
                 },
@@ -212,7 +213,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
                 duration: 2000,
                 id: "networktables",
                 style: {
-                  backgroundColor: toastColor,
                   color: teamColor,
                   border: "none",
                 },
@@ -244,7 +244,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
                 {
                   duration: 2000,
                   style: {
-                    backgroundColor: toastColor,
                     color: "yellow",
                     border: "none",
                   },

@@ -52,7 +52,7 @@ export function Sidebar({ compact }: { compact: boolean }) {
             {
               Icon: connection.networktables ? Bot : BotOff,
               label:
-                "NetworkTables" +
+                "NetworkTables " +
                 (connection.networktables ? "Connected" : "Disconnected"),
             },
             {

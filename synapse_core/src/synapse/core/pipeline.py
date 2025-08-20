@@ -4,8 +4,8 @@
 
 from abc import ABC, abstractmethod
 from functools import cache
-from typing import (Any, Callable, Generic, Iterable, Optional, Tuple, Type,
-                    TypeVar, Union, overload)
+from typing import (Any, Callable, Generic, Iterable, Optional, Type, TypeVar,
+                    Union, overload)
 
 from ntcore import NetworkTable
 from synapse.log import createMessage
@@ -35,9 +35,8 @@ def isFrameResult(value: object) -> bool:
 TSettingsType = TypeVar("TSettingsType", bound=PipelineSettings)
 TResultType = TypeVar("TResultType", bound=PipelineResult)
 
-ResultWithFrameResult = Tuple[TResultType, FrameResult]
 
-PipelineProcessFrameResult = Union[ResultWithFrameResult, TResultType, FrameResult]
+PipelineProcessFrameResult = FrameResult
 
 
 class Pipeline(ABC, Generic[TSettingsType, TResultType]):
@@ -100,6 +99,9 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
                     ),
                 )
             )
+
+    def setResults(self, value: TResultType) -> None:
+        self.setDataValue("results", value)  # TODO: Make it use msgpack to serialize
 
     @overload
     def getSetting(self, setting: str) -> Optional[Any]: ...

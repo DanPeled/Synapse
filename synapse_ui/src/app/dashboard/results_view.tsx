@@ -84,7 +84,7 @@ export function ResultsView({ results }: { results?: PipelineResultMap }) {
                               variant="ghost"
                               size="icon"
                               onClick={() => copyToClipboard(key, val)}
-                              className="hover:bg-zinc-700 rounded-xl"
+                              className="hover:bg-zinc-700 rounded-xl cursor-pointer"
                             >
                               {copiedKey === key ? (
                                 <Check
