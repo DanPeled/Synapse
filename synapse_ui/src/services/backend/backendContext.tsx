@@ -22,6 +22,8 @@ import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
 import assert from "assert";
+import { toast } from "sonner";
+import { teamColor, toastColor } from "../style";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -140,13 +142,24 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   }, [dispatch, state]);
 
   const socket = useRef<WebSocketWrapper | undefined>(undefined);
+  let wasConnected: boolean = false;
 
   useEffect(() => {
     const ws = new WebSocketWrapper(`ws://${window.location.hostname}:8765`, {
       onOpen: () => {
+        wasConnected = true;
         dispatch({
           type: "SET_CONNECTION",
           payload: { ...stateRef.current.connection, backend: true },
+        });
+        toast.success("Connected to backend", {
+          duration: 2000,
+          id: "backend-connect",
+          style: {
+            backgroundColor: toastColor,
+            color: teamColor,
+            border: "none",
+          },
         });
       },
       onClose: () => {
@@ -154,6 +167,18 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           type: "SET_CONNECTION",
           payload: { ...stateRef.current.connection, backend: false },
         });
+        if (wasConnected) {
+          toast.warning("Disconnected from backend", {
+            duration: 2000,
+            id: "backend-disconnect",
+            style: {
+              backgroundColor: toastColor,
+              color: "yellow",
+              border: "none",
+            },
+          });
+          wasConnected = false;
+        }
       },
       onMessage: (message: ArrayBufferLike) => {
         const uint8Array = new Uint8Array(message);
@@ -171,6 +196,28 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             stateRef.current.connection.networktables =
               connectionInfo.connectedToNetworktables;
+
+            if (!connectionInfo.connectedToNetworktables) {
+              toast.warning("Disconnected from NetworkTables", {
+                duration: 2000,
+                id: "networktables",
+                style: {
+                  backgroundColor: toastColor,
+                  color: "yellow",
+                  border: "none",
+                },
+              });
+            } else {
+              toast.success("Connected to NetworkTables", {
+                duration: 2000,
+                id: "networktables",
+                style: {
+                  backgroundColor: toastColor,
+                  color: teamColor,
+                  border: "none",
+                },
+              });
+            }
 
             break;
           }
@@ -190,6 +237,21 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               ...hardwareMetrics,
               lastFetched: formatHHMMSSLocal(new Date()),
             });
+
+            if (hardwareMetrics.cpuTemp > 90) {
+              toast.warning(
+                `CPU Temperature Critical: ${hardwareMetrics.cpuTemp}°C`,
+                {
+                  duration: 2000,
+                  style: {
+                    backgroundColor: toastColor,
+                    color: "yellow",
+                    border: "none",
+                  },
+                },
+              );
+            }
+
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE: {
