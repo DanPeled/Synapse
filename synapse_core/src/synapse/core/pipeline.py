@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from functools import cache
 from typing import (Any, Callable, Generic, Iterable, Optional, Type, TypeVar,
                     Union, overload)
@@ -176,6 +177,24 @@ def systemPipeline(
         return cls
 
     return wrap
+
+
+def pipelineResult(cls):
+    new_cls = type(
+        cls.__name__,
+        (PipelineResult, cls),
+        dict(cls.__dict__),
+    )
+    return dataclass(new_cls)
+
+
+def pipelineSettings(cls):
+    new_cls = type(
+        cls.__name__,
+        (PipelineSettings, cls),
+        dict(cls.__dict__),
+    )
+    return new_cls
 
 
 @cache

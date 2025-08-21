@@ -14,10 +14,10 @@ import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
-from synapse.core.pipeline import FrameResult, Pipeline, PipelineResult
+from synapse.core.pipeline import (FrameResult, Pipeline, pipelineResult,
+                                   pipelineSettings)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, PipelineSettings,
-                                       settingField)
+                                       NumberConstraint, settingField)
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
@@ -30,8 +30,8 @@ class RobotPoseEstimate:
     robotPose_fieldSpace: Pose3d
 
 
-@dataclass
-class ApriltagResult(PipelineResult):
+@pipelineResult
+class ApriltagResult:
     detection: apriltag.AprilTagDetection
     timestamp: float
     robotPoseEstimate: RobotPoseEstimate
@@ -76,7 +76,8 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
-class ApriltagPipelineSettings(PipelineSettings):
+@pipelineSettings
+class ApriltagPipelineSettings:
     tag_size = settingField(
         NumberConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
     )
