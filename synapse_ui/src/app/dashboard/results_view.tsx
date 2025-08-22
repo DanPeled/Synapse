@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PipelineResultMap } from "@/services/backend/dataStractures";
 import { protoToSettingValue } from "@/services/controls_generator";
@@ -8,6 +8,45 @@ import { Activity, Copy, Check } from "lucide-react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { PipelineResultProto } from "@/proto/v1/pipeline";
+import { MsgPackTree } from "@/widgets/msgpackTree";
+
+function RenderPrimitiveResult({
+  dataKey,
+  value,
+  copiedKey,
+  copyToClipboard,
+}: {
+  dataKey: string;
+  value: PipelineResultProto;
+  copiedKey: string | null;
+  copyToClipboard: (key: string, text: string) => void;
+}) {
+  const val =
+    value.value === undefined ? "" : String(protoToSettingValue(value.value));
+  return (
+    <>
+      <TableCell className="font-medium">{dataKey}</TableCell>
+      <TableCell className="truncate max-w-xs">{val}</TableCell>
+      <TableCell className="text-right">
+        {val && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => copyToClipboard(dataKey, val)}
+            className="hover:bg-zinc-700 rounded-xl cursor-pointer"
+          >
+            {copiedKey === dataKey ? (
+              <Check className="h-4 w-4" style={{ color: teamColor }} />
+            ) : (
+              <Copy className="h-4 w-4" style={{ color: teamColor }} />
+            )}
+          </Button>
+        )}
+      </TableCell>
+    </>
+  );
+}
 
 export function ResultsView({ results }: { results?: PipelineResultMap }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -62,46 +101,41 @@ export function ResultsView({ results }: { results?: PipelineResultMap }) {
               <Table>
                 <TableBody>
                   {Array.from(results.entries()).map(([key, value]) => {
-                    const val =
-                      value.value === undefined
-                        ? ""
-                        : String(protoToSettingValue(value.value));
-                    return (
-                      <TableRow
-                        key={key}
-                        className="hover:bg-zinc-800/60 transition-colors"
-                        style={{
-                          borderColor: teamColor,
-                        }}
-                      >
-                        <TableCell className="font-medium">{key}</TableCell>
-                        <TableCell className="truncate max-w-xs">
-                          {val}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {val && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => copyToClipboard(key, val)}
-                              className="hover:bg-zinc-700 rounded-xl cursor-pointer"
-                            >
-                              {copiedKey === key ? (
-                                <Check
-                                  className="h-4 w-4"
-                                  style={{ color: teamColor }}
-                                />
-                              ) : (
-                                <Copy
-                                  className="h-4 w-4"
-                                  style={{ color: teamColor }}
-                                />
-                              )}
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
+                    if (value.isMsgpack) {
+                      return (
+                        <TableRow
+                          key={key}
+                          className="hover:bg-zinc-800/60 transition-colors"
+                          style={{
+                            borderColor: teamColor,
+                          }}
+                        >
+                          <TableCell colSpan={3}>
+                            <MsgPackTree
+                              encoded={value.value!.bytesValue!}
+                              name={key}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    } else {
+                      return (
+                        <TableRow
+                          key={key}
+                          className="hover:bg-zinc-800/60 transition-colors"
+                          style={{
+                            borderColor: teamColor,
+                          }}
+                        >
+                          <RenderPrimitiveResult
+                            dataKey={key}
+                            value={value}
+                            copiedKey={copiedKey}
+                            copyToClipboard={copyToClipboard}
+                          />
+                        </TableRow>
+                      );
+                    }
                   })}
                 </TableBody>
               </Table>

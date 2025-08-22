@@ -93,18 +93,9 @@ def serializeTwist3d(obj: geometry.Twist3d):
 # -------------------
 # Dispatcher with caching
 # -------------------
-
-
 def parsePipelineResult(
     result: PipelineResult, _cache: dict[int, Any] | None = None
 ) -> Any:
-    """
-    Recursively convert a PipelineResult (dataclass) into
-    plain Python types that are msgpack-serializable,
-    including wpimath.geometry types.
-
-    Uses an object-id cache so the same object is only serialized once.
-    """
     if _cache is None:
         _cache = {}
 
@@ -150,7 +141,6 @@ def parsePipelineResult(
             for k, v in result.items()
         }
 
-    # --- Primitives ---
     else:
         out = result
 
