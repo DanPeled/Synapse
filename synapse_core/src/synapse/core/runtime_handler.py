@@ -39,8 +39,8 @@ from .camera_factory import (CameraConfig, CameraFactory, CameraSettingsKeys,
                              SynapseCamera, getCameraTable, getCameraTableName)
 from .config import Config, NetworkConfig, yaml
 from .global_settings import GlobalSettings
-from .pipeline import (FrameResult, Pipeline, PipelineSettings,
-                       getPipelineTypename)
+from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
+                       PipelineSettings, getPipelineTypename)
 from .settings_api import SettingsMap
 
 
@@ -171,6 +171,7 @@ class PipelineLoader:
             settingsInst = settingsType(settings)
             currPipeline = pipelineType(settings=settingsInst)
             currPipeline.name = name
+            currPipeline.pipelineIndex = index
 
             self.pipelineInstanceBindings[index] = currPipeline
             self.pipelineNames[index] = name
@@ -923,8 +924,8 @@ class RuntimeManager:
             )
 
         if cameraTable is not None:
-            setattr(currPipeline, "nt_table", cameraTable)
-            setattr(currPipeline, "builder_cache", {})
+            currPipeline.nt_table = cameraTable
+
             pipeline_config.sendSettings(
                 cameraTable.getSubTable(NTKeys.kSettings.value)
             )
@@ -1169,10 +1170,9 @@ class RuntimeManager:
                 continue
 
     def handleResults(
-        self, frames: FrameResult, cameraIndex: CameraID
+        self, result: PipelineProcessFrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        if frames is not None:
-            return self.handleFramePublishing(frames, cameraIndex)
+        return self.handleFramePublishing(result, cameraIndex)
 
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID

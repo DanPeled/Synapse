@@ -63,6 +63,7 @@ setup(
     install_requires=[
         "rich",
         "numpy==1.23.3",
+        "msgpack",
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),
         wpilibDep("robotpy_cscore"),

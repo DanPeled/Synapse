@@ -59,6 +59,7 @@ class MessageTypeProto(betterproto.Enum):
     DELETE_CALIBRATION = 22
     SET_CAMERA_RECORDING_STATUS = 23
     SET_DEVICE_CONNECTION_STATUS = 24
+    SET_PIPELINE_RESULT = 25
 
 
 @dataclass(eq=False, repr=False)
@@ -271,6 +272,25 @@ class SetPipelineNameMessageProto(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class PipelineResultProto(betterproto.Message):
+    """
+    Represents the result of a pipeline execution, including whether it's in MsgPack format
+    """
+
+    is_msgpack: bool = betterproto.bool_field(1)
+    """Indicates if the result is in MsgPack format"""
+
+    key: str = betterproto.string_field(2)
+    """Key to identify the result"""
+
+    pipeline_index: int = betterproto.int32_field(3)
+    """The index of the pipeline instance this result belongs to"""
+
+    value: "_settings_v1__.SettingValueProto" = betterproto.message_field(4)
+    """The value of the result"""
+
+
+@dataclass(eq=False, repr=False)
 class MessageProto(betterproto.Message):
     type: "MessageTypeProto" = betterproto.enum_field(1)
     device_info: "DeviceInfoProto" = betterproto.message_field(2, group="payload")
@@ -316,5 +336,8 @@ class MessageProto(betterproto.Message):
     )
     set_connection_info: "SetConnectionInfoProto" = betterproto.message_field(
         19, group="payload"
+    )
+    pipeline_result: "PipelineResultProto" = betterproto.message_field(
+        21, group="payload"
     )
     pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(20)

@@ -24,6 +24,7 @@ import {
 import { LogMessageProto } from "./log";
 import {
   PipelineProto,
+  PipelineResultProto,
   PipelineTypeProto,
   SetPipelineIndexMessageProto,
   SetPipelineNameMessageProto,
@@ -60,6 +61,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_DELETE_CALIBRATION = 22,
   MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS = 23,
   MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24,
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT = 25,
   UNRECOGNIZED = -1,
 }
 
@@ -140,6 +142,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 24:
     case "MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS;
+    case 25:
+    case "MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -199,6 +204,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS:
       return "MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT:
+      return "MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -245,6 +252,8 @@ export interface MessageProto {
   setCameraRecordingStatus?: SetCameraRecordingStatusMessageProto | undefined;
   /** Message to set connection information for the device */
   setConnectionInfo?: SetConnectionInfoProto | undefined;
+  /** Result of a pipeline operation */
+  pipelineResult?: PipelineResultProto | undefined;
   /** List of pipeline types available in the system */
   pipelineTypeInfo: PipelineTypeProto[];
 }
@@ -270,6 +279,7 @@ function createBaseMessageProto(): MessageProto {
     deleteCalibration: undefined,
     setCameraRecordingStatus: undefined,
     setConnectionInfo: undefined,
+    pipelineResult: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -379,6 +389,12 @@ export const MessageProto: MessageFns<MessageProto> = {
       SetConnectionInfoProto.encode(
         message.setConnectionInfo,
         writer.uint32(154).fork(),
+      ).join();
+    }
+    if (message.pipelineResult !== undefined) {
+      PipelineResultProto.encode(
+        message.pipelineResult,
+        writer.uint32(170).fork(),
       ).join();
     }
     for (const v of message.pipelineTypeInfo) {
@@ -587,6 +603,17 @@ export const MessageProto: MessageFns<MessageProto> = {
           );
           continue;
         }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.pipelineResult = PipelineResultProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
         case 20: {
           if (tag !== 162) {
             break;
@@ -662,6 +689,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       setConnectionInfo: isSet(object.setConnectionInfo)
         ? SetConnectionInfoProto.fromJSON(object.setConnectionInfo)
+        : undefined,
+      pipelineResult: isSet(object.pipelineResult)
+        ? PipelineResultProto.fromJSON(object.pipelineResult)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -752,6 +782,9 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.setConnectionInfo = SetConnectionInfoProto.toJSON(
         message.setConnectionInfo,
       );
+    }
+    if (message.pipelineResult !== undefined) {
+      obj.pipelineResult = PipelineResultProto.toJSON(message.pipelineResult);
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -850,6 +883,10 @@ export const MessageProto: MessageFns<MessageProto> = {
       object.setConnectionInfo !== undefined &&
       object.setConnectionInfo !== null
         ? SetConnectionInfoProto.fromPartial(object.setConnectionInfo)
+        : undefined;
+    message.pipelineResult =
+      object.pipelineResult !== undefined && object.pipelineResult !== null
+        ? PipelineResultProto.fromPartial(object.pipelineResult)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||

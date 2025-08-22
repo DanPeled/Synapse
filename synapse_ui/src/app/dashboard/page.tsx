@@ -27,6 +27,7 @@ import {
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
 import { SaveActionsDialog } from "./save_actions";
+import { PipelineResultMap } from "@/services/backend/dataStractures";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -77,9 +78,11 @@ export default function Dashboard() {
     socket,
     setPipelines,
     pipelinetypes,
+    pipelineresults,
     cameraperformance: cameraPerformance,
     recordingstatuses,
   } = useBackendContext();
+
   const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
   const [selectedPipelineType, setSelectedPipelineType] = useState(
     Array.from(pipelinetypes.values()).at(0)!,
@@ -94,6 +97,9 @@ export default function Dashboard() {
   const [locked, setLocked] = useState(false);
   const [selectedCameraPerformance, setSelectedCameraPerformance] = useState<
     CameraPerformanceProto | undefined
+  >(undefined);
+  const [selectedPipelineResults, setSelectedPipelineResults] = useState<
+    PipelineResultMap | undefined
   >(undefined);
 
   useEffect(() => {
@@ -137,6 +143,12 @@ export default function Dashboard() {
       );
     }
   }, [selectedCamera, recordingstatuses]);
+
+  useEffect(() => {
+    if (selectedPipeline !== undefined) {
+      setSelectedPipelineResults(pipelineresults.get(selectedPipeline.index));
+    }
+  }, [selectedPipeline, pipelineresults, selectedPipelineType]);
 
   useEffect(() => {
     document.title = "Synapse Client";
@@ -281,7 +293,7 @@ export default function Dashboard() {
                   }
                 }}
               />
-              <ResultsView />
+              <ResultsView results={selectedPipelineResults} />
             </Column>
           </Row>
         </div>

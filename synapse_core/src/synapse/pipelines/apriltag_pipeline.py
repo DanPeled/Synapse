@@ -14,10 +14,10 @@ import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
-from synapse.core.pipeline import Pipeline
+from synapse.core.pipeline import (FrameResult, Pipeline, pipelineResult,
+                                   pipelineSettings)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, PipelineSettings,
-                                       settingField)
+                                       NumberConstraint, settingField)
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
@@ -30,7 +30,7 @@ class RobotPoseEstimate:
     robotPose_fieldSpace: Pose3d
 
 
-@dataclass
+@pipelineResult
 class ApriltagResult:
     detection: apriltag.AprilTagDetection
     timestamp: float
@@ -76,7 +76,8 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
-class ApriltagPipelineSettings(PipelineSettings):
+@pipelineSettings
+class ApriltagPipelineSettings:
     tag_size = settingField(
         NumberConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
     )
@@ -92,7 +93,7 @@ class ApriltagPipelineSettings(PipelineSettings):
     num_threads = settingField(NumberConstraint(minValue=1, maxValue=6), default=1)
 
 
-class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
+class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
@@ -153,7 +154,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
     ) -> apriltag.AprilTagPoseEstimate:
         return self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
 
-    def processFrame(self, img, timestamp: float) -> Optional[Frame]:
+    def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -164,7 +165,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setDataValue("results", ApriltagsJson.empty())
+            self.setResults(ApriltagsJson.empty())
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
@@ -246,8 +247,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings]):
                     )
 
         self.setDataValue("hasResults", True)
-        self.setDataValue(
-            "results",
+        self.setResults(
             ApriltagsJson.toJsonString(
                 results,
                 getIgnoredDataByVerbosity(
@@ -503,12 +503,12 @@ class ApriltagFieldJson:
 
 
 class ApriltagsJson:
-    _emptyJson: Optional[str] = None
+    _emptyJson: Optional[dict] = None
 
     @classmethod
     def toJsonString(
         cls, tags: List[ApriltagResult], ignore_keys: Optional[set] = None
-    ) -> str:
+    ) -> dict:
         ignore_keys = set(
             ignore_keys or []
         )  # Convert ignore_keys to a set for fast lookup
@@ -529,17 +529,13 @@ class ApriltagsJson:
                 }
             )
 
-        return json.dumps(
-            {
-                "data": data,
-                "type": "apriltag",
-            },
-            cls=cls.Encoder,
-            separators=(",", ":"),
-        )
+        return {
+            "data": data,
+            "type": "apriltag",
+        }
 
     @classmethod
-    def empty(cls) -> str:
+    def empty(cls) -> dict:
         if cls._emptyJson is not None:
             return cls._emptyJson
         else:
