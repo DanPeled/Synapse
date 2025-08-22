@@ -12,6 +12,7 @@ from synapse_net.socketServer import WebSocketServer, createMessage
 
 from synapse_net.proto import v1
 
+from .alert import alert
 from .bcolors import MarkupColors, TextTarget, parseTextStyle
 
 # Flag to control printing to the console
@@ -104,6 +105,8 @@ def err(text: str):
         WebSocketServer.kInstance,
     )
 
+    alert(v1.AlertTypeProto.ERROR, text)
+
 
 def warn(text: str):
     """
@@ -122,6 +125,8 @@ def warn(text: str):
         v1.LogLevelProto.WARNING,
         WebSocketServer.kInstance,
     )
+
+    alert(v1.AlertTypeProto.WARNING, text)
 
 
 def missingFeature(text: str) -> None:

@@ -22,8 +22,10 @@ import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
 import assert from "assert";
-import { toast } from "sonner";
+import { ExternalToast, toast, ToasterProps } from "sonner";
 import { teamColor, toastColor } from "../style";
+import { AlertTypeProto } from "@/proto/v1/alert";
+import { TemplateContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -218,6 +220,47 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
                 },
               });
             }
+
+            break;
+          }
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_ALERT: {
+            assert(messageObj.alert !== undefined);
+
+            const alert = messageObj.alert!;
+            assert(
+              alert.type !== AlertTypeProto.ALERT_TYPE_PROTO_UNSPECIFIED &&
+                alert.type !== AlertTypeProto.UNRECOGNIZED,
+            );
+
+            let func: typeof toast.info = toast.info;
+            let textColor = teamColor;
+
+            typeSwitch: switch (alert.type) {
+              case AlertTypeProto.ALERT_TYPE_PROTO_ERROR:
+                func = toast.error;
+                textColor = "red";
+                break typeSwitch;
+              case AlertTypeProto.ALERT_TYPE_PROTO_WARNING:
+                func = toast.warning;
+                textColor = "yellow";
+                break typeSwitch;
+            }
+
+            func(
+              <p className={`whitespace-pre-line`} style={{ color: textColor }}>
+                {alert.message.replace(
+                  /\[(\/?)(red|yellow|green|bold|italic)\]/g,
+                  "",
+                )}
+              </p>,
+              {
+                duration: 2000,
+                style: {
+                  border: "none",
+                  color: textColor,
+                },
+              },
+            );
 
             break;
           }
