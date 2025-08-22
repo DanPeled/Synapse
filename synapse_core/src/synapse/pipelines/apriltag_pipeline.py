@@ -35,6 +35,7 @@ class ApriltagResult:
     detection: apriltag.AprilTagDetection
     timestamp: float
     robotPoseEstimate: RobotPoseEstimate
+    tagPoseEstimate: apriltag.AprilTagPoseEstimate
 
 
 class ApriltagVerbosity(Enum):
@@ -241,6 +242,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                             detection=tag,
                             timestamp=timestamp,
                             robotPoseEstimate=robotPoseEstimate,
+                            tagPoseEstimate=tagPoseEstimate,
                         )
                     )
 
@@ -519,6 +521,7 @@ class ApriltagsJson:
                     ApriltagPipeline.kHammingKey: tag.detection.getHamming(),
                     ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
                     ApriltagPipeline.kRobotPoseTagSpaceKey: tag.robotPoseEstimate.robotPose_tagSpace,
+                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
                     ApriltagPipeline.kTagCenterKey: [
                         tag.detection.getCenter().x,
                         tag.detection.getCenter().y,

@@ -90,9 +90,6 @@ def serializeTwist3d(obj: geometry.Twist3d):
     }
 
 
-# -------------------
-# Dispatcher with caching
-# -------------------
 def parsePipelineResult(
     result: PipelineResult, _cache: dict[int, Any] | None = None
 ) -> Any:
@@ -103,34 +100,33 @@ def parsePipelineResult(
     if oid in _cache:
         return _cache[oid]
 
-    # --- Geometry Types ---
-    if isinstance(result, geometry.Translation2d):
-        out = serializeTranslation2d(result)
-    elif isinstance(result, geometry.Translation3d):
-        out = serializeTranslation3d(result)
-    elif isinstance(result, geometry.Rotation2d):
-        out = serializeRotation2d(result)
-    elif isinstance(result, geometry.Rotation3d):
-        out = serializeRotation3d(result)
-    elif isinstance(result, geometry.Pose2d):
-        out = serializePose2d(result)
-    elif isinstance(result, geometry.Pose3d):
-        out = serializePose3d(result)
-    elif isinstance(result, geometry.Transform2d):
-        out = serializeTransform2d(result)
-    elif isinstance(result, geometry.Transform3d):
-        out = serializeTransform3d(result)
-    elif isinstance(result, geometry.Twist2d):
-        out = serializeTwist2d(result)
-    elif isinstance(result, geometry.Twist3d):
-        out = serializeTwist3d(result)
+    # --- Primitive types ---
+    if isinstance(result, (int, float, str, bool, type(None))):
+        return result
 
-    # --- Dataclasses ---
-    elif is_dataclass(result):
-        out = {
-            f.name: parsePipelineResult(getattr(result, f.name), _cache)
-            for f in fields(result)
-        }
+    # --- Geometry types ---
+    import wpimath.geometry as geom
+
+    if isinstance(result, geom.Translation2d):
+        out = serializeTranslation2d(result)
+    elif isinstance(result, geom.Translation3d):
+        out = serializeTranslation3d(result)
+    elif isinstance(result, geom.Rotation2d):
+        out = serializeRotation2d(result)
+    elif isinstance(result, geom.Rotation3d):
+        out = serializeRotation3d(result)
+    elif isinstance(result, geom.Pose2d):
+        out = serializePose2d(result)
+    elif isinstance(result, geom.Pose3d):
+        out = serializePose3d(result)
+    elif isinstance(result, geom.Transform2d):
+        out = serializeTransform2d(result)
+    elif isinstance(result, geom.Transform3d):
+        out = serializeTransform3d(result)
+    elif isinstance(result, geom.Twist2d):
+        out = serializeTwist2d(result)
+    elif isinstance(result, geom.Twist3d):
+        out = serializeTwist3d(result)
 
     # --- Containers ---
     elif isinstance(result, (list, tuple, set)):
@@ -141,8 +137,28 @@ def parsePipelineResult(
             for k, v in result.items()
         }
 
+    # --- Dataclasses ---
+    elif is_dataclass(result):
+        out = {
+            f.name: parsePipelineResult(getattr(result, f.name), _cache)
+            for f in fields(result)
+        }
+
+    # --- Other objects (including pybind / properties) ---
     else:
-        out = result
+        out = {}
+        for attr_name in dir(result):
+            if attr_name.startswith("_"):
+                continue  # skip internal/private
+            try:
+                attr_val = getattr(result, attr_name)
+                if callable(attr_val):
+                    continue
+                out[attr_name] = parsePipelineResult(attr_val, _cache)
+            except Exception:
+                continue
+        if not out:  # fallback
+            out = str(result)  # or raw object if you prefer
 
     _cache[oid] = out
     return out
