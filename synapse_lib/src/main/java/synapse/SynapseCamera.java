@@ -1,26 +1,27 @@
 package synapse;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableType;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import org.msgpack.jackson.dataformat.MessagePackFactory;
+import synapse.util.deserializers.WPILibGeometryModule;
 
 /**
  * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
  * results from NetworkTables.
  */
 public class SynapseCamera {
+
+  /** Jackson ObjectMapper configured for MessagePack and WPILib geometry. */
+  private static final ObjectMapper s_ObjectMapper = createMapper();
+
   /** The name of the Synapse table in the NetworkTables */
   public static final String kSynapseTable = "Synapse";
 
@@ -30,25 +31,34 @@ public class SynapseCamera {
   /** The topic for recording status */
   public static final String kRecordStatusTopic = "record";
 
-  /** A map for associating result classes with their corresponding data types as strings */
-  private static Map<Class<?>, String> registeredResultTypes = new HashMap<>();
+  /** The topic for pipeline type */
+  public static final String kPipelineTypeTopic = "pipeline_type";
+
+  /** The topic for results data */
+  public static final String kResultsTopic = "results";
 
   /** Unique identifier for this Synapse instance */
   private final int m_id;
 
-  /** The main NetworkTable instance used for storing and retrieving Synapse-related data */
+  /** Main NetworkTable instance for this camera. */
   private NetworkTable m_table;
 
-  /** The NetworkTable used for storing detection and result data */
+  /** Subtable storing detection and result data. */
   private NetworkTable m_dataTable;
 
-  /** The NetworkTable used for storing camera and pipeline settings */
+  /** Subtable storing camera and pipeline settings. */
   private NetworkTable m_settingsTable;
 
-  /** The NetworkTableEntry representing the selected vision processing pipeline */
+  /** NetworkTableEntry representing the selected vision processing pipeline. */
   private NetworkTableEntry m_pipelineEntry;
 
-  /** The NetworkTableEntry representing the camera's recording status */
+  /** NetworkTableEntry storing the pipeline type string. */
+  private NetworkTableEntry m_pipelineTypeEntry;
+
+  /** NetworkTableEntry storing the raw results data. */
+  private NetworkTableEntry m_resultsTopic;
+
+  /** NetworkTableEntry representing the camera's recording status. */
   private NetworkTableEntry m_recordStateEntry;
 
   /**
@@ -58,12 +68,15 @@ public class SynapseCamera {
    */
   public SynapseCamera(int id) {
     m_id = id;
-    m_table =
-        NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
+
+    if (!isJUnitTest()) { // JUnit crashes ntcore for some reason
+      m_table =
+          NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
+    }
   }
 
   /**
-   * Sets the camera pipeline.
+   * Sets the camera pipeline ID.
    *
    * @param pipeline The pipeline ID to set.
    */
@@ -115,77 +128,84 @@ public class SynapseCamera {
   }
 
   /**
-   * Retrieves detection results of a given type from the default "results" key.
-   *
-   * @param clazz The class type of the results.
-   * @param <T> The type parameter.
-   * @return A list of detected results.
-   * @throws IllegalArgumentException If the result type does not match the expected type.
-   */
-  public <T> List<T> getResults(Class<T> clazz) throws IllegalArgumentException {
-    return getResults("results", clazz);
-  }
-
-  /**
-   * Retrieves detection results with a specified key.
-   *
-   * @param resultsKey The key for retrieving results.
-   * @param clazz The class type of the results.
-   * @param <T> The type parameter.
-   * @return A list of detected results.
-   * @throws IllegalArgumentException If the result type does not match the expected type.
-   */
-  public <T> List<T> getResults(String resultsKey, Class<T> clazz) throws IllegalArgumentException {
-    String jsonString = getDataEntry(resultsKey).getString("{\"data\":[],\"type\":\"\"}");
-
-    if (jsonString.isEmpty() || jsonString.equals("{\"data\":[],\"type\":\"\"}")) {
-      return new ArrayList<>();
-    }
-
-    ObjectMapper objectMapper =
-        new ObjectMapper()
-            .registerModule(new ParameterNamesModule())
-            .registerModule(new Jdk8Module());
-    try {
-      Map<String, Object> resultMap = objectMapper.readValue(jsonString, new TypeReference<>() {});
-
-      String actualTypeString = (String) resultMap.get("type");
-
-      String requestedTypeString =
-          registeredResultTypes.computeIfAbsent(
-              clazz,
-              c -> {
-                if (c.isAnnotationPresent(RegisterSynapseResult.class)) {
-                  return c.getAnnotation(RegisterSynapseResult.class).type();
-                }
-                throw new RuntimeException(
-                    "Class " + c.getName() + " lacks @RegisterSynapseResult annotation.");
-              });
-
-      if (!actualTypeString.equals(requestedTypeString)) {
-        throw new RuntimeException(
-            "Type mismatch. Expected: " + requestedTypeString + ", but found: " + actualTypeString);
-      }
-
-      List<?> dataList = (List<?>) resultMap.get("data");
-
-      return dataList.stream()
-          .map(item -> objectMapper.convertValue(item, clazz))
-          .collect(Collectors.toList());
-
-    } catch (JsonProcessingException e) {
-      e.printStackTrace();
-    }
-    return new ArrayList<>();
-  }
-
-  /**
    * Retrieves the camera ID.
    *
    * @return The camera ID.
    */
   public int getCameraID() {
     return m_id;
+  }
+
+  /**
+   * Fetches and deserializes the results for a given SynapsePipeline in a type-safe way.
+   *
+   * @param pipeline The SynapsePipeline to fetch results from.
+   * @param <T> The expected result type of the pipeline.
+   * @return The deserialized result.
+   * @throws IOException if reading or deserialization fails.
+   */
+  public <T> T getResults(SynapsePipeline<T> pipeline) throws IOException {
+    return getResults(pipeline.getTypeReference(), pipeline.typestring);
+  }
+
+  /**
+   * Fetches and deserializes data from the NetworkTables results topic into the specified type.
+   *
+   * @param <T> The type of the object to deserialize.
+   * @param typeref The TypeReference describing the target type.
+   * @param typestring The expected pipeline type string; used to validate the entry.
+   * @return An object of type {@code T}, deserialized from the raw NetworkTables data.
+   * @throws StreamReadException If the input stream cannot be read properly.
+   * @throws DatabindException If there is a problem mapping the JSON bytes to the target type.
+   * @throws IOException If there is a low-level I/O problem accessing the NetworkTables data.
+   */
+  public <T> T getResults(TypeReference<T> typeref, String typestring)
+      throws StreamReadException, DatabindException, IOException {
+    if (m_resultsTopic == null) {
+      m_resultsTopic = getDataEntry(kResultsTopic);
+    }
+    if (m_resultsTopic == null) {
+      throw new IllegalStateException("Results topic is null");
+    }
+    if (!getPipelineType().equals(typestring)) {
+      throw new IllegalArgumentException(
+          "Pipeline type mismatch: expected " + typestring + " but got " + getPipelineType());
+    }
+
+    byte[] data = m_resultsTopic.getRaw(new byte[0]);
+    return getResults(typeref, data);
+  }
+
+  /**
+   * Deserializes the given byte array into an object of the specified type.
+   *
+   * <p>This method supports both JSON and MessagePack formats, depending on the configured
+   * ObjectMapper.
+   *
+   * @param <T> The type of the result object.
+   * @param typeref The TypeReference describing the expected type of the result.
+   * @param data The serialized data as a byte array.
+   * @return An instance of type T deserialized from the provided data.
+   * @throws StreamReadException If there is a low-level I/O or format problem while reading.
+   * @throws DatabindException If there is a problem mapping the data to the specified type.
+   * @throws IOException If a general I/O error occurs during deserialization.
+   */
+  public <T> T getResults(TypeReference<T> typeref, byte[] data)
+      throws StreamReadException, DatabindException, IOException {
+    return s_ObjectMapper.readValue(data, typeref);
+  }
+
+  /**
+   * Gets the pipeline type string from the camera.
+   *
+   * @return The pipeline type string; "unknown" if not set.
+   */
+  public String getPipelineType() {
+    if (m_pipelineTypeEntry == null) {
+      m_pipelineTypeEntry = m_table.getEntry(kPipelineTypeTopic);
+    }
+    assert m_pipelineTypeEntry != null;
+    return m_pipelineTypeEntry.getString("unknown");
   }
 
   /**
@@ -261,12 +281,29 @@ public class SynapseCamera {
     }
   }
 
-  /** Similar Javadoc applies for the other overloaded setSetting methods... */
+  /**
+   * Throws a standardized runtime exception for type mismatches.
+   *
+   * @param key The setting key.
+   * @param actual The actual NetworkTableType found.
+   * @param expected The expected type as a string.
+   */
   private void throwTypeMismatchException(String key, NetworkTableType actual, String expected) {
     throw new RuntimeException(
         String.format(
             "[Synapse]: Type mismatch for setting (%s). Expected: %s, but found: %s",
             key, expected, actual.toString()));
+  }
+
+  /**
+   * Creates and configures the ObjectMapper for MessagePack and WPILib geometry support.
+   *
+   * @return A configured ObjectMapper instance.
+   */
+  private static ObjectMapper createMapper() {
+    ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
+    mapper.registerModule(new WPILibGeometryModule());
+    return mapper;
   }
 
   /**
@@ -298,5 +335,27 @@ public class SynapseCamera {
     CameraSettings(String key) {
       this.key = key;
     }
+  }
+
+  /**
+   * Checks if the current code is running inside a unit test framework.
+   *
+   * <p>This method inspects the current thread's stack trace and looks for class names associated
+   * with popular test frameworks, such as JUnit 4/5 and TestNG. If any stack frame indicates that a
+   * test framework is active, it returns {@code true}.
+   *
+   * @return {@code true} if the current code is executing inside a unit test, {@code false}
+   *     otherwise
+   */
+  public static boolean isJUnitTest() {
+    for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+      String className = element.getClassName();
+      if (className.startsWith("org.junit.") // JUnit 4 internal
+          || className.startsWith("org.junit.jupiter.") // JUnit 5
+          || className.startsWith("org.testng.")) { // Optional: TestNG
+        return true;
+      }
+    }
+    return false;
   }
 }

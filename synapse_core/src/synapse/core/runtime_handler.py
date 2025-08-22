@@ -1083,6 +1083,9 @@ class RuntimeManager:
             self.__pipelineEntryCache[cameraIndex] = table.getEntry(pipeline_entryPath)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
+        getCameraTable(cameraIndex).getEntry("pipeline_type").setString(
+            self.pipelineLoader.pipelineTypeNames.get(pipelineIndex, "unknown")
+        )
 
     def processCamera(self, cameraIndex: CameraID):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
