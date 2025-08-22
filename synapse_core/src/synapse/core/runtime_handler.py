@@ -924,8 +924,8 @@ class RuntimeManager:
             )
 
         if cameraTable is not None:
-            setattr(currPipeline, "nt_table", cameraTable)
-            setattr(currPipeline, "builder_cache", {})
+            currPipeline.nt_table = cameraTable
+
             pipeline_config.sendSettings(
                 cameraTable.getSubTable(NTKeys.kSettings.value)
             )

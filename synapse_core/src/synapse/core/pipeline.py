@@ -15,7 +15,7 @@ from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
 from synapse_net.socketServer import WebSocketServer
 
 from ..stypes import CameraID, Frame, PipelineID
-from .results_api import PipelineResult
+from .results_api import PipelineResult, serializePipelineResult
 from .settings_api import (PipelineSettings, Setting, SettingsAPI,
                            SettingsValue, TConstraintType, TSettingValueType,
                            settingValueToProto)
@@ -78,7 +78,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         """
         pass
 
-    def setDataValue(self, key: str, value: Any) -> None:
+    def setDataValue(self, key: str, value: Any, isMsgpack: bool = False) -> None:
         """
         Sets a value in the network table.
 
@@ -93,7 +93,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
                 createMessage(
                     MessageTypeProto.SET_PIPELINE_RESULT,
                     PipelineResultProto(
-                        is_msgpack=False,
+                        is_msgpack=isMsgpack,
                         key=key,
                         value=settingValueToProto(value),
                         pipeline_index=self.pipelineIndex,
@@ -102,7 +102,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             )
 
     def setResults(self, value: TResultType) -> None:
-        self.setDataValue("results", value)  # TODO: Make it use msgpack to serialize
+        self.setDataValue("results", serializePipelineResult(value), isMsgpack=True)
 
     @overload
     def getSetting(self, setting: str) -> Optional[Any]: ...

@@ -14,7 +14,7 @@ RemoteConnectionIP = str
 
 
 @lru_cache
-def teamNumberToIP(teamNumber: int, lastOctet: int) -> str:
+def teamNumberToIP(teamNumber: int, lastOctet: int = 1) -> str:
     te = str(teamNumber // 100)
     am = str(teamNumber % 100).zfill(2)
     return f"10.{te}.{am}.{lastOctet}"
@@ -52,6 +52,7 @@ class NtClient:
         NtClient.NT_TABLE = name
         # Initialize NetworkTables instance
         self.nt_inst = NetworkTableInstance.getDefault()
+        self.teamNumber = teamNumber
 
         # If acting as a server, create and start the server instance
         if isServer:
@@ -75,13 +76,17 @@ class NtClient:
             if event.is_(EventFlags.kConnected):
                 assert isinstance(event.data, ConnectionInfo)
 
-                log(f"Connected to NetworkTables server ({event.data.remote_ip})")
-                NtClient.onConnect.call(event.data.remote_ip)
+                if event.data.remote_ip == teamNumberToIP(self.teamNumber):
+                    log(f"Connected to NetworkTables server ({event.data.remote_ip})")
+                    NtClient.onConnect.call(event.data.remote_ip)
             elif event.is_(EventFlags.kDisconnected):
                 assert isinstance(event.data, ConnectionInfo)
 
-                log(f"Disconnected from NetworkTables server {event.data.remote_ip}")
-                NtClient.onDisconnect.call(event.data.remote_ip)
+                if event.data.remote_ip == teamNumberToIP(self.teamNumber):
+                    log(
+                        f"Disconnected from NetworkTables server {event.data.remote_ip}"
+                    )
+                    NtClient.onDisconnect.call(event.data.remote_ip)
 
         NetworkTableInstance.getDefault().addConnectionListener(
             True, connectionListener

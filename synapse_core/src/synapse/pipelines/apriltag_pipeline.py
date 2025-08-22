@@ -165,7 +165,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setDataValue("results", ApriltagsJson.empty())
+            self.setResults(ApriltagsJson.empty())
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
@@ -504,12 +504,12 @@ class ApriltagFieldJson:
 
 
 class ApriltagsJson:
-    _emptyJson: Optional[str] = None
+    _emptyJson: Optional[dict] = None
 
     @classmethod
     def toJsonString(
         cls, tags: List[ApriltagResult], ignore_keys: Optional[set] = None
-    ) -> str:
+    ) -> dict:
         ignore_keys = set(
             ignore_keys or []
         )  # Convert ignore_keys to a set for fast lookup
@@ -530,17 +530,13 @@ class ApriltagsJson:
                 }
             )
 
-        return json.dumps(
-            {
-                "data": data,
-                "type": "apriltag",
-            },
-            cls=cls.Encoder,
-            separators=(",", ":"),
-        )
+        return {
+            "data": data,
+            "type": "apriltag",
+        }
 
     @classmethod
-    def empty(cls) -> str:
+    def empty(cls) -> dict:
         if cls._emptyJson is not None:
             return cls._emptyJson
         else:
