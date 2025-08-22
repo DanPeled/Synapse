@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { AlertProto } from "./alert";
 import {
   CalibrationDataProto,
   CameraPerformanceProto,
@@ -62,6 +63,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS = 23,
   MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24,
   MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT = 25,
+  MESSAGE_TYPE_PROTO_ALERT = 26,
   UNRECOGNIZED = -1,
 }
 
@@ -145,6 +147,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 25:
     case "MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT;
+    case 26:
+    case "MESSAGE_TYPE_PROTO_ALERT":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_ALERT;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -206,6 +211,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT:
       return "MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_ALERT:
+      return "MESSAGE_TYPE_PROTO_ALERT";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -254,6 +261,8 @@ export interface MessageProto {
   setConnectionInfo?: SetConnectionInfoProto | undefined;
   /** Result of a pipeline operation */
   pipelineResult?: PipelineResultProto | undefined;
+  /** Alert message containing alert data */
+  alert?: AlertProto | undefined;
   /** List of pipeline types available in the system */
   pipelineTypeInfo: PipelineTypeProto[];
 }
@@ -280,6 +289,7 @@ function createBaseMessageProto(): MessageProto {
     setCameraRecordingStatus: undefined,
     setConnectionInfo: undefined,
     pipelineResult: undefined,
+    alert: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -396,6 +406,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         message.pipelineResult,
         writer.uint32(170).fork(),
       ).join();
+    }
+    if (message.alert !== undefined) {
+      AlertProto.encode(message.alert, writer.uint32(178).fork()).join();
     }
     for (const v of message.pipelineTypeInfo) {
       PipelineTypeProto.encode(v!, writer.uint32(162).fork()).join();
@@ -614,6 +627,14 @@ export const MessageProto: MessageFns<MessageProto> = {
           );
           continue;
         }
+        case 22: {
+          if (tag !== 178) {
+            break;
+          }
+
+          message.alert = AlertProto.decode(reader, reader.uint32());
+          continue;
+        }
         case 20: {
           if (tag !== 162) {
             break;
@@ -692,6 +713,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       pipelineResult: isSet(object.pipelineResult)
         ? PipelineResultProto.fromJSON(object.pipelineResult)
+        : undefined,
+      alert: isSet(object.alert)
+        ? AlertProto.fromJSON(object.alert)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -785,6 +809,9 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.pipelineResult !== undefined) {
       obj.pipelineResult = PipelineResultProto.toJSON(message.pipelineResult);
+    }
+    if (message.alert !== undefined) {
+      obj.alert = AlertProto.toJSON(message.alert);
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -887,6 +914,10 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.pipelineResult =
       object.pipelineResult !== undefined && object.pipelineResult !== null
         ? PipelineResultProto.fromPartial(object.pipelineResult)
+        : undefined;
+    message.alert =
+      object.alert !== undefined && object.alert !== null
+        ? AlertProto.fromPartial(object.alert)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||
