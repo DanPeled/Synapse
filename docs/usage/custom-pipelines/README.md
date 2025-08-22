@@ -1,5 +1,6 @@
 ---
 description: An intro to writing custom pipelines
+icon: person-military-pointing
 ---
 
 # Custom Pipelines

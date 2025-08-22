@@ -1,3 +1,7 @@
+---
+icon: earth-europe
+---
+
 # Accessing Global Settings
 
 The Global Settings in Synapse store:

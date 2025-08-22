@@ -1,3 +1,7 @@
+---
+icon: hands-holding-circle
+---
+
 # Project Management
 
 In order to create a new project on your local machine, you will need to run the following command:

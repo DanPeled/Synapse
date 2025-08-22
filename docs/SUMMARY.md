@@ -28,6 +28,7 @@
 * [Working without a robot](usage/working-without-a-robot.md)
 * [Custom Pipelines](usage/custom-pipelines/README.md)
   * [Settings API](usage/custom-pipelines/settings-api.md)
+  * [Sending Results](usage/custom-pipelines/sending-results.md)
   * [Accessing Global Settings](usage/custom-pipelines/accessing-global-settings.md)
 
 ## Robot Interfacing

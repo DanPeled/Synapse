@@ -1,5 +1,6 @@
 ---
 description: Overview of the Settings API and it's built in constraints
+icon: sliders-up
 ---
 
 # Settings API
