@@ -11,7 +11,8 @@ import edu.wpi.first.networktables.NetworkTableType;
 import java.io.IOException;
 import java.util.Optional;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
-import synapse.util.deserializers.WPILibGeometryModule;
+
+// import synapse.util.deserializers.WPILibGeometryModule;
 
 /**
  * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
@@ -302,7 +303,7 @@ public class SynapseCamera {
    */
   private static ObjectMapper createMapper() {
     ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
-    mapper.registerModule(new WPILibGeometryModule());
+    // mapper.registerModule(new WPILibGeometryModule());
     return mapper;
   }
 

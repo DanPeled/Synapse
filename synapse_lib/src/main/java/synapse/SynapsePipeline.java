@@ -2,6 +2,7 @@ package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.List;
+import synapse.pipelines.apriltag.ApriltagResult;
 
 /**
  * Represents a Synapse pipeline. Each pipeline is associated with a result class that defines the
