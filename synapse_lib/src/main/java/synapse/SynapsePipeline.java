@@ -1,25 +1,47 @@
 package synapse;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.List;
+import synapse.pipelines.apriltag.ApriltagResult;
+
 /**
- * Enum representing the different Synapse pipelines. Each pipeline is associated with a result
- * class that defines the type of data returned.
+ * Represents a Synapse pipeline. Each pipeline is associated with a result class that defines the
+ * type of data returned.
+ *
+ * @param <T> the type of result data returned by this pipeline, typically a List or Map of results
  */
-enum SynapsePipeline {
+public class SynapsePipeline<T> {
 
   /**
-   * The AprilTag pipeline. This pipeline uses the ApriltagResult class to store the result data.
+   * The AprilTag pipeline. This pipeline uses the {@link ApriltagResult} class to store the result
+   * data.
    */
-  kApriltag(ApriltagResult.class);
+  public static final SynapsePipeline<List<ApriltagResult>> kApriltag =
+      new SynapsePipeline<>(new TypeReference<List<ApriltagResult>>() {}, "ApriltagPipeline");
 
-  /** The class that represents the result type for this pipeline. */
-  public final Class<?> clazz;
+  /** The TypeReference representing the result type for this pipeline. */
+  private final TypeReference<T> typeRef;
+
+  /** The string identifier for this pipeline, used as the topic name. */
+  public final String typestring;
 
   /**
-   * Constructor for the SynapsePipeline enum.
+   * Constructor for the SynapsePipeline class.
    *
-   * @param clazz The class associated with this pipeline's result data.
+   * @param typeRef The TypeReference associated with this pipeline's result data.
+   * @param typestring The string identifier for this pipeline.
    */
-  SynapsePipeline(Class<?> clazz) {
-    this.clazz = clazz;
+  public SynapsePipeline(TypeReference<T> typeRef, String typestring) {
+    this.typeRef = typeRef;
+    this.typestring = typestring;
+  }
+
+  /**
+   * Gets the TypeReference for this pipeline.
+   *
+   * @return The TypeReference representing the result type {@code T}.
+   */
+  public TypeReference<T> getTypeReference() {
+    return typeRef;
   }
 }

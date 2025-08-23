@@ -5,7 +5,6 @@
 from dataclasses import dataclass
 from math import radians
 
-# test_results_api_full.py
 import msgpack
 from synapse.core import results_api as api
 from wpimath import geometry
@@ -125,51 +124,36 @@ def test_parse_primitives():
 
 def test_parse_geometry():
     # Translation
-    assert api.parsePipelineResult(PRTranslation2d(1, 2))["translation"] == {
-        "type": "Translation2d",
-        "value": [1, 2],
-    }
-    assert api.parsePipelineResult(PRTranslation3d(1, 2, 3))["translation"] == {
-        "type": "Translation3d",
-        "value": [1, 2, 3],
-    }
+    assert api.parsePipelineResult(PRTranslation2d(1, 2))["translation"] == [1, 2]
+    assert api.parsePipelineResult(PRTranslation3d(1, 2, 3))["translation"] == [1, 2, 3]
 
     # Rotation
     r2d_obj = geometry.Rotation2d(radians(45))
     parsed2d = api.parsePipelineResult(PRRotation2d(45))["rotation"]
-    assert parsed2d == {"type": "Rotation2d", "value": r2d_obj.degrees()}
+    assert parsed2d == r2d_obj.degrees()
 
     r3d_obj = geometry.Rotation3d(radians(10), radians(20), radians(30))
     parsed3d = api.parsePipelineResult(PRRotation3d(10, 20, 30))["rotation"]
-    expected3d = {
-        "type": "Rotation3d",
-        "value": [r3d_obj.x_degrees, r3d_obj.y_degrees, r3d_obj.z_degrees],
-    }
+    expected3d = [r3d_obj.x_degrees, r3d_obj.y_degrees, r3d_obj.z_degrees]
     assert parsed3d == expected3d
 
     # Pose
     p2d_obj = geometry.Pose2d(5, 7, geometry.Rotation2d(radians(90)))
     parsed_p2d = api.parsePipelineResult(PRPose2d(5, 7, 90))["pose"]
-    assert parsed_p2d == {
-        "type": "Pose2d",
-        "value": [p2d_obj.X(), p2d_obj.Y(), p2d_obj.rotation().degrees()],
-    }
+    assert parsed_p2d == [p2d_obj.X(), p2d_obj.Y(), p2d_obj.rotation().degrees()]
 
     p3d_obj = geometry.Pose3d(
         1, 2, 3, geometry.Rotation3d(radians(10), radians(20), radians(30))
     )
     parsed_p3d = api.parsePipelineResult(PRPose3d(1, 2, 3, 10, 20, 30))["pose"]
-    expected_p3d = {
-        "type": "Pose3d",
-        "value": [
-            p3d_obj.X(),
-            p3d_obj.Y(),
-            p3d_obj.Z(),
-            p3d_obj.rotation().x_degrees,
-            p3d_obj.rotation().y_degrees,
-            p3d_obj.rotation().z_degrees,
-        ],
-    }
+    expected_p3d = [
+        p3d_obj.X(),
+        p3d_obj.Y(),
+        p3d_obj.Z(),
+        p3d_obj.rotation().x_degrees,
+        p3d_obj.rotation().y_degrees,
+        p3d_obj.rotation().z_degrees,
+    ]
     assert parsed_p3d == expected_p3d
 
     # Transform
@@ -177,14 +161,11 @@ def test_parse_geometry():
         geometry.Translation2d(1, 2), geometry.Rotation2d(radians(90))
     )
     parsed_t2d = api.parsePipelineResult(PRTransform2d(1, 2, 90))["transform"]
-    assert parsed_t2d == {
-        "type": "Transform2d",
-        "value": [
-            t2d_obj.translation().X(),
-            t2d_obj.translation().Y(),
-            t2d_obj.rotation().degrees(),
-        ],
-    }
+    assert parsed_t2d == [
+        t2d_obj.translation().X(),
+        t2d_obj.translation().Y(),
+        t2d_obj.rotation().degrees(),
+    ]
 
     t3d_obj = geometry.Transform3d(
         geometry.Translation3d(1, 2, 3),
@@ -193,37 +174,28 @@ def test_parse_geometry():
     parsed_t3d = api.parsePipelineResult(PRTransform3d(1, 2, 3, 10, 20, 30))[
         "transform"
     ]
-    expected_t3d = {
-        "type": "Transform3d",
-        "value": [
-            t3d_obj.translation().X(),
-            t3d_obj.translation().Y(),
-            t3d_obj.translation().Z(),
-            t3d_obj.rotation().x_degrees,
-            t3d_obj.rotation().y_degrees,
-            t3d_obj.rotation().z_degrees,
-        ],
-    }
+    expected_t3d = [
+        t3d_obj.translation().X(),
+        t3d_obj.translation().Y(),
+        t3d_obj.translation().Z(),
+        t3d_obj.rotation().x_degrees,
+        t3d_obj.rotation().y_degrees,
+        t3d_obj.rotation().z_degrees,
+    ]
     assert parsed_t3d == expected_t3d
 
     # Twist
-    assert api.parsePipelineResult(PRTwist2d(1, 2, 3))["twist"] == {
-        "type": "Twist2d",
-        "value": [1, 2, 3],
-    }
+    assert api.parsePipelineResult(PRTwist2d(1, 2, 3))["twist"] == [1, 2, 3]
     twist3d_obj = geometry.Twist3d(1, 2, 3, radians(4), radians(5), radians(6))
     parsed_twist3d = api.parsePipelineResult(PRTwist3d(1, 2, 3, 4, 5, 6))["twist"]
-    expected_twist3d = {
-        "type": "Twist3d",
-        "value": [
-            twist3d_obj.dx,
-            twist3d_obj.dy,
-            twist3d_obj.dz,
-            twist3d_obj.rx,
-            twist3d_obj.ry,
-            twist3d_obj.rz,
-        ],
-    }
+    expected_twist3d = [
+        twist3d_obj.dx,
+        twist3d_obj.dy,
+        twist3d_obj.dz,
+        twist3d_obj.rx,
+        twist3d_obj.ry,
+        twist3d_obj.rz,
+    ]
     assert parsed_twist3d == expected_twist3d
 
 
@@ -260,4 +232,4 @@ def test_serialize_pipeline_result_msgpack():
     pr = PRTranslation2d(1, 2)
     packed = api.serializePipelineResult(pr)
     unpacked = msgpack.unpackb(packed, raw=False)
-    assert unpacked["translation"] == {"type": "Translation2d", "value": [1, 2]}
+    assert unpacked["translation"] == [1, 2]

@@ -18,76 +18,56 @@ class PipelineResult: ...
 
 
 def serializeTranslation2d(obj: geometry.Translation2d):
-    return {"type": "Translation2d", "value": [obj.X(), obj.Y()]}
+    return [obj.X(), obj.Y()]
 
 
 def serializeTranslation3d(obj: geometry.Translation3d):
-    return {"type": "Translation3d", "value": [obj.X(), obj.Y(), obj.Z()]}
+    return [obj.X(), obj.Y(), obj.Z()]
 
 
 def serializeRotation2d(obj: geometry.Rotation2d):
-    return {"type": "Rotation2d", "value": obj.degrees()}
+    return obj.degrees()
 
 
 def serializeRotation3d(obj: geometry.Rotation3d):
-    return {
-        "type": "Rotation3d",
-        "value": [obj.x_degrees, obj.y_degrees, obj.z_degrees],
-    }
+    return [obj.x_degrees, obj.y_degrees, obj.z_degrees]
 
 
 def serializePose2d(obj: geometry.Pose2d):
-    return {"type": "Pose2d", "value": [obj.X(), obj.Y(), obj.rotation().degrees()]}
+    t = obj.translation()
+    r = obj.rotation()
+    return [t.X(), t.Y(), r.degrees()]
 
 
 def serializePose3d(obj: geometry.Pose3d):
-    return {
-        "type": "Pose3d",
-        "value": [
-            obj.X(),
-            obj.Y(),
-            obj.Z(),
-            obj.rotation().x_degrees,
-            obj.rotation().y_degrees,
-            obj.rotation().z_degrees,
-        ],
-    }
+    return [
+        obj.X(),
+        obj.Y(),
+        obj.Z(),
+        obj.rotation().x_degrees,
+        obj.rotation().y_degrees,
+        obj.rotation().z_degrees,
+    ]
 
 
 def serializeTransform2d(obj: geometry.Transform2d):
-    return {
-        "type": "Transform2d",
-        "value": [
-            obj.translation().X(),
-            obj.translation().Y(),
-            obj.rotation().degrees(),
-        ],
-    }
+    t = obj.translation()
+    r = obj.rotation()
+    return [t.X(), t.Y(), r.degrees()]
 
 
 def serializeTransform3d(obj: geometry.Transform3d):
-    return {
-        "type": "Transform3d",
-        "value": [
-            obj.translation().X(),
-            obj.translation().Y(),
-            obj.translation().Z(),
-            obj.rotation().x_degrees,
-            obj.rotation().y_degrees,
-            obj.rotation().z_degrees,
-        ],
-    }
+    t = obj.translation()
+    r = obj.rotation()
+    return [t.X(), t.Y(), t.Z(), r.x_degrees, r.y_degrees, r.z_degrees]
 
 
 def serializeTwist2d(obj: geometry.Twist2d):
-    return {"type": "Twist2d", "value": [obj.dx, obj.dy, obj.dtheta]}
+    return [obj.dx, obj.dy, obj.dtheta]
 
 
 def serializeTwist3d(obj: geometry.Twist3d):
-    return {
-        "type": "Twist3d",
-        "value": [obj.dx, obj.dy, obj.dz, obj.rx, obj.ry, obj.rz],
-    }
+    return [obj.dx, obj.dy, obj.dz, obj.rx, obj.ry, obj.rz]
 
 
 def parsePipelineResult(

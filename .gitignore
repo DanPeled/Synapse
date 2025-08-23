@@ -6,3 +6,4 @@ build/
 dist/
 .uistart
 *.avi
+synapse_lib/vendordep/docs/**

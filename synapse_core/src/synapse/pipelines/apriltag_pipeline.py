@@ -508,7 +508,7 @@ class ApriltagsJson:
     @classmethod
     def toJsonString(
         cls, tags: List[ApriltagResult], ignore_keys: Optional[set] = None
-    ) -> dict:
+    ) -> List[dict[str, Any]]:
         ignore_keys = set(
             ignore_keys or []
         )  # Convert ignore_keys to a set for fast lookup
@@ -529,18 +529,11 @@ class ApriltagsJson:
                 }
             )
 
-        return {
-            "data": data,
-            "type": "apriltag",
-        }
+        return data  # only return the list, not a wrapper dict
 
     @classmethod
-    def empty(cls) -> dict:
-        if cls._emptyJson is not None:
-            return cls._emptyJson
-        else:
-            cls._emptyJson = cls.toJsonString([])
-            return cls._emptyJson
+    def empty(cls) -> List[dict[str, Any]]:
+        return []
 
     class Encoder(json.JSONEncoder):
         def default(self, o):

@@ -49,8 +49,14 @@ dependencies {
     implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
     implementation 'edu.wpi.first.thirdparty.frc2025.opencv:opencv-java:4.10.0-2'
 
+    implementation "org.msgpack:jackson-dataformat-msgpack:0.9.10"
+    implementation "org.msgpack:msgpack-core:0.9.10"
+    annotationProcessor "org.msgpack:jackson-dataformat-msgpack:0.9.10"
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.mockito:mockito-core:5.5.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.5.0'
 }
 
 // Set up Java tests
