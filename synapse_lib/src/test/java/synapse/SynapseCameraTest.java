@@ -17,7 +17,7 @@ class SynapseCameraTest {
 
   @BeforeEach
   void setup() {
-    camera = new SynapseCamera(0);
+    camera = new SynapseCamera("TestCamera");
   }
 
   @Test

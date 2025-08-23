@@ -38,8 +38,8 @@ public class SynapseCamera {
   /** The topic for results data */
   public static final String kResultsTopic = "results";
 
-  /** Unique identifier for this Synapse instance */
-  private final int m_id;
+  /** Unique identifier for this SynapseCamera instance */
+  private final String m_cameraName;
 
   /** Main NetworkTable instance for this camera. */
   private NetworkTable m_table;
@@ -65,14 +65,13 @@ public class SynapseCamera {
   /**
    * Constructs a new SynapseCamera instance.
    *
-   * @param id The camera ID.
+   * @param cameraName the camera's name.
    */
-  public SynapseCamera(int id) {
-    m_id = id;
+  public SynapseCamera(String cameraName) {
+    m_cameraName = cameraName;
 
     if (!isJUnitTest()) { // JUnit crashes ntcore for some reason
-      m_table =
-          NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable("camera" + m_id);
+      m_table = NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable(m_cameraName);
     }
   }
 
@@ -129,12 +128,12 @@ public class SynapseCamera {
   }
 
   /**
-   * Retrieves the camera ID.
+   * Retrieves the camera name.
    *
-   * @return The camera ID.
+   * @return The camera name.
    */
-  public int getCameraID() {
-    return m_id;
+  public String getCameraName() {
+    return m_cameraName;
   }
 
   /**

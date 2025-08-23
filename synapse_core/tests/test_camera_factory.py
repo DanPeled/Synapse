@@ -13,9 +13,6 @@ from synapse.core.camera_factory import CsCoreCamera
 
 
 class TestUtilityFunctions(unittest.TestCase):
-    def test_getCameraTableName(self):
-        self.assertEqual(synapse.core.camera_factory.getCameraTableName(2), "camera2")
-
     def test_cscoreToOpenCVProp(self):
         self.assertEqual(
             synapse.core.camera_factory.cscoreToOpenCVProp("brightness"),

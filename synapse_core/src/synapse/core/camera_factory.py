@@ -64,10 +64,6 @@ class CameraSettingsKeys(Enum):
     kPipelineType = "pipeline_t"
 
 
-def getCameraTableName(cameraIndex: CameraID) -> str:
-    return f"camera{cameraIndex}"
-
-
 @dataclass
 class CalibrationData:
     matrix: List[float]
@@ -154,15 +150,6 @@ class CameraConfigKey(Enum):
     kMeanErr = "mean_err"
 
 
-@cache
-def getCameraTable(cameraIndex: CameraID) -> NetworkTable:
-    return (
-        NetworkTableInstance.getDefault()
-        .getTable(NtClient.NT_TABLE)
-        .getSubTable(getCameraTableName(cameraIndex))
-    )
-
-
 def cscoreToOpenCVProp(prop: str) -> Optional[int]:
     return CSCORE_TO_CV_PROPS.get(prop)
 
@@ -227,14 +214,14 @@ class SynapseCamera(ABC):
 
     def getSettingEntry(self, key: str) -> Optional[NetworkTableEntry]:
         if hasattr(self, "cameraIndex"):
-            table: NetworkTable = getCameraTable(self.cameraIndex)
+            table: NetworkTable = getCameraTable(self)
             entry: NetworkTableEntry = table.getEntry(key)
             return entry
         return None
 
     def getSetting(self, key: str, defaultValue: Any) -> Any:
         if hasattr(self, "cameraIndex"):
-            table: NetworkTable = getCameraTable(self.cameraIndex)
+            table: NetworkTable = getCameraTable(self)
             entry: NetworkTableEntry = table.getEntry(key)
             if not entry.exists():
                 entry.setValue(defaultValue)
@@ -243,7 +230,7 @@ class SynapseCamera(ABC):
 
     def setSetting(self, key: str, value: Any) -> None:
         if hasattr(self, "cameraIndex"):
-            table: NetworkTable = getCameraTable(self.cameraIndex)
+            table: NetworkTable = getCameraTable(self)
             entry: NetworkTableEntry = table.getEntry(key)
             entry.setValue(value)
 
@@ -554,3 +541,16 @@ def cameraToProto(
         default_pipeline=defaultPipeline,
         max_fps=int(camera.getMaxFPS()),
     )
+
+
+@cache
+def getCameraTable(camera: SynapseCamera) -> NetworkTable:
+    return (
+        NetworkTableInstance.getDefault()
+        .getTable(NtClient.NT_TABLE)
+        .getSubTable(getCameraTableName(camera))
+    )
+
+
+def getCameraTableName(camera: SynapseCamera) -> str:
+    return camera.name

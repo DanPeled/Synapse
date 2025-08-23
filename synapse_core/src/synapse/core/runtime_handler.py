@@ -554,7 +554,7 @@ class CameraHandler:
             to their corresponding video output objects.
         """
         return cs.CameraServer.putVideo(
-            f"{NtClient.NT_TABLE}/{getCameraTableName(cameraIndex)}",
+            f"{NtClient.NT_TABLE}/{getCameraTableName(self.cameras[cameraIndex])}",
             width=self.getStreamRes(cameraIndex)[0],
             height=self.getStreamRes(cameraIndex)[1],
         )
@@ -598,7 +598,7 @@ class CameraHandler:
             frameSize=(height, width),
         )
 
-        log.log(f"Started recording camera #{cameraIndex} to {filename}")
+        log.log(f"Started recording camera {self.cameras[cameraIndex]} to {filename}")
         self.recordFileNames[cameraIndex] = filename
 
         return self.recordingOutputs[cameraIndex]
@@ -629,7 +629,7 @@ class CameraHandler:
                 )
             elif camera.cameraIndex in self.recordingOutputs:
                 log.log(
-                    f"Written Camera #{camera.cameraIndex} recording to {self.recordFileNames[camera.cameraIndex]}"
+                    f"Written Camera {camera.name} recording to {self.recordFileNames[camera.cameraIndex]}"
                 )
                 videoWriter = self.recordingOutputs.pop(camera.cameraIndex)
                 videoWriter.release()
@@ -664,7 +664,7 @@ class CameraHandler:
             if camera.isConnected():
                 break
             log.log(
-                f"Trying to open camera #{cameraIndex} ({cameraConfig.id}), attempt {attempt + 1}"
+                f"Trying to open camera {camera.name} ({cameraConfig.id}), attempt {attempt + 1}"
             )
             time.sleep(1)
 
@@ -681,7 +681,7 @@ class CameraHandler:
             return True
 
         log.err(
-            f"Failed to open camera #{cameraIndex} ({cameraConfig.id}) after {MAX_RETRIES} retries."
+            f"Failed to open camera {camera.name} ({cameraConfig.id}) after {MAX_RETRIES} retries."
         )
         return False
 
@@ -912,16 +912,19 @@ class RuntimeManager:
             return
 
         currPipeline.bind(cameraIndex)
-        cameraTable: Optional[NetworkTable] = getCameraTable(cameraIndex)
         camera: Optional[SynapseCamera] = self.cameraHandler.getCamera(cameraIndex)
-        if camera is not None:
-            self.cameraHandler.setCameraProps(
-                {
-                    key: pipeline_config.getSetting(key)
-                    for key in pipeline_config.getMap().keys()
-                },
-                camera,
-            )
+
+        assert camera is not None
+
+        cameraTable: Optional[NetworkTable] = getCameraTable(camera)
+
+        self.cameraHandler.setCameraProps(
+            {
+                key: pipeline_config.getSetting(key)
+                for key in pipeline_config.getMap().keys()
+            },
+            camera,
+        )
 
         if cameraTable is not None:
             currPipeline.nt_table = cameraTable
@@ -940,7 +943,7 @@ class RuntimeManager:
                 self.onSettingChangedFromNT.call(prop, value, cameraIndex)
 
             for key in pipeline_config.getMap().keys():
-                nt_table = getCameraTable(cameraIndex)
+                nt_table = getCameraTable(camera)
                 if nt_table is not None:
                     entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
 
@@ -960,7 +963,7 @@ class RuntimeManager:
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 
-        nt_table = getCameraTable(cameraIndex)
+        nt_table = getCameraTable(camera)
         entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
         if entry is not None and entry.getValue() != value:
             entry.setValue(value)
@@ -1078,19 +1081,19 @@ class RuntimeManager:
             self.__pipelineEntryCache = {}
 
         if cameraIndex not in self.__pipelineEntryCache:
-            table = getCameraTable(cameraIndex)
+            table = getCameraTable(self.cameraHandler.getCamera(cameraIndex))
             pipeline_entryPath = f"{CameraSettingsKeys.kPipeline.value}"
             self.__pipelineEntryCache[cameraIndex] = table.getEntry(pipeline_entryPath)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
-        getCameraTable(cameraIndex).getEntry("pipeline_type").setString(
-            self.pipelineLoader.pipelineTypeNames.get(pipelineIndex, "unknown")
-        )
+        getCameraTable(self.cameraHandler.getCamera(cameraIndex)).getEntry(
+            "pipeline_type"
+        ).setString(self.pipelineLoader.pipelineTypeNames.get(pipelineIndex, "unknown"))
 
     def processCamera(self, cameraIndex: CameraID):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
-        log.log(f"Started Camera #{cameraIndex} loop")
+        log.log(f"Started {camera.name} loop")
 
         while self.isRunning:
             maxFps = camera.getMaxFPS()
@@ -1118,7 +1121,7 @@ class RuntimeManager:
                     result = pipeline.processFrame(frame, loop_start)
                 except Exception as e:
                     log.err(
-                        f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for camera #{cameraIndex}: {e}\n{traceback.format_exc()}"
+                        f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for {self.cameraHandler.cameras[cameraIndex].name}: {e}\n{traceback.format_exc()}"
                     )
                 frame = self.handleResults(result, cameraIndex)
                 if frame is not None:
@@ -1180,7 +1183,9 @@ class RuntimeManager:
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        entry = getCameraTable(cameraIndex).getEntry(CameraSettingsKeys.kViewID.value)
+        entry = getCameraTable(self.cameraHandler.getCamera(cameraIndex)).getEntry(
+            CameraSettingsKeys.kViewID.value
+        )
         DEFAULT_STEP = "step_0"
 
         if result is None:
@@ -1215,7 +1220,7 @@ class RuntimeManager:
 
         self.lastLatencyReportTime = current_time
 
-        cameraTable = getCameraTable(cameraIndex)
+        cameraTable = getCameraTable(self.cameraHandler.getCamera(cameraIndex))
         cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
         cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
 
@@ -1237,7 +1242,7 @@ class RuntimeManager:
             entry = camera.getSettingEntry(CameraSettingsKeys.kPipeline.value)
 
             if entry is None:
-                entry = getCameraTable(cameraIndex=cameraIndex).getEntry(
+                entry = getCameraTable(camera).getEntry(
                     CameraSettingsKeys.kPipeline.value
                 )
 
