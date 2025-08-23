@@ -118,40 +118,50 @@ class TestRuntimeManager(unittest.TestCase):
         """
         Tests logic for automatic binding for cameras that use a removed pipeline
         """
-        on_removed = Mock()
-        self.handler.pipelineLoader.onRemovePipeline.add(on_removed)
-        self.handler.setupCallbacks()
+        with (
+            patch(
+                "synapse.core.runtime_handler.getCameraTableName",
+                return_value="FakeCamera",
+            ),
+            patch(
+                "synapse.core.runtime_handler.getCameraTable", return_value=MagicMock()
+            ),
+        ):
+            on_removed = Mock()
+            self.handler.pipelineLoader.onRemovePipeline.add(on_removed)
+            self.handler.setupCallbacks()
 
-        self.mock_camera_handler.cameras = {0: Mock()}
+            self.mock_camera_handler.cameras = {0: Mock()}
+            self.mock_camera_handler.cameras[0].name = "yeepers"
 
-        self.handler.pipelineLoader.pipelineTypes["AnotherDummy"] = DummyPipeline
-        self.handler.pipelineLoader.addPipeline(
-            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
-        )
-        self.handler.pipelineLoader.setDefaultPipeline(0, 5)
+            self.handler.pipelineLoader.pipelineTypes["AnotherDummy"] = DummyPipeline
+            self.handler.pipelineLoader.addPipeline(
+                index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+            )
+            self.handler.pipelineLoader.setDefaultPipeline(0, 5)
 
-        self.handler.pipelineLoader.pipelineTypes["DummyPipeline"] = DummyPipeline
-        self.handler.pipelineLoader.pipelineTypeNames[5] = "DummyPipeline"
+            self.handler.pipelineLoader.pipelineTypes["DummyPipeline"] = DummyPipeline
+            self.handler.pipelineLoader.pipelineTypeNames[5] = "DummyPipeline"
 
-        self.assertEqual(
-            self.handler.pipelineLoader.getPipelineTypeByIndex(5), DummyPipeline
-        )
-        self.assertEqual(
-            self.handler.pipelineLoader.getPipelineTypeByName("DummyPipeline"),
-            DummyPipeline,
-        )
+            self.assertEqual(
+                self.handler.pipelineLoader.getPipelineTypeByIndex(5), DummyPipeline
+            )
+            self.assertEqual(
+                self.handler.pipelineLoader.getPipelineTypeByName("DummyPipeline"),
+                DummyPipeline,
+            )
 
-        self.handler.pipelineLoader.addPipeline(
-            index=7, name="New Pipeline", typename="AnotherDummy", settings={}
-        )
-        self.handler.pipelineBindings[0] = 7
-        self.handler.setPipelineByIndex(0, 7)
-        self.handler.pipelineLoader.removePipeline(7)
+            self.handler.pipelineLoader.addPipeline(
+                index=7, name="New Pipeline", typename="AnotherDummy", settings={}
+            )
+            self.handler.pipelineBindings[0] = 7
+            self.handler.setPipelineByIndex(0, 7)
+            self.handler.pipelineLoader.removePipeline(7)
 
-        on_removed.assert_called_once()
-        called_args = on_removed.call_args[0]
-        self.assertEqual(called_args[0], 7)
-        self.assertEqual(self.handler.pipelineBindings[0], 5)
+            on_removed.assert_called_once()
+            called_args = on_removed.call_args[0]
+            self.assertEqual(called_args[0], 7)
+            self.assertEqual(self.handler.pipelineBindings[0], 5)
 
 
 if __name__ == "__main__":
