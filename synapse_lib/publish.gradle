@@ -49,7 +49,7 @@ ext.addTaskToCopyAllOutputs = { task ->
 
 def artifactGroupId = 'synapse'
 def baseArtifactId = 'Synapse'
-def driverZipBaseName = "_GROUP_synapse_ID_${baseArtifactId}-driver_CLS"
+// def driverZipBaseName = "_GROUP_synapse_ID_${baseArtifactId}-driver_CLS"
 def zipBaseName = "_GROUP_synapse_ID_${baseArtifactId}-cpp_CLS"
 def javaBaseName = "_GROUP_synapse_ID_${baseArtifactId}-java_CLS"
 
@@ -81,19 +81,19 @@ task cppSourceZip(type: Zip) {
     }
 }
 
-task cppDriverHeadersZip(type: Zip) {
-    destinationDirectory = outputsFolder
-    archiveBaseName = driverZipBaseName
-    archiveClassifier = "headers"
-
-    from(licenseFile) {
-        into '/'
-    }
-
-    from('src/main/driver/include') {
-        into '/'
-    }
-}
+// task cppDriverHeadersZip(type: Zip) {
+//     destinationDirectory = outputsFolder
+//     archiveBaseName = driverZipBaseName
+//     archiveClassifier = "headers"
+//
+//     from(licenseFile) {
+//         into '/'
+//     }
+//
+//     from('src/main/driver/include') {
+//         into '/'
+//     }
+// }
 
 /* Uncomment me to add C++
  build.dependsOn cppHeadersZip
@@ -200,7 +200,7 @@ model {
     publishing {
         def taskList = createComponentZipTasks($.components, ['Vendor'], zipBaseName, Zip, project, includeStandardZipFormat)
 
-        def driverTaskList = createComponentZipTasks($.components, ['VendorDriver'], driverZipBaseName, Zip, project, includeStandardZipFormat)
+        // def driverTaskList = createComponentZipTasks($.components, ['VendorDriver'], driverZipBaseName, Zip, project, includeStandardZipFormat)
 
         publications {
             /*cpp(MavenPublication) {
