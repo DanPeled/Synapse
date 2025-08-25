@@ -1,71 +1,71 @@
 {
-    "fileName": "SynapseBridge.json",
-    "name": "SynapseBridge",
-    "version": "2025.0.0a2",
-    "frcYear": "2025",
-    "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
-    "mavenUrls": [
-        "https://danpeled.github.io/synapse/synapse_lib/vendordep/maven/"
-    ],
-    "jsonUrl": "https://danpeled.github.io/synapse/synapse_lib/vendordep/synapse-2025.0.0a2.json",
-    "javaDependencies": [
-        {
-            "groupId": "synapse",
-            "artifactId": "Synapse-java",
-            "version": "2025.0.0a2"
-        }
-    ],
-    "jniDependencies": [
-        {
-            "groupId": "synapse",
-            "artifactId": "Synapse-driver",
-            "version": "2025.0.0a2",
-            "skipInvalidPlatforms": true,
-            "isJar": false,
-            "validPlatforms": [
-                "windowsx86-64",
-                "linuxarm64",
-                "linuxx86-64",
-                "linuxathena",
-                "linuxarm32",
-                "osxuniversal"
-            ]
-        }
-    ],
-    "cppDependencies": [
-        {
-            "groupId": "synapse",
-            "artifactId": "Synapse-cpp",
-            "version": "2025.0.0a2",
-            "libName": "Vendor",
-            "headerClassifier": "headers",
-            "sharedLibrary": false,
-            "skipInvalidPlatforms": true,
-            "binaryPlatforms": [
-                "windowsx86-64",
-                "linuxarm64",
-                "linuxx86-64",
-                "linuxathena",
-                "linuxarm32",
-                "osxuniversal"
-            ]
-        },
-        {
-            "groupId": "synapse",
-            "artifactId": "Synapse-driver",
-            "version": "2025.0.0a2",
-            "libName": "VendorDriver",
-            "headerClassifier": "headers",
-            "sharedLibrary": false,
-            "skipInvalidPlatforms": true,
-            "binaryPlatforms": [
-                "windowsx86-64",
-                "linuxarm64",
-                "linuxx86-64",
-                "linuxathena",
-                "linuxarm32",
-                "osxuniversal"
-            ]
-        }
-    ]
+  "fileName": "SynapseBridge.json",
+  "name": "SynapseBridge",
+  "version": "2025.0.0a2",
+  "frcYear": "2025",
+  "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
+  "mavenUrls": [
+    "https://danpeled.github.io/synapse/synapse_lib/vendordep/maven/"
+  ],
+  "jsonUrl": "https://raw.githubusercontent.com/DanPeled/Synapse/refs/heads/main/synapse_lib/vendordep/SynapseBridge.json",
+  "javaDependencies": [
+    {
+      "groupId": "synapse",
+      "artifactId": "Synapse-java",
+      "version": "2025.0.0a2"
+    }
+  ],
+  "jniDependencies": [
+    {
+      "groupId": "synapse",
+      "artifactId": "Synapse-driver",
+      "version": "2025.0.0a2",
+      "skipInvalidPlatforms": true,
+      "isJar": false,
+      "validPlatforms": [
+        "windowsx86-64",
+        "linuxarm64",
+        "linuxx86-64",
+        "linuxathena",
+        "linuxarm32",
+        "osxuniversal"
+      ]
+    }
+  ],
+  "cppDependencies": [
+    {
+      "groupId": "synapse",
+      "artifactId": "Synapse-cpp",
+      "version": "2025.0.0a2",
+      "libName": "Vendor",
+      "headerClassifier": "headers",
+      "sharedLibrary": false,
+      "skipInvalidPlatforms": true,
+      "binaryPlatforms": [
+        "windowsx86-64",
+        "linuxarm64",
+        "linuxx86-64",
+        "linuxathena",
+        "linuxarm32",
+        "osxuniversal"
+      ]
+    },
+    {
+      "groupId": "synapse",
+      "artifactId": "Synapse-driver",
+      "version": "2025.0.0a2",
+      "libName": "VendorDriver",
+      "headerClassifier": "headers",
+      "sharedLibrary": false,
+      "skipInvalidPlatforms": true,
+      "binaryPlatforms": [
+        "windowsx86-64",
+        "linuxarm64",
+        "linuxx86-64",
+        "linuxathena",
+        "linuxarm32",
+        "osxuniversal"
+      ]
+    }
+  ]
 }
