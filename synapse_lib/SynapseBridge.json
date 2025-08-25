@@ -5,7 +5,7 @@
   "frcYear": "2025",
   "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
   "mavenUrls": ["https://danpeled.github.io/Synapse/maven/"],
-  "jsonUrl": "https://raw.githubusercontent.com/DanPeled/Synapse/refs/heads/main/synapse_lib/vendordep/SynapseBridge.json",
+  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseBridge.json",
   "javaDependencies": [
     {
       "groupId": "${groupId}",
