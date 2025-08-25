@@ -1,0 +1,50 @@
+name: Publish Maven Artifacts
+
+on:
+  push:
+    tags:
+      - "v*" # triggers on any tag starting with 'v'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed to create and push branches
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Run Gradle publish
+        working-directory: synapse_lib
+        run: ./gradlew publish
+
+      - name: Prepare gh-pages branch
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          if git show-ref --verify --quiet refs/heads/gh-pages; then
+            git checkout gh-pages
+          else
+            git checkout -b gh-pages
+          fi
+
+      - name: Copy Maven artifacts
+        run: |
+          mkdir -p maven
+          cp -r synapse_lib/vendordep/maven/* maven/
+          git add maven
+          git commit -m "Add vendordep Maven artifacts" || echo "No changes to commit"
+          git push origin gh-pages
+
+      - name: Upload SynapseBridge.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: SynapseBridge-json
+          path: synapse_lib/vendordep/SynapseBridge.json
