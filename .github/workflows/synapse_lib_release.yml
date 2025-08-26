@@ -25,6 +25,10 @@ jobs:
         working-directory: synapse_lib
         run: ./gradlew installRoboRioToolchain
 
+      - name: Build SynapseLib
+        working-directory: synapse_lib
+        run: ./gradlew build
+
       - name: Run Gradle publish
         working-directory: synapse_lib
         run: ./gradlew publish
