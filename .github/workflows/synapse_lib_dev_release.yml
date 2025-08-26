@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - "synapse_lib/**"
+      - ".github/workflows/synapse_lib_dev_release.yml"
+    branches: [main]
 
 jobs:
   publish-dev:
@@ -24,7 +26,7 @@ jobs:
       - name: Append -dev to pubVersion
         working-directory: synapse_lib
         run: |
-          sed -i "s/^\(def pubVersion = '[^']*\)'\$/\1-dev'/" build.gradle
+          sed -i "s/^\(def pubVersion = '[^']*\)'\$/\1-dev'/" publish.gradle
 
       - name: Install RoboRio Toolchain
         working-directory: synapse_lib
@@ -57,6 +59,7 @@ jobs:
           git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
           git pull --rebase origin gh-pages || echo "No remote changes to pull"
           git push origin gh-pages
+
 
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
