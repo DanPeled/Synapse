@@ -42,8 +42,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Fetch all branches to make sure gh-pages exists
+          git fetch origin gh-pages
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
+            git pull --rebase origin gh-pages
           else
             git checkout -b gh-pages
           fi
