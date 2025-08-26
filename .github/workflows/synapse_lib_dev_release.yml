@@ -55,6 +55,7 @@ jobs:
           cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
           git add maven SynapseBridge.json
           git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
+          git pull --rebase origin gh-pages || echo "No remote changes to pull"
           git push origin gh-pages
 
       - name: Upload SynapseBridge.json as artifact
