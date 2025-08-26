@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "synapse_lib/**"
+      - ".github/workflows/synapse_lib_dev_release.yml"
 
 jobs:
   publish-dev:
