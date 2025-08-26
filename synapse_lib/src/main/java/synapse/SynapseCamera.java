@@ -19,24 +19,41 @@ import org.msgpack.jackson.dataformat.MessagePackFactory;
  * results from NetworkTables.
  */
 public class SynapseCamera {
+  /**
+   * A container class holding the standard NetworkTables topic keys used for communication between
+   * Synapse and coprocessors.
+   *
+   * <p>These constants define the names of NetworkTables topics for pipeline configuration, status
+   * reporting, and result data.
+   */
+  public static class NetworkTableTopics {
+    /** The topic for pipeline-related data. */
+    public static final String kPipelineTopic = "pipeline";
+
+    /** The topic for recording status. */
+    public static final String kRecordStatusTopic = "record";
+
+    /** The topic for pipeline type. */
+    public static final String kPipelineTypeTopic = "pipeline_type";
+
+    /** The topic for results data. */
+    public static final String kResultsTopic = "results";
+
+    /** The topic for capture latency. */
+    public static final String kCaptureLatencyTopic = "captureLatency";
+
+    /** The topic for processing latency. */
+    public static final String kProcessLatencyTopic = "processLatency";
+
+    /** Prevents instantiation. */
+    private NetworkTableTopics() {}
+  }
 
   /** Jackson ObjectMapper configured for MessagePack and WPILib geometry. */
   private static final ObjectMapper s_ObjectMapper = createMapper();
 
   /** The name of the Synapse table in the NetworkTables */
-  public static final String kSynapseTable = "Synapse";
-
-  /** The topic for pipeline-related data */
-  public static final String kPipelineTopic = "pipeline";
-
-  /** The topic for recording status */
-  public static final String kRecordStatusTopic = "record";
-
-  /** The topic for pipeline type */
-  public static final String kPipelineTypeTopic = "pipeline_type";
-
-  /** The topic for results data */
-  public static final String kResultsTopic = "results";
+  public final String synapseTableName;
 
   /** Unique identifier for this SynapseCamera instance */
   private final String m_cameraName;
@@ -62,16 +79,36 @@ public class SynapseCamera {
   /** NetworkTableEntry representing the camera's recording status. */
   private NetworkTableEntry m_recordStateEntry;
 
+  /** NetworkTableEntry representing the camera's capture latency (ms). */
+  private NetworkTableEntry m_captureLatencyEntry;
+
+  /** NetworkTableEntry representing the camera's processing latency (ms). */
+  private NetworkTableEntry m_processLatencyEntry;
+
   /**
-   * Constructs a new SynapseCamera instance.
+   * Constructs a new {@code SynapseCamera} instance with the given camera name. Uses the default
+   * coprocessor name {@code "Synapse"}.
    *
-   * @param cameraName the camera's name.
+   * @param cameraName the camera's name
    */
   public SynapseCamera(String cameraName) {
+    this(cameraName, "Synapse");
+  }
+
+  /**
+   * Constructs a new {@code SynapseCamera} instance with the given camera name and coprocessor
+   * name.
+   *
+   * @param cameraName the camera's name
+   * @param coprocessorName the coprocessor table name
+   */
+  public SynapseCamera(String cameraName, String coprocessorName) {
     m_cameraName = cameraName;
+    synapseTableName = coprocessorName;
 
     if (!isJUnitTest()) { // JUnit crashes ntcore for some reason
-      m_table = NetworkTableInstance.getDefault().getTable(kSynapseTable).getSubTable(m_cameraName);
+      m_table =
+          NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
     }
   }
 
@@ -82,7 +119,7 @@ public class SynapseCamera {
    */
   public void setPipeline(long pipeline) {
     if (m_pipelineEntry == null) {
-      m_pipelineEntry = m_table.getEntry(kPipelineTopic);
+      m_pipelineEntry = m_table.getEntry(NetworkTableTopics.kPipelineTopic);
     }
     assert m_pipelineEntry != null;
     m_pipelineEntry.setInteger(pipeline);
@@ -95,7 +132,7 @@ public class SynapseCamera {
    */
   public long getPipeline() {
     if (m_pipelineEntry == null) {
-      m_pipelineEntry = m_table.getEntry(kPipelineTopic);
+      m_pipelineEntry = m_table.getEntry(NetworkTableTopics.kPipelineTopic);
     }
     assert m_pipelineEntry != null;
     return m_pipelineEntry.getInteger(-1);
@@ -108,7 +145,7 @@ public class SynapseCamera {
    */
   public boolean getRecordingStatus() {
     if (m_recordStateEntry == null) {
-      m_recordStateEntry = m_table.getEntry(kRecordStatusTopic);
+      m_recordStateEntry = m_table.getEntry(NetworkTableTopics.kRecordStatusTopic);
     }
     assert m_recordStateEntry != null;
     return m_recordStateEntry.getBoolean(false);
@@ -121,7 +158,7 @@ public class SynapseCamera {
    */
   public void setRecordStatus(boolean status) {
     if (m_recordStateEntry == null) {
-      m_recordStateEntry = m_table.getEntry(kRecordStatusTopic);
+      m_recordStateEntry = m_table.getEntry(NetworkTableTopics.kRecordStatusTopic);
     }
     assert m_recordStateEntry != null;
     m_recordStateEntry.setBoolean(status);
@@ -162,7 +199,7 @@ public class SynapseCamera {
   public <T> T getResults(TypeReference<T> typeref, String typestring)
       throws StreamReadException, DatabindException, IOException {
     if (m_resultsTopic == null) {
-      m_resultsTopic = getDataEntry(kResultsTopic);
+      m_resultsTopic = getDataEntry(NetworkTableTopics.kResultsTopic);
     }
     if (m_resultsTopic == null) {
       throw new IllegalStateException("Results topic is null");
@@ -202,7 +239,7 @@ public class SynapseCamera {
    */
   public String getPipelineType() {
     if (m_pipelineTypeEntry == null) {
-      m_pipelineTypeEntry = m_table.getEntry(kPipelineTypeTopic);
+      m_pipelineTypeEntry = m_table.getEntry(NetworkTableTopics.kPipelineTypeTopic);
     }
     assert m_pipelineTypeEntry != null;
     return m_pipelineTypeEntry.getString("unknown");
@@ -304,6 +341,30 @@ public class SynapseCamera {
     ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
     // mapper.registerModule(new WPILibGeometryModule());
     return mapper;
+  }
+
+  /**
+   * Gets the latest capture latency from the camera in milliseconds.
+   *
+   * @return The capture latency, or -1 if not available.
+   */
+  public double getCaptureLatency() {
+    if (m_captureLatencyEntry == null) {
+      m_captureLatencyEntry = getDataEntry(NetworkTableTopics.kCaptureLatencyTopic);
+    }
+    return m_captureLatencyEntry.getDouble(-1);
+  }
+
+  /**
+   * Gets the latest processing latency from the camera in milliseconds.
+   *
+   * @return The processing latency, or -1 if not available.
+   */
+  public double getProcessLatency() {
+    if (m_processLatencyEntry == null) {
+      m_processLatencyEntry = getDataEntry(NetworkTableTopics.kProcessLatencyTopic);
+    }
+    return m_processLatencyEntry.getDouble(-1);
   }
 
   /**
