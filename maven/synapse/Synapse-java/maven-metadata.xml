@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>synapse</groupId>
+  <artifactId>Synapse-java</artifactId>
+  <versioning>
+    <latest>2025.0.0a2-dev</latest>
+    <release>2025.0.0a2-dev</release>
+    <versions>
+      <version>2025.0.0a2-dev</version>
+    </versions>
+    <lastUpdated>20250826152009</lastUpdated>
+  </versioning>
+</metadata>
