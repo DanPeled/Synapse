@@ -56,10 +56,13 @@ jobs:
           mkdir -p maven
           cp -r synapse_lib/vendordep/maven/* maven/
           cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
-          git add maven SynapseBridge.json
+
+          # Stage new + modified + deleted files
+          git add -A  
+
           git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
 
-          # Re-sync in case remote changed after we pulled earlier
+          # Rebase to handle remote updates
           git pull --rebase origin gh-pages || true
 
           git push origin gh-pages
