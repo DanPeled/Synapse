@@ -40,29 +40,44 @@ jobs:
         working-directory: synapse_lib
         run: ./gradlew publish
 
-      - name: Prepare gh-pages branch
+      - name: Prepare and push gh-pages branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Fetch and check out branch
+          # Copy artifacts to temporary location so they are safe
+          mkdir -p /tmp/maven
+          cp -r synapse_lib/vendordep/maven/* /tmp/maven/
+          cp synapse_lib/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
+
+          # Stash any local changes
+          git stash push -m "workflow stash"
+
+          # Fetch and check out gh-pages
           git fetch origin gh-pages
-          git checkout gh-pages
+          if git show-ref --verify --quiet refs/heads/gh-pages; then
+            git checkout gh-pages
+            git pull --rebase origin gh-pages
+          else
+            git checkout -b gh-pages
+          fi
 
-          # Pull remote changes to make sure local branch is up-to-date
-          git pull --rebase origin gh-pages
-
-      - name: Upload Maven Artifacts
-        run: |
+          # Remove old artifacts
           rm -rf maven SynapseBridge.json || true
-          mkdir -p maven
-          cp -r synapse_lib/vendordep/maven/* maven/
-          cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
 
+          # Restore copied artifacts
+          mkdir -p maven
+          cp -r /tmp/maven/* maven/
+          cp /tmp/SynapseBridge.json SynapseBridge.json
+
+          # Stage, commit, and push
           git add -A maven SynapseBridge.json
           git commit -m "Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
-
           git push origin gh-pages
+
+          # Switch back to previous branch and restore stashed changes
+          git checkout -
+          git stash pop || echo "Nothing to pop"
 
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
