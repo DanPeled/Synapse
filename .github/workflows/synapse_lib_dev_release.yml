@@ -62,8 +62,8 @@ jobs:
 
           git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
 
-          # Rebase to handle remote updates
-          git pull --rebase origin gh-pages || true
+          # Rebase to handle remote updates, prefer our changes
+          git pull --rebase -X ours origin gh-pages || true
 
           git push origin gh-pages
 
