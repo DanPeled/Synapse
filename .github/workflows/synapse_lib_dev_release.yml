@@ -43,28 +43,33 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Fetch and check out gh-pages
           git fetch origin gh-pages
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
-            git pull --rebase origin gh-pages
+            git reset --hard origin/gh-pages
           else
             git checkout -b gh-pages
           fi
 
-      - name: Copy Maven artifacts
+      - name: Upload Maven Artifacts
         run: |
+          # Remove old artifacts
+          rm -rf maven SynapseBridge.json
+
+          # Copy new artifacts
           mkdir -p maven
           cp -r synapse_lib/vendordep/maven/* maven/
           cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
 
-          # Stage new + modified + deleted files
-          git add -A  
+          # Stage only the artifacts we want to replace
+          git add -A maven SynapseBridge.json
 
-          git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
+          # Commit changes
+          git commit -m "Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
 
-          # Rebase to handle remote updates, prefer our changes
-          git pull --rebase -X ours origin gh-pages || true
-
+          # Push safely
           git push origin gh-pages
 
       - name: Upload SynapseBridge.json as artifact
