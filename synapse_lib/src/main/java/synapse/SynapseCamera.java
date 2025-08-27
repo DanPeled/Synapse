@@ -350,7 +350,7 @@ public class SynapseCamera {
    */
   public double getCaptureLatency() {
     if (m_captureLatencyEntry == null) {
-      m_captureLatencyEntry = getDataEntry(NetworkTableTopics.kCaptureLatencyTopic);
+      m_captureLatencyEntry = m_table.getEntry(NetworkTableTopics.kCaptureLatencyTopic);
     }
     return m_captureLatencyEntry.getDouble(-1);
   }
@@ -362,7 +362,7 @@ public class SynapseCamera {
    */
   public double getProcessLatency() {
     if (m_processLatencyEntry == null) {
-      m_processLatencyEntry = getDataEntry(NetworkTableTopics.kProcessLatencyTopic);
+      m_processLatencyEntry = m_table.getEntry(NetworkTableTopics.kProcessLatencyTopic);
     }
     return m_processLatencyEntry.getDouble(-1);
   }
