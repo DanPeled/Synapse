@@ -5,7 +5,7 @@ on:
     paths:
       - "synapse_lib/**"
       - ".github/workflows/synapse_lib_dev_release.yml"
-    branches: [main]
+    # branches: [main]
 
 jobs:
   publish-dev:
@@ -45,32 +45,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Fetch and check out gh-pages
+          # Fetch and check out branch
           git fetch origin gh-pages
-          if git show-ref --verify --quiet refs/heads/gh-pages; then
-            git checkout gh-pages
-            git reset --hard origin/gh-pages
-          else
-            git checkout -b gh-pages
-          fi
+          git checkout gh-pages
+
+          # Pull remote changes to make sure local branch is up-to-date
+          git pull --rebase origin gh-pages
 
       - name: Upload Maven Artifacts
         run: |
-          # Remove old artifacts
-          rm -rf maven SynapseBridge.json
-
-          # Copy new artifacts
+          rm -rf maven SynapseBridge.json || true
           mkdir -p maven
           cp -r synapse_lib/vendordep/maven/* maven/
           cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
 
-          # Stage only the artifacts we want to replace
           git add -A maven SynapseBridge.json
-
-          # Commit changes
           git commit -m "Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
 
-          # Push safely
           git push origin gh-pages
 
       - name: Upload SynapseBridge.json as artifact
