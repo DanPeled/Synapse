@@ -598,7 +598,9 @@ class CameraHandler:
             frameSize=(height, width),
         )
 
-        log.log(f"Started recording camera {self.cameras[cameraIndex]} to {filename}")
+        log.log(
+            f"Started recording camera {self.cameras[cameraIndex].name} to {filename}"
+        )
         self.recordFileNames[cameraIndex] = filename
 
         return self.recordingOutputs[cameraIndex]

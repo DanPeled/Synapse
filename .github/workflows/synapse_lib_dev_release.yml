@@ -44,7 +44,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Fetch all branches to make sure gh-pages exists
           git fetch origin gh-pages
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
@@ -58,11 +57,16 @@ jobs:
           mkdir -p maven
           cp -r synapse_lib/vendordep/maven/* maven/
           cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
-          git add maven SynapseBridge.json
-          git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
-          git pull --rebase origin gh-pages || echo "No remote changes to pull"
-          git push origin gh-pages
 
+          # Stage new + modified + deleted files
+          git add -A  
+
+          git commit -m "Add vendordep Maven artifacts (dev)" || echo "No changes to commit"
+
+          # Rebase to handle remote updates, prefer our changes
+          git pull --rebase -X ours origin gh-pages || true
+
+          git push origin gh-pages
 
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
