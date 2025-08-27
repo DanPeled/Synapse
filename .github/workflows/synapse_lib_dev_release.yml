@@ -50,15 +50,16 @@ jobs:
           cp -r synapse_lib/vendordep/maven/* /tmp/maven/
           cp synapse_lib/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
 
+          # Stash all local changes (including untracked files)
+          git stash push -m "workflow stash" --include-untracked
+
           # Fetch gh-pages branch
           git fetch origin gh-pages
 
-          # Check out gh-pages (create if it doesn't exist)
+          # Checkout gh-pages (create if missing)
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
             git pull --rebase -X ours origin gh-pages
-          elif git ls-remote --exit-code --heads origin gh-pages; then
-            git checkout -b gh-pages origin/gh-pages
           else
             git checkout -b gh-pages
           fi
@@ -75,6 +76,10 @@ jobs:
           git add -A maven SynapseBridge.json
           git commit -m "Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
           git push origin gh-pages
+
+          # Return to previous branch and restore stashed changes
+          git checkout -
+          git stash pop || echo "Nothing to pop"
 
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
