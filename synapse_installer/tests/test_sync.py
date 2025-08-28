@@ -193,10 +193,6 @@ def make_stderr(data: bytes = b""):
 
 
 def test_install_pip_requirements(mocker, mock_client):
-    mocker.patch(
-        "synapse_installer.sync.getDistRequirements",
-        return_value=["pkg1==1.0", "pkg2==2.0"],
-    )
     mocker.patch("synapse_installer.sync.getWPILibYear", return_value=2025)
 
     def exec_command_side_effect(cmd, *args, **kwargs):
@@ -217,7 +213,7 @@ def test_install_pip_requirements(mocker, mock_client):
 
     fprint_mock = mocker.patch("synapse_installer.sync.fprint")
 
-    installPipRequirements(mock_client)
+    installPipRequirements(mock_client, ["pkg1", "pkg2"])
 
     assert any("pkg1" in call.args[0] for call in fprint_mock.call_args_list), (
         "Expected fprint to be called indicating pkg1 already installed"
@@ -282,11 +278,7 @@ def test_install_npm_package_installs_failure(mocker):
 
 def test_install_pip_requirements_partial_installed(mocker):
     client = mocker.Mock(spec=paramiko.SSHClient)
-    mocker.patch(
-        "synapse_installer.sync.getDistRequirements",
-        return_value=["pkg1==1.0", "pkg2==2.0"],
-    )
-    mocker.patch("synapse_installer.sync.getWPILibYear", return_value=2025)
+    mocker.patch("synapse_installer.util.getWPILibYear", return_value=2025)
 
     def exec_command_side_effect(cmd, *args, **kwargs):
         if "pip freeze" in cmd:
@@ -310,7 +302,7 @@ def test_install_pip_requirements_partial_installed(mocker):
     client.exec_command.side_effect = exec_command_side_effect
     fprint_mock = mocker.patch("synapse_installer.sync.fprint")
 
-    installPipRequirements(client)
+    installPipRequirements(client, ["pkg1==1.0", "pkg2==2.0"])
 
     def strip_ansi(s: str) -> str:
         ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")

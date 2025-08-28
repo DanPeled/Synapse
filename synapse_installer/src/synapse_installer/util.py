@@ -6,7 +6,10 @@ import ipaddress
 from dataclasses import dataclass
 from functools import cache
 from importlib.metadata import distribution
+from pathlib import Path
 from typing import Final, List
+
+import toml
 
 SYNAPSE_PROJECT_FILE: Final[str] = ".synapseproject"
 NOT_IN_SYNAPSE_PROJECT_ERR: Final[str] = (
@@ -34,6 +37,12 @@ def getDistRequirements() -> List[str]:
     dist = distribution("synapsefrc")
     requirements = dist.requires or []
     return requirements
+
+
+def getUserRequirements(pyprojectPath: Path) -> List[str]:
+    data = toml.load(pyprojectPath)
+    requires = data.get("tool", {}).get("synapse", {}).get("requires", [])
+    return requires
 
 
 def getWPILibVersion() -> str:
