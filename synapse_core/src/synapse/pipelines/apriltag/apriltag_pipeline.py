@@ -14,10 +14,13 @@ import robotpy_apriltag as apriltag
 import synapse.log as log
 from cv2.typing import MatLike
 from synapse.core.global_settings import GlobalSettings
-from synapse.core.pipeline import (FrameResult, Pipeline, pipelineResult,
-                                   pipelineSettings)
+from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
+                                   pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
+from synapse.pipelines.apriltag.apriltag_detector import (AprilTagDetection,
+                                                          AprilTagDetector)
+from synapse.pipelines.apriltag.apriltag_robotpy import RobotpyApriltagDetector
 from synapse.stypes import CameraID, Frame
 from wpimath import geometry, units
 from wpimath.geometry import (Pose2d, Pose3d, Quaternion, Rotation3d,
@@ -32,7 +35,7 @@ class RobotPoseEstimate:
 
 @pipelineResult
 class ApriltagResult:
-    detection: apriltag.AprilTagDetection
+    detection: AprilTagDetection
     timestamp: float
     robotPoseEstimate: RobotPoseEstimate
     tagPoseEstimate: apriltag.AprilTagPoseEstimate
@@ -76,8 +79,7 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
-@pipelineSettings
-class ApriltagPipelineSettings:
+class ApriltagPipelineSettings(PipelineSettings):
     tag_size = settingField(
         NumberConstraint(minValue=0, maxValue=None), default=units.meters(0.1651)
     )
@@ -90,7 +92,13 @@ class ApriltagPipelineSettings:
         EnumeratedConstraint(options=[ver.value for ver in ApriltagVerbosity]),
         default=ApriltagVerbosity.kPoseOnly.value,
     )
-    num_threads = settingField(NumberConstraint(minValue=1, maxValue=6), default=1)
+    num_threads = settingField(
+        NumberConstraint(minValue=1, maxValue=6, step=1), default=1
+    )
+    iteration_count = settingField(
+        NumberConstraint(minValue=1, maxValue=None, step=1),
+        default=4,
+    )
 
 
 class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
@@ -115,19 +123,19 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         self.distCoeffs = self.getDistCoeffs(cameraIndex)
         self.camera_transform = self.getCameraTransform(cameraIndex)
-        self.apriltagDetector: apriltag.AprilTagDetector = apriltag.AprilTagDetector()
+        self.apriltagDetector: AprilTagDetector = RobotpyApriltagDetector()
 
-        detectorConfig: apriltag.AprilTagDetector.Config = (
-            apriltag.AprilTagDetector.Config()
-        )
+        detectorConfig: AprilTagDetector.Config = AprilTagDetector.Config()
 
         detectorConfig.numThreads = int(
             self.settings.getSetting(ApriltagPipelineSettings.num_threads)
         )
         self.apriltagDetector.setConfig(detectorConfig)
+
         self.apriltagDetector.addFamily(
             self.settings.getSetting(ApriltagPipelineSettings.tag_family)
         )
+
         self.poseEstimator: apriltag.AprilTagPoseEstimator = (
             apriltag.AprilTagPoseEstimator(
                 config=apriltag.AprilTagPoseEstimator.Config(
@@ -149,10 +157,12 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
 
     @lru_cache(maxsize=100)
-    def estimateTagPose(
-        self, tag: apriltag.AprilTagDetection
-    ) -> apriltag.AprilTagPoseEstimate:
-        return self.poseEstimator.estimateOrthogonalIteration(detection=tag, nIters=10)
+    def estimateTagPose(self, tag: AprilTagDetection) -> apriltag.AprilTagPoseEstimate:
+        return self.poseEstimator.estimateOrthogonalIteration(
+            homography=tag.homography,
+            corners=tag.corners,
+            nIters=int(self.getSetting(self.settings.iteration_count)),
+        )
 
     def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
@@ -169,7 +179,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
-            if tag.getId() < 0 or tag.getId() > max(self.fmap.fieldMap.keys()):
+            if tag.tagID < 0 or tag.tagID > max(self.fmap.fieldMap.keys()):
                 return gray
             tagPoseEstimate: apriltag.AprilTagPoseEstimate = self.estimateTagPose(tag)
 
@@ -213,7 +223,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 self.getSetting(ApriltagPipelineSettings.fieldpose)
                 and self.camera_transform
             ):
-                tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.getId())
+                tagFieldPose = ApriltagPipeline.getTagPoseOnField(tag.tagID)
 
                 if tagFieldPose:
                     robotPoseEstimate = ApriltagPipeline.tagToRobotPose(
@@ -276,7 +286,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
     def drawTagDetectionMarker(
         self,
-        tag: apriltag.AprilTagDetection,
+        tag: AprilTagDetection,
         tagTransform: Transform3d,
         tagSize: units.meters,
         img: Frame,
