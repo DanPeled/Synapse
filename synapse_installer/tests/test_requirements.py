@@ -17,18 +17,18 @@ def write_pyproject(tmp_path: Path, content: dict) -> Path:
 
 
 def test_requires_present(tmp_path):
-    content = {"tool": {"robotpy": {"requires": ["numpy", "scipy>=1.7"]}}}
+    content = {"tool": {"synapse": {"requires": ["numpy", "scipy>=1.7"]}}}
     pyproject = write_pyproject(tmp_path, content)
     assert getUserRequirements(pyproject) == ["numpy", "scipy>=1.7"]
 
 
 def test_requires_missing_returns_empty(tmp_path):
-    content = {"tool": {"robotpy": {}}}
+    content = {"tool": {"synapse": {}}}
     pyproject = write_pyproject(tmp_path, content)
     assert getUserRequirements(pyproject) == []
 
 
-def test_robotpy_missing_returns_empty(tmp_path):
+def test_synapse_missing_returns_empty(tmp_path):
     content = {"tool": {}}
     pyproject = write_pyproject(tmp_path, content)
     assert getUserRequirements(pyproject) == []
