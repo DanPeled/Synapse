@@ -89,4 +89,12 @@ def createProject() -> None:
         with open(deployDir / "readme.md", "w") as readmeFile:
             readmeFile.write(deployReadme)
 
+        pyproject_content = """[tool.synapse]
+requires = []
+        """
+        with open(projectPath / "pyproject.toml", "w") as pyprojectFile:
+            pyprojectFile.write(pyproject_content)
+
+        print(f"Created project `{projectName}` at:\n{projectPath.absolute()}")
+
         print(f"Created project `{projectName}` at:\n{projectPath.absolute()}")

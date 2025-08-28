@@ -15,7 +15,7 @@ from rich import print as fprint
 
 from .deploy import addDeviceConfig
 from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
-                   getDistRequirements, getWPILibYear)
+                   getDistRequirements, getUserRequirements, getWPILibYear)
 
 PackageManager = str
 CheckInstalledCmd = str
@@ -43,7 +43,12 @@ def syncRequirements(hostname: str, password: str, ip: str) -> None:
         installSystemPackage(client, "libopencv-dev")
         installSystemPackage(client, "npm")
         installNpmPackage(client, "serve", True)
-        installPipRequirements(client)
+
+        synapseRequirements = getDistRequirements()
+        userRequirements = getUserRequirements(Path.cwd() / "pyproject.toml")
+        synapseRequirements.extend(userRequirements)
+
+        installPipRequirements(client, synapseRequirements)
 
         client.close()
         print(f"Sync completed on {hostname}")
@@ -178,8 +183,7 @@ def installNpmPackage(
         )
 
 
-def installPipRequirements(client: paramiko.SSHClient) -> None:
-    requirements = getDistRequirements()
+def installPipRequirements(client: paramiko.SSHClient, requirements) -> None:
     # Get installed packages on remote device
     stdin, stdout, stderr = client.exec_command("python3 -m pip freeze")
     installed_packages = {}
