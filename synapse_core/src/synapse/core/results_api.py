@@ -70,9 +70,7 @@ def serializeTwist3d(obj: geometry.Twist3d):
     return [obj.dx, obj.dy, obj.dz, obj.rx, obj.ry, obj.rz]
 
 
-def parsePipelineResult(
-    result: PipelineResult, _cache: dict[int, Any] | None = None
-) -> Any:
+def parsePipelineResult(result: Any, _cache: dict[int, Any] | None = None) -> Any:
     if _cache is None:
         _cache = {}
 

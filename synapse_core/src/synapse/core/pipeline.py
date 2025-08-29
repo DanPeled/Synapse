@@ -4,18 +4,21 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import cache
-from typing import (Any, Callable, Generic, Iterable, Optional, Type, TypeVar,
-                    Union, overload)
+from functools import lru_cache
+from typing import (Any, Callable, Generic, Iterable, List, Optional, Type,
+                    TypeVar, Union, overload)
 
 from ntcore import NetworkTable
-from synapse.log import createMessage
+from synapse.core.global_settings import GlobalSettings
+from synapse.log import createMessage, err
 from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
                                   PipelineResultProto)
 from synapse_net.socketServer import WebSocketServer
+from wpimath.geometry import Transform3d
 
 from ..stypes import CameraID, Frame, PipelineID
-from .results_api import PipelineResult, serializePipelineResult
+from .results_api import (PipelineResult, parsePipelineResult,
+                          serializePipelineResult)
 from .settings_api import (PipelineSettings, Setting, SettingsAPI,
                            SettingsValue, TConstraintType, TSettingValueType,
                            settingValueToProto)
@@ -24,12 +27,13 @@ FrameResult = Optional[Frame]
 
 
 def isFrameResult(value: object) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, Frame):
+    if value is None or isinstance(value, Frame):
         return True
     if isinstance(value, Iterable):
-        return all(isinstance(f, Frame) for f in value)
+        for f in value:
+            if not isinstance(f, Frame):
+                return False
+        return True
     return False
 
 
@@ -38,6 +42,9 @@ TResultType = TypeVar("TResultType", bound=PipelineResult)
 
 
 PipelineProcessFrameResult = FrameResult
+
+DataTableKey = "data"
+ResultsTopicKey = "results"
 
 
 class Pipeline(ABC, Generic[TSettingsType, TResultType]):
@@ -55,9 +62,9 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         Args:
             settings (TSettingsType): The settings object to use for the pipeline.
         """
-        self.settings = settings
-        self.cameraIndex = -1
-        self.pipelineIndex: PipelineID
+        self.settings: TSettingsType = settings
+        self.cameraIndex: CameraID = -1
+        self.pipelineIndex: PipelineID = -1
         self.name: str = "new pipeline"
 
     def bind(self, cameraIndex: CameraID):
@@ -79,30 +86,37 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         pass
 
     def setDataValue(self, key: str, value: Any, isMsgpack: bool = False) -> None:
-        """
-        Sets a value in the network table.
+        if isinstance(value, (bytes, int, float, str, bool)):
+            parsed = value
+        elif isinstance(value, (list, tuple)) and all(
+            isinstance(x, (int, float, bytes, bool)) for x in value
+        ):
+            parsed = (
+                value if isinstance(value, tuple) else tuple(value)
+            )  # make immutable
+        else:
+            parsed = parsePipelineResult(value)
 
-        :param key: The key for the value.
-        :param value: The value to store.
-        """
-        if self.nt_table is not None:
-            self.nt_table.getSubTable("data").putValue(key, value)
+        if self.nt_table:
+            self.nt_table.getSubTable(DataTableKey).putValue(key, parsed)
 
-        if WebSocketServer.kInstance is not None:
+        if WebSocketServer.kInstance:
             WebSocketServer.kInstance.sendToAllSync(
                 createMessage(
                     MessageTypeProto.SET_PIPELINE_RESULT,
                     PipelineResultProto(
                         is_msgpack=isMsgpack,
                         key=key,
-                        value=settingValueToProto(value),
+                        value=settingValueToProto(parsed),
                         pipeline_index=self.pipelineIndex,
                     ),
                 )
             )
 
     def setResults(self, value: TResultType) -> None:
-        self.setDataValue("results", serializePipelineResult(value), isMsgpack=True)
+        self.setDataValue(
+            ResultsTopicKey, serializePipelineResult(value), isMsgpack=True
+        )
 
     @overload
     def getSetting(self, setting: str) -> Optional[Any]: ...
@@ -133,6 +147,32 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
     def toDict(self, type: str) -> dict:
         return {"type": type, "settings": self.settings.toDict(), "name": self.name}
+
+    def getCameraMatrix(self, cameraIndex: CameraID) -> Optional[List[List[float]]]:
+        camConfig = GlobalSettings.getCameraConfig(cameraIndex)
+        if not camConfig:
+            err("No camera matrix found, invalid results for AprilTag detection")
+            return None
+
+        currRes = self.getSetting(self.settings.resolution)
+        matrixData = camConfig.calibration.get(currRes)
+        if matrixData:
+            lst = matrixData.matrix
+            return [lst[i : i + 3] for i in range(0, 9, 3)]
+        return None
+
+    def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
+        data = GlobalSettings.getCameraConfig(cameraIndex)
+        currRes = self.getSetting(self.settings.resolution)
+        if data and currRes in data.calibration:
+            return data.calibration[currRes].distCoeff
+        return None
+
+    def getCameraTransform(self, cameraIndex: CameraID) -> Optional[Transform3d]:
+        data = GlobalSettings.getCameraConfig(cameraIndex)
+        if data:
+            return data.transform
+        return None
 
 
 def disabled(cls):
@@ -197,7 +237,7 @@ def pipelineSettings(cls):
     return new_cls
 
 
-@cache
+@lru_cache(maxsize=128)
 def getPipelineTypename(pipelineType: Type[Pipeline]) -> str:
     if hasattr(pipelineType, "__typename"):
         return getattr(pipelineType, "__typename")

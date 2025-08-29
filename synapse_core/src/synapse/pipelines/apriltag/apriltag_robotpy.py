@@ -21,12 +21,15 @@ class RobotpyApriltagDetector(AprilTagDetector):
                     tagID=detection.getId(),
                     homography=detection.getHomography(),
                     corners=detection.getCorners(makeCorners()),
+                    center=(int(detection.getCenter().x), int(detection.getCenter().y)),
+                    hamming=detection.getHamming(),
                 ),
                 self.detector.detect(frame),
             )
         )
 
-    def addFamily(self, fam: str) -> None:
+    def setFamily(self, fam: str) -> None:
+        self.detector.clearFamilies()
         self.detector.addFamily(fam)
 
     def setConfig(self, config: AprilTagDetector.Config) -> None:
