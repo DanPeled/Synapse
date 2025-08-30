@@ -7,7 +7,9 @@ from typing import List
 import robotpy_apriltag as rpy_apriltag
 from typing_extensions import Buffer
 
-from .apriltag_detector import AprilTagDetection, AprilTagDetector, makeCorners
+from .apriltag_detector import (AprilTagDetection, AprilTagDetector,
+                                ApriltagPoseEstimate, ApriltagPoseEstimator,
+                                makeCorners)
 
 
 class RobotpyApriltagDetector(AprilTagDetector):
@@ -41,3 +43,36 @@ class RobotpyApriltagDetector(AprilTagDetector):
         rpy_config.numThreads = config.numThreads
 
         self.detector.setConfig(rpy_config)
+
+
+class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
+    def __init__(self, config: ApriltagPoseEstimator.Config) -> None:
+        self.estimator: rpy_apriltag.AprilTagPoseEstimator = (
+            rpy_apriltag.AprilTagPoseEstimator(
+                rpy_apriltag.AprilTagPoseEstimator.Config(
+                    config.tagSize, config.fx, config.fy, config.cx, config.cy
+                )
+            )
+        )
+
+    def estimate(
+        self, tagDetection: AprilTagDetection, nIters: int
+    ) -> ApriltagPoseEstimate:
+        estimate = self.estimator.estimateOrthogonalIteration(
+            tagDetection.homography, tagDetection.corners, nIters
+        )
+        return ApriltagPoseEstimate(
+            estimate.getAmbiguity(),
+            estimate.error1,
+            estimate.error2,
+            estimate.pose1,
+            estimate.pose2,
+        )
+
+    def setConfig(self, config: ApriltagPoseEstimator.Config) -> None:
+        estimatorConfig = self.estimator.getConfig()
+        estimatorConfig.tagSize = config.tagSize
+        estimatorConfig.fx = config.fx
+        estimatorConfig.fy = config.fy
+        estimatorConfig.cx = config.cx
+        estimatorConfig.cy = config.cy
