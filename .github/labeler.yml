@@ -54,3 +54,7 @@ tests:
 workflows:
   - changed-files:
       - any-glob-to-any-file: [".github/workflows/**"]
+
+apriltags:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_core/synapse/pipelines/apriltag/**"]
