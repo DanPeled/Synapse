@@ -146,6 +146,9 @@ class AprilTagDetector(ABC):
         """
         ...
 
+    @abstractmethod
+    def getConfig(self) -> Config: ...
+
 
 class ApriltagPoseEstimator(ABC):
     """Abstract base class for AprilTag pose estimators."""
@@ -191,6 +194,9 @@ class ApriltagPoseEstimator(ABC):
             config (Config): Pose estimation configuration.
         """
         ...
+
+    @abstractmethod
+    def getConfig(self) -> Config: ...
 
 
 def drawTagDetectionMarker(

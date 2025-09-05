@@ -75,6 +75,8 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         """
         self.cameraIndex = cameraIndex
 
+    def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None: ...
+
     @abstractmethod
     def processFrame(self, img, timestamp: float) -> PipelineProcessFrameResult:
         """
@@ -140,10 +142,17 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         return self.settings.getSetting(setting)
 
     def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
-        if isinstance(setting, str):
-            self.settings.getAPI().setValue(setting, value)
-        elif isinstance(setting, Setting):
-            self.setSetting(setting.key, value)
+        settingObj = (
+            setting
+            if isinstance(setting, Setting)
+            else self.settings.getAPI().getSetting(setting)
+        )
+        if settingObj is not None:
+            self.settings.setSetting(settingObj, value)
+
+            self.onSettingChanged(settingObj, self.getSetting(setting))
+        else:
+            err(f"Setting {setting} was not found for pipeline {self.pipelineIndex}")
 
     def toDict(self, type: str) -> dict:
         return {"type": type, "settings": self.settings.toDict(), "name": self.name}

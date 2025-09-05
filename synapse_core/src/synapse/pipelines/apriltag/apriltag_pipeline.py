@@ -9,7 +9,7 @@ from typing import Any, Dict, Final, List, Optional, Set
 import cv2
 import numpy as np
 from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
-                                   pipelineResult)
+                                   Setting, SettingsValue, pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse.log import warn
@@ -177,6 +177,30 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.camera_transform: Optional[Transform3d] = self.getCameraTransform(
             cameraIndex
         )
+
+    def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
+        if setting.key in [
+            self.settings.num_threads.key,
+            self.settings.quad_decimate.key,
+            self.settings.quad_sigma.key,
+            self.settings.tag_family.key,
+        ]:
+            config = self.apriltagDetector.getConfig()
+
+            config.numThreads = int(self.getSetting(self.settings.num_threads))
+            config.quadDecimate = self.getSetting(self.settings.quad_decimate)
+            config.quadSigma = self.getSetting(self.settings.quad_sigma)
+            config.refineEdges = self.getSetting(self.settings.refine_edges)
+
+            self.apriltagDetector.setConfig(config)
+
+            self.apriltagDetector.setFamily(
+                self.settings.getSetting(self.settings.tag_family)
+            )
+        elif setting.key == self.settings.tag_size.key:
+            config = self.poseEstimator.getConfig()
+            config.tagSize = value
+            self.poseEstimator.setConfig(config)
 
     @lru_cache(maxsize=100)
     def estimateTagPose(self, tag: AprilTagDetection) -> ApriltagPoseEstimate:

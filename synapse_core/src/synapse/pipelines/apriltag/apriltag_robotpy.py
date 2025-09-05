@@ -44,6 +44,12 @@ class RobotpyApriltagDetector(AprilTagDetector):
 
         self.detector.setConfig(rpy_config)
 
+    def getConfig(self) -> AprilTagDetector.Config:
+        config = self.detector.getConfig()
+        return self.Config(
+            config.numThreads, config.refineEdges, config.quadDecimate, config.quadSigma
+        )
+
 
 class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
     def __init__(self, config: ApriltagPoseEstimator.Config) -> None:
@@ -76,3 +82,9 @@ class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
         estimatorConfig.fy = config.fy
         estimatorConfig.cx = config.cx
         estimatorConfig.cy = config.cy
+
+    def getConfig(self) -> ApriltagPoseEstimator.Config:
+        config = self.estimator.getConfig()
+        return ApriltagPoseEstimator.Config(
+            config.cx, config.cy, config.fx, config.fy, config.tagSize
+        )

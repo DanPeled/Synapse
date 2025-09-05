@@ -592,6 +592,17 @@ class SettingsAPI:
 
         return result
 
+    def getSetting(self, prop: str) -> Optional[Setting]:
+        """Retrieves the setting object for a given key.
+
+        Args:
+            prop (str): The key of the setting to retrieve.
+
+        Returns:
+            Optional[Setting]: The Setting object if found, otherwise None.
+        """
+        return self.settings.get(prop)
+
     def getValue(self, key: str) -> Any:
         """Retrieves the current value of a setting.
 
@@ -991,7 +1002,7 @@ class PipelineSettings(SettingsCollection):
     )
 
     def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
-        return super().setSetting(setting, value)
+        super().setSetting(setting, value)
 
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
