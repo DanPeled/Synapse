@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Iterable, List, Protocol, Tuple
 
 import cv2
 import numpy as np
@@ -91,10 +91,10 @@ class ApriltagPoseEstimate:
     """
 
     ambiguity: float
-    error1: float
-    error2: float
-    pose1: Transform3d
-    pose2: Transform3d
+    acceptedError: float
+    rejectedError: float
+    acceptedPose: Transform3d
+    rejectedPose: Transform3d
 
 
 class AprilTagDetector(ABC):
@@ -146,6 +146,9 @@ class AprilTagDetector(ABC):
         """
         ...
 
+    @abstractmethod
+    def getConfig(self) -> Config: ...
+
 
 class ApriltagPoseEstimator(ABC):
     """Abstract base class for AprilTag pose estimators."""
@@ -191,6 +194,14 @@ class ApriltagPoseEstimator(ABC):
             config (Config): Pose estimation configuration.
         """
         ...
+
+    @abstractmethod
+    def getConfig(self) -> Config: ...
+
+
+class ICombinedApriltagRobotPoseEstimator(Protocol):
+    @staticmethod
+    def estimate(tags: Iterable[RobotPoseEstimate], **kwargs) -> Pose3d: ...
 
 
 def drawTagDetectionMarker(
