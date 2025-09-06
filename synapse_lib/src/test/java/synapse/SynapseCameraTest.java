@@ -9,6 +9,7 @@ import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
+import synapse.pipelines.apriltag.ApriltagDetection;
 import synapse.pipelines.apriltag.ApriltagResult;
 
 class SynapseCameraTest {
@@ -34,9 +35,11 @@ class SynapseCameraTest {
     ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
 
     ApriltagResult original = new ApriltagResult();
-    original.hamming = 2;
-    original.tagID = 7;
-    original.robotPose_fieldSpace = new double[] {1, 2, 3, 4, 5, 6};
+    original.robotEstimate_fieldSpace = new double[] {1, 2, 3};
+    original.tags = new ApriltagDetection[] {new ApriltagDetection()};
+    original.tags[0].hamming = 2;
+    original.tags[0].tagID = 7;
+    original.tags[0].robotPose_fieldSpace = new double[] {1, 2, 3, 4, 5, 6};
 
     byte[] serialized = mapper.writeValueAsBytes(original);
 

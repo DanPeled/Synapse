@@ -955,9 +955,20 @@ class RuntimeManager:
                         )
 
     def updateSetting(self, prop: str, cameraIndex: CameraID, value: Any) -> None:
-        self.pipelineLoader.getPipelineSettings(
+        settings = self.pipelineLoader.getPipelineSettings(
             self.pipelineBindings[cameraIndex]
-        ).setSetting(prop, value)
+        )
+        settings.setSetting(prop, value)
+        pipeline = self.pipelineLoader.getPipeline(self.pipelineBindings[cameraIndex])
+
+        if pipeline is not None:
+            setting = settings.getAPI().getSetting(prop)
+            if setting is not None:
+                pipeline.onSettingChanged(setting, settings.getSetting(prop))
+            else:
+                log.warn(
+                    f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
+                )
 
         camera = self.cameraHandler.getCamera(cameraIndex)
         if camera is not None:

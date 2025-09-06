@@ -1,7 +1,6 @@
 package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import java.util.List;
 import synapse.pipelines.apriltag.ApriltagResult;
 
 /**
@@ -16,8 +15,8 @@ public class SynapsePipeline<T> {
    * The AprilTag pipeline. This pipeline uses the {@link ApriltagResult} class to store the result
    * data.
    */
-  public static final SynapsePipeline<List<ApriltagResult>> kApriltag =
-      new SynapsePipeline<>(new TypeReference<List<ApriltagResult>>() {}, "ApriltagPipeline");
+  public static final SynapsePipeline<ApriltagResult> kApriltag =
+      new SynapsePipeline<>(new TypeReference<ApriltagResult>() {}, "ApriltagPipeline");
 
   /** The TypeReference representing the result type for this pipeline. */
   private final TypeReference<T> typeRef;
