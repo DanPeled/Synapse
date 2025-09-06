@@ -42,7 +42,7 @@ class WeightedAverageMultiTagEstimator(ICombinedApriltagRobotPoseEstimator):
 
             # Collect weighted quaternion
             rot = pose.rotation()
-            q = rot.getQuaternion()
+            q: Quaternion = rot.getQuaternion()
             weighted_quats.append((q, weight))
 
         # Average translation
@@ -53,10 +53,10 @@ class WeightedAverageMultiTagEstimator(ICombinedApriltagRobotPoseEstimator):
         # Weighted quaternion average
         qw, qx, qy, qz = 0.0, 0.0, 0.0, 0.0
         for q, w in weighted_quats:
-            qw += q.w * w
-            qx += q.x * w
-            qy += q.y * w
-            qz += q.z * w
+            qw += q.W() * w
+            qx += q.X() * w
+            qy += q.Y() * w
+            qz += q.Z() * w
         norm = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
         if norm > 1e-9:
             qw, qx, qy, qz = qw / norm, qx / norm, qy / norm, qz / norm

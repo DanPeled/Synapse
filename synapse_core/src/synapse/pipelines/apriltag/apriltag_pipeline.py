@@ -17,7 +17,7 @@ from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
     ApriltagPoseEstimator, ICombinedApriltagRobotPoseEstimator,
-    drawTagDetectionMarker, opencvToWPI, tagToRobotPose)
+    RobotPoseEstimate, drawTagDetectionMarker, opencvToWPI, tagToRobotPose)
 from synapse.pipelines.apriltag.apriltag_robotpy import (
     RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
@@ -124,7 +124,7 @@ class ApriltagPipelineSettings(PipelineSettings):
 class ApriltagDetectionResult:
     detection: AprilTagDetection
     timestamp: float
-    robotPoseEstimate: Pose3d
+    robotPoseEstimate: RobotPoseEstimate
     tagPoseEstimate: ApriltagPoseEstimate
 
 
@@ -281,7 +281,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                         ApriltagDetectionResult(
                             detection=tag,
                             timestamp=timestamp,
-                            robotPoseEstimate=robotPoseEstimate.robotPose_fieldSpace,
+                            robotPoseEstimate=robotPoseEstimate,
                             tagPoseEstimate=tagPoseEstimate,
                         )
                     )
@@ -289,11 +289,14 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.setDataValue("hasResults", True)
         self.setResults(
             ApriltagsJson.toJsonString(
-                ApriltagResult(None, tagEstimates),
-                getIgnoredDataByVerbosity(
-                    ApriltagVerbosity.fromValue(
-                        self.getSetting(ApriltagPipelineSettings.verbosity)
-                    )
+                ApriltagResult(
+                    self.combinedApriltagPoseEstimator.estimate(
+                        map(
+                            lambda estimate: estimate.robotPoseEstimate,
+                            tagEstimates,
+                        )
+                    ),
+                    tagEstimates,
                 ),
             ),
         )
@@ -303,20 +306,16 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
 class ApriltagsJson:
     @classmethod
-    def toJsonString(
-        cls, result: ApriltagResult, ignore_keys: Optional[set] = None
-    ) -> Dict[str, Any]:
-        ignore_keys = set(
-            ignore_keys or []
-        )  # Convert ignore_keys to a set for fast lookup
-        data: List[dict] = []
+    def toJsonString(cls, result: ApriltagResult) -> Dict[str, Any]:
+        tags: List[dict] = []
 
         for tag in result.tagDetections:
-            data.append(
+            tag: ApriltagDetectionResult = tag
+            tags.append(
                 {
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
-                    ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate,
+                    ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
                     # TODO: change to wrapper class with "rejected" and "accepted" pose
                     ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
@@ -325,7 +324,7 @@ class ApriltagsJson:
 
         return {
             ApriltagPipeline.kRobotPoseEstimateKey: result.robotPoseEstimate,
-            ApriltagPipeline.kTagDetectionsKey: data,
+            ApriltagPipeline.kTagDetectionsKey: tags,
         }
 
     @classmethod
