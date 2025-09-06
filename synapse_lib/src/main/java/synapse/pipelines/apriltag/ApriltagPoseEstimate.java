@@ -4,84 +4,92 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Represents the estimated pose(s) of an AprilTag detection.
+ * Represents the candidate 3D pose estimates of an AprilTag detection.
  *
- * <p>AprilTag pose estimation can sometimes produce two possible poses due to ambiguity. This class
- * stores both candidate poses along with their associated error values, allowing downstream code to
- * choose the most reliable estimate.
+ * <p>When estimating the pose of an AprilTag, the algorithm may return two possible solutions due
+ * to perspective ambiguity. This class stores both candidate poses along with their associated
+ * error metrics, allowing downstream logic to determine which pose is more reliable.
+ *
+ * <p>Each pose is represented as a 6-element array of doubles: {@code [x, y, z, roll, pitch, yaw]}.
  */
 public class ApriltagPoseEstimate {
 
   /**
-   * The error metric (e.g., reprojection or fitting error) associated with {@link #pose1}. Lower
-   * values indicate higher confidence in the estimated pose.
+   * The error metric (e.g., reprojection error) associated with {@link #acceptedPose}. Lower values
+   * indicate higher confidence in this candidate pose.
    */
-  public double error1;
+  public double acceptedError;
 
   /**
-   * The error metric (e.g., reprojection or fitting error) associated with {@link #pose2}. Lower
-   * values indicate higher confidence in the estimated pose.
+   * The error metric (e.g., reprojection error) associated with {@link #rejectedPose}. Lower values
+   * indicate higher confidence in this candidate pose.
    */
-  public double error2;
-
-  /** The first possible 3D transform of the AprilTag relative to the camera or robot frame. */
-  public double[] pose1;
+  public double rejectedError;
 
   /**
-   * The second possible 3D transform of the AprilTag relative to the camera or robot frame. This is
-   * typically the ambiguous alternative to {@link #pose1}.
-   */
-  public double[] pose2;
-
-  /**
-   * Creates a new {@code ApriltagPoseEstimate} with all errors set to {@code 0.0} and poses
-   * initialized to {@code null}.
+   * The first possible 3D pose of the AprilTag relative to the camera or robot frame, represented
+   * as {@code [x, y, z, roll, pitch, yaw]}.
    *
-   * <p>This constructor is primarily provided for frameworks or serializers that require a
-   * no-argument constructor. In most cases, values should be populated explicitly after
-   * construction.
+   * <p>This pose is generally selected as the more reliable estimate, based on the associated error
+   * value.
+   */
+  public double[] acceptedPose;
+
+  /**
+   * The second possible 3D pose of the AprilTag relative to the camera or robot frame, represented
+   * as {@code [x, y, z, roll, pitch, yaw]}.
+   *
+   * <p>This pose is typically the ambiguous alternative to {@link #acceptedPose}.
+   */
+  public double[] rejectedPose;
+
+  /**
+   * Creates a new {@code ApriltagPoseEstimate} with errors initialized to {@code 0.0} and poses set
+   * to {@code null}.
+   *
+   * <p>This no-argument constructor exists primarily for use by serialization frameworks. In most
+   * cases, values should be assigned explicitly after construction.
    */
   public ApriltagPoseEstimate() {}
 
   /**
-   * Compares this {@code ApriltagPoseEstimate} with another object for equality.
+   * Checks whether this {@code ApriltagPoseEstimate} is equal to another object.
    *
-   * <p>Two {@code ApriltagPoseEstimate} objects are considered equal if all of the following are
-   * true:
+   * <p>Two instances are considered equal if and only if:
    *
    * <ul>
-   *   <li>Their {@link #error1} and {@link #error2} values are numerically equal.
-   *   <li>Their {@link #pose1} and {@link #pose2} arrays contain the same elements in the same
-   *       order.
+   *   <li>Their {@link #acceptedError} and {@link #rejectedError} values are equal, and
+   *   <li>Their {@link #acceptedPose} and {@link #rejectedPose} arrays contain the same elements in
+   *       the same order.
    * </ul>
    *
    * @param o the object to compare with this instance
-   * @return {@code true} if the objects are equal, {@code false} otherwise
+   * @return {@code true} if the objects are equal; {@code false} otherwise
    */
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (!(o instanceof ApriltagPoseEstimate)) return false;
     ApriltagPoseEstimate that = (ApriltagPoseEstimate) o;
-    return Double.compare(that.error1, error1) == 0
-        && Double.compare(that.error2, error2) == 0
-        && Arrays.equals(pose1, that.pose1)
-        && Arrays.equals(pose2, that.pose2);
+    return Double.compare(that.acceptedError, acceptedError) == 0
+        && Double.compare(that.rejectedError, rejectedError) == 0
+        && Arrays.equals(acceptedPose, that.acceptedPose)
+        && Arrays.equals(rejectedPose, that.rejectedPose);
   }
 
   /**
    * Computes a hash code for this {@code ApriltagPoseEstimate}.
    *
-   * <p>The hash code is based on the same fields used in {@link #equals(Object)}: {@link #error1},
-   * {@link #error2}, {@link #pose1}, and {@link #pose2}.
+   * <p>The hash code is derived from the same fields used in {@link #equals(Object)}: {@link
+   * #acceptedError}, {@link #rejectedError}, {@link #acceptedPose}, and {@link #rejectedPose}.
    *
    * @return a hash code value for this object
    */
   @Override
   public int hashCode() {
-    int result = Objects.hash(error1, error2);
-    result = 31 * result + Arrays.hashCode(pose1);
-    result = 31 * result + Arrays.hashCode(pose2);
+    int result = Objects.hash(acceptedError, rejectedError);
+    result = 31 * result + Arrays.hashCode(acceptedPose);
+    result = 31 * result + Arrays.hashCode(rejectedPose);
     return result;
   }
 }

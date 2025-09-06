@@ -91,10 +91,10 @@ class ApriltagPoseEstimate:
     """
 
     ambiguity: float
-    error1: float
-    error2: float
-    pose1: Transform3d
-    pose2: Transform3d
+    acceptedError: float
+    rejectedError: float
+    acceptedPose: Transform3d
+    rejectedPose: Transform3d
 
 
 class AprilTagDetector(ABC):

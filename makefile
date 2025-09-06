@@ -57,8 +57,13 @@ format:
 	@echo Prettier format...
 	@$(CD) synapse_ui && npm run format
 	@echo ProtoBuf format...
+	@cd ..
 	@$(CD) synapse_net/proto && \
 		buf format -w
+	@cd ..
+	@echo SynapseLib SpotlessApply
+	@${CD} synapse_lib && \
+		./gradlew spotlessApply
 
 test:
 	@echo Reinstalling Synapse Runtime...

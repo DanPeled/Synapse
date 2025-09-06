@@ -141,6 +141,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
     kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
+    kTagPoseEstimateErrorKey: Final[str] = "tag_error"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
     kRobotPoseEstimateKey: Final[str] = "robotEstimate_fieldSpace"
@@ -244,7 +245,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             self.setDataValue(self.kTagIDKey, tag.tagID)
 
             tagRelativePose: Transform3d = (
-                tagPoseEstimate.pose1
+                tagPoseEstimate.acceptedPose
             )  # TODO: check if needs to switch with pose2 sometimes
 
             drawTagDetectionMarker(
@@ -255,6 +256,9 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             tagRelativePose = opencvToWPI(tagRelativePose)
 
             self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
+            self.setDataValue(
+                self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
+            )
 
             if (
                 self.getSetting(ApriltagPipelineSettings.fieldpose)

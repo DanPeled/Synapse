@@ -67,12 +67,18 @@ class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
         estimate = self.estimator.estimateOrthogonalIteration(
             tagDetection.homography, tagDetection.corners, nIters
         )
+        rejected, rejectedErr = estimate.pose1, estimate.error1
+        accepted, acceptedErr = estimate.pose2, estimate.error2
+        if estimate.error1 < estimate.error2:
+            rejected, rejectedErr = estimate.pose2, estimate.error2
+            accepted, acceptedErr = estimate.pose1, estimate.error1
+
         return ApriltagPoseEstimate(
             estimate.getAmbiguity(),
-            estimate.error1,
-            estimate.error2,
-            estimate.pose1,
-            estimate.pose2,
+            acceptedPose=accepted,
+            acceptedError=acceptedErr,
+            rejectedPose=rejected,
+            rejectedError=rejectedErr,
         )
 
     def setConfig(self, config: ApriltagPoseEstimator.Config) -> None:
