@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from dataclasses import dataclass
 from enum import Enum
 from functools import cache, lru_cache
 from typing import Any, Dict, Final, List, Optional, Set
@@ -15,22 +16,16 @@ from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
-    ApriltagPoseEstimator, RobotPoseEstimate, drawTagDetectionMarker,
-    opencvToWPI, tagToRobotPose)
+    ApriltagPoseEstimator, ICombinedApriltagRobotPoseEstimator,
+    drawTagDetectionMarker, opencvToWPI, tagToRobotPose)
 from synapse.pipelines.apriltag.apriltag_robotpy import (
     RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
+from synapse.pipelines.apriltag.multi_tag_estimator import \
+    WeightedAverageMultiTagEstimator
 from synapse.stypes import CameraID
 from wpimath import units
-from wpimath.geometry import Transform3d
-
-
-@pipelineResult
-class ApriltagResult:
-    detection: AprilTagDetection
-    timestamp: float
-    robotPoseEstimate: RobotPoseEstimate
-    tagPoseEstimate: ApriltagPoseEstimate
+from wpimath.geometry import Pose3d, Transform3d
 
 
 class ApriltagVerbosity(Enum):
@@ -125,6 +120,20 @@ class ApriltagPipelineSettings(PipelineSettings):
     )
 
 
+@dataclass
+class ApriltagDetectionResult:
+    detection: AprilTagDetection
+    timestamp: float
+    robotPoseEstimate: Pose3d
+    tagPoseEstimate: ApriltagPoseEstimate
+
+
+@pipelineResult
+class ApriltagResult:
+    robotPoseEstimate: Optional[Pose3d]
+    tagDetections: List[ApriltagDetectionResult]
+
+
 class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
@@ -134,10 +143,15 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
+    kRobotPoseEstimateKey: Final[str] = "robotEstimate_fieldSpace"
+    kTagDetectionsKey: Final[str] = "tags"
 
     def __init__(self, settings: ApriltagPipelineSettings):
         super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
+        self.combinedApriltagPoseEstimator: ICombinedApriltagRobotPoseEstimator = (
+            WeightedAverageMultiTagEstimator()
+        )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
     def bind(self, cameraIndex: CameraID):
@@ -214,17 +228,20 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         tags = self.apriltagDetector.detect(gray)
-        results: List[ApriltagResult] = []
+        tagEstimates: List[ApriltagDetectionResult] = []
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setResults(ApriltagsJson.empty())
+            self.setResults(ApriltagResult(None, []))
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
-            if tag.tagID < 0 or tag.tagID > max(self.fmap.fieldMap.keys()):
-                return gray
+            if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap.keys():
+                warn(f"Invalid tagID: {tag.tagID}")
+                return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
             tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(tag)
+
+            self.setDataValue(self.kTagIDKey, tag.tagID)
 
             tagRelativePose: Transform3d = (
                 tagPoseEstimate.pose1
@@ -260,11 +277,11 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                         robotPoseEstimate.robotPose_fieldSpace,
                     )
 
-                    results.append(
-                        ApriltagResult(
+                    tagEstimates.append(
+                        ApriltagDetectionResult(
                             detection=tag,
                             timestamp=timestamp,
-                            robotPoseEstimate=robotPoseEstimate,
+                            robotPoseEstimate=robotPoseEstimate.robotPose_fieldSpace,
                             tagPoseEstimate=tagPoseEstimate,
                         )
                     )
@@ -272,7 +289,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.setDataValue("hasResults", True)
         self.setResults(
             ApriltagsJson.toJsonString(
-                results,
+                ApriltagResult(None, tagEstimates),
                 getIgnoredDataByVerbosity(
                     ApriltagVerbosity.fromValue(
                         self.getSetting(ApriltagPipelineSettings.verbosity)
@@ -287,26 +304,29 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 class ApriltagsJson:
     @classmethod
     def toJsonString(
-        cls, tags: List[ApriltagResult], ignore_keys: Optional[set] = None
-    ) -> List[Dict[str, Any]]:
+        cls, result: ApriltagResult, ignore_keys: Optional[set] = None
+    ) -> Dict[str, Any]:
         ignore_keys = set(
             ignore_keys or []
         )  # Convert ignore_keys to a set for fast lookup
         data: List[dict] = []
 
-        for tag in tags:
+        for tag in result.tagDetections:
             data.append(
                 {
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
-                    ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
-                    ApriltagPipeline.kRobotPoseTagSpaceKey: tag.robotPoseEstimate.robotPose_tagSpace,
+                    ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate,
+                    # TODO: change to wrapper class with "rejected" and "accepted" pose
                     ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
                 }
             )
 
-        return data
+        return {
+            ApriltagPipeline.kRobotPoseEstimateKey: result.robotPoseEstimate,
+            ApriltagPipeline.kTagDetectionsKey: data,
+        }
 
     @classmethod
     def empty(cls) -> List[Dict[str, Any]]:
