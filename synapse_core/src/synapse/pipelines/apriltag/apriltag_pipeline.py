@@ -320,7 +320,6 @@ class ApriltagsJson:
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
                     ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
-                    # TODO: change to wrapper class with "rejected" and "accepted" pose
                     ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
                 }
