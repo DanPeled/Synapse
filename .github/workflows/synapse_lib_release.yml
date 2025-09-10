@@ -22,15 +22,15 @@ jobs:
           java-version: "17"
 
       - name: Install RoboRio Toolchain
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: ./gradlew installRoboRioToolchain
 
       - name: Build SynapseLib
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: ./gradlew build
 
       - name: Run Gradle publish
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: ./gradlew publish
 
       - name: Prepare and push gh-pages branch
@@ -40,8 +40,8 @@ jobs:
 
           # Copy artifacts to temporary location
           mkdir -p /tmp/maven
-          cp -r synapse_lib/vendordep/maven/* /tmp/maven/
-          cp synapse_lib/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
+          cp -r synapse_lib_vendordep/vendordep/maven/* /tmp/maven/
+          cp synapse_lib_vendordep/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
 
           # Stash all local changes (including untracked files)
           git stash push -m "workflow stash" --include-untracked
@@ -82,6 +82,6 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: synapse_lib/vendordep/SynapseBridge.json
+          asset_path: synapse_lib_vendordep/vendordep/SynapseBridge.json
           asset_name: SynapseBridge.json
           asset_content_type: application/json

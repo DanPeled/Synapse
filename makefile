@@ -62,7 +62,7 @@ format:
 		buf format -w
 	@cd ..
 	@echo SynapseLib SpotlessApply
-	@${CD} synapse_lib && \
+	@${CD} synapse_lib_vendordep && \
 		./gradlew spotlessApply
 
 test:

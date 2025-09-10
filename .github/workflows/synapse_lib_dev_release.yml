@@ -3,7 +3,7 @@ name: Publish SynapseLib Dev Vendordep
 on:
   push:
     paths:
-      - "synapse_lib/**"
+      - "synapse_lib_vendordep/**"
       - ".github/workflows/synapse_lib_dev_release.yml"
     branches: [main]
 
@@ -24,20 +24,20 @@ jobs:
           java-version: "17"
 
       - name: Append -dev to pubVersion
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: |
           sed -i "s/^\(def pubVersion = '[^']*\)'\$/\1-dev'/" publish.gradle
 
       - name: Install RoboRio Toolchain
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: ./gradlew installRoboRioToolchain
 
       - name: Build SynapseLib
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: ./gradlew build
 
       - name: Run Gradle publish
-        working-directory: synapse_lib
+        working-directory: synapse_lib_vendordep
         run: ./gradlew publish
 
       - name: Prepare and push gh-pages branch
@@ -47,8 +47,8 @@ jobs:
 
           # Copy artifacts to temporary location
           mkdir -p /tmp/maven
-          cp -r synapse_lib/vendordep/maven/* /tmp/maven/
-          cp synapse_lib/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
+          cp -r synapse_lib_vendordep/vendordep/maven/* /tmp/maven/
+          cp synapse_lib_vendordep/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
 
           # Stash all local changes (including untracked files)
           git stash push -m "workflow stash" --include-untracked
@@ -88,4 +88,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SynapseBridge-dev.json
-          path: synapse_lib/vendordep/SynapseBridge.json
+          path: synapse_lib_vendordep/vendordep/SynapseBridge.json
