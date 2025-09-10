@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "synapse_lib_vendordep/**"
+      - "synapse_lib/**"
   pull_request:
     paths:
-      - "synapse_lib_vendordep/**"
+      - "synapse_lib/**"
 
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Project
         run: |
-          cd synapse_lib_vendordep
+          cd synapse_lib
           ./gradlew build
 
   roborio-cross-build:
@@ -67,7 +67,7 @@ jobs:
 
       - name: Build for RoboRIO
         run: |
-          cd synapse_lib_vendordep
+          cd synapse_lib
           ./gradlew build
 
   test:
@@ -97,7 +97,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          cd synapse_lib_vendordep
+          cd synapse_lib
           ./gradlew test
 
   spotless-check:
@@ -123,5 +123,5 @@ jobs:
 
       - name: Run Spotless Check
         run: |
-          cd synapse_lib_vendordep
+          cd synapse_lib
           ./gradlew spotlessCheck

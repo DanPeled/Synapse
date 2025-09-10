@@ -15,15 +15,19 @@ import org.msgpack.jackson.dataformat.MessagePackFactory;
 // import synapse.util.deserializers.WPILibGeometryModule;
 
 /**
- * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
+ * Represents a camera in the Synapse system, providing methods to manage
+ * settings and retrieve
  * results from NetworkTables.
  */
 public class SynapseCamera {
   /**
-   * A container class holding the standard NetworkTables topic keys used for communication between
+   * A container class holding the standard NetworkTables topic keys used for
+   * communication between
    * Synapse and coprocessors.
    *
-   * <p>These constants define the names of NetworkTables topics for pipeline configuration, status
+   * <p>
+   * These constants define the names of NetworkTables topics for pipeline
+   * configuration, status
    * reporting, and result data.
    */
   public static class NetworkTableTopics {
@@ -46,7 +50,8 @@ public class SynapseCamera {
     public static final String kProcessLatencyTopic = "processLatency";
 
     /** Prevents instantiation. */
-    private NetworkTableTopics() {}
+    private NetworkTableTopics() {
+    }
   }
 
   /** Jackson ObjectMapper configured for MessagePack and WPILib geometry. */
@@ -86,7 +91,8 @@ public class SynapseCamera {
   private NetworkTableEntry m_processLatencyEntry;
 
   /**
-   * Constructs a new {@code SynapseCamera} instance with the given camera name. Uses the default
+   * Constructs a new {@code SynapseCamera} instance with the given camera name.
+   * Uses the default
    * coprocessor name {@code "Synapse"}.
    *
    * @param cameraName the camera's name
@@ -96,10 +102,11 @@ public class SynapseCamera {
   }
 
   /**
-   * Constructs a new {@code SynapseCamera} instance with the given camera name and coprocessor
+   * Constructs a new {@code SynapseCamera} instance with the given camera name
+   * and coprocessor
    * name.
    *
-   * @param cameraName the camera's name
+   * @param cameraName      the camera's name
    * @param coprocessorName the coprocessor table name
    */
   public SynapseCamera(String cameraName, String coprocessorName) {
@@ -107,8 +114,7 @@ public class SynapseCamera {
     synapseTableName = coprocessorName;
 
     if (!isJUnitTest()) { // JUnit crashes ntcore for some reason
-      m_table =
-          NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
+      m_table = NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
     }
   }
 
@@ -174,10 +180,11 @@ public class SynapseCamera {
   }
 
   /**
-   * Fetches and deserializes the results for a given SynapsePipeline in a type-safe way.
+   * Fetches and deserializes the results for a given SynapsePipeline in a
+   * type-safe way.
    *
    * @param pipeline The SynapsePipeline to fetch results from.
-   * @param <T> The expected result type of the pipeline.
+   * @param <T>      The expected result type of the pipeline.
    * @return The deserialized result.
    * @throws IOException if reading or deserialization fails.
    */
@@ -186,15 +193,20 @@ public class SynapseCamera {
   }
 
   /**
-   * Fetches and deserializes data from the NetworkTables results topic into the specified type.
+   * Fetches and deserializes data from the NetworkTables results topic into the
+   * specified type.
    *
-   * @param <T> The type of the object to deserialize.
-   * @param typeref The TypeReference describing the target type.
-   * @param typestring The expected pipeline type string; used to validate the entry.
-   * @return An object of type {@code T}, deserialized from the raw NetworkTables data.
+   * @param <T>        The type of the object to deserialize.
+   * @param typeref    The TypeReference describing the target type.
+   * @param typestring The expected pipeline type string; used to validate the
+   *                   entry.
+   * @return An object of type {@code T}, deserialized from the raw NetworkTables
+   *         data.
    * @throws StreamReadException If the input stream cannot be read properly.
-   * @throws DatabindException If there is a problem mapping the JSON bytes to the target type.
-   * @throws IOException If there is a low-level I/O problem accessing the NetworkTables data.
+   * @throws DatabindException   If there is a problem mapping the JSON bytes to
+   *                             the target type.
+   * @throws IOException         If there is a low-level I/O problem accessing the
+   *                             NetworkTables data.
    */
   public <T> T getResults(TypeReference<T> typeref, String typestring)
       throws StreamReadException, DatabindException, IOException {
@@ -216,16 +228,21 @@ public class SynapseCamera {
   /**
    * Deserializes the given byte array into an object of the specified type.
    *
-   * <p>This method supports both JSON and MessagePack formats, depending on the configured
+   * <p>
+   * This method supports both JSON and MessagePack formats, depending on the
+   * configured
    * ObjectMapper.
    *
-   * @param <T> The type of the result object.
+   * @param <T>     The type of the result object.
    * @param typeref The TypeReference describing the expected type of the result.
-   * @param data The serialized data as a byte array.
+   * @param data    The serialized data as a byte array.
    * @return An instance of type T deserialized from the provided data.
-   * @throws StreamReadException If there is a low-level I/O or format problem while reading.
-   * @throws DatabindException If there is a problem mapping the data to the specified type.
-   * @throws IOException If a general I/O error occurs during deserialization.
+   * @throws StreamReadException If there is a low-level I/O or format problem
+   *                             while reading.
+   * @throws DatabindException   If there is a problem mapping the data to the
+   *                             specified type.
+   * @throws IOException         If a general I/O error occurs during
+   *                             deserialization.
    */
   public <T> T getResults(TypeReference<T> typeref, byte[] data)
       throws StreamReadException, DatabindException, IOException {
@@ -289,7 +306,8 @@ public class SynapseCamera {
    */
   public Optional<Object> getSetting(String key) {
     NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (!entry.exists()) return Optional.empty();
+    if (!entry.exists())
+      return Optional.empty();
 
     return switch (entry.getType()) {
       case kDouble -> Optional.of(entry.getDouble(0.0));
@@ -305,7 +323,7 @@ public class SynapseCamera {
   /**
    * Sets a double setting value in the camera's settings table.
    *
-   * @param key The setting key.
+   * @param key   The setting key.
    * @param value The double value to set.
    * @throws RuntimeException If the setting type does not match.
    */
@@ -321,8 +339,8 @@ public class SynapseCamera {
   /**
    * Throws a standardized runtime exception for type mismatches.
    *
-   * @param key The setting key.
-   * @param actual The actual NetworkTableType found.
+   * @param key      The setting key.
+   * @param actual   The actual NetworkTableType found.
    * @param expected The expected type as a string.
    */
   private void throwTypeMismatchException(String key, NetworkTableType actual, String expected) {
@@ -333,7 +351,8 @@ public class SynapseCamera {
   }
 
   /**
-   * Creates and configures the ObjectMapper for MessagePack and WPILib geometry support.
+   * Creates and configures the ObjectMapper for MessagePack and WPILib geometry
+   * support.
    *
    * @return A configured ObjectMapper instance.
    */
@@ -368,7 +387,8 @@ public class SynapseCamera {
   }
 
   /**
-   * Enum representing the camera setting keys. These keys are used to configure and retrieve
+   * Enum representing the camera setting keys. These keys are used to configure
+   * and retrieve
    * specific camera settings from a configuration system or camera interface.
    */
   public static enum CameraSettings {
@@ -401,12 +421,16 @@ public class SynapseCamera {
   /**
    * Checks if the current code is running inside a unit test framework.
    *
-   * <p>This method inspects the current thread's stack trace and looks for class names associated
-   * with popular test frameworks, such as JUnit 4/5 and TestNG. If any stack frame indicates that a
+   * <p>
+   * This method inspects the current thread's stack trace and looks for class
+   * names associated
+   * with popular test frameworks, such as JUnit 4/5 and TestNG. If any stack
+   * frame indicates that a
    * test framework is active, it returns {@code true}.
    *
-   * @return {@code true} if the current code is executing inside a unit test, {@code false}
-   *     otherwise
+   * @return {@code true} if the current code is executing inside a unit test,
+   *         {@code false}
+   *         otherwise
    */
   public static boolean isJUnitTest() {
     for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
