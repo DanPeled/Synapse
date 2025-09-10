@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from typing import Final
+
 from setuptools import find_packages, setup
 
 SOURCE_DIR: Final[str] = "src"
