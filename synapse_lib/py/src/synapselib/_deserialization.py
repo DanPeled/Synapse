@@ -1,5 +1,9 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from dataclasses import fields, is_dataclass
-from typing import Type, Any, Dict
+from typing import Any, Dict, Type
 
 
 def from_dict(cls: Type[Any], data: Dict[str, Any]) -> Any:

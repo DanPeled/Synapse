@@ -1,9 +1,12 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import unittest
 from unittest.mock import MagicMock
-from synapselib import SynapsePipeline, SynapseCamera
-from synapselib.pipelines.apriltag import (
-    ApriltagResult,
-)
+
+from synapselib import SynapseCamera, SynapsePipeline
+from synapselib.pipelines.apriltag import ApriltagResult
 
 
 class TestSynapsePipeline(unittest.TestCase):

@@ -3,11 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from enum import Enum
-from typing import Any, Final, Generic, Optional, Type, TypeVar, Union, overload
-from ._deserialization import dataclass_object_hook
-from .pipelines.apriltag import ApriltagResult
+from typing import (Any, Final, Generic, Optional, Type, TypeVar, Union,
+                    overload)
+
 import msgpack
 import ntcore
+
+from ._deserialization import dataclass_object_hook
+from .pipelines.apriltag import ApriltagResult
 
 TResultType = TypeVar("TResultType")
 

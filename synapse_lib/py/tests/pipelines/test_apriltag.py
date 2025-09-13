@@ -1,9 +1,12 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import unittest
-from synapselib.pipelines.apriltag import (
-    ApriltagPoseEstimate,
-    ApriltagDetection,
-    ApriltagResult,
-)
+
+from synapselib.pipelines.apriltag import (ApriltagDetection,
+                                           ApriltagPoseEstimate,
+                                           ApriltagResult)
 
 
 class TestApriltagClasses(unittest.TestCase):
