@@ -31,10 +31,11 @@ jobs:
           python-version: "3.10.7"
 
       - name: Install Python dependencies
-        run: pip install .
+        run: |
+          pip install .
 
       - name: Run build check
-        run: python3 -m compileall .
+        run: python3 setup.py sdist bdist_wheel
 
       - name: Check wheel contents
         run: |
