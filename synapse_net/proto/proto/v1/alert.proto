@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package proto.v1;
 
 enum AlertTypeProto {
@@ -8,7 +9,9 @@ enum AlertTypeProto {
   ALERT_TYPE_PROTO_ERROR = 3;
 }
 
-message AlertProto { // Structure for an alert message
+message AlertProto {
+  // Structure for an alert message
+
   AlertTypeProto type = 1; // Type of the alert (info, warning, error)
   string message = 2; // The alert message
 }

@@ -8,7 +8,9 @@ import "proto/v1/device.proto";
 import "proto/v1/log.proto";
 import "proto/v1/pipeline.proto";
 
-message MessageProto { // Main message structure for communication
+message MessageProto {
+  // Main message structure for communication
+
   MessageTypeProto type = 1; // Type of the message, indicating what kind of data it contains
   oneof payload {
     DeviceInfoProto device_info = 2; // Information about the device
