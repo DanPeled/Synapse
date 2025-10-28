@@ -936,12 +936,7 @@ def setEntryValue(entry: NetworkTableEntry, value):
         raise ValueError("Unsupported type")
 
 
-class PipelineSettings(SettingsCollection):
-    """Base class for creating pipeline settings collections."""
-
-    def __init__(self, settings: Optional[SettingsMap] = None):
-        super().__init__(settings)
-
+class CameraSettings(SettingsCollection):
     kCameraPropsCategory = "Camera Properties"
 
     brightness = settingField(
@@ -1001,8 +996,12 @@ class PipelineSettings(SettingsCollection):
         description="Camera Resolution",
     )
 
-    def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
-        super().setSetting(setting, value)
+
+class PipelineSettings(SettingsCollection):
+    """Base class for creating pipeline settings collections."""
+
+    def __init__(self, settings: Optional[SettingsMap] = None):
+        super().__init__(settings)
 
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:

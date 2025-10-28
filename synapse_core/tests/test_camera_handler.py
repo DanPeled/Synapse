@@ -5,7 +5,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from synapse.core.runtime_handler import CameraHandler
+from synapse.core.camera_handler import CameraHandler
 
 
 class TestCameraHandler(unittest.TestCase):

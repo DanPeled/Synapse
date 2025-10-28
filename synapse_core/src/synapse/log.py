@@ -8,8 +8,9 @@ import time
 from typing import Any, Optional
 
 from rich import print
-from synapse_net.proto import v1
 from synapse_net.socketServer import WebSocketServer, createMessage
+
+from synapse_net.proto import v1
 
 from .alert import alert
 from .bcolors import MarkupColors, TextTarget, parseTextStyle

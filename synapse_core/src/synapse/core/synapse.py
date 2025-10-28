@@ -300,7 +300,7 @@ class Synapse:
             for (
                 id,
                 pipeline,
-            ) in self.runtime_handler.pipelineLoader.pipelineInstanceBindings.items():
+            ) in self.runtime_handler.pipelineHandler.pipelineInstanceBindings.items():
                 msg = pipelineToProto(pipeline, id)
 
                 await self.websocket.sendToAll(
@@ -311,7 +311,7 @@ class Synapse:
             for (
                 typename,
                 type,
-            ) in self.runtime_handler.pipelineLoader.pipelineTypes.items():
+            ) in self.runtime_handler.pipelineHandler.pipelineTypes.items():
                 settingType = resolveGenericArgument(type)
                 if settingType:
                     settings = settingType({})
@@ -333,7 +333,7 @@ class Synapse:
                     camera.name,
                     camera,
                     self.runtime_handler.pipelineBindings.get(id, 0),
-                    self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
+                    self.runtime_handler.pipelineHandler.defaultPipelineIndexes.get(
                         id, -1
                     ),
                     self.runtime_handler.cameraHandler.cameraConfigBindings[id].id,
@@ -421,7 +421,7 @@ class Synapse:
                 name,
                 camera,
                 self.runtime_handler.pipelineBindings.get(cameraid, 0),
-                self.runtime_handler.pipelineLoader.defaultPipelineIndexes.get(
+                self.runtime_handler.pipelineHandler.defaultPipelineIndexes.get(
                     cameraid, 0
                 ),
                 self.runtime_handler.cameraHandler.cameraConfigBindings[cameraid].id,
@@ -489,7 +489,7 @@ class Synapse:
                 camera.name,
                 camera,
                 pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
-                defaultPipeline=self.runtime_handler.pipelineLoader.defaultPipelineIndexes[
+                defaultPipeline=self.runtime_handler.pipelineHandler.defaultPipelineIndexes[
                     cameraIndex
                 ],
                 kind=self.runtime_handler.cameraHandler.cameraConfigBindings[
@@ -530,11 +530,11 @@ class Synapse:
                 ),
             )
 
-        self.runtime_handler.pipelineLoader.onAddPipeline.add(onAddPipeline)
+        self.runtime_handler.pipelineHandler.onAddPipeline.add(onAddPipeline)
         self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
         self.runtime_handler.onPipelineChanged.add(onPipelineIndexChangedInNt)
-        self.runtime_handler.pipelineLoader.onDefaultPipelineSet.add(
+        self.runtime_handler.pipelineHandler.onDefaultPipelineSet.add(
             onDefaultPipelineSet
         )
         self.runtime_handler.cameraHandler.onRenameCamera.add(onCameraRename)
@@ -553,7 +553,7 @@ class Synapse:
             setSettingMSG: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
 
             pipeline: Optional[Pipeline] = (
-                self.runtime_handler.pipelineLoader.getPipeline(
+                self.runtime_handler.pipelineHandler.getPipeline(
                     setSettingMSG.pipeline_index
                 )
             )
@@ -580,7 +580,7 @@ class Synapse:
             assert_set(msgObj.set_pipeline_name)
             setPipelineNameMsg: SetPipelineNameMessageProto = msgObj.set_pipeline_name
             pipeline: Optional[Pipeline] = (
-                self.runtime_handler.pipelineLoader.getPipeline(
+                self.runtime_handler.pipelineHandler.getPipeline(
                     setPipelineNameMsg.pipeline_index
                 )
             )
@@ -608,9 +608,9 @@ class Synapse:
             addPipelineMsg: PipelineProto = msgObj.pipeline_info
             if addPipelineMsg.type is not None and (
                 addPipelineMsg.type
-                in self.runtime_handler.pipelineLoader.pipelineTypes.keys()
+                in self.runtime_handler.pipelineHandler.pipelineTypes.keys()
             ):
-                self.runtime_handler.pipelineLoader.addPipeline(
+                self.runtime_handler.pipelineHandler.addPipeline(
                     index=addPipelineMsg.index,
                     name=addPipelineMsg.name,
                     typename=addPipelineMsg.type,
@@ -625,7 +625,7 @@ class Synapse:
                     pipelineId,
                 ) in self.runtime_handler.pipelineBindings.items():
                     if pipelineId == addPipelineMsg.index:
-                        pipeline = self.runtime_handler.pipelineLoader.getPipeline(
+                        pipeline = self.runtime_handler.pipelineHandler.getPipeline(
                             pipelineId
                         )
                         if pipeline is not None:
@@ -638,13 +638,13 @@ class Synapse:
         elif msgType == MessageTypeProto.DELETE_PIPELINE:
             assert_set(msgObj.remove_pipeline_index)
             removePipelineIndex: int = msgObj.remove_pipeline_index
-            self.runtime_handler.pipelineLoader.removePipeline(removePipelineIndex)
+            self.runtime_handler.pipelineHandler.removePipeline(removePipelineIndex)
         elif msgType == MessageTypeProto.SET_DEFAULT_PIPELINE:
             assert_set(msgObj.set_default_pipeline)
             defaultPipelineMsg: SetDefaultPipelineMessageProto = (
                 msgObj.set_default_pipeline
             )
-            self.runtime_handler.pipelineLoader.setDefaultPipeline(
+            self.runtime_handler.pipelineHandler.setDefaultPipeline(
                 cameraIndex=defaultPipelineMsg.camera_index,
                 pipelineIndex=defaultPipelineMsg.pipeline_index,
             )
