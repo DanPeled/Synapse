@@ -1,7 +1,0 @@
-<factorypath>
-    <factorypathentry kind="EXTJAR" id="/home/dan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-databind/2.18.4/7533a629c563ef6a5e2424d6ff3654155abea6b0/jackson-databind-2.18.4.jar" enabled="true" runInBatchMode="false"/>
-    <factorypathentry kind="EXTJAR" id="/home/dan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-core/2.18.4/cdcc3706edf9b847a55aecad4d1ddb87250882ca/jackson-core-2.18.4.jar" enabled="true" runInBatchMode="false"/>
-    <factorypathentry kind="EXTJAR" id="/home/dan/.gradle/caches/modules-2/files-2.1/org.msgpack/jackson-dataformat-msgpack/0.9.10/2acaefaa1ee747b61bf8114994fd4c072a419bb7/jackson-dataformat-msgpack-0.9.10.jar" enabled="true" runInBatchMode="false"/>
-    <factorypathentry kind="EXTJAR" id="/home/dan/.gradle/caches/modules-2/files-2.1/org.msgpack/msgpack-core/0.9.10/e7b1aa5f73766adfd3959370f61a9598254b86ae/msgpack-core-0.9.10.jar" enabled="true" runInBatchMode="false"/>
-    <factorypathentry kind="EXTJAR" id="/home/dan/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-annotations/2.18.4/21e5645ac25cd6c281cfc9e51df031055d26ffd6/jackson-annotations-2.18.4.jar" enabled="true" runInBatchMode="false"/>
-</factorypath>
