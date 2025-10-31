@@ -105,7 +105,7 @@ class TestRuntimeManager(unittest.TestCase):
         fake_pipeline.toDict.return_value = {"mock": "pipeline_config"}
 
         with patch(
-            "synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap"
+            "synapse.core.global_settings.GlobalSettings.getCameraConfigMap"
         ) as mock_camera_map:
             mock_camera_map.return_value = {0: fake_config}
             self.handler.pipelineHandler.pipelineInstanceBindings = {0: fake_pipeline}

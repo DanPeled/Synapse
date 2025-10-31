@@ -16,7 +16,7 @@ from .config import Config
 from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
 from .pipeline import Pipeline, getPipelineTypename
-from .settings_api import CameraSettings, PipelineSettings, SettingsMap
+from .settings_api import PipelineSettings, SettingsMap
 
 
 class PipelineHandler:
@@ -38,9 +38,6 @@ class PipelineHandler:
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
         self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
         self.pipelineNames: Dict[PipelineID, PipelineName] = {}
-        self.cameraPipelineSettings: Dict[
-            CameraID, Dict[PipelineID, CameraSettings]
-        ] = {}
 
         self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}

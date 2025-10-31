@@ -24,6 +24,7 @@ from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
 
 from ..bcolors import MarkupColors
 from ..log import err
+from .camera_factory import CameraPropKeys, PropertyMetaDict, SynapseCamera
 
 SettingsValue = Any
 
@@ -995,6 +996,40 @@ class CameraSettings(SettingsCollection):
         category=kCameraPropsCategory,
         description="Camera Resolution",
     )
+
+    @staticmethod
+    def fromCamera(camera: SynapseCamera) -> "CameraSettings":
+        def getPropNumberConstraint(
+            propMeta: PropertyMetaDict, prop: str
+        ) -> NumberConstraint:
+            if prop not in propMeta:
+                return NumberConstraint(0, 100, 1)
+            else:
+                propData = propMeta.get(prop)
+                assert propData is not None
+
+                return NumberConstraint(propData["min"], propData["max"], step=None)
+
+        propMeta = camera.getPropertyMeta()
+        inst = CameraSettings()
+        if propMeta is not None:
+            inst.brightness.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.exposure.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.saturation.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.sharpness.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.gain.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+
+        return inst
 
 
 class PipelineSettings(SettingsCollection):

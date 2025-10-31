@@ -242,10 +242,11 @@ class RuntimeManager:
             log.err(f"No pipeline with index: {self.pipelineBindings[cameraIndex]}")
             return
 
-        currPipeline.bind(cameraIndex)
         camera: Optional[SynapseCamera] = self.cameraHandler.getCamera(cameraIndex)
 
         assert camera is not None
+
+        currPipeline.bind(cameraIndex, camera)
 
         cameraTable: Optional[NetworkTable] = getCameraTable(camera)
 
@@ -653,11 +654,16 @@ class RuntimeManager:
             and self.pipelineBindings[cameraIndex]
             in self.pipelineHandler.pipelineInstanceBindings
         ):
-            settings = self.pipelineHandler.pipelineInstanceBindings[
+            pipeline = self.pipelineHandler.getPipeline(
                 self.pipelineBindings[cameraIndex]
-            ].settings
-            frame = self.rotateCameraBySettings(settings, frame)
-            # frame = self.fixBlackLevelOffset(settings, frame)
+            )
+            if pipeline is None:
+                return frame
+            settings: Optional[CameraSettings] = (
+                pipeline.getCurrentCameraSettingCollection()
+            )
+            if settings is not None:
+                frame = self.rotateCameraBySettings(settings, frame)
 
         return frame
 
