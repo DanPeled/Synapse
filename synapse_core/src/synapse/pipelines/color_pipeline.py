@@ -4,7 +4,7 @@
 
 from synapse.core.pipeline import Pipeline, PipelineResult
 from synapse.core.settings_api import PipelineSettings
-from synapse.stypes import CameraID, Frame
+from synapse.stypes import Frame
 
 
 class ColorPipeline(Pipeline[PipelineSettings, PipelineResult]):

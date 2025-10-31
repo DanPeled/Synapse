@@ -142,9 +142,6 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         Returns:
             Optional[Any]: The value of the setting if found, else None.
         """
-        cameraSettings = self.getCurrentCameraSettingCollection()
-        if cameraSettings is not None and setting in cameraSettings:
-            return cameraSettings.getSetting(setting)
         return self.settings.getSetting(setting)
 
     def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
@@ -185,6 +182,13 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         if data and currRes in data.calibration:
             return data.calibration[currRes].distCoeff
         return None
+
+    @overload
+    def getCameraSetting(self, setting: str) -> Optional[Any]: ...
+    @overload
+    def getCameraSetting(
+        self, setting: Setting[TConstraintType, TSettingValueType]
+    ) -> TSettingValueType: ...
 
     def getCameraSetting(self, setting: Union[str, Setting]) -> Optional[Any]:
         if self.cameraIndex in self._cameraSettings:

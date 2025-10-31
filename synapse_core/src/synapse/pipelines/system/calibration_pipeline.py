@@ -258,19 +258,18 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
                             mean_error=retval,
                             camera_matrix=flattenedMatrix,
                             dist_coeffs=flattendDistCoeffs,
-                            resolution=self.getSetting(CameraSettings.resolution),
+                            resolution=self.getCameraSetting(CameraSettings.resolution),
                         ),
                     ).SerializeToString()
                 )
-
-                resolution = self.getSetting(CameraSettings.resolution).split("x")
+                resolution = self.getCameraSetting(CameraSettings.resolution).split("x")
                 width = int(resolution[0])
                 height = int(resolution[1])
 
                 Synapse.kInstance.runtime_handler.cameraHandler.cameraConfigBindings[
                     self.cameraIndex
                 ].calibration[
-                    self.getSetting(CameraSettings.resolution)
+                    self.getCameraSetting(CameraSettings.resolution)
                 ] = CalibrationData(
                     matrix=cameraMatrix.flatten().tolist(),
                     distCoeff=distCoeffs.flatten().tolist(),
