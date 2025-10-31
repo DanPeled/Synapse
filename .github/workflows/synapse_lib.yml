@@ -4,10 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "synapse_lib/**"
+      - "synapse_lib/src/**"
+      - "synapse_lib/*.gradle"
   pull_request:
     paths:
-      - "synapse_lib/**"
+      - "synapse_lib/src/**"
+      - "synapse_lib/*.gradle"
 
 permissions:
   contents: read
