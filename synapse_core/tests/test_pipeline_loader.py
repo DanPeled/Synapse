@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 from synapse.core.pipeline import FrameResult, PipelineResult
-from synapse.core.runtime_handler import (Pipeline, PipelineLoader,
+from synapse.core.runtime_handler import (Pipeline, PipelineHandler,
                                           PipelineSettings)
 
 
@@ -26,10 +26,10 @@ class DummySettings(PipelineSettings):
         self.config_map = config_map or {}
 
 
-class TestPipelineLoader(unittest.TestCase):
+class TestPipelineHandler(unittest.TestCase):
     def setUp(self):
         self.pipeline_dir = Path("/fake/path")
-        self.loader = PipelineLoader(self.pipeline_dir)
+        self.loader = PipelineHandler(self.pipeline_dir)
 
     @patch("synapse.core.runtime_handler.importlib.util.spec_from_file_location")
     @patch("synapse.core.runtime_handler.importlib.util.module_from_spec")

@@ -3,7 +3,7 @@ version: v1
 name: github.com/DanPeled/Synapse
 lint:
   use:
-    - STANDARD
+    - DEFAULT
 breaking:
   use:
     - FILE

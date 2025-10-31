@@ -24,6 +24,7 @@ from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
 
 from ..bcolors import MarkupColors
 from ..log import err
+from .camera_factory import CameraPropKeys, PropertyMetaDict, SynapseCamera
 
 SettingsValue = Any
 
@@ -936,12 +937,7 @@ def setEntryValue(entry: NetworkTableEntry, value):
         raise ValueError("Unsupported type")
 
 
-class PipelineSettings(SettingsCollection):
-    """Base class for creating pipeline settings collections."""
-
-    def __init__(self, settings: Optional[SettingsMap] = None):
-        super().__init__(settings)
-
+class CameraSettings(SettingsCollection):
     kCameraPropsCategory = "Camera Properties"
 
     brightness = settingField(
@@ -1001,8 +997,46 @@ class PipelineSettings(SettingsCollection):
         description="Camera Resolution",
     )
 
-    def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
-        super().setSetting(setting, value)
+    @staticmethod
+    def fromCamera(camera: SynapseCamera) -> "CameraSettings":
+        def getPropNumberConstraint(
+            propMeta: PropertyMetaDict, prop: str
+        ) -> NumberConstraint:
+            if prop not in propMeta:
+                return NumberConstraint(0, 100, 1)
+            else:
+                propData = propMeta.get(prop)
+                assert propData is not None
+
+                return NumberConstraint(propData["min"], propData["max"], step=None)
+
+        propMeta = camera.getPropertyMeta()
+        inst = CameraSettings()
+        if propMeta is not None:
+            inst.brightness.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.exposure.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.saturation.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.sharpness.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            inst.gain.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+
+        return inst
+
+
+class PipelineSettings(SettingsCollection):
+    """Base class for creating pipeline settings collections."""
+
+    def __init__(self, settings: Optional[SettingsMap] = None):
+        super().__init__(settings)
 
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:

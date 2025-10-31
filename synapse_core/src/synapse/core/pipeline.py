@@ -5,23 +5,24 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import (Any, Callable, Generic, Iterable, List, Optional, Type,
-                    TypeVar, Union, overload)
+from typing import (Any, Callable, Dict, Generic, Iterable, List, Optional,
+                    Type, TypeVar, Union, overload)
 
 from ntcore import NetworkTable
-from synapse.core.global_settings import GlobalSettings
-from synapse.log import createMessage, err
 from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
                                   PipelineResultProto)
 from synapse_net.socketServer import WebSocketServer
 from wpimath.geometry import Transform3d
 
+from ..log import createMessage, err
 from ..stypes import CameraID, Frame, PipelineID
+from .camera_factory import SynapseCamera
+from .global_settings import GlobalSettings
 from .results_api import (PipelineResult, parsePipelineResult,
                           serializePipelineResult)
-from .settings_api import (PipelineSettings, Setting, SettingsAPI,
-                           SettingsValue, TConstraintType, TSettingValueType,
-                           settingValueToProto)
+from .settings_api import (CameraSettings, PipelineSettings, Setting,
+                           SettingsAPI, SettingsValue, TConstraintType,
+                           TSettingValueType, settingValueToProto)
 
 FrameResult = Optional[Frame]
 
@@ -63,17 +64,19 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             settings (TSettingsType): The settings object to use for the pipeline.
         """
         self.settings: TSettingsType = settings
+        self._cameraSettings: Dict[CameraID, CameraSettings] = {}
         self.cameraIndex: CameraID = -1
         self.pipelineIndex: PipelineID = -1
         self.name: str = "new pipeline"
 
-    def bind(self, cameraIndex: CameraID):
+    def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         """Binds a camera index to this pipeline instance.
 
         Args:
             cameraIndex (CameraID): The index of the camera.
         """
         self.cameraIndex = cameraIndex
+        self._cameraSettings[cameraIndex] = CameraSettings.fromCamera(camera)
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None: ...
 
@@ -163,19 +166,38 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             err("No camera matrix found, invalid results for AprilTag detection")
             return None
 
-        currRes = self.getSetting(self.settings.resolution)
-        matrixData = camConfig.calibration.get(currRes)
-        if matrixData:
-            lst = matrixData.matrix
-            return [lst[i : i + 3] for i in range(0, 9, 3)]
+        currRes = self.getCameraSetting(CameraSettings.resolution)
+        if currRes:
+            matrixData = camConfig.calibration.get(currRes)
+            if matrixData:
+                lst = matrixData.matrix
+                return [lst[i : i + 3] for i in range(0, 9, 3)]
         return None
 
     def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
-        currRes = self.getSetting(self.settings.resolution)
+        currRes = self.getCameraSetting(CameraSettings.resolution)
+        if not currRes:
+            return None
         if data and currRes in data.calibration:
             return data.calibration[currRes].distCoeff
         return None
+
+    @overload
+    def getCameraSetting(self, setting: str) -> Optional[Any]: ...
+    @overload
+    def getCameraSetting(
+        self, setting: Setting[TConstraintType, TSettingValueType]
+    ) -> TSettingValueType: ...
+
+    def getCameraSetting(self, setting: Union[str, Setting]) -> Optional[Any]:
+        if self.cameraIndex in self._cameraSettings:
+            return self._cameraSettings[self.cameraIndex].getSetting(setting)
+        else:
+            return None
+
+    def getCurrentCameraSettingCollection(self) -> Optional[CameraSettings]:
+        return self._cameraSettings.get(self.cameraIndex)
 
     def getCameraTransform(self, cameraIndex: CameraID) -> Optional[Transform3d]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
@@ -191,15 +213,24 @@ def disabled(cls):
 
 def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
     api: SettingsAPI = inst.settings.getAPI()
-
+    cameraSettings = inst.getCurrentCameraSettingCollection()
+    assert cameraSettings is not None
+    cameraAPI = cameraSettings.getAPI()
+    settingsValues = {
+        key: settingValueToProto(api.getValue(key))
+        for key in api.getSettingsSchema().keys()
+    }
+    settingsValues.update(
+        {
+            key: settingValueToProto(cameraAPI.getValue(key))
+            for key in cameraAPI.getSettingsSchema().keys()
+        }
+    )
     msg = PipelineProto(
         name=inst.name,
         index=index,
         type=type(inst).__name__,
-        settings_values={
-            key: settingValueToProto(api.getValue(key))
-            for key in api.getSettingsSchema().keys()
-        },
+        settings_values=settingsValues,
     )
 
     return msg
