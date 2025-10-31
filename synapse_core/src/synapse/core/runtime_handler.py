@@ -248,41 +248,44 @@ class RuntimeManager:
 
         currPipeline.bind(cameraIndex, camera)
 
-        cameraTable: Optional[NetworkTable] = getCameraTable(camera)
+        cameraSettings = currPipeline.getCurrentCameraSettingCollection()
+
+        assert cameraSettings is not None
+
+        cameraTable: NetworkTable = getCameraTable(camera)
 
         self.cameraHandler.setCameraProps(
             {
-                key: pipeline_config.getSetting(key)
-                for key in pipeline_config.getMap().keys()
+                key: cameraSettings.getSetting(key)
+                for key in cameraSettings.getMap().keys()
             },
             camera,
         )
 
-        if cameraTable is not None:
-            currPipeline.nt_table = cameraTable
+        currPipeline.nt_table = cameraTable
+        settingsSubtable = cameraTable.getSubTable(NTKeys.kSettings.value)
+        pipeline_config.sendSettings(settingsSubtable)
 
-            pipeline_config.sendSettings(
-                cameraTable.getSubTable(NTKeys.kSettings.value)
-            )
+        cameraSettings.sendSettings(settingsSubtable)
 
-            def updateSettingListener(event: Event, cameraIndex=cameraIndex):
-                assert isinstance(event.data, ValueEventData)
+        def updateSettingListener(event: Event, cameraIndex=cameraIndex):
+            assert isinstance(event.data, ValueEventData)
 
-                prop: str = event.data.topic.getName().split("/")[-1]
-                value: Any = self.getEventDataValue(event)
-                self.updateSetting(prop, cameraIndex, value)
+            prop: str = event.data.topic.getName().split("/")[-1]
+            value: Any = self.getEventDataValue(event)
+            self.updateSetting(prop, cameraIndex, value)
 
-                self.onSettingChangedFromNT.call(prop, value, cameraIndex)
+            self.onSettingChangedFromNT.call(prop, value, cameraIndex)
 
-            for key in pipeline_config.getMap().keys():
-                nt_table = getCameraTable(camera)
-                if nt_table is not None:
-                    entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
+        for key in pipeline_config.getMap().keys():
+            nt_table = getCameraTable(camera)
+            if nt_table is not None:
+                entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
 
-                    if NtClient.INSTANCE is not None:
-                        NetworkTableInstance.getDefault().addListener(
-                            entry, EventFlags.kValueRemote, updateSettingListener
-                        )
+                if NtClient.INSTANCE is not None:
+                    NetworkTableInstance.getDefault().addListener(
+                        entry, EventFlags.kValueRemote, updateSettingListener
+                    )
 
     def updateSetting(self, prop: str, cameraIndex: CameraID, value: Any) -> None:
         settings = self.pipelineHandler.getPipelineSettings(
@@ -301,8 +304,9 @@ class RuntimeManager:
                 )
 
         camera = self.cameraHandler.getCamera(cameraIndex)
-        if camera is not None:
-            camera.setProperty(prop=prop, value=value)
+        if prop in CameraSettings():
+            if camera is not None:
+                camera.setProperty(prop=prop, value=value)
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 

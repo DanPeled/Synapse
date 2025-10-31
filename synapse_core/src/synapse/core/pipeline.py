@@ -64,7 +64,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             settings (TSettingsType): The settings object to use for the pipeline.
         """
         self.settings: TSettingsType = settings
-        self.__cameraSettings: Dict[CameraID, CameraSettings] = {}
+        self._cameraSettings: Dict[CameraID, CameraSettings] = {}
         self.cameraIndex: CameraID = -1
         self.pipelineIndex: PipelineID = -1
         self.name: str = "new pipeline"
@@ -76,8 +76,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             cameraIndex (CameraID): The index of the camera.
         """
         self.cameraIndex = cameraIndex
-        if cameraIndex not in self.__cameraSettings:
-            self.__cameraSettings[cameraIndex] = CameraSettings.fromCamera(camera)
+        self._cameraSettings[cameraIndex] = CameraSettings.fromCamera(camera)
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None: ...
 
@@ -143,6 +142,9 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         Returns:
             Optional[Any]: The value of the setting if found, else None.
         """
+        cameraSettings = self.getCurrentCameraSettingCollection()
+        if cameraSettings is not None and setting in cameraSettings:
+            return cameraSettings.getSetting(setting)
         return self.settings.getSetting(setting)
 
     def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
@@ -185,13 +187,13 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         return None
 
     def getCameraSetting(self, setting: Union[str, Setting]) -> Optional[Any]:
-        if self.cameraIndex in self.__cameraSettings:
-            return self.__cameraSettings[self.cameraIndex].getSetting(setting)
+        if self.cameraIndex in self._cameraSettings:
+            return self._cameraSettings[self.cameraIndex].getSetting(setting)
         else:
             return None
 
     def getCurrentCameraSettingCollection(self) -> Optional[CameraSettings]:
-        return self.__cameraSettings.get(self.cameraIndex)
+        return self._cameraSettings.get(self.cameraIndex)
 
     def getCameraTransform(self, cameraIndex: CameraID) -> Optional[Transform3d]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
@@ -207,15 +209,24 @@ def disabled(cls):
 
 def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
     api: SettingsAPI = inst.settings.getAPI()
-
+    cameraSettings = inst.getCurrentCameraSettingCollection()
+    assert cameraSettings is not None
+    cameraAPI = cameraSettings.getAPI()
+    settingsValues = {
+        key: settingValueToProto(api.getValue(key))
+        for key in api.getSettingsSchema().keys()
+    }
+    settingsValues.update(
+        {
+            key: settingValueToProto(cameraAPI.getValue(key))
+            for key in cameraAPI.getSettingsSchema().keys()
+        }
+    )
     msg = PipelineProto(
         name=inst.name,
         index=index,
         type=type(inst).__name__,
-        settings_values={
-            key: settingValueToProto(api.getValue(key))
-            for key in api.getSettingsSchema().keys()
-        },
+        settings_values=settingsValues,
     )
 
     return msg

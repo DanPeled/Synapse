@@ -629,7 +629,12 @@ class Synapse:
                             pipelineId
                         )
                         if pipeline is not None:
-                            pipeline.bind(cameraId)
+                            camera = self.runtime_handler.cameraHandler.getCamera(
+                                cameraId
+                            )
+                            assert camera is not None
+
+                            pipeline.bind(cameraId, camera)
                         break
             else:
                 err(

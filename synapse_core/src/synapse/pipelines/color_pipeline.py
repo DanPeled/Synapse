@@ -12,7 +12,5 @@ class ColorPipeline(Pipeline[PipelineSettings, PipelineResult]):
         super().__init__(settings)
         self.settings = settings
 
-    def bind(self, cameraIndex: CameraID): ...
-
     def processFrame(self, img: Frame, timestamp: float) -> Frame:
         return img
