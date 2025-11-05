@@ -1,0 +1,20 @@
+0:
+  {
+    brightness: 10.0,
+    exposure: 50,
+    gain: 50,
+    orientation: 0,
+    resolution: 1920x1080,
+    saturation: 20.0,
+    sharpness: 50,
+  }
+1:
+  {
+    brightness: 50,
+    exposure: 50,
+    gain: 50,
+    orientation: 0,
+    resolution: 1920x1080,
+    saturation: 50,
+    sharpness: 50,
+  }

@@ -29,7 +29,7 @@ from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
 from ..util import getIP
 from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
 from .camera_handler import CameraHandler
-from .config import NetworkConfig, yaml
+from .config import Config, NetworkConfig, yaml
 from .nt_keys import NTKeys
 from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
                        PipelineSettings, getPipelineTypename)
@@ -692,6 +692,32 @@ class RuntimeManager:
             },
         }
 
+    def saveCameraSettings(self) -> None:
+        cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}
+        for (
+            pipelineid,
+            pipeline,
+        ) in self.pipelineHandler.pipelineInstanceBindings.items():
+            for cameraid, camerasettings in pipeline.cameraSettings.items():
+                if cameraid not in cameraSettingsDict:
+                    cameraSettingsDict[cameraid] = {}
+                assert cameraid in cameraSettingsDict
+
+                cameraSettingsDict[cameraid][pipelineid] = camerasettings.toDict()
+
+        for cameraid, data in cameraSettingsDict.items():
+            y = yaml.safe_dump(
+                data, default_flow_style=None, sort_keys=False, indent=2, width=80
+            )
+            savefile = (
+                Config.getInstance().path.parent
+                / f"camera_{cameraid}"
+                / "pipeline_settings.yml"
+            )
+            savefile.parent.mkdir(parents=True, exist_ok=True)
+            with open(savefile, "w") as f:
+                f.write(y)
+
     def save(self) -> None:
         y = yaml.safe_dump(
             self.toDict(),
@@ -703,6 +729,8 @@ class RuntimeManager:
         savefile = Path(os.getcwd()) / "config" / "settings.yml"
         with open(savefile, "w") as f:
             f.write(y)
+
+        self.saveCameraSettings()
 
         log.log(
             MarkupColors.bold(

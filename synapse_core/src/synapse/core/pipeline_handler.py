@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Final, Optional, Type
 
 import synapse.log as log
+import yaml
 
 from ..callback import Callback
 from ..stypes import CameraID, PipelineID, PipelineName, PipelineTypeName
@@ -16,7 +17,7 @@ from .config import Config
 from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
 from .pipeline import Pipeline, getPipelineTypename
-from .settings_api import PipelineSettings, SettingsMap
+from .settings_api import CameraSettings, PipelineSettings, SettingsMap
 
 
 class PipelineHandler:
@@ -25,6 +26,7 @@ class PipelineHandler:
     kPipelineTypeKey: Final[str] = "type"
     kPipelineNameKey: Final[str] = "name"
     kPipelinesArrayKey: Final[str] = "pipelines"
+    kCameraConfigKey: Final[str] = "camera_configs"
     kPipelineFilesQuery: Final[str] = "**/*_pipeline.py"
     kInvalidPipelineIndex: Final[int] = -1
 
@@ -36,6 +38,9 @@ class PipelineHandler:
         """
         self.pipelineTypeNames: Dict[PipelineID, PipelineTypeName] = {}
         self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
+        self.cameraPipelineSettings: Dict[
+            PipelineID, Dict[CameraID, CameraSettings]
+        ] = {}
         self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
         self.pipelineNames: Dict[PipelineID, PipelineName] = {}
 
@@ -57,7 +62,26 @@ class PipelineHandler:
         self.pipelineDirectory = directory
         self.pipelineTypes = self.loadPipelineTypes(directory)
         self.loadPipelineSettings()
+        self.loadPipelineCameraSettings()
         self.loadPipelineInstances()
+
+    def loadPipelineCameraSettings(self):
+        camera_configs = GlobalSettings.getCameraConfigMap()
+        for cameraid in camera_configs.keys():
+            with open(
+                Config.getInstance().path.parent
+                / f"camera_{cameraid}"
+                / "pipeline_settings.yml",
+                "r",
+            ) as f:
+                config = yaml.full_load(f)
+                camera_config_dict = {}
+                for pipelineid, camerasettings in config["pipeline_configs"].items():
+                    camera_config_dict[pipelineid] = CameraSettings(camerasettings)
+                    self.cameraPipelineSettings[pipelineid] = {}
+                    self.cameraPipelineSettings[pipelineid][cameraid] = (
+                        camera_config_dict[pipelineid]
+                    )
 
     def loadPipelineInstances(self):
         for pipelineIndex in self.pipelineSettings.keys():
@@ -71,6 +95,7 @@ class PipelineHandler:
                 }
             else:
                 settingsMap = {}
+
             self.addPipeline(
                 pipelineIndex,
                 self.pipelineNames[pipelineIndex],
@@ -122,6 +147,7 @@ class PipelineHandler:
             settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
             settingsInst = settingsType(settings)
             currPipeline = pipelineType(settings=settingsInst)
+            currPipeline.cameraSettings = self.cameraPipelineSettings.get(index) or {}
             currPipeline.name = name
             currPipeline.pipelineIndex = index
 

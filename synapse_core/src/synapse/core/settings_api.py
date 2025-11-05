@@ -979,7 +979,7 @@ class CameraSettings(SettingsCollection):
     resolution = settingField(
         EnumeratedConstraint(
             options=[
-                "1080x1920",
+                "1920x1080",
                 "1640x1232",
                 "1296x972",
                 "1280x960",
@@ -992,13 +992,12 @@ class CameraSettings(SettingsCollection):
                 "320x180",
             ]
         ),
-        default="1080x1920",
+        default="1920x1080",
         category=kCameraPropsCategory,
         description="Camera Resolution",
     )
 
-    @staticmethod
-    def fromCamera(camera: SynapseCamera) -> "CameraSettings":
+    def fromCamera(self, camera: SynapseCamera):
         def getPropNumberConstraint(
             propMeta: PropertyMetaDict, prop: str
         ) -> NumberConstraint:
@@ -1011,25 +1010,27 @@ class CameraSettings(SettingsCollection):
                 return NumberConstraint(propData["min"], propData["max"], step=None)
 
         propMeta = camera.getPropertyMeta()
-        inst = CameraSettings()
         if propMeta is not None:
-            inst.brightness.constraint = getPropNumberConstraint(
+            self.brightness.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
-            inst.exposure.constraint = getPropNumberConstraint(
+            self.exposure.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
-            inst.saturation.constraint = getPropNumberConstraint(
+            self.saturation.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
-            inst.sharpness.constraint = getPropNumberConstraint(
+            self.sharpness.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
-            inst.gain.constraint = getPropNumberConstraint(
+            self.gain.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
-
-        return inst
+        self.resolution.constraint = EnumeratedConstraint(
+            options=list(
+                set(map(lambda s: f"{s[0]}x{s[1]}", camera.getSupportedResolutions()))
+            )
+        )
 
 
 class PipelineSettings(SettingsCollection):
