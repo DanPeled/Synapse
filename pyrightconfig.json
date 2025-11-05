@@ -3,7 +3,7 @@
   "venvPath": ".",
   "venv": "venv",
   "pythonPath": "./venv/bin/python",
-  "exclude": ["venv", "synapselib"],
+  "exclude": ["venv", "synapse_lib"],
   "reportMissingImports": true,
   "reportMissingModuleSource": false
 }
