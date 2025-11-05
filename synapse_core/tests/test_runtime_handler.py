@@ -122,11 +122,11 @@ class TestRuntimeManager(unittest.TestCase):
         """
         with (
             patch(
-                "synapse.core.runtime_handler.getCameraTableName",
+                "synapse.core.camera_factory.getCameraTableName",
                 return_value="FakeCamera",
             ),
             patch(
-                "synapse.core.runtime_handler.getCameraTable", return_value=MagicMock()
+                "synapse.core.camera_factory.getCameraTable", return_value=MagicMock()
             ),
         ):
             on_removed = Mock()
