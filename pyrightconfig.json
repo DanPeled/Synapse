@@ -1,0 +1,10 @@
+{
+  "pythonVersion": "3.10",
+  "venvPath": ".",
+  "venv": "venv",
+  "pythonPath": "./venv/bin/python",
+  "include": ["."],
+  "exclude": ["venv", "synapselib"],
+  "reportMissingImports": true,
+  "reportMissingModuleSource": false
+}
