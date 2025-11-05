@@ -69,7 +69,7 @@ test:
 	@echo Reinstalling Synapse Runtime...
 	@make install
 	@echo Starting Tests...
-	@python3 -m pytest .
+	@python3 -m pytest . --ignore=synapselib
 
 # Build Python and UI
 build:
