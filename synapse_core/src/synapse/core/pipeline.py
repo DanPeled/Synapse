@@ -157,6 +157,10 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             self.settings.setSetting(settingObj, value)
 
             self.onSettingChanged(settingObj, self.getSetting(setting))
+        elif setting in CameraSettings():
+            collection = self.getCurrentCameraSettingCollection()
+            assert collection is not None
+            collection.setSetting(setting, value)
         else:
             err(f"Setting {setting} was not found for pipeline {self.pipelineIndex}")
 
@@ -198,6 +202,22 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             return self.cameraSettings[self.cameraIndex].getSetting(setting)
         else:
             return None
+
+    @overload
+    def setCameraSetting(self, setting: str, value: SettingsValue) -> None: ...
+    @overload
+    def setCameraSetting(
+        self,
+        setting: Setting[TConstraintType, TSettingValueType],
+        value: TSettingValueType,
+    ) -> None: ...
+
+    def setCameraSetting(
+        self, setting: Union[str, Setting], value: SettingsValue
+    ) -> None:
+        collection = self.getCurrentCameraSettingCollection()
+        assert collection is not None
+        collection.setSetting(setting, value)
 
     def getCurrentCameraSettingCollection(self) -> Optional[CameraSettings]:
         return self.cameraSettings.get(self.cameraIndex)

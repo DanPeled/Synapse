@@ -39,12 +39,12 @@ from ..log import err, log, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
                       RecordingStatus)
 from ..util import getIP, resolveGenericArgument
-from .camera_factory import SynapseCamera, cameraToProto
+from .camera_factory import SynapseCamera
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import (protoToSettingValue, settingsToProto,
+from .settings_api import (cameraToProto, protoToSettingValue, settingsToProto,
                            settingValueToProto)
 
 

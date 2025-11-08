@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package proto.v1;
 
+import "proto/settings/v1/settings.proto";
+
 // Represents a camera in the system
 message CameraProto {
   string name = 1;
@@ -11,6 +13,7 @@ message CameraProto {
   int32 pipeline_index = 5;
   int32 default_pipeline = 6;
   int32 max_fps = 7;
+  repeated proto.settings.v1.SettingMetaProto settings = 8;
 }
 
 // Performance metrics for a camera

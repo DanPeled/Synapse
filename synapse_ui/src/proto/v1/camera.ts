@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SettingMetaProto } from "../settings/v1/settings";
 
 export const protobufPackage = "proto.v1";
 
@@ -18,6 +19,7 @@ export interface CameraProto {
   pipelineIndex: number;
   defaultPipeline: number;
   maxFps: number;
+  settings: SettingMetaProto[];
 }
 
 /** Performance metrics for a camera */
@@ -67,6 +69,7 @@ function createBaseCameraProto(): CameraProto {
     pipelineIndex: 0,
     defaultPipeline: 0,
     maxFps: 0,
+    settings: [],
   };
 }
 
@@ -95,6 +98,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     }
     if (message.maxFps !== 0) {
       writer.uint32(56).int32(message.maxFps);
+    }
+    for (const v of message.settings) {
+      SettingMetaProto.encode(v!, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -163,6 +169,16 @@ export const CameraProto: MessageFns<CameraProto> = {
           message.maxFps = reader.int32();
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.settings.push(
+            SettingMetaProto.decode(reader, reader.uint32()),
+          );
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -187,6 +203,9 @@ export const CameraProto: MessageFns<CameraProto> = {
         ? globalThis.Number(object.defaultPipeline)
         : 0,
       maxFps: isSet(object.maxFps) ? globalThis.Number(object.maxFps) : 0,
+      settings: globalThis.Array.isArray(object?.settings)
+        ? object.settings.map((e: any) => SettingMetaProto.fromJSON(e))
+        : [],
     };
   },
 
@@ -213,6 +232,9 @@ export const CameraProto: MessageFns<CameraProto> = {
     if (message.maxFps !== 0) {
       obj.maxFps = Math.round(message.maxFps);
     }
+    if (message.settings?.length) {
+      obj.settings = message.settings.map((e) => SettingMetaProto.toJSON(e));
+    }
     return obj;
   },
 
@@ -230,6 +252,8 @@ export const CameraProto: MessageFns<CameraProto> = {
     message.pipelineIndex = object.pipelineIndex ?? 0;
     message.defaultPipeline = object.defaultPipeline ?? 0;
     message.maxFps = object.maxFps ?? 0;
+    message.settings =
+      object.settings?.map((e) => SettingMetaProto.fromPartial(e)) || [];
     return message;
   },
 };

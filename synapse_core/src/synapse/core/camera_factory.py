@@ -19,11 +19,11 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import CalibrationDataProto, CameraProto
+from synapse_net.proto.v1 import CalibrationDataProto
 from wpimath import geometry
 
 from ..log import err, warn
-from ..stypes import CameraID, Frame, PipelineID, Resolution
+from ..stypes import CameraID, Frame, Resolution
 
 PropName = str
 PropertyMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
@@ -521,25 +521,6 @@ class CameraFactory:
         )
         cam.setIndex(cameraIndex)
         return cam
-
-
-def cameraToProto(
-    camid: CameraID,
-    name: str,
-    camera: SynapseCamera,
-    pipelineIndex: PipelineID,
-    defaultPipeline: PipelineID,
-    kind: str,
-) -> CameraProto:
-    return CameraProto(
-        name=name,
-        index=camid,
-        stream_path=camera.stream,
-        kind=kind,
-        pipeline_index=pipelineIndex,
-        default_pipeline=defaultPipeline,
-        max_fps=int(camera.getMaxFPS()),
-    )
 
 
 @cache

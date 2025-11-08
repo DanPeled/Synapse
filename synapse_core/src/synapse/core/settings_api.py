@@ -21,9 +21,11 @@ from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
                                            NumberConstraintProto,
                                            SettingMetaProto, SettingValueProto,
                                            StringConstraintProto)
+from synapse_net.proto.v1 import CameraProto
 
 from ..bcolors import MarkupColors
 from ..log import err
+from ..stypes import CameraID, PipelineID
 from .camera_factory import CameraPropKeys, PropertyMetaDict, SynapseCamera
 
 SettingsValue = Any
@@ -1118,3 +1120,27 @@ def settingsToProto(
             result.append(settingToProto(schema, typename))
 
     return result
+
+
+def cameraToProto(
+    camid: CameraID,
+    name: str,
+    camera: SynapseCamera,
+    pipelineIndex: PipelineID,
+    defaultPipeline: PipelineID,
+    kind: str,
+) -> CameraProto:
+    cameraSettingsMetaValue = CameraSettings()
+    cameraSettingsMetaValue.fromCamera(camera)
+    return CameraProto(
+        name=name,
+        index=camid,
+        stream_path=camera.stream,
+        kind=kind,
+        pipeline_index=pipelineIndex,
+        default_pipeline=defaultPipeline,
+        max_fps=int(camera.getMaxFPS()),
+        settings=settingsToProto(
+            typename="Camera Props", settings=cameraSettingsMetaValue
+        ),
+    )

@@ -288,32 +288,33 @@ class RuntimeManager:
                     )
 
     def updateSetting(self, prop: str, cameraIndex: CameraID, value: Any) -> None:
-        settings = self.pipelineHandler.getPipelineSettings(
-            self.pipelineBindings[cameraIndex]
-        )
-        settings.setSetting(prop, value)
         pipeline = self.pipelineHandler.getPipeline(self.pipelineBindings[cameraIndex])
 
         if pipeline is not None:
+            settings = self.pipelineHandler.getPipelineSettings(
+                self.pipelineBindings[cameraIndex]
+            )
             setting = settings.getAPI().getSetting(prop)
+            camera = self.cameraHandler.getCamera(cameraIndex)
             if setting is not None:
+                settings.setSetting(prop, value)
                 pipeline.onSettingChanged(setting, settings.getSetting(prop))
+            elif prop in CameraSettings():
+                if camera is not None:
+                    camera.setProperty(prop=prop, value=value)
+                    pipeline.cameraSettings[cameraIndex].setSetting(prop, value)
             else:
                 log.warn(
                     f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
                 )
+                return
 
-        camera = self.cameraHandler.getCamera(cameraIndex)
-        if prop in CameraSettings():
-            if camera is not None:
-                camera.setProperty(prop=prop, value=value)
+            self.onSettingChanged.call(prop, value, cameraIndex)
 
-        self.onSettingChanged.call(prop, value, cameraIndex)
-
-        nt_table = getCameraTable(camera)
-        entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
-        if entry is not None and entry.getValue() != value:
-            entry.setValue(value)
+            nt_table = getCameraTable(camera)
+            entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
+            if entry is not None and entry.getValue() != value:
+                entry.setValue(value)
 
     @staticmethod
     def getEventDataValue(
@@ -707,7 +708,11 @@ class RuntimeManager:
 
         for cameraid, data in cameraSettingsDict.items():
             y = yaml.safe_dump(
-                data, default_flow_style=None, sort_keys=False, indent=2, width=80
+                {"pipeline_configs": data},
+                default_flow_style=None,
+                sort_keys=False,
+                indent=2,
+                width=80,
             )
             savefile = (
                 Config.getInstance().path.parent
