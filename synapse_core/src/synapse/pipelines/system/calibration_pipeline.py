@@ -11,7 +11,8 @@ from cv2.typing import MatLike
 from synapse import Pipeline, PipelineSettings
 from synapse.core import Synapse
 from synapse.core.camera_factory import CalibrationData
-from synapse.core.pipeline import FrameResult, PipelineResult, systemPipeline
+from synapse.core.pipeline import (CameraSettings, FrameResult, PipelineResult,
+                                   systemPipeline)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse_net.proto.v1 import (CalibrationDataProto, MessageProto,
@@ -257,19 +258,18 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
                             mean_error=retval,
                             camera_matrix=flattenedMatrix,
                             dist_coeffs=flattendDistCoeffs,
-                            resolution=self.getSetting(self.settings.resolution),
+                            resolution=self.getCameraSetting(CameraSettings.resolution),
                         ),
                     ).SerializeToString()
                 )
-
-                resolution = self.getSetting(self.settings.resolution).split("x")
+                resolution = self.getCameraSetting(CameraSettings.resolution).split("x")
                 width = int(resolution[0])
                 height = int(resolution[1])
 
                 Synapse.kInstance.runtime_handler.cameraHandler.cameraConfigBindings[
                     self.cameraIndex
                 ].calibration[
-                    self.getSetting(self.settings.resolution)
+                    self.getCameraSetting(CameraSettings.resolution)
                 ] = CalibrationData(
                     matrix=cameraMatrix.flatten().tolist(),
                     distCoeff=distCoeffs.flatten().tolist(),

@@ -1,5 +1,7 @@
 import { Card, CardHeader } from "@/components/ui/card";
+import { SettingMetaProto } from "@/proto/settings/v1/settings";
 import { SettingValueProto } from "@/proto/settings/v1/value";
+import { CameraProto } from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { hasSettingValue } from "@/services/backend/backendContext";
 import {
@@ -11,9 +13,71 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Activity, Camera, Settings } from "lucide-react";
 import { JSX, useEffect, useState } from "react";
 
+function generateControlFromSettingMeta({
+  setting,
+  selectedPipeline,
+  pipelines,
+  setPipelines,
+  setSetting,
+  locked,
+}: {
+  setting: SettingMetaProto;
+  selectedPipeline?: PipelineProto;
+  setSetting: (
+    val: SettingValueProto,
+    setting: string,
+    pipeline: PipelineProto,
+  ) => void;
+  setPipelines: (val: Map<number, PipelineProto>) => void;
+  pipelines: Map<number, PipelineProto>;
+  locked: boolean;
+}) {
+  return (
+    <GenerateControl
+      key={setting.name + setting.category}
+      setting={setting}
+      setValue={(val) => {
+        if (hasSettingValue(val)) {
+          setTimeout(() => {
+            if (selectedPipeline !== undefined) {
+              const oldPipelines = pipelines;
+
+              const newSettingsValues = {
+                ...selectedPipeline.settingsValues,
+                [setting.name]: val,
+              };
+
+              const updatedPipeline = {
+                ...selectedPipeline,
+                settingsValues: newSettingsValues,
+              };
+
+              const newPipelines = new Map(oldPipelines);
+              newPipelines.set(selectedPipeline.index, updatedPipeline);
+              setPipelines(newPipelines);
+            }
+          }, 0);
+
+          setTimeout(() => {
+            setSetting(val, setting.name, selectedPipeline!);
+          }, 0);
+        }
+      }}
+      value={
+        selectedPipeline?.settingsValues[setting.name] ??
+        setting.default ??
+        settingValueToProto("")
+      }
+      defaultValue={setting.default}
+      locked={locked}
+    />
+  );
+}
+
 export function PipelineConfigControl({
   selectedPipeline,
   selectedPipelineType,
+  cameraInfo,
   backendConnected,
   setSetting,
   setPipelines,
@@ -22,6 +86,7 @@ export function PipelineConfigControl({
 }: {
   selectedPipeline?: PipelineProto;
   selectedPipelineType?: PipelineTypeProto;
+  cameraInfo?: CameraProto;
   backendConnected: boolean | undefined;
   setSetting: (
     val: SettingValueProto,
@@ -50,52 +115,32 @@ export function PipelineConfigControl({
     const pipelineItems: (JSX.Element | undefined)[] = [];
 
     selectedPipelineType.settings.forEach((setting) => {
-      const control = (
-        <GenerateControl
-          key={setting.name + setting.category}
-          setting={setting}
-          setValue={(val) => {
-            if (hasSettingValue(val)) {
-              setTimeout(() => {
-                if (selectedPipeline !== undefined) {
-                  const oldPipelines = pipelines;
-
-                  const newSettingsValues = {
-                    ...selectedPipeline.settingsValues,
-                    [setting.name]: val,
-                  };
-
-                  const updatedPipeline = {
-                    ...selectedPipeline,
-                    settingsValues: newSettingsValues,
-                  };
-
-                  const newPipelines = new Map(oldPipelines);
-                  newPipelines.set(selectedPipeline.index, updatedPipeline);
-                  setPipelines(newPipelines);
-                }
-              }, 0);
-
-              setTimeout(() => {
-                setSetting(val, setting.name, selectedPipeline!);
-              }, 0);
-            }
-          }}
-          value={
-            selectedPipeline?.settingsValues[setting.name] ??
-            setting.default ??
-            settingValueToProto("")
-          }
-          defaultValue={setting.default}
-          locked={locked}
-        />
-      );
+      const control = generateControlFromSettingMeta({
+        setting: setting,
+        selectedPipeline: selectedPipeline,
+        setPipelines: setPipelines,
+        setSetting: setSetting,
+        locked: locked,
+        pipelines: pipelines,
+      });
 
       if (setting.category === "Camera Properties") {
         cameraItems.push(control);
       } else {
         pipelineItems.push(control);
       }
+    });
+
+    cameraInfo?.settings.forEach((setting) => {
+      const control = generateControlFromSettingMeta({
+        setting: setting,
+        selectedPipeline: selectedPipeline,
+        setPipelines: setPipelines,
+        setSetting: setSetting,
+        locked: locked,
+        pipelines: pipelines,
+      });
+      cameraItems.push(control);
     });
 
     setCameraControls(cameraItems);

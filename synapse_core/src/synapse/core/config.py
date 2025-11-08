@@ -82,6 +82,7 @@ class Config:
         Args:
             filePath (Path): The path to the YAML configuration file.
         """
+        self.__path = filePath
         with open(filePath) as file:
             self.__dictData: dict = yaml.full_load(file)
             Config.__inst = self
@@ -108,6 +109,10 @@ class Config:
                 0: {"type": "ApriltagPipeline", "name": "New Pipeline", "settings": {}}
             }
         }
+
+    @property
+    def path(self) -> Path:
+        return self.__path
 
     @property
     def network(self) -> NetworkConfig:

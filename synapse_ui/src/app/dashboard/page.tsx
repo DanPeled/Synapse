@@ -176,6 +176,7 @@ export default function Dashboard() {
               />
               <PipelineConfigControl
                 pipelines={pipelines}
+                cameraInfo={selectedCamera}
                 setPipelines={setPipelines}
                 selectedPipeline={selectedPipeline}
                 selectedPipelineType={selectedPipelineType}

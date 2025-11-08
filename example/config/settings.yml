@@ -1,49 +1,23 @@
-network: { team_number: 9738, name: SynapseExample, ip: null, interface: null }
+network: {team_number: 9738, name: SynapseExample, ip: null, interface: null}
 global:
   camera_configs:
     0:
-      name: MonochromeLeft
-      id: Integrated Webcam_27152
+      name: Integrated Camera
+      id: Integrated Camera_47033
       transform:
-        - [0.24637, -0.23285, 0.28899]
-        - [
-            -3.012310822900386e-09,
-            6.478087791183619e-09,
-            4.0407072597507856e-08,
-          ]
+      - [0.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0]
       default_pipeline: 0
-      stream_res: [320, 180]
+      stream_res: [320, 240]
       calibration: {}
 pipelines:
   0:
     type: ApriltagPipeline
-    settings:
-      {
-        brightness: 50.0,
-        exposure: 20.0,
-        fieldpose: true,
-        gain: 50.0,
-        num_threads: 4.0,
-        orientation: 180,
-        resolution: 1024x768,
-        saturation: 10.0,
-        sharpness: 50.0,
-        stick_to_ground: true,
-        tag_family: tag36h11,
-        tag_size: 0.1651,
-        verbosity: 1,
-      }
+    settings: {fieldpose: true, iteration_count: 4.0, num_threads: 4.0, quad_decimate: 2.0,
+      quad_sigma: 0.0, refine_edges: true, stick_to_ground: true, tag_family: tag36h11,
+      tag_size: 0.1651, verbosity: 1}
     name: FieldPose
   1:
     type: ColorPipeline
-    settings:
-      {
-        brightness: 100.0,
-        exposure: 20.0,
-        gain: 50.0,
-        orientation: 0,
-        resolution: 1080x1920,
-        saturation: 50.0,
-        sharpness: 50.0,
-      }
+    settings: {}
     name: Cheese
