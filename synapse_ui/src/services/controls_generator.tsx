@@ -148,7 +148,6 @@ export function GenerateControl({
           </div>
         );
       }
-      break;
     }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_STRING: {
       return (
@@ -204,16 +203,45 @@ export function GenerateControl({
         );
       }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED: {
+      const options =
+        setting.constraint.constraint?.enumerated?.options.map((op) => {
+          const val = protoToSettingValue(op);
+          return { label: String(val), value: val };
+        }) ?? [];
+
+      // Patterns for "1920x1080" and single numbers like "60"
+      const resolutionPattern = /^(\d+)\s*[xX]\s*(\d+)$/;
+      const singleNumberPattern = /^\d+$/;
+
+      const allResLike = options.every((opt) =>
+        resolutionPattern.test(opt.label),
+      );
+      const allNumLike = options.every((opt) =>
+        singleNumberPattern.test(opt.label),
+      );
+
+      let sortedOptions = options;
+
+      if (allResLike) {
+        sortedOptions = [...options].sort((a, b) => {
+          const [, aw, ah] = a.label.match(resolutionPattern) || [];
+          const [, bw, bh] = b.label.match(resolutionPattern) || [];
+          return (
+            (parseInt(aw) || 0) - (parseInt(bw) || 0) ||
+            (parseInt(ah) || 0) - (parseInt(bh) || 0)
+          );
+        });
+      } else if (allNumLike) {
+        sortedOptions = [...options].sort(
+          (a, b) => parseFloat(a.label) - parseFloat(b.label),
+        );
+      }
+
       return (
         <LabeledControl label={settingName}>
           <Dropdown
             label=""
-            options={
-              (setting.constraint.constraint?.enumerated?.options.map((op) => ({
-                label: protoToSettingValue(op),
-                value: protoToSettingValue(op),
-              })) as DropdownOption<SettingValueProto>[]) ?? []
-            }
+            options={sortedOptions as DropdownOption<SettingValueProto>[]}
             value={val}
             onValueChange={(val) => setValue(settingValueToProto(val))}
             disabled={locked}
