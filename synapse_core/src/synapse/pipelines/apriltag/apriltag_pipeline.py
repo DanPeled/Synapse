@@ -10,7 +10,8 @@ from typing import Any, Dict, Final, List, Optional, Set
 import cv2
 import numpy as np
 from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
-                                   Setting, SettingsValue, pipelineResult)
+                                   Setting, SettingsValue, SynapseCamera,
+                                   pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse.log import warn
@@ -155,7 +156,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def bind(self, cameraIndex: CameraID):
+    def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
+        super().bind(cameraIndex, camera)
         self.cameraMatrix: List[List[float]] = (
             self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
         )

@@ -18,15 +18,15 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
                     VideoSource)
 from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
-from synapse.log import err, warn
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import CalibrationDataProto, CameraProto
+from synapse_net.proto.v1 import CalibrationDataProto
 from wpimath import geometry
 
-from ..stypes import CameraID, Frame, PipelineID, Resolution
+from ..log import err, warn
+from ..stypes import CameraID, Frame, Resolution
 
 PropName = str
-PropertMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
+PropertyMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
 ResolutionString = str
 
 
@@ -206,7 +206,7 @@ class SynapseCamera(ABC):
     def getSupportedResolutions(self) -> List[Size]: ...
 
     @abstractmethod
-    def getPropertyMeta(self) -> Optional[PropertMetaDict]: ...
+    def getPropertyMeta(self) -> Optional[PropertyMetaDict]: ...
 
     @abstractmethod
     def getMaxFPS(self) -> float: ...
@@ -262,7 +262,7 @@ class OpenCvCamera(SynapseCamera):
     def getSupportedResolutions(self) -> List[Size]:
         return [self.getResolution()]
 
-    def getPropertyMeta(self) -> Optional[PropertMetaDict]:
+    def getPropertyMeta(self) -> Optional[PropertyMetaDict]:
         return None
 
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
@@ -314,7 +314,7 @@ class CsCoreCamera(SynapseCamera):
         self.camera: VideoCamera
         self.frameBuffer: np.ndarray
         self.sink: CvSink
-        self.propertyMeta: PropertMetaDict = {}
+        self.propertyMeta: PropertyMetaDict = {}
         self._properties: Dict[str, Any] = {}
         self._videoModes: List[Any] = []
         self._validVideoModes: List[VideoMode] = []
@@ -370,7 +370,7 @@ class CsCoreCamera(SynapseCamera):
 
         return inst
 
-    def getPropertyMeta(self) -> Optional[PropertMetaDict]:
+    def getPropertyMeta(self) -> Optional[PropertyMetaDict]:
         return self.propertyMeta
 
     def _startFrameThread(self) -> None:
@@ -521,25 +521,6 @@ class CameraFactory:
         )
         cam.setIndex(cameraIndex)
         return cam
-
-
-def cameraToProto(
-    camid: CameraID,
-    name: str,
-    camera: SynapseCamera,
-    pipelineIndex: PipelineID,
-    defaultPipeline: PipelineID,
-    kind: str,
-) -> CameraProto:
-    return CameraProto(
-        name=name,
-        index=camid,
-        stream_path=camera.stream,
-        kind=kind,
-        pipeline_index=pipelineIndex,
-        default_pipeline=defaultPipeline,
-        max_fps=int(camera.getMaxFPS()),
-    )
 
 
 @cache

@@ -21,9 +21,12 @@ from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
                                            NumberConstraintProto,
                                            SettingMetaProto, SettingValueProto,
                                            StringConstraintProto)
+from synapse_net.proto.v1 import CameraProto
 
 from ..bcolors import MarkupColors
 from ..log import err
+from ..stypes import CameraID, PipelineID
+from .camera_factory import CameraPropKeys, PropertyMetaDict, SynapseCamera
 
 SettingsValue = Any
 
@@ -936,12 +939,7 @@ def setEntryValue(entry: NetworkTableEntry, value):
         raise ValueError("Unsupported type")
 
 
-class PipelineSettings(SettingsCollection):
-    """Base class for creating pipeline settings collections."""
-
-    def __init__(self, settings: Optional[SettingsMap] = None):
-        super().__init__(settings)
-
+class CameraSettings(SettingsCollection):
     kCameraPropsCategory = "Camera Properties"
 
     brightness = settingField(
@@ -983,7 +981,7 @@ class PipelineSettings(SettingsCollection):
     resolution = settingField(
         EnumeratedConstraint(
             options=[
-                "1080x1920",
+                "1920x1080",
                 "1640x1232",
                 "1296x972",
                 "1280x960",
@@ -996,13 +994,52 @@ class PipelineSettings(SettingsCollection):
                 "320x180",
             ]
         ),
-        default="1080x1920",
+        default="1920x1080",
         category=kCameraPropsCategory,
         description="Camera Resolution",
     )
 
-    def setSetting(self, setting: Union[Setting, str], value: SettingsValue) -> None:
-        super().setSetting(setting, value)
+    def fromCamera(self, camera: SynapseCamera):
+        def getPropNumberConstraint(
+            propMeta: PropertyMetaDict, prop: str
+        ) -> NumberConstraint:
+            if prop not in propMeta:
+                return NumberConstraint(0, 100, 1)
+            else:
+                propData = propMeta.get(prop)
+                assert propData is not None
+
+                return NumberConstraint(propData["min"], propData["max"], step=None)
+
+        propMeta = camera.getPropertyMeta()
+        if propMeta is not None:
+            self.brightness.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            self.exposure.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            self.saturation.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            self.sharpness.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+            self.gain.constraint = getPropNumberConstraint(
+                propMeta, CameraPropKeys.kBrightness.value
+            )
+        self.resolution.constraint = EnumeratedConstraint(
+            options=list(
+                set(map(lambda s: f"{s[0]}x{s[1]}", camera.getSupportedResolutions()))
+            )
+        )
+
+
+class PipelineSettings(SettingsCollection):
+    """Base class for creating pipeline settings collections."""
+
+    def __init__(self, settings: Optional[SettingsMap] = None):
+        super().__init__(settings)
 
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
@@ -1083,3 +1120,27 @@ def settingsToProto(
             result.append(settingToProto(schema, typename))
 
     return result
+
+
+def cameraToProto(
+    camid: CameraID,
+    name: str,
+    camera: SynapseCamera,
+    pipelineIndex: PipelineID,
+    defaultPipeline: PipelineID,
+    kind: str,
+) -> CameraProto:
+    cameraSettingsMetaValue = CameraSettings()
+    cameraSettingsMetaValue.fromCamera(camera)
+    return CameraProto(
+        name=name,
+        index=camid,
+        stream_path=camera.stream,
+        kind=kind,
+        pipeline_index=pipelineIndex,
+        default_pipeline=defaultPipeline,
+        max_fps=int(camera.getMaxFPS()),
+        settings=settingsToProto(
+            typename="Camera Props", settings=cameraSettingsMetaValue
+        ),
+    )

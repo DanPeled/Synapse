@@ -87,6 +87,7 @@ class CameraProto(betterproto.Message):
     pipeline_index: int = betterproto.int32_field(5)
     default_pipeline: int = betterproto.int32_field(6)
     max_fps: int = betterproto.int32_field(7)
+    settings: List["_settings_v1__.SettingMetaProto"] = betterproto.message_field(8)
 
 
 @dataclass(eq=False, repr=False)

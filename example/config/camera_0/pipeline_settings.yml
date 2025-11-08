@@ -1,0 +1,21 @@
+pipeline_configs:
+  0:
+    {
+      brightness: 57.0,
+      exposure: 50.0,
+      gain: 50.0,
+      orientation: 0,
+      resolution: 1920x1080,
+      saturation: 20.0,
+      sharpness: 50.0,
+    }
+  1:
+    {
+      brightness: 50.0,
+      exposure: 50.0,
+      gain: 50.0,
+      orientation: 0,
+      resolution: 1920x1080,
+      saturation: 50.0,
+      sharpness: 50.0,
+    }

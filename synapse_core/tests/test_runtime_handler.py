@@ -39,7 +39,9 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_assign_default_pipelines(self):
         self.mock_camera_handler.cameras = {0: "Camera0", 1: "Camera1"}
-        self.handler.pipelineLoader.getDefaultPipeline = MagicMock(side_effect=[10, 20])
+        self.handler.pipelineHandler.getDefaultPipeline = MagicMock(
+            side_effect=[10, 20]
+        )
         self.handler.setPipelineByIndex = MagicMock()
 
         self.handler.assignDefaultPipelines()
@@ -50,7 +52,7 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_set_pipeline_by_index_invalid_camera(self):
         self.mock_camera_handler.cameras = {0: "Camera0"}
-        self.handler.pipelineLoader.pipelineTypeNames = {1: "PipelineA"}
+        self.handler.pipelineHandler.pipelineTypeNames = {1: "PipelineA"}
 
         with patch("synapse.core.runtime_handler.log.err") as mock_log:
             self.handler.setPipelineByIndex(cameraIndex=5, pipelineIndex=1)
@@ -58,7 +60,7 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_set_pipeline_by_index_invalid_pipeline(self):
         self.mock_camera_handler.cameras = {0: "Camera0"}
-        self.handler.pipelineLoader.pipelineTypeNames = {1: "PipelineA"}
+        self.handler.pipelineHandler.pipelineTypeNames = {1: "PipelineA"}
         self.handler.pipelineBindings = {0: 1}
         self.handler.setNTPipelineIndex = MagicMock()
 
@@ -81,7 +83,7 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_setup_calls_all_components(self):
         with (
-            patch.object(self.handler.pipelineLoader, "setup") as setup_loader,
+            patch.object(self.handler.pipelineHandler, "setup") as setup_loader,
             patch.object(self.handler.cameraHandler, "setup") as setup_cameras,
             patch.object(self.handler, "assignDefaultPipelines") as assign_defaults,
             patch.object(self.handler, "setupNetworkTables") as setup_nt,
@@ -103,11 +105,11 @@ class TestRuntimeManager(unittest.TestCase):
         fake_pipeline.toDict.return_value = {"mock": "pipeline_config"}
 
         with patch(
-            "synapse.core.runtime_handler.GlobalSettings.getCameraConfigMap"
+            "synapse.core.global_settings.GlobalSettings.getCameraConfigMap"
         ) as mock_camera_map:
             mock_camera_map.return_value = {0: fake_config}
-            self.handler.pipelineLoader.pipelineInstanceBindings = {0: fake_pipeline}
-            self.handler.pipelineLoader.pipelineTypeNames = {0: "mock"}
+            self.handler.pipelineHandler.pipelineInstanceBindings = {0: fake_pipeline}
+            self.handler.pipelineHandler.pipelineTypeNames = {0: "mock"}
 
             result_dict = self.handler.toDict()
             assert "global" in result_dict
@@ -120,43 +122,43 @@ class TestRuntimeManager(unittest.TestCase):
         """
         with (
             patch(
-                "synapse.core.runtime_handler.getCameraTableName",
+                "synapse.core.camera_factory.getCameraTableName",
                 return_value="FakeCamera",
             ),
             patch(
-                "synapse.core.runtime_handler.getCameraTable", return_value=MagicMock()
+                "synapse.core.camera_factory.getCameraTable", return_value=MagicMock()
             ),
         ):
             on_removed = Mock()
-            self.handler.pipelineLoader.onRemovePipeline.add(on_removed)
+            self.handler.pipelineHandler.onRemovePipeline.add(on_removed)
             self.handler.setupCallbacks()
 
             self.mock_camera_handler.cameras = {0: Mock()}
             self.mock_camera_handler.cameras[0].name = "yeepers"
 
-            self.handler.pipelineLoader.pipelineTypes["AnotherDummy"] = DummyPipeline
-            self.handler.pipelineLoader.addPipeline(
+            self.handler.pipelineHandler.pipelineTypes["AnotherDummy"] = DummyPipeline
+            self.handler.pipelineHandler.addPipeline(
                 index=5, name="New Pipeline", typename="AnotherDummy", settings={}
             )
-            self.handler.pipelineLoader.setDefaultPipeline(0, 5)
+            self.handler.pipelineHandler.setDefaultPipeline(0, 5)
 
-            self.handler.pipelineLoader.pipelineTypes["DummyPipeline"] = DummyPipeline
-            self.handler.pipelineLoader.pipelineTypeNames[5] = "DummyPipeline"
+            self.handler.pipelineHandler.pipelineTypes["DummyPipeline"] = DummyPipeline
+            self.handler.pipelineHandler.pipelineTypeNames[5] = "DummyPipeline"
 
             self.assertEqual(
-                self.handler.pipelineLoader.getPipelineTypeByIndex(5), DummyPipeline
+                self.handler.pipelineHandler.getPipelineTypeByIndex(5), DummyPipeline
             )
             self.assertEqual(
-                self.handler.pipelineLoader.getPipelineTypeByName("DummyPipeline"),
+                self.handler.pipelineHandler.getPipelineTypeByName("DummyPipeline"),
                 DummyPipeline,
             )
 
-            self.handler.pipelineLoader.addPipeline(
+            self.handler.pipelineHandler.addPipeline(
                 index=7, name="New Pipeline", typename="AnotherDummy", settings={}
             )
             self.handler.pipelineBindings[0] = 7
             self.handler.setPipelineByIndex(0, 7)
-            self.handler.pipelineLoader.removePipeline(7)
+            self.handler.pipelineHandler.removePipeline(7)
 
             on_removed.assert_called_once()
             called_args = on_removed.call_args[0]
