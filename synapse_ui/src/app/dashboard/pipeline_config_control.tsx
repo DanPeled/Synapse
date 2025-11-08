@@ -174,7 +174,16 @@ export function PipelineConfigControl({
               value="input"
               className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer h-8"
             >
-              Input
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>Camera Properties</span>
+                <Camera />
+              </div>
             </TabsTrigger>
             <TabsTrigger
               value="pipeline"
