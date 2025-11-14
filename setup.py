@@ -96,6 +96,7 @@ setup(
             "pyright",
             "build",
             "reuse",
+            "requests",
         ]
     },
     include_package_data=True,
