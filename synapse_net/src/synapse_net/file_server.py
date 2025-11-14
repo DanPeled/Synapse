@@ -17,6 +17,8 @@ from typing import Optional
 class FileServerHandler(http.server.SimpleHTTPRequestHandler):
     """Custom HTTP handler to support file upload and download."""
 
+    files_dir: Path
+
     def __init__(self, *args, directory: Optional[Path] = None, **kwargs):
         if directory is None:
             raise ValueError("directory must be provided")
@@ -91,11 +93,17 @@ class FileServer:
 
     def start(self) -> None:
         """Start the HTTP server in a background daemon thread."""
+        files_dir = self.files_dir
 
-        def handler_class(*args, **kwargs):
-            return FileServerHandler(*args, directory=self.files_dir, **kwargs)
+        class CustomHandler(FileServerHandler):
+            def __init__(self, *args, **kwargs):
+                self.files_dir = files_dir
+                super().__init__(*args, directory=files_dir, **kwargs)
 
-        self._server = socketserver.TCPServer((self.host, self.port), handler_class)
+        class ReusableTCPServer(socketserver.TCPServer):
+            allow_reuse_address = True
+
+        self._server = ReusableTCPServer((self.host, self.port), CustomHandler)
         print(
             f"Serving files from '{self.files_dir}' at http://{self.host}:{self.port}/"
         )

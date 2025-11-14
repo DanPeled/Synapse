@@ -2,78 +2,103 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import http.client
-import shutil
 import tempfile
-import unittest
+import threading
+# test_file_server.py
 from pathlib import Path
 
+import pytest
+import requests
 from synapse_net.file_server import FileServer
 
 
-class TestFileServer(unittest.TestCase):
-    def setUp(self) -> None:
-        # Create a temporary directory for uploads
-        self.temp_dir = Path(tempfile.mkdtemp())
-        self.port = 9090
-        self.server = FileServer(files_dir=self.temp_dir, port=self.port)
-        self.server.start()
+# -------------------------
+# Helper: start server in background for tests
+# -------------------------
+@pytest.fixture
+def server():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        files_dir = Path(tmpdir)
+        srv = FileServer(
+            files_dir, host="127.0.0.1", port=0
+        )  # port=0 -> random free port
+        srv.start()
 
-    def tearDown(self) -> None:
-        # Stop the server and remove temp directory
-        self.server.stop()
-        shutil.rmtree(self.temp_dir)
+        # Wait for thread to start
+        threading.Event().wait(0.1)
 
-    def test_file_upload(self) -> None:
-        """Test that a file can be uploaded successfully."""
-        conn = http.client.HTTPConnection("localhost", self.port)
-        boundary = "testboundary"
-        file_content = b"Hello, world!"
-        filename = "test.txt"
+        yield srv
 
-        body = (
-            (
-                f"--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n\r\n'
-            ).encode()
-            + file_content
-            + f"\r\n--{boundary}--\r\n".encode()
-        )
-
-        headers = {
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-            "Content-Length": str(len(body)),
-        }
-
-        conn.request("POST", "/", body=body, headers=headers)
-        response = conn.getresponse()
-        resp_body = response.read()
-        conn.close()
-
-        self.assertEqual(response.status, 200)
-        self.assertIn(b"Upload successful", resp_body)
-        # Check that file exists
-        uploaded_file = self.temp_dir / filename
-        self.assertTrue(uploaded_file.exists())
-        self.assertEqual(uploaded_file.read_bytes(), file_content)
-
-    def test_file_download(self) -> None:
-        """Test that a file can be downloaded successfully."""
-        # First, create a file in the directory
-        filename = "download.txt"
-        content = b"Download me!"
-        file_path = self.temp_dir / filename
-        file_path.write_bytes(content)
-
-        conn = http.client.HTTPConnection("localhost", self.port)
-        conn.request("GET", f"/{filename}")
-        response = conn.getresponse()
-        resp_body = response.read()
-        conn.close()
-
-        self.assertEqual(response.status, 200)
-        self.assertEqual(resp_body, content)
+        srv.stop()
 
 
-if __name__ == "__main__":
-    unittest.main()
+# -------------------------
+# Helper: get server URL
+# -------------------------
+def server_url(srv: FileServer) -> str:
+    host, port = srv._server.server_address  # pyright: ignore
+    return f"http://{host}:{port}"
+
+
+# -------------------------
+# Test: OPTIONS request
+# -------------------------
+def test_options(server):
+    url = server_url(server)
+    resp = requests.options(url)
+    assert resp.status_code == 200
+    assert resp.headers["Access-Control-Allow-Origin"] == "*"
+    assert "GET" in resp.headers["Access-Control-Allow-Methods"]
+
+
+# -------------------------
+# Test: upload file via POST
+# -------------------------
+def test_file_upload(server):
+    url = server_url(server)
+    files = {"file": ("test.txt", b"hello world")}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 200
+    assert resp.content == b"Upload successful"
+
+    # Confirm file saved
+    saved_file = server.files_dir / "test.txt"
+    assert saved_file.exists()
+    assert saved_file.read_bytes() == b"hello world"
+
+
+# -------------------------
+# Test: download file via GET
+# -------------------------
+def test_file_download(server):
+    # Create a file
+    test_file = server.files_dir / "download.txt"
+    test_file.write_bytes(b"download content")
+
+    url = server_url(server) + "/download.txt"
+    resp = requests.get(url)
+    assert resp.status_code == 200
+    assert resp.content == b"download content"
+
+
+# -------------------------
+# Test: POST without multipart
+# -------------------------
+def test_post_non_multipart(server):
+    url = server_url(server)
+    resp = requests.post(url, data={"foo": "bar"})
+    assert resp.status_code == 400
+    assert b"not multipart/form-data" in resp.content
+
+
+# -------------------------
+# Test: start/stop server
+# -------------------------
+def test_server_start_stop():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        srv = FileServer(Path(tmpdir))
+        srv.start()
+        assert srv._thread.is_alive()  # pyright: ignore
+        assert srv._server is not None
+        srv.stop()
+        assert not srv._thread.is_alive()  # pyright: ignore
