@@ -22,10 +22,9 @@ import { CameraProto } from "@/proto/v1/camera";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { LogMessageProto } from "@/proto/v1/log";
 import assert from "assert";
-import { ExternalToast, toast, ToasterProps } from "sonner";
-import { teamColor, toastColor } from "../style";
+import { toast } from "sonner";
+import { teamColor } from "../style";
 import { AlertTypeProto } from "@/proto/v1/alert";
-import { TemplateContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (

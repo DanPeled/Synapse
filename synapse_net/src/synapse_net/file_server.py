@@ -23,6 +23,16 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(directory), **kwargs)
         self.files_dir: Path = directory
 
+    def end_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        super().end_headers()
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(200, "OK")
+        self.end_headers()
+
     # -------------------------
     # Handle POST (Upload)
     # -------------------------

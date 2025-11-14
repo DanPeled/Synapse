@@ -23,6 +23,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "google-protobuf": "^3.21.4",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.516.0",
     "next": "15.3.3",
     "polished": "^4.3.1",

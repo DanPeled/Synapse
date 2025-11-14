@@ -36,6 +36,25 @@ import { ProgramLogsDialog } from "./programLogsDialog";
 import { NetworkSettings } from "./network_settings";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "@/services/websocket";
+import {
+  downloadHttpDirectoryAsZip,
+  FILE_SERVER_URL,
+} from "@/services/backend/fileServer";
+import { DeviceInfoProto } from "@/proto/v1/device";
+
+async function downloadSettings(deviceInfo: DeviceInfoProto) {
+  await downloadHttpDirectoryAsZip(
+    FILE_SERVER_URL(deviceInfo) + "/config/",
+    "settings",
+  );
+}
+
+async function downloadLogs(deviceInfo: DeviceInfoProto) {
+  await downloadHttpDirectoryAsZip(
+    FILE_SERVER_URL(deviceInfo) + "/logs/",
+    "logs",
+  );
+}
 
 function DeviceInfo({}) {
   const { hardwaremetrics, deviceinfo } = useBackendContext();
@@ -201,7 +220,7 @@ function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
 
 function DeviceControls({}) {
   const [programLogsVisible, setProgramLogsVisible] = useState(false);
-  const { logs, socket } = useBackendContext();
+  const { logs, socket, deviceinfo } = useBackendContext();
 
   return (
     <Card
@@ -223,7 +242,10 @@ function DeviceControls({}) {
                 Import Settings
               </span>
             </Button>
-            <Button className="w-full">
+            <Button
+              className="w-full"
+              onClickAction={() => downloadSettings(deviceinfo)}
+            >
               <span className="flex items-center justify-center gap-2">
                 <Download size={iconSize} />
                 Export Settings
@@ -231,7 +253,10 @@ function DeviceControls({}) {
             </Button>
           </Row>
           <Row gap="gap-6">
-            <Button className="w-full">
+            <Button
+              className="w-full"
+              onClickAction={() => downloadLogs(deviceinfo)}
+            >
               <span className="flex items-center justify-center gap-2">
                 <Download size={iconSize} />
                 Download Logs
