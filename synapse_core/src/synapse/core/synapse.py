@@ -16,6 +16,7 @@ from typing import Any, List, Optional
 import psutil
 from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
+from synapse_net.file_server import FileServer
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineProto,
@@ -103,14 +104,15 @@ class Synapse:
 
     def __init__(self) -> None:
         self.isRunning: bool = False
-        self.runtime_handler: RuntimeManager
+        self.runtimeHandler: RuntimeManager
         self.networkingManager = NetworkingManager()
-        self.nt_client: NtClient = NtClient()
+        self.ntClient: NtClient = NtClient()
+        self.fileServer: Optional[FileServer] = None
 
     def init(
         self,
-        runtime_handler: RuntimeManager,
-        config_path: Path,
+        runtimeHandler: RuntimeManager,
+        configPath: Path,
     ) -> bool:
         """
         Initializes the Synapse pipeline by loading configuration settings and setting up NetworkTables and global settings.
@@ -142,21 +144,24 @@ class Synapse:
             )
         )
 
-        self.runtime_handler = runtime_handler
+        self.runtimeHandler = runtimeHandler
         self.setupRuntimeCallbacks()
 
         self.setupWebsocket()
 
-        if config_path.exists():
+        self.fileServer = FileServer(configPath.parent.parent)
+        self.fileServer.start()
+
+        if configPath.exists():
             ...
         else:
             log("No config file!")
-            with open(config_path, "w") as _:
+            with open(configPath, "w") as _:
                 ...
         try:
             config = Config()
-            config.load(filePath=config_path)
-            self.runtime_handler.networkSettings = config.network
+            config.load(filePath=configPath)
+            self.runtimeHandler.networkSettings = config.network
 
             if (
                 config.network.ip is not None
@@ -185,7 +190,7 @@ class Synapse:
 
             nt_good = self.__init_networktables(config.network)
             if nt_good:
-                self.runtime_handler.setup(Path(os.getcwd()))
+                self.runtimeHandler.setup(Path(os.getcwd()))
             else:
                 err(
                     f"Something went wrong while setting up networktables with params: {config.network}"
@@ -211,7 +216,7 @@ class Synapse:
         Returns:
             bool: True if NetworkTables was successfully initialized, False otherwise.
         """
-        setup_good = self.nt_client.setup(
+        setup_good = self.ntClient.setup(
             teamNumber=settings.teamNumber,
             name=settings.name,
             isServer=self.__isServer,
@@ -243,7 +248,7 @@ class Synapse:
 
         This method is responsible for running the pipeline after it has been initialized.
         """
-        self.runtime_handler.run()
+        self.runtimeHandler.run()
 
     def setupWebsocket(self) -> None:
         import asyncio
@@ -262,9 +267,9 @@ class Synapse:
 
             from ..__version__ import SYNAPSE_VERSION
 
-            if self.nt_client:
+            if self.ntClient:
                 connectionDetails = SetConnectionInfoProto(
-                    connected_to_networktables=self.nt_client.nt_inst.isConnected()
+                    connected_to_networktables=self.ntClient.nt_inst.isConnected()
                 )
 
                 await self.websocket.sendToClient(
@@ -278,7 +283,7 @@ class Synapse:
                 ip=getIP(),
                 version=SYNAPSE_VERSION,
                 platform=metrics.Platform.getCurrentPlatform().getOSType().value,
-                hostname=self.runtime_handler.networkSettings.hostname,
+                hostname=self.runtimeHandler.networkSettings.hostname,
             )
 
             deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
@@ -291,7 +296,7 @@ class Synapse:
                 ),
             )
 
-            while not self.runtime_handler.isSetup:
+            while not self.runtimeHandler.isSetup:
                 try:
                     time.sleep(0.1)
                 except Exception:
@@ -300,7 +305,7 @@ class Synapse:
             for (
                 id,
                 pipeline,
-            ) in self.runtime_handler.pipelineHandler.pipelineInstanceBindings.items():
+            ) in self.runtimeHandler.pipelineHandler.pipelineInstanceBindings.items():
                 msg = pipelineToProto(pipeline, id)
 
                 await self.websocket.sendToAll(
@@ -311,7 +316,7 @@ class Synapse:
             for (
                 typename,
                 type,
-            ) in self.runtime_handler.pipelineHandler.pipelineTypes.items():
+            ) in self.runtimeHandler.pipelineHandler.pipelineTypes.items():
                 settingType = resolveGenericArgument(type)
                 if settingType:
                     settings = settingType({})
@@ -327,16 +332,16 @@ class Synapse:
                 ).SerializeToString()
             )
 
-            for id, camera in self.runtime_handler.cameraHandler.cameras.items():
+            for id, camera in self.runtimeHandler.cameraHandler.cameras.items():
                 msg = cameraToProto(
                     id,
                     camera.name,
                     camera,
-                    self.runtime_handler.pipelineBindings.get(id, 0),
-                    self.runtime_handler.pipelineHandler.defaultPipelineIndexes.get(
+                    self.runtimeHandler.pipelineBindings.get(id, 0),
+                    self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
                         id, -1
                     ),
-                    self.runtime_handler.cameraHandler.cameraConfigBindings[id].id,
+                    self.runtimeHandler.cameraHandler.cameraConfigBindings[id].id,
                 )
 
                 await self.websocket.sendToAll(
@@ -346,7 +351,7 @@ class Synapse:
             for (
                 id,
                 config,
-            ) in self.runtime_handler.cameraHandler.cameraConfigBindings.items():
+            ) in self.runtimeHandler.cameraHandler.cameraConfigBindings.items():
                 calibrations = config.calibration
 
                 for calib in calibrations.values():
@@ -403,6 +408,9 @@ class Synapse:
 
             self.websocket.loop.call_soon_threadsafe(self.websocket.loop.stop)
 
+        if self.fileServer is not None:
+            self.fileServer.stop()
+
         # Only join if not current thread
         if self.websocketThread is not threading.current_thread():
             self.websocketThread.join(timeout=5)
@@ -420,11 +428,11 @@ class Synapse:
                 cameraid,
                 name,
                 camera,
-                self.runtime_handler.pipelineBindings.get(cameraid, 0),
-                self.runtime_handler.pipelineHandler.defaultPipelineIndexes.get(
+                self.runtimeHandler.pipelineBindings.get(cameraid, 0),
+                self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
                     cameraid, 0
                 ),
-                self.runtime_handler.cameraHandler.cameraConfigBindings[cameraid].id,
+                self.runtimeHandler.cameraHandler.cameraConfigBindings[cameraid].id,
             )
 
             Synapse.kInstance.websocket.sendToAllSync(
@@ -438,7 +446,7 @@ class Synapse:
                 SetPipleineSettingMessageProto(
                     setting=setting,
                     value=settingValueToProto(value),
-                    pipeline_index=Synapse.kInstance.runtime_handler.pipelineBindings[
+                    pipeline_index=Synapse.kInstance.runtimeHandler.pipelineBindings[
                         cameraIndex
                     ],
                 )
@@ -465,16 +473,16 @@ class Synapse:
 
         def onDefaultPipelineSet(pipelineIndex: PipelineID, cameraIndex: CameraID):
             camera: Optional[SynapseCamera] = (
-                Synapse.kInstance.runtime_handler.cameraHandler.getCamera(cameraIndex)
+                Synapse.kInstance.runtimeHandler.cameraHandler.getCamera(cameraIndex)
             )
             if camera:
                 cameraMsg = cameraToProto(
                     cameraIndex,
                     camera.name,
                     camera,
-                    pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
+                    pipelineIndex=self.runtimeHandler.pipelineBindings[cameraIndex],
                     defaultPipeline=pipelineIndex,
-                    kind=self.runtime_handler.cameraHandler.cameraConfigBindings[
+                    kind=self.runtimeHandler.cameraHandler.cameraConfigBindings[
                         cameraIndex
                     ].id,
                 )
@@ -483,22 +491,22 @@ class Synapse:
                 Synapse.kInstance.websocket.sendToAllSync(msg)
 
         def onCameraRename(cameraIndex: CameraID, newName: CameraName):
-            camera = self.runtime_handler.cameraHandler.cameras[cameraIndex]
+            camera = self.runtimeHandler.cameraHandler.cameras[cameraIndex]
             cameraMsg = cameraToProto(
                 cameraIndex,
                 camera.name,
                 camera,
-                pipelineIndex=self.runtime_handler.pipelineBindings[cameraIndex],
-                defaultPipeline=self.runtime_handler.pipelineHandler.defaultPipelineIndexes[
+                pipelineIndex=self.runtimeHandler.pipelineBindings[cameraIndex],
+                defaultPipeline=self.runtimeHandler.pipelineHandler.defaultPipelineIndexes[
                     cameraIndex
                 ],
-                kind=self.runtime_handler.cameraHandler.cameraConfigBindings[
+                kind=self.runtimeHandler.cameraHandler.cameraConfigBindings[
                     cameraIndex
                 ].id,
             )
             msg = createMessage(MessageTypeProto.ADD_CAMERA, cameraMsg)
             self.websocket.sendToAllSync(msg)
-            self.runtime_handler.save()
+            self.runtimeHandler.save()
 
         def onCameraRecordingStatusChanged(
             cameraIndex: CameraID, status: RecordingStatus, filename: RecordingFilename
@@ -530,19 +538,19 @@ class Synapse:
                 ),
             )
 
-        self.runtime_handler.pipelineHandler.onAddPipeline.add(onAddPipeline)
-        self.runtime_handler.cameraHandler.onAddCamera.add(onAddCamera)
-        self.runtime_handler.onSettingChangedFromNT.add(onSettingChangedInNt)
-        self.runtime_handler.onPipelineChanged.add(onPipelineIndexChangedInNt)
-        self.runtime_handler.pipelineHandler.onDefaultPipelineSet.add(
+        self.runtimeHandler.pipelineHandler.onAddPipeline.add(onAddPipeline)
+        self.runtimeHandler.cameraHandler.onAddCamera.add(onAddCamera)
+        self.runtimeHandler.onSettingChangedFromNT.add(onSettingChangedInNt)
+        self.runtimeHandler.onPipelineChanged.add(onPipelineIndexChangedInNt)
+        self.runtimeHandler.pipelineHandler.onDefaultPipelineSet.add(
             onDefaultPipelineSet
         )
-        self.runtime_handler.cameraHandler.onRenameCamera.add(onCameraRename)
-        self.runtime_handler.cameraHandler.onRecordingStatusChanged.add(
+        self.runtimeHandler.cameraHandler.onRenameCamera.add(onCameraRename)
+        self.runtimeHandler.cameraHandler.onRecordingStatusChanged.add(
             onCameraRecordingStatusChanged
         )
-        self.nt_client.onConnect.add(onConnect)
-        self.nt_client.onDisconnect.add(onDisconnect)
+        self.ntClient.onConnect.add(onConnect)
+        self.ntClient.onDisconnect.add(onDisconnect)
 
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
@@ -553,7 +561,7 @@ class Synapse:
             setSettingMSG: SetPipleineSettingMessageProto = msgObj.set_pipeline_setting
 
             pipeline: Optional[Pipeline] = (
-                self.runtime_handler.pipelineHandler.getPipeline(
+                self.runtimeHandler.pipelineHandler.getPipeline(
                     setSettingMSG.pipeline_index
                 )
             )
@@ -564,15 +572,15 @@ class Synapse:
                 for (
                     cameraid,
                     pipelineid,
-                ) in self.runtime_handler.pipelineBindings.items():
+                ) in self.runtimeHandler.pipelineBindings.items():
                     if pipelineid == setSettingMSG.pipeline_index:
-                        self.runtime_handler.updateSetting(
+                        self.runtimeHandler.updateSetting(
                             setSettingMSG.setting, cameraid, val
                         )
         elif msgType == MessageTypeProto.SET_PIPELINE_INDEX:
             assert_set(msgObj.set_pipeline_index)
             setPipeIndexMSG: SetPipelineIndexMessageProto = msgObj.set_pipeline_index
-            self.runtime_handler.setPipelineByIndex(
+            self.runtimeHandler.setPipelineByIndex(
                 cameraIndex=setPipeIndexMSG.camera_index,
                 pipelineIndex=setPipeIndexMSG.pipeline_index,
             )
@@ -580,7 +588,7 @@ class Synapse:
             assert_set(msgObj.set_pipeline_name)
             setPipelineNameMsg: SetPipelineNameMessageProto = msgObj.set_pipeline_name
             pipeline: Optional[Pipeline] = (
-                self.runtime_handler.pipelineHandler.getPipeline(
+                self.runtimeHandler.pipelineHandler.getPipeline(
                     setPipelineNameMsg.pipeline_index
                 )
             )
@@ -608,9 +616,9 @@ class Synapse:
             addPipelineMsg: PipelineProto = msgObj.pipeline_info
             if addPipelineMsg.type is not None and (
                 addPipelineMsg.type
-                in self.runtime_handler.pipelineHandler.pipelineTypes.keys()
+                in self.runtimeHandler.pipelineHandler.pipelineTypes.keys()
             ):
-                self.runtime_handler.pipelineHandler.addPipeline(
+                self.runtimeHandler.pipelineHandler.addPipeline(
                     index=addPipelineMsg.index,
                     name=addPipelineMsg.name,
                     typename=addPipelineMsg.type,
@@ -623,13 +631,13 @@ class Synapse:
                 for (
                     cameraId,
                     pipelineId,
-                ) in self.runtime_handler.pipelineBindings.items():
+                ) in self.runtimeHandler.pipelineBindings.items():
                     if pipelineId == addPipelineMsg.index:
-                        pipeline = self.runtime_handler.pipelineHandler.getPipeline(
+                        pipeline = self.runtimeHandler.pipelineHandler.getPipeline(
                             pipelineId
                         )
                         if pipeline is not None:
-                            camera = self.runtime_handler.cameraHandler.getCamera(
+                            camera = self.runtimeHandler.cameraHandler.getCamera(
                                 cameraId
                             )
                             assert camera is not None
@@ -643,18 +651,18 @@ class Synapse:
         elif msgType == MessageTypeProto.DELETE_PIPELINE:
             assert_set(msgObj.remove_pipeline_index)
             removePipelineIndex: int = msgObj.remove_pipeline_index
-            self.runtime_handler.pipelineHandler.removePipeline(removePipelineIndex)
+            self.runtimeHandler.pipelineHandler.removePipeline(removePipelineIndex)
         elif msgType == MessageTypeProto.SET_DEFAULT_PIPELINE:
             assert_set(msgObj.set_default_pipeline)
             defaultPipelineMsg: SetDefaultPipelineMessageProto = (
                 msgObj.set_default_pipeline
             )
-            self.runtime_handler.pipelineHandler.setDefaultPipeline(
+            self.runtimeHandler.pipelineHandler.setDefaultPipeline(
                 cameraIndex=defaultPipelineMsg.camera_index,
                 pipelineIndex=defaultPipelineMsg.pipeline_index,
             )
         elif msgType == MessageTypeProto.SAVE:
-            self.runtime_handler.save()
+            self.runtimeHandler.save()
         elif msgType == MessageTypeProto.SET_NETWORK_SETTINGS:
             assert_set(msgObj.set_network_settings)
             networkSettings: SetNetworkSettingsProto = msgObj.set_network_settings
@@ -670,14 +678,14 @@ class Synapse:
             reboot()
         elif msgType == MessageTypeProto.RESTART_SYNAPSE:
             warn("Attempting to restart Synapse, may cause some unexpected results")
-            self.runtime_handler.isRunning = False
-            self.runtime_handler.cleanup()
+            self.runtimeHandler.isRunning = False
+            self.runtimeHandler.cleanup()
             restartRuntime()
         elif msgType == MessageTypeProto.RENAME_CAMERA:
             assert_set(msgObj.rename_camera)
             renameCameraMsg = msgObj.rename_camera
 
-            self.runtime_handler.cameraHandler.renameCamera(
+            self.runtimeHandler.cameraHandler.renameCamera(
                 renameCameraMsg.camera_index, renameCameraMsg.new_name
             )
         elif msgType == MessageTypeProto.DELETE_CALIBRATION:
@@ -686,9 +694,9 @@ class Synapse:
 
             if (
                 deleteCalibrationMsg.camera_index
-                in self.runtime_handler.cameraHandler.cameraConfigBindings
+                in self.runtimeHandler.cameraHandler.cameraConfigBindings
             ):
-                self.runtime_handler.cameraHandler.cameraConfigBindings[
+                self.runtimeHandler.cameraHandler.cameraConfigBindings[
                     deleteCalibrationMsg.camera_index
                 ].calibration.pop(deleteCalibrationMsg.resolution)
 
@@ -698,7 +706,7 @@ class Synapse:
 
             setRecordingStatusMsg = msgObj.set_camera_recording_status
 
-            self.runtime_handler.cameraHandler.setRecordingStatus(
+            self.runtimeHandler.cameraHandler.setRecordingStatus(
                 setRecordingStatusMsg.camera_index, setRecordingStatusMsg.record
             )
 
@@ -714,14 +722,14 @@ class Synapse:
                 self.networkingManager.configureStaticIP(
                     networkSettings.ip, networkSettings.network_interface
                 )
-                self.runtime_handler.networkSettings.ip = networkSettings.ip
-                self.runtime_handler.networkSettings.networkInterface = (
+                self.runtimeHandler.networkSettings.ip = networkSettings.ip
+                self.runtimeHandler.networkSettings.networkInterface = (
                     networkSettings.network_interface
                 )
             elif (
                 networkSettings.ip == "NULL"
             ):  # Don't configure static IP and remove if config exists
-                self.runtime_handler.networkSettings.ip = None
+                self.runtimeHandler.networkSettings.ip = None
                 self.networkingManager.removeStaticIPDecl(
                     networkSettings.network_interface
                 )
@@ -729,7 +737,7 @@ class Synapse:
                 err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")
 
             if networkSettings.hostname.__len__() > 0:
-                self.runtime_handler.networkSettings.hostname = networkSettings.hostname
+                self.runtimeHandler.networkSettings.hostname = networkSettings.hostname
                 devicenetworking.setHostname(networkSettings.hostname)
             else:
                 err("Empty hostname isn't allowed!")
@@ -738,18 +746,18 @@ class Synapse:
                 "Non-Linux systems network and system settings modification isn't supported at the time"
             )
 
-        self.runtime_handler.networkSettings.teamNumber = networkSettings.team_number
-        self.runtime_handler.networkSettings.name = networkSettings.network_table
-        self.nt_client.NT_TABLE = networkSettings.network_table
+        self.runtimeHandler.networkSettings.teamNumber = networkSettings.team_number
+        self.runtimeHandler.networkSettings.name = networkSettings.network_table
+        self.ntClient.NT_TABLE = networkSettings.network_table
         warn(
             "Changes to team number and NetworkTables config will only take affect after restarting the runtime"
         )
-        self.runtime_handler.save()
+        self.runtimeHandler.save()
 
     def close(self):
-        self.runtime_handler.isRunning = False
+        self.runtimeHandler.isRunning = False
         self.cleanup()
-        self.runtime_handler.cleanup()
+        self.runtimeHandler.cleanup()
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:

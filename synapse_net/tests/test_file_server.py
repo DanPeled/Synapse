@@ -1,8 +1,13 @@
-import unittest
-import tempfile
-import shutil
-from pathlib import Path
+# SPDX-FileCopyrightText: 2025 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import http.client
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
+
 from synapse_net.file_server import FileServer
 
 
