@@ -266,7 +266,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
                 width = int(resolution[0])
                 height = int(resolution[1])
 
-                Synapse.kInstance.runtime_handler.cameraHandler.cameraConfigBindings[
+                Synapse.kInstance.runtimeHandler.cameraHandler.cameraConfigBindings[
                     self.cameraIndex
                 ].calibration[
                     self.getCameraSetting(CameraSettings.resolution)
@@ -277,7 +277,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
                     meanErr=retval,
                 )
 
-                Synapse.kInstance.runtime_handler.save()
+                Synapse.kInstance.runtimeHandler.save()
 
                 self.all_imgs = 0
                 self.all_corners = []
