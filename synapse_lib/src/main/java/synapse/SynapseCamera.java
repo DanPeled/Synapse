@@ -251,7 +251,7 @@ public class SynapseCamera {
    * @param dataKey The key of the data entry.
    * @return The NetworkTableEntry associated with the key.
    */
-  private NetworkTableEntry getDataEntry(String dataKey) {
+  public NetworkTableEntry getDataEntry(String dataKey) {
     return getDataResultsTable().getEntry(dataKey);
   }
 
@@ -260,7 +260,7 @@ public class SynapseCamera {
    *
    * @return The NetworkTable representing the data table.
    */
-  private NetworkTable getDataResultsTable() {
+  public NetworkTable getDataResultsTable() {
     if (m_dataTable == null) {
       m_dataTable = m_table.getSubTable("data");
     }
@@ -273,7 +273,7 @@ public class SynapseCamera {
    *
    * @return The NetworkTable representing the settings table.
    */
-  private NetworkTable getSettingsTable() {
+  public NetworkTable getSettingsTable() {
     if (m_settingsTable == null) {
       m_settingsTable = m_table.getSubTable("settings");
     }

@@ -2,57 +2,83 @@ package synapse.pipelines.apriltag;
 
 import java.util.Arrays;
 
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import static edu.wpi.first.units.Units.Degrees;
+
 /**
- * Represents the result of detecting AprilTags in a single frame or input source.
+ * Represents the result of detecting AprilTags in a single frame or input
+ * source.
  *
- * <p>This class contains the list of detected tags and an estimate of the robot's pose in field
+ * <p>
+ * This class contains the list of detected tags and an estimate of the camera's
+ * pose in field
  * space. It is typically produced by an AprilTag pipeline.
  */
 public class ApriltagResult {
-
   /** The array of detected AprilTags with their associated detection data. */
-  public ApriltagDetection[] tags;
+  public SynapseApriltagDetection[] tags;
+  public long timestamp;
 
   /**
-   * The estimated robot pose in field space represented as an array of doubles.
+   * The estimated camera pose in field space represented as an array of doubles.
    *
-   * <p>({@code [x, y, z, roll, pitch, yaw]}).
+   * <p>
+   * ({@code [x, y, z, roll, pitch, yaw]}).
    */
-  public double[] robotEstimate_fieldSpace;
+  public double[] cameraEstimate_fieldSpace;
+
+  public Pose3d getCameraEstimateFieldSpace3D() {
+    return new Pose3d(
+        cameraEstimate_fieldSpace[0],
+        cameraEstimate_fieldSpace[1],
+        cameraEstimate_fieldSpace[2],
+        new Rotation3d(
+            Degrees.of(cameraEstimate_fieldSpace[3]),
+            Degrees.of(cameraEstimate_fieldSpace[4]),
+            Degrees.of(cameraEstimate_fieldSpace[5])));
+  }
 
   /**
    * Creates a new, empty {@code ApriltagResult}.
    *
-   * <p>This constructor is primarily used for JSON deserialization by Jackson and for general
+   * <p>
+   * This constructor is primarily used for JSON deserialization by Jackson and
+   * for general
    * instantiation when no initial values are provided.
    */
-  public ApriltagResult() {}
+  public ApriltagResult() {
+  }
 
   /**
-   * Compares this result to another object for equality. Two results are considered equal if both
-   * their detected tags and robot field space estimates are equal.
+   * Compares this result to another object for equality. Two results are
+   * considered equal if both
+   * their detected tags and camera field space estimates are equal.
    *
    * @param o the object to compare with
    * @return {@code true} if the objects are equal, otherwise {@code false}
    */
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof ApriltagResult)) return false;
+    if (this == o)
+      return true;
+    if (!(o instanceof ApriltagResult))
+      return false;
     ApriltagResult that = (ApriltagResult) o;
     return Arrays.equals(tags, that.tags)
-        && Arrays.equals(robotEstimate_fieldSpace, that.robotEstimate_fieldSpace);
+        && Arrays.equals(cameraEstimate_fieldSpace, that.cameraEstimate_fieldSpace);
   }
 
   /**
-   * Computes a hash code for this result based on its detected tags and robot field space estimate.
+   * Computes a hash code for this result based on its detected tags and camera
+   * field space estimate.
    *
    * @return the computed hash code
    */
   @Override
   public int hashCode() {
     int result = Arrays.hashCode(tags);
-    result = 31 * result + Arrays.hashCode(robotEstimate_fieldSpace);
+    result = 31 * result + Arrays.hashCode(cameraEstimate_fieldSpace);
     return result;
   }
 }
