@@ -68,20 +68,26 @@ class PipelineHandler:
     def loadPipelineCameraSettings(self):
         camera_configs = GlobalSettings.getCameraConfigMap()
         for cameraid in camera_configs.keys():
-            with open(
+            path = (
                 Config.getInstance().path.parent
                 / f"camera_{cameraid}"
-                / "pipeline_settings.yml",
-                "r",
-            ) as f:
-                config = yaml.full_load(f)
-                camera_config_dict = {}
-                for pipelineid, camerasettings in config["pipeline_configs"].items():
-                    camera_config_dict[pipelineid] = CameraSettings(camerasettings)
-                    self.cameraPipelineSettings[pipelineid] = {}
-                    self.cameraPipelineSettings[pipelineid][cameraid] = (
-                        camera_config_dict[pipelineid]
-                    )
+                / "pipeline_settings.yml"
+            )
+            if path.exists():
+                with open(
+                    path,
+                    "r",
+                ) as f:
+                    config = yaml.full_load(f)
+                    camera_config_dict = {}
+                    for pipelineid, camerasettings in config[
+                        "pipeline_configs"
+                    ].items():
+                        camera_config_dict[pipelineid] = CameraSettings(camerasettings)
+                        self.cameraPipelineSettings[pipelineid] = {}
+                        self.cameraPipelineSettings[pipelineid][cameraid] = (
+                            camera_config_dict[pipelineid]
+                        )
 
     def loadPipelineInstances(self):
         for pipelineIndex in self.pipelineSettings.keys():

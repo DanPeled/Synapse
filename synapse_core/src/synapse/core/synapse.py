@@ -156,6 +156,7 @@ class Synapse:
             ...
         else:
             log("No config file!")
+            configPath.parent.mkdir(exist_ok=True)
             with open(configPath, "w") as _:
                 ...
         try:
