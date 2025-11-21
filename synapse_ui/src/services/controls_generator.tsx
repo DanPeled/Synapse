@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { teamColor } from "./style";
 import { RefreshCcw } from "lucide-react";
 import assert from "assert";
+import { FloatValue } from "@/google/protobuf/wrappers";
 
 interface ControlGeneratorProps {
   setting: SettingMetaProto;
@@ -190,6 +191,12 @@ export function GenerateControl({
         return (
           <LabeledControl label={settingName}>
             <NumberInput
+              min={
+                setting.constraint.constraint?.numeric?.min ?? Number.MIN_VALUE
+              }
+              max={
+                setting.constraint.constraint?.numeric?.max ?? Number.MAX_VALUE
+              }
               value={val as number}
               onChange={(val) => setValue(settingValueToProto(val))}
               disabled={locked}

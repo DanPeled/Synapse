@@ -99,6 +99,7 @@ export function CalibrationDialog({
     pipelines,
     pipelinetypes,
     connection,
+    cameras,
   } = useBackendContext();
 
   useEffect(() => {
@@ -127,7 +128,7 @@ export function CalibrationDialog({
 
   useEffect(() => {
     generateControls();
-  }, [selectedPipelineType, selectedPipeline]);
+  }, [selectedPipelineType, selectedPipeline, camera, cameras]);
 
   useEffect(() => {
     if (visible) {
