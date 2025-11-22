@@ -5,7 +5,7 @@
 import importlib.util
 import traceback
 from pathlib import Path
-from typing import Dict, Final, Optional, Type
+from typing import Dict, Final, Optional, Type, TypeVar
 
 import synapse.log as log
 import yaml
@@ -16,8 +16,11 @@ from ..util import resolveGenericArgument
 from .config import Config
 from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
-from .pipeline import Pipeline, getPipelineTypename
+from .pipeline import Pipeline, getPipelineTypename, pipelineSettings
 from .settings_api import CameraSettings, PipelineSettings, SettingsMap
+
+T = TypeVar("T")
+CameraPipelineDict = Dict[CameraID, Dict[PipelineID, T]]
 
 
 class PipelineHandler:
@@ -36,21 +39,19 @@ class PipelineHandler:
         Args:
             pipelineDirectory (Path): Path to the directory containing pipeline files.
         """
-        self.pipelineTypeNames: Dict[PipelineID, PipelineTypeName] = {}
-        self.pipelineSettings: Dict[PipelineID, PipelineSettings] = {}
-        self.cameraPipelineSettings: Dict[
-            PipelineID, Dict[CameraID, CameraSettings]
-        ] = {}
-        self.pipelineInstanceBindings: Dict[PipelineID, Pipeline] = {}
-        self.pipelineNames: Dict[PipelineID, PipelineName] = {}
+        self.pipelineTypeNames: CameraPipelineDict[PipelineTypeName] = {}
+        self.pipelineSettings: CameraPipelineDict[PipelineSettings] = {}
+        self.cameraPipelineSettings: CameraPipelineDict[CameraSettings] = {}
+        self.pipelineInstanceBindings: CameraPipelineDict[Pipeline] = {}
+        self.pipelineNames: CameraPipelineDict[PipelineName] = {}
 
-        self.pipelineTypes: Dict[str, Type[Pipeline]] = {}
+        self.pipelineTypesViaName: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
 
         self.pipelineDirectory: Path = pipelineDirectory
 
-        self.onAddPipeline: Callback[PipelineID, Pipeline] = Callback()
-        self.onRemovePipeline: Callback[PipelineID, Pipeline] = Callback()
+        self.onAddPipeline: Callback[PipelineID, Pipeline, CameraID] = Callback()
+        self.onRemovePipeline: Callback[PipelineID, Pipeline, CameraID] = Callback()
         self.onDefaultPipelineSet: Callback[PipelineID, CameraID] = Callback()
 
     def setup(self, directory: Path):
@@ -60,7 +61,7 @@ class PipelineHandler:
             directory (Path): The directory containing pipeline implementations.
         """
         self.pipelineDirectory = directory
-        self.pipelineTypes = self.loadPipelineTypes(directory)
+        self.pipelineTypesViaName = self.loadPipelineTypes(directory)
         self.loadPipelineSettings()
         self.loadPipelineCameraSettings()
         self.loadPipelineInstances()
@@ -90,24 +91,26 @@ class PipelineHandler:
                         )
 
     def loadPipelineInstances(self):
-        for pipelineIndex in self.pipelineSettings.keys():
-            pipelineType = self.getPipelineTypeByIndex(pipelineIndex)
-            settings = self.pipelineSettings.get(pipelineIndex)
-            settingsMap: Dict = {}
-            if settings:
-                settingsMap = {
-                    key: settings.getAPI().getValue(key)
-                    for key in settings.getSchema().keys()
-                }
-            else:
-                settingsMap = {}
+        for cameraid in self.pipelineSettings.keys():
+            for pipelineIndex in self.pipelineSettings[cameraid].keys():
+                pipelineType = self.getPipelineTypeByIndex(pipelineIndex, cameraid)
+                settings = self.pipelineSettings[cameraid].get(pipelineIndex)
+                settingsMap: Dict = {}
+                if settings:
+                    settingsMap = {
+                        key: settings.getAPI().getValue(key)
+                        for key in settings.getSchema().keys()
+                    }
+                else:
+                    settingsMap = {}
 
-            self.addPipeline(
-                pipelineIndex,
-                self.pipelineNames[pipelineIndex],
-                getPipelineTypename(pipelineType),
-                settingsMap,
-            )
+                self.addPipeline(
+                    pipelineIndex,
+                    self.pipelineNames[cameraid][pipelineIndex],
+                    getPipelineTypename(pipelineType),
+                    cameraid,
+                    settingsMap,
+                )
 
     def setDefaultPipeline(
         self, cameraIndex: CameraID, pipelineIndex: PipelineID
@@ -123,16 +126,18 @@ class PipelineHandler:
                 f"Default Pipeline attempted to be set (#{pipelineIndex}) for Camera #{cameraIndex} but that pipeline does not exist"
             )
 
-    def removePipeline(self, index: PipelineID) -> Optional[Pipeline]:
+    def removePipeline(
+        self, index: PipelineID, cameraid: CameraID
+    ) -> Optional[Pipeline]:
         if index in self.pipelineInstanceBindings:
-            pipeline = self.pipelineInstanceBindings.pop(index)
+            pipeline = self.pipelineInstanceBindings[cameraid].pop(index)
             self.pipelineTypeNames.pop(index)
             self.pipelineNames.pop(index)
             self.pipelineSettings.pop(index)
 
             log.warn(f"Pipeline at index {index} was removed.")
 
-            self.onRemovePipeline.call(index, pipeline)
+            self.onRemovePipeline.call(index, pipeline, cameraid)
 
             return pipeline
         else:
@@ -146,9 +151,12 @@ class PipelineHandler:
         index: PipelineID,
         name: str,
         typename: str,
+        cameraid: CameraID,
         settings: Optional[SettingsMap] = None,
     ):
-        pipelineType: Optional[Type[Pipeline]] = self.pipelineTypes.get(typename, None)
+        pipelineType: Optional[Type[Pipeline]] = self.pipelineTypesViaName.get(
+            typename, None
+        )
         if pipelineType is not None:
             settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
             settingsInst = settingsType(settings)
@@ -157,13 +165,24 @@ class PipelineHandler:
             currPipeline.name = name
             currPipeline.pipelineIndex = index
 
-            self.pipelineInstanceBindings[index] = currPipeline
-            self.pipelineNames[index] = name
-            self.pipelineTypeNames[index] = typename
-            self.pipelineSettings[index] = settingsInst
+            if cameraid not in self.pipelineInstanceBindings.keys():
+                self.pipelineInstanceBindings[cameraid] = {}
+            if cameraid not in self.pipelineNames:
+                self.pipelineNames[cameraid] = {}
+            if cameraid not in self.pipelineSettings:
+                self.pipelineSettings[cameraid] = {}
+            if cameraid not in self.pipelineTypeNames:
+                self.pipelineTypeNames[cameraid] = {}
 
-            log.log(f"Added Pipeline #{index} with type {typename}")
-            self.onAddPipeline.call(index, currPipeline)
+            self.pipelineInstanceBindings[cameraid][index] = currPipeline
+            self.pipelineNames[cameraid][index] = name
+            self.pipelineTypeNames[cameraid][index] = typename
+            self.pipelineSettings[cameraid][index] = settingsInst
+
+            log.log(
+                f"Added Pipeline #{index} with type {typename} to camera #{cameraid}"
+            )
+            self.onAddPipeline.call(index, currPipeline, cameraid)
 
     def loadPipelineTypes(self, directory: Path) -> Dict[PipelineName, Type[Pipeline]]:
         """Loads all classes that extend Pipeline from Python files in the directory.
@@ -239,20 +258,25 @@ class PipelineHandler:
 
         pipelines: dict = settings[self.kPipelinesArrayKey]
 
-        for pipeIndex, _ in enumerate(pipelines):
+        for pipeIndex, _ in enumerate(pipelines):  # TODO
             pipeline = pipelines[pipeIndex]
 
             log.log(
                 f"Loaded pipeline #{pipeIndex} from disk with type {pipeline[self.kPipelineTypeKey]}"
             )
 
-            self.pipelineTypeNames[pipeIndex] = pipeline[self.kPipelineTypeKey]
-            self.pipelineNames[pipeIndex] = pipeline[self.kPipelineNameKey]
+            if 0 not in self.pipelineTypeNames:
+                self.pipelineTypeNames[0] = {}
+                self.pipelineNames[0] = {}
+
+            self.pipelineTypeNames[0][pipeIndex] = pipeline[self.kPipelineTypeKey]
+            self.pipelineNames[0][pipeIndex] = pipeline[self.kPipelineNameKey]
 
             self.createPipelineSettings(
-                self.pipelineTypes[self.pipelineTypeNames[pipeIndex]],
+                self.pipelineTypesViaName[self.pipelineTypeNames[0][pipeIndex]],
                 pipeIndex,
                 pipeline[NTKeys.kSettings.value],
+                cameraid=0,
             )
 
         log.log("Loaded pipeline settings successfully")
@@ -262,6 +286,7 @@ class PipelineHandler:
         pipelineType: Type[Pipeline],
         pipelineIndex: PipelineID,
         settings: SettingsMap,
+        cameraid: CameraID,
     ) -> None:
         """Creates and stores the settings object for a given pipeline.
 
@@ -271,7 +296,9 @@ class PipelineHandler:
             settings (PipelineSettingsMap): The settings dictionary for the pipeline.
         """
         settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
-        self.pipelineSettings[pipelineIndex] = settingsType(settings)
+        if cameraid not in self.pipelineSettings:
+            self.pipelineSettings[cameraid] = {}
+        self.pipelineSettings[cameraid][pipelineIndex] = settingsType(settings)
 
     def getDefaultPipeline(self, cameraIndex: CameraID) -> PipelineID:
         """Returns the default pipeline index for a given camera.
@@ -284,7 +311,9 @@ class PipelineHandler:
         """
         return self.defaultPipelineIndexes.get(cameraIndex, 0)
 
-    def getPipelineSettings(self, pipelineIndex: PipelineID) -> PipelineSettings:
+    def getPipelineSettings(
+        self, pipelineIndex: PipelineID, cameraid: CameraID
+    ) -> PipelineSettings:
         """Returns the settings for a given pipeline.
 
         Args:
@@ -293,9 +322,11 @@ class PipelineHandler:
         Returns:
             PipelineSettings: The settings object for the pipeline.
         """
-        return self.pipelineSettings[pipelineIndex]
+        return self.pipelineSettings[cameraid][pipelineIndex]
 
-    def getPipeline(self, pipelineIndex: PipelineID) -> Optional[Pipeline]:
+    def getPipeline(
+        self, pipelineIndex: PipelineID, cameraid: CameraID
+    ) -> Optional[Pipeline]:
         """Returns the pipeline instance bound to a given index, if any.
 
         Args:
@@ -304,12 +335,12 @@ class PipelineHandler:
         Returns:
             Optional[Pipeline]: The pipeline instance, or None if not bound.
         """
-        if pipelineIndex in self.pipelineInstanceBindings:
-            return self.pipelineInstanceBindings[pipelineIndex]
+        if cameraid in self.pipelineInstanceBindings:
+            return self.pipelineInstanceBindings[cameraid].get(pipelineIndex)
         return None
 
     def setPipelineInstance(
-        self, pipelineIndex: PipelineID, pipeline: Pipeline
+        self, pipelineIndex: PipelineID, pipeline: Pipeline, cameraid: CameraID
     ) -> None:
         """Binds a pipeline instance to a given index.
 
@@ -317,7 +348,7 @@ class PipelineHandler:
             pipelineIndex (PipelineID): The pipeline index.
             pipeline (Pipeline): The pipeline instance to bind.
         """
-        self.pipelineInstanceBindings[pipelineIndex] = pipeline
+        self.pipelineInstanceBindings[cameraid][pipelineIndex] = pipeline
 
     def getPipelineTypeByName(self, name: PipelineName) -> Type[Pipeline]:
         """Returns the pipeline class type given its name.
@@ -328,9 +359,11 @@ class PipelineHandler:
         Returns:
             Type[Pipeline]: The class type of the pipeline.
         """
-        return self.pipelineTypes[name]
+        return self.pipelineTypesViaName[name]
 
-    def getPipelineTypeByIndex(self, index: PipelineID) -> Type[Pipeline]:
+    def getPipelineTypeByIndex(
+        self, index: PipelineID, cameraID: CameraID
+    ) -> Type[Pipeline]:
         """Returns the pipeline class type given its index.
 
         Args:
@@ -339,4 +372,4 @@ class PipelineHandler:
         Returns:
             Type[Pipeline]: The class type of the pipeline.
         """
-        return self.getPipelineTypeByName(self.pipelineTypeNames[index])
+        return self.getPipelineTypeByName(self.pipelineTypeNames[cameraID][index])

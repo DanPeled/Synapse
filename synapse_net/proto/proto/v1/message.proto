@@ -22,7 +22,7 @@ message MessageProto {
     SetPipelineIndexMessageProto set_pipeline_index = 8; // Message to set the index of a pipeline
     SetPipelineNameMessageProto set_pipeline_name = 9; // Message to set the name of a pipeline
     SetDefaultPipelineMessageProto set_default_pipeline = 10; // Message to set the default pipeline
-    int32 remove_pipeline_index = 11; // Index of the pipeline to be removed
+    RemovePipelineMessageProto remove_pipeline = 11;
     LogMessageProto log = 12; // Log message containing log data
     CameraPerformanceProto camera_performance = 13; // Performance data for a camera
     SetNetworkSettingsProto set_network_settings = 14; // Message to set network settings

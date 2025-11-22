@@ -234,7 +234,7 @@ def disabled(cls):
     return cls
 
 
-def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
+def pipelineToProto(inst: Pipeline, index: int, cameraid: CameraID) -> PipelineProto:
     api: SettingsAPI = inst.settings.getAPI()
     settingsValues = {
         key: settingValueToProto(api.getValue(key))
@@ -254,6 +254,7 @@ def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
         index=index,
         type=type(inst).__name__,
         settings_values=settingsValues,
+        cameraid=cameraid,
     )
 
     return msg

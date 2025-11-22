@@ -246,6 +246,8 @@ class PipelineProto(betterproto.Message):
     Map of setting keys to their actual configured values for this pipeline instance
     """
 
+    cameraid: int = betterproto.uint32_field(5)
+
 
 @dataclass(eq=False, repr=False)
 class SetPipelineTypeMessageProto(betterproto.Message):
@@ -254,8 +256,10 @@ class SetPipelineTypeMessageProto(betterproto.Message):
     new_type: str = betterproto.string_field(1)
     """The new pipeline type to assign"""
 
-    pipeline_index: int = betterproto.int32_field(2)
+    pipeline_index: int = betterproto.uint32_field(2)
     """The index of the pipeline instance to update"""
+
+    cameraid: int = betterproto.uint32_field(3)
 
 
 @dataclass(eq=False, repr=False)
@@ -270,20 +274,23 @@ class SetPipleineSettingMessageProto(betterproto.Message):
     value: "_settings_v1__.SettingValueProto" = betterproto.message_field(2)
     """The new value to assign to the setting"""
 
-    pipeline_index: int = betterproto.int32_field(3)
+    pipeline_index: int = betterproto.uint32_field(3)
     """The index of the pipeline instance to update"""
+
+    cameraid: int = betterproto.uint32_field(4)
 
 
 @dataclass(eq=False, repr=False)
 class SetPipelineIndexMessageProto(betterproto.Message):
-    pipeline_index: int = betterproto.int32_field(1)
-    camera_index: int = betterproto.int32_field(2)
+    pipeline_index: int = betterproto.uint32_field(1)
+    camera_index: int = betterproto.uint32_field(2)
 
 
 @dataclass(eq=False, repr=False)
 class SetPipelineNameMessageProto(betterproto.Message):
-    pipeline_index: int = betterproto.int32_field(1)
-    name: str = betterproto.string_field(2)
+    pipeline_index: int = betterproto.uint32_field(1)
+    cameraid: int = betterproto.uint32_field(2)
+    name: str = betterproto.string_field(3)
 
 
 @dataclass(eq=False, repr=False)
@@ -298,11 +305,19 @@ class PipelineResultProto(betterproto.Message):
     key: str = betterproto.string_field(2)
     """Key to identify the result"""
 
-    pipeline_index: int = betterproto.int32_field(3)
+    pipeline_index: int = betterproto.uint32_field(3)
     """The index of the pipeline instance this result belongs to"""
 
     value: "_settings_v1__.SettingValueProto" = betterproto.message_field(4)
     """The value of the result"""
+
+    cameraid: int = betterproto.uint32_field(5)
+
+
+@dataclass(eq=False, repr=False)
+class RemovePipelineMessageProto(betterproto.Message):
+    remove_pipeline_index: int = betterproto.uint32_field(1)
+    cameraid: int = betterproto.uint32_field(2)
 
 
 @dataclass(eq=False, repr=False)
@@ -329,7 +344,9 @@ class MessageProto(betterproto.Message):
     set_default_pipeline: "SetDefaultPipelineMessageProto" = betterproto.message_field(
         10, group="payload"
     )
-    remove_pipeline_index: int = betterproto.int32_field(11, group="payload")
+    remove_pipeline: "RemovePipelineMessageProto" = betterproto.message_field(
+        11, group="payload"
+    )
     log: "LogMessageProto" = betterproto.message_field(12, group="payload")
     camera_performance: "CameraPerformanceProto" = betterproto.message_field(
         13, group="payload"
