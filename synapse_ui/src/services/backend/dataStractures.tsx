@@ -20,6 +20,7 @@ export type PipelineResultMap = Map<string, PipelineResultProto>;
 
 export namespace BackendStateSystem {
   export interface State {
+    [key: string]: any;
     deviceinfo: DeviceInfoProto;
     hardwaremetrics: HardwareMetricsProto;
     connection: ConnectionState;
@@ -30,8 +31,8 @@ export namespace BackendStateSystem {
     teamnumber: number;
     cameras: Map<CameraID, CameraProto>;
     cameraperformance: Map<CameraID, CameraPerformanceProto>;
-    pipelines: Map<PipelineID, PipelineProto>;
-    pipelineresults: Map<PipelineID, PipelineResultMap>;
+    pipelines: Map<CameraID, Map<PipelineID, PipelineProto>>;
+    pipelineresults: Map<CameraID, Map<PipelineID, PipelineResultMap>>;
     pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
     calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
     recordingstatuses: Map<CameraID, boolean>;

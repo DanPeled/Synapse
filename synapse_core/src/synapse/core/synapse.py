@@ -18,27 +18,19 @@ from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.file_server import FileServer
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.proto.v1 import (
-    DeviceInfoProto,
-    MessageProto,
-    MessageTypeProto,
-    PipelineProto,
-    PipelineTypeProto,
-    RemovePipelineMessageProto,
-    SetCameraRecordingStatusMessageProto,
-    SetConnectionInfoProto,
-    SetDefaultPipelineMessageProto,
-    SetNetworkSettingsProto,
-    SetPipelineIndexMessageProto,
-    SetPipelineNameMessageProto,
-    SetPipleineSettingMessageProto,
-)
-from synapse_net.socketServer import (
-    SocketEvent,
-    WebSocketServer,
-    assert_set,
-    createMessage,
-)
+from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
+                                  MessageTypeProto, PipelineProto,
+                                  PipelineTypeProto,
+                                  RemovePipelineMessageProto,
+                                  SetCameraRecordingStatusMessageProto,
+                                  SetConnectionInfoProto,
+                                  SetDefaultPipelineMessageProto,
+                                  SetNetworkSettingsProto,
+                                  SetPipelineIndexMessageProto,
+                                  SetPipelineNameMessageProto,
+                                  SetPipleineSettingMessageProto)
+from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
+                                      createMessage)
 
 from synapse_net import devicenetworking
 
@@ -46,25 +38,16 @@ from ..bcolors import MarkupColors
 from ..hardware.deviceactions import reboot, restartRuntime
 from ..hardware.metrics import Platform
 from ..log import err, log, logs, missingFeature, warn
-from ..stypes import (
-    CameraID,
-    CameraName,
-    PipelineID,
-    RecordingFilename,
-    RecordingStatus,
-)
+from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
+                      RecordingStatus)
 from ..util import getIP, resolveGenericArgument
 from .camera_factory import SynapseCamera
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import (
-    cameraToProto,
-    protoToSettingValue,
-    settingsToProto,
-    settingValueToProto,
-)
+from .settings_api import (cameraToProto, protoToSettingValue, settingsToProto,
+                           settingValueToProto)
 
 
 class UIHandle:

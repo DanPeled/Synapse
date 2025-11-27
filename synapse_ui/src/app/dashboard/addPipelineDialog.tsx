@@ -19,12 +19,14 @@ export function AddPipelineDialog({
   pipelineTypes,
   socket,
   index,
+  cameraid,
 }: {
   visible: boolean;
   setVisible: (state: boolean) => void;
   pipelineTypes: Map<string, PipelineTypeProto>;
   socket?: WebSocketWrapper;
   index: number;
+  cameraid?: number;
 }) {
   const [pipelineType, setPipelineType] = useState<PipelineTypeProto>(
     Array.from(pipelineTypes.values())[0]!,
@@ -42,6 +44,7 @@ export function AddPipelineDialog({
         type: pipelineType.type,
         index: safeIndex,
         settingsValues: {},
+        cameraid: cameraid,
       }),
     });
 

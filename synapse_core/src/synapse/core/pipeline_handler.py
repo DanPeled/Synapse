@@ -13,6 +13,7 @@ import yaml
 from ..callback import Callback
 from ..stypes import CameraID, PipelineID, PipelineName, PipelineTypeName
 from ..util import resolveGenericArgument
+from .camera_factory import SynapseCamera
 from .config import Config
 from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
@@ -65,6 +66,20 @@ class PipelineHandler:
         self.loadPipelineSettings()
         self.loadPipelineCameraSettings()
         self.loadPipelineInstances()
+
+    def onAddCamera(
+        self, cameraIndex: CameraID, name: str, camera: SynapseCamera
+    ) -> None:
+        if cameraIndex not in self.pipelineInstanceBindings.keys():
+            self.pipelineInstanceBindings[cameraIndex] = {}
+        if cameraIndex not in self.pipelineNames:
+            self.pipelineNames[cameraIndex] = {}
+        if cameraIndex not in self.pipelineSettings:
+            self.pipelineSettings[cameraIndex] = {}
+        if cameraIndex not in self.pipelineTypeNames:
+            self.pipelineTypeNames[cameraIndex] = {}
+        if cameraIndex not in self.defaultPipelineIndexes:
+            self.defaultPipelineIndexes[cameraIndex] = 0
 
     def loadPipelineCameraSettings(self):
         camera_configs = GlobalSettings.getCameraConfigMap()

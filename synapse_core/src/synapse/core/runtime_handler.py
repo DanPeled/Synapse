@@ -14,20 +14,11 @@ from typing import Any, Dict, Final, List, Optional, TypeAlias
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableInstance,
-    NetworkTableType,
-    ValueEventData,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
+                    NetworkTableType, ValueEventData)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.proto.v1 import (
-    CameraPerformanceProto,
-    HardwareMetricsProto,
-    MessageTypeProto,
-)
+from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
+                                  MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds, secondsToMilliseconds
@@ -40,13 +31,8 @@ from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .nt_keys import NTKeys
-from .pipeline import (
-    FrameResult,
-    Pipeline,
-    PipelineProcessFrameResult,
-    PipelineSettings,
-    getPipelineTypename,
-)
+from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
+                       PipelineSettings, getPipelineTypename)
 from .pipeline_handler import PipelineHandler
 from .settings_api import CameraSettings
 
@@ -68,6 +54,7 @@ def sendWebUIIP():
 
 
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
+DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
 
 
 class RuntimeManager:
@@ -114,12 +101,30 @@ class RuntimeManager:
         self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
 
         def onAddCamera(cameraID: CameraID, name: str, camera: SynapseCamera):
+            if cameraID not in self.pipelineBindings:
+                self.pipelineBindings[cameraID] = DEFAULT_PIPELINE_FOR_NEW_CAMERA
+            if (
+                self.pipelineHandler.getPipeline(
+                    self.pipelineBindings[cameraID], cameraid=cameraID
+                )
+                is None
+            ):
+                self.pipelineHandler.addPipeline(
+                    self.pipelineBindings[cameraID],
+                    "New Pipeline",
+                    "ApriltagPipeline",  # TODO: maybe generate different pipeline?
+                    cameraID,
+                    {},
+                )
+                print(self.pipelineBindings[cameraID])
+                self.setPipelineByIndex(cameraID, self.pipelineBindings[cameraID])
             thread = threading.Thread(target=self.processCamera, args=(cameraID,))
             thread.daemon = True
             thread.start()
             self.cameraManagementThreads.append(thread)
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
+        self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
 
     def setup(self, directory: Path):
         """
@@ -142,8 +147,8 @@ class RuntimeManager:
 
         self.setupCallbacks()
 
-        self.cameraHandler.setup()
         self.pipelineHandler.setup(directory)
+        self.cameraHandler.setup()
 
         self.assignDefaultPipelines()
 
@@ -159,7 +164,7 @@ class RuntimeManager:
         Assigns the default pipeline to each connected camera based on predefined configuration.
         """
 
-        for cameraIndex in self.cameraHandler.cameras.keys():
+        for cameraIndex in self.cameraHandler.cameras:
             pipeline = self.pipelineHandler.getDefaultPipeline(cameraIndex)
             self.setPipelineByIndex(
                 cameraIndex=cameraIndex,
@@ -397,28 +402,28 @@ class RuntimeManager:
             cameraIndex (int): The index of the target camera.
             pipelineIndex (int): The index of the pipeline to assign.
         """
-        if cameraIndex not in self.cameraHandler.cameras.keys():
+        if cameraIndex not in self.cameraHandler.cameras:
             log.err(
                 f"Invalid cameraIndex {cameraIndex}. Must be in {list(self.cameraHandler.cameras.keys())})."
             )
             return
 
-        if (
-            pipelineIndex
-            not in self.pipelineHandler.pipelineTypeNames[cameraIndex].keys()
-        ):
-            log.err(
-                f"Invalid pipeline index {pipelineIndex}. Must be one of {list(self.pipelineHandler.pipelineTypeNames[cameraIndex].keys())}."
-            )
-            self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
-            return
+        print(self.pipelineHandler.pipelineTypeNames)
 
-        for cameraId, pipelineId in self.pipelineBindings.items():
-            if cameraId != cameraIndex and pipelineId == pipelineIndex:
-                log.err(
-                    f"Another camera is using this pipeline at the moment (camera=#{cameraId})"
-                )
-                return
+        if pipelineIndex not in self.pipelineHandler.pipelineTypeNames[cameraIndex]:
+            self.pipelineHandler.addPipeline(
+                self.pipelineBindings[cameraIndex],
+                "New Pipeline",
+                "ApriltagPipeline",  # TODO: maybe generate different pipeline?
+                cameraIndex,
+                {},
+            )
+            self.setPipelineByIndex(cameraIndex, self.pipelineBindings[cameraIndex])
+            # log.err(
+            #     f"Invalid pipeline index {pipelineIndex}. Must be one of {list(self.pipelineHandler.pipelineTypeNames[cameraIndex].keys())}."
+            # )
+            # self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
+            # return
 
         # If both indices are valid, proceed with the pipeline setting
         self.pipelineBindings[cameraIndex] = pipelineIndex

@@ -118,26 +118,58 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const stateRef = useRef(state);
+  const stateRef = useRef<BackendStateSystem.State>(state);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
+  // Create setters that both dispatch to the reducer and mirror into stateRef
   const setters = React.useMemo(() => {
     return Object.keys(initialState).reduce((acc, key) => {
       const functionName =
         `set${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof BackendStateSystem.StateSetter;
+
       acc[functionName] = (value: unknown | ((prev: unknown) => unknown)) => {
+        const keyLower = key.toLowerCase() as keyof BackendStateSystem.State;
+
         if (typeof value === "function") {
-          const keyLower = key.toLowerCase() as keyof BackendStateSystem.State;
+          // compute new value using current state slice
           const currentSlice = state[keyLower];
           const newValue = (value as Function)(currentSlice);
+
           dispatch({ type: `SET_${key.toUpperCase()}`, payload: newValue });
+
+          // Mirror into the ref immediately so any async handlers see it
+          if (stateRef && stateRef.current) {
+            // clone Maps/Objects where helpful to avoid accidental mutations
+            if (newValue instanceof Map) {
+              stateRef.current[keyLower] = new Map(newValue) as any;
+            } else if (Array.isArray(newValue)) {
+              stateRef.current[keyLower] = [...newValue] as any;
+            } else if (typeof newValue === "object" && newValue !== null) {
+              stateRef.current[keyLower] = { ...(newValue as object) } as any;
+            } else {
+              stateRef.current[keyLower] = newValue as any;
+            }
+          }
         } else {
           // Direct value update
           dispatch({ type: `SET_${key.toUpperCase()}`, payload: value });
+
+          if (stateRef && stateRef.current) {
+            if (value instanceof Map) {
+              stateRef.current[keyLower] = new Map(value) as any;
+            } else if (Array.isArray(value)) {
+              stateRef.current[keyLower] = [...value] as any;
+            } else if (typeof value === "object" && value !== null) {
+              stateRef.current[keyLower] = { ...(value as object) } as any;
+            } else {
+              stateRef.current[keyLower] = value as any;
+            }
+          }
         }
       };
+
       return acc;
     }, {} as BackendStateSystem.StateSetter);
   }, [dispatch, state]);
@@ -149,9 +181,10 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
     const ws = new WebSocketWrapper(`ws://${window.location.hostname}:8765`, {
       onOpen: () => {
         wasConnected = true;
-        dispatch({
-          type: "SET_CONNECTION",
-          payload: { ...stateRef.current.connection, backend: true },
+        // Use setter so reducer + ref are in sync
+        setters.setConnection({
+          ...stateRef.current.connection,
+          backend: true,
         });
         toast.success("Connected to backend", {
           duration: 2000,
@@ -163,9 +196,9 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         });
       },
       onClose: () => {
-        dispatch({
-          type: "SET_CONNECTION",
-          payload: { ...stateRef.current.connection, backend: false },
+        setters.setConnection({
+          ...stateRef.current.connection,
+          backend: false,
         });
         if (wasConnected) {
           setters.setConnection({
@@ -186,7 +219,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
       onMessage: (message: ArrayBufferLike) => {
         const uint8Array = new Uint8Array(message);
         const messageObj = MessageProto.decode(uint8Array);
-        // console.log(messageObj);
         switch (messageObj.type) {
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS: {
             assert(messageObj.setConnectionInfo !== undefined);
@@ -197,8 +229,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
               networktables: connectionInfo.connectedToNetworktables,
             });
 
-            stateRef.current.connection.networktables =
-              connectionInfo.connectedToNetworktables;
+            // stateRef mirrored by setter above, no direct assignment needed
 
             if (!connectionInfo.connectedToNetworktables) {
               toast.warning("Disconnected from NetworkTables", {
@@ -265,10 +296,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO: {
             const deviceInfo: DeviceInfoProto = messageObj.deviceInfo!;
-
-            stateRef.current.deviceinfo = deviceInfo;
             setters.setDeviceinfo(deviceInfo);
-
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SEND_METRICS: {
@@ -297,9 +325,14 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_ADD_PIPELINE: {
             const pipeline: PipelineProto = messageObj.pipelineInfo!;
-            const pipelines = stateRef.current.pipelines;
-            pipelines.set(pipeline.index, pipeline);
-            setters.setPipelines(pipelines);
+            const pipelinesMap = new Map(stateRef.current.pipelines);
+
+            if (!pipelinesMap.has(pipeline.cameraid)) {
+              pipelinesMap.set(pipeline.cameraid, new Map());
+            }
+
+            pipelinesMap.get(pipeline.cameraid)!.set(pipeline.index, pipeline);
+            setters.setPipelines(pipelinesMap);
 
             const results = new Map(stateRef.current.pipelineresults);
             results.set(pipeline.index, new Map());
@@ -318,7 +351,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const newCamerasList = new Map(stateRef.current.cameras);
             newCamerasList.set(camera.index, camera);
             setters.setCameras(newCamerasList);
-            stateRef.current.cameras = newCamerasList;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX: {
@@ -337,16 +369,25 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const setPipelineNameMSG: SetPipelineNameMessageProto =
               messageObj.setPipelineName!;
 
-            const pipeline = stateRef.current.pipelines.get(
-              setPipelineNameMSG.pipelineIndex,
-            );
+            if (!stateRef.current.pipelines.has(setPipelineNameMSG.cameraid)) {
+              stateRef.current.pipelines.set(
+                setPipelineNameMSG.cameraid,
+                new Map(),
+              );
+            }
+
+            const pipeline = stateRef.current.pipelines
+              .get(setPipelineNameMSG.cameraid)!
+              .get(setPipelineNameMSG.pipelineIndex);
 
             if (pipeline) {
               pipeline.name = setPipelineNameMSG.name;
               const newPipelines = new Map(stateRef.current.pipelines);
-              newPipelines.set(setPipelineNameMSG.pipelineIndex, pipeline);
+              newPipelines
+                .get(setPipelineNameMSG.cameraid)!
+                .set(setPipelineNameMSG.pipelineIndex, pipeline);
 
-              stateRef.current.pipelines = newPipelines;
+              // Use setter so reducer + ref are kept in sync
               setters.setPipelines(newPipelines);
             }
             break;
@@ -354,7 +395,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           case MessageTypeProto.MESSAGE_TYPE_PROTO_LOG: {
             const logMsg: LogMessageProto = messageObj.log!;
             const logs = [...stateRef.current.logs];
-            stateRef.current.logs = logs; // Keep the ref updated!
 
             const exists = logs.some(
               (log) => log.timestamp === logMsg.timestamp,
@@ -362,7 +402,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             if (!exists) {
               logs.push(logMsg);
-              // Sort logs by timestamp ascending (older first)
               logs.sort((a, b) => a.timestamp - b.timestamp);
               setters.setLogs(logs);
             }
@@ -374,12 +413,10 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             reports.set(report.cameraIndex, report);
 
             setters.setCameraperformance(reports);
-            stateRef.current.cameraperformance = reports;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATING: {
             setters.setCalibrating(true);
-            stateRef.current.calibrating = true;
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_CALIBRATION_DATA: {
@@ -387,12 +424,10 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const calibrationMap = new Map(stateRef.current.calibrationdata);
 
             if (calibrationMap.has(calibData.cameraIndex)) {
-              // Append to the existing array
               calibrationMap
                 .get(calibData.cameraIndex)!
                 .set(calibData.resolution, calibData);
             } else {
-              // Create a new array with this entry
               calibrationMap.set(
                 calibData.cameraIndex,
                 new Map([[calibData.resolution, calibData]]),
@@ -400,10 +435,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             }
 
             setters.setCalibrationdata(calibrationMap);
-            stateRef.current.calibrationdata = calibrationMap;
-
             setters.setCalibrating(false);
-            stateRef.current.calibrating = false;
 
             break;
           }
@@ -412,13 +444,22 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const setSettingMsg = messageObj.setPipelineSetting!;
             const newPipelines = new Map(stateRef.current.pipelines);
 
-            const pipeline = newPipelines.get(setSettingMsg.pipelineIndex);
+            if (!newPipelines.has(setSettingMsg.cameraid)) {
+              newPipelines.set(setSettingMsg.cameraid, new Map());
+            }
+
+            const pipeline = newPipelines
+              .get(setSettingMsg.cameraid)!
+              .get(setSettingMsg.pipelineIndex);
 
             if (pipeline && setSettingMsg.value) {
               pipeline.settingsValues[setSettingMsg.setting] =
                 setSettingMsg.value;
-              newPipelines.set(pipeline?.index, pipeline);
-              stateRef.current.pipelines = newPipelines;
+              newPipelines
+                .get(setSettingMsg.cameraid)!
+                .set(pipeline?.index, pipeline);
+              // Use setter to keep reducer + ref in sync
+              setters.setPipelines(newPipelines);
             }
 
             break;
@@ -430,7 +471,6 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             statusMap.set(setstatusmsg.cameraIndex, setstatusmsg.record);
 
             setters.setRecordingstatuses(statusMap);
-            stateRef.current.recordingstatuses = statusMap;
 
             break;
           }
@@ -440,18 +480,26 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             const results = new Map(stateRef.current.pipelineresults);
 
-            if (!results.has(pipelineResult.pipelineIndex)) {
-              results.set(pipelineResult.pipelineIndex, new Map());
+            if (!results.has(pipelineResult.cameraid)) {
+              results.set(pipelineResult.cameraid, new Map());
             }
 
-            assert(results.has(pipelineResult.pipelineIndex));
+            if (
+              !results
+                .get(pipelineResult.cameraid)!
+                .has(pipelineResult.pipelineIndex)
+            ) {
+              results
+                .get(pipelineResult.cameraid)!
+                .set(pipelineResult.pipelineIndex, new Map());
+            }
 
             results
+              .get(pipelineResult.cameraid)!
               .get(pipelineResult.pipelineIndex)!
               .set(pipelineResult.key, pipelineResult);
 
             setters.setPipelineresults(results);
-            stateRef.current.pipelineresults = results;
 
             break;
           }
