@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
-import { PipelineProto } from "@/proto/v1/pipeline";
+import { PipelineProto, RemovePipelineMessageProto } from "@/proto/v1/pipeline";
+import { CameraID } from "@/services/backend/dataStractures";
 import { teamColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";
 import { AlertDialog } from "@/widgets/alertDialog";
@@ -12,6 +13,7 @@ interface ConfirmDeletePipelineDialogProps {
   setVisible: (val: boolean) => void;
   socket?: WebSocketWrapper;
   pipelineToBeDeleted?: PipelineProto;
+  selectedCameraIndex?: CameraID;
   onRemovePipeline: (pipeline: PipelineProto) => void;
 }
 
@@ -20,6 +22,7 @@ export function ConfirmDeletePipelineDialog({
   setVisible,
   socket,
   pipelineToBeDeleted,
+  selectedCameraIndex,
   onRemovePipeline,
 }: ConfirmDeletePipelineDialogProps) {
   return (
@@ -47,7 +50,10 @@ export function ConfirmDeletePipelineDialog({
               if (pipelineToBeDeleted) {
                 const payload = MessageProto.create({
                   type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
-                  removePipelineIndex: pipelineToBeDeleted?.index,
+                  removePipeline: RemovePipelineMessageProto.create({
+                    removePipelineIndex: pipelineToBeDeleted?.index,
+                    cameraid: selectedCameraIndex,
+                  }),
                 });
 
                 const binary = MessageProto.encode(payload).finish();

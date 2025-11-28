@@ -164,8 +164,15 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         else:
             err(f"Setting {setting} was not found for pipeline {self.pipelineIndex}")
 
-    def toDict(self, type: str) -> dict:
-        return {"type": type, "settings": self.settings.toDict(), "name": self.name}
+    def toDict(self, type_: str, cameraIndex: int) -> dict:
+        settingsDict = self.settings.toDict()
+        settingsDict.update(self.cameraSettings[cameraIndex].toDict())
+
+        return {
+            "name": self.name,
+            "type": type_,
+            "settings": settingsDict,
+        }
 
     def getCameraMatrix(self, cameraIndex: CameraID) -> Optional[List[List[float]]]:
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
@@ -234,7 +241,7 @@ def disabled(cls):
     return cls
 
 
-def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
+def pipelineToProto(inst: Pipeline, index: int, cameraid: CameraID) -> PipelineProto:
     api: SettingsAPI = inst.settings.getAPI()
     settingsValues = {
         key: settingValueToProto(api.getValue(key))
@@ -254,6 +261,7 @@ def pipelineToProto(inst: Pipeline, index: int) -> PipelineProto:
         index=index,
         type=type(inst).__name__,
         settings_values=settingsValues,
+        cameraid=cameraid,
     )
 
     return msg

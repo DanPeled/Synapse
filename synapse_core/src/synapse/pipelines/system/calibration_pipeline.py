@@ -15,6 +15,7 @@ from synapse.core.pipeline import (CameraSettings, FrameResult, PipelineResult,
                                    systemPipeline)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
+from synapse.core.synapse import RemovePipelineMessageProto
 from synapse_net.proto.v1 import (CalibrationDataProto, MessageProto,
                                   MessageTypeProto)
 
@@ -230,7 +231,11 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
 
                 Synapse.kInstance.websocket.sendToAllSync(
                     MessageProto(
-                        type=MessageTypeProto.CALIBRATING, remove_pipeline_index=-1
+                        type=MessageTypeProto.CALIBRATING,
+                        remove_pipeline=RemovePipelineMessageProto(
+                            cameraid=self.cameraIndex,
+                            remove_pipeline_index=self.pipelineIndex,
+                        ),
                     ).SerializeToString()
                 )
 

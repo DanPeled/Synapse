@@ -104,11 +104,7 @@ class Config:
         Returns:
             dict: The parsed configuration data.
         """
-        return self.__dictData or {
-            "pipelines": {
-                0: {"type": "ApriltagPipeline", "name": "New Pipeline", "settings": {}}
-            }
-        }
+        return self.__dictData or {}
 
     @property
     def path(self) -> Path:

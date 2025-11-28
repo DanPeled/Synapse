@@ -5,6 +5,7 @@ import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
   PipelineProto,
   PipelineTypeProto,
+  RemovePipelineMessageProto,
   SetPipelineIndexMessageProto,
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
@@ -24,6 +25,8 @@ import { Column, Row } from "@/widgets/containers";
 import { Barcode, Camera, LoaderPinwheel, X } from "lucide-react";
 import { JSX, useEffect, useRef, useState } from "react";
 
+const CALIBRATION_PIPELINE_ID = 9999;
+
 function setCalibrationPipeline(
   socket?: WebSocketWrapper,
   camera?: CameraProto,
@@ -34,7 +37,7 @@ function setCalibrationPipeline(
       pipelineInfo: PipelineProto.create({
         name: "TemporaryCalibrationPipeline",
         type: "$$CalibrationPipeline$$",
-        index: 9999,
+        index: CALIBRATION_PIPELINE_ID,
         settingsValues: {},
       }),
     });
@@ -46,7 +49,7 @@ function setCalibrationPipeline(
       type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
       setPipelineIndex: SetPipelineIndexMessageProto.create({
         cameraIndex: camera.index,
-        pipelineIndex: 9999,
+        pipelineIndex: CALIBRATION_PIPELINE_ID,
       }),
     });
 
@@ -132,8 +135,8 @@ export function CalibrationDialog({
 
   useEffect(() => {
     if (visible) {
-      const pipelineIndex = 9999;
-      const pipeline = pipelines.get(pipelineIndex);
+      const pipelineIndex = CALIBRATION_PIPELINE_ID;
+      const pipeline = pipelines.get(camera?.index ?? -1)?.get(pipelineIndex);
 
       if (pipeline) {
         setSelectedPipeline(pipeline);
@@ -157,7 +160,9 @@ export function CalibrationDialog({
     socket?: WebSocketWrapper,
   ) {
     if (!pipeline) {
-      pipeline = pipelines.get(9999);
+      pipeline = pipelines
+        .get(camera?.index ?? -1)
+        ?.get(CALIBRATION_PIPELINE_ID);
     }
 
     if (pipeline !== undefined) {
@@ -165,7 +170,8 @@ export function CalibrationDialog({
         const payload = MessageProto.create({
           type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
           setPipelineSetting: SetPipleineSettingMessageProto.create({
-            pipelineIndex: 9999,
+            cameraid: camera?.index,
+            pipelineIndex: CALIBRATION_PIPELINE_ID,
             value: val,
             setting: setting,
           }),
@@ -209,7 +215,9 @@ export function CalibrationDialog({
                   };
 
                   const newPipelines = new Map(oldPipelines);
-                  newPipelines.set(selectedPipeline.index, updatedPipeline);
+                  newPipelines
+                    .get(camera?.index ?? -1)
+                    ?.set(selectedPipeline.index, updatedPipeline);
                   // setPipelines(newPipelines);
 
                   if (stateRef) {
@@ -248,7 +256,7 @@ export function CalibrationDialog({
     if (visible) {
       if (camera) {
         generateControls();
-        if (camera.pipelineIndex !== 9999) {
+        if (camera.pipelineIndex !== CALIBRATION_PIPELINE_ID) {
           setPrevPipelineIndex(camera.pipelineIndex);
         }
         setCalibrationPipeline(socket, camera);
@@ -263,7 +271,9 @@ export function CalibrationDialog({
 
   useEffect(() => {
     setSelectedPipelineType(pipelinetypes.get("$$CalibrationPipeline$$"));
-    setSelectedPipeline(pipelines.get(9999));
+    setSelectedPipeline(
+      pipelines.get(camera?.index ?? -1)?.get(CALIBRATION_PIPELINE_ID),
+    );
     generateControls();
   }, [pipelines, visible, camera]);
 
@@ -281,7 +291,10 @@ export function CalibrationDialog({
 
     const deletePipelinePayload = MessageProto.create({
       type: MessageTypeProto.MESSAGE_TYPE_PROTO_DELETE_PIPELINE,
-      removePipelineIndex: 9999,
+      removePipeline: RemovePipelineMessageProto.create({
+        removePipelineIndex: CALIBRATION_PIPELINE_ID,
+        cameraid: camera.index,
+      }),
     });
 
     const removePipelineBinary = MessageProto.encode(

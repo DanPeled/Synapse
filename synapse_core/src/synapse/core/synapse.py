@@ -21,6 +21,7 @@ from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   MessageTypeProto, PipelineProto,
                                   PipelineTypeProto,
+                                  RemovePipelineMessageProto,
                                   SetCameraRecordingStatusMessageProto,
                                   SetConnectionInfoProto,
                                   SetDefaultPipelineMessageProto,
@@ -304,20 +305,21 @@ class Synapse:
                     ...
 
             for (
-                id,
-                pipeline,
+                cameraid,
+                pipelines,
             ) in self.runtimeHandler.pipelineHandler.pipelineInstanceBindings.items():
-                msg = pipelineToProto(pipeline, id)
+                for id, pipeline in pipelines.items():
+                    msg = pipelineToProto(pipeline, id, cameraid)
 
-                await self.websocket.sendToAll(
-                    createMessage(MessageTypeProto.ADD_PIPELINE, msg)
-                )
+                    await self.websocket.sendToAll(
+                        createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+                    )
 
             typeMessages: List[PipelineTypeProto] = []
             for (
                 typename,
                 type,
-            ) in self.runtimeHandler.pipelineHandler.pipelineTypes.items():
+            ) in self.runtimeHandler.pipelineHandler.pipelineTypesViaName.items():
                 settingType = resolveGenericArgument(type)
                 if settingType:
                     settings = settingType({})
@@ -417,8 +419,8 @@ class Synapse:
             self.websocketThread.join(timeout=5)
 
     def setupRuntimeCallbacks(self):
-        def onAddPipeline(id: PipelineID, inst: Pipeline) -> None:
-            pipelineProto = pipelineToProto(inst, id)
+        def onAddPipeline(id: PipelineID, inst: Pipeline, cameraid: CameraID) -> None:
+            pipelineProto = pipelineToProto(inst, id, cameraid)
 
             Synapse.kInstance.websocket.sendToAllSync(
                 createMessage(MessageTypeProto.ADD_PIPELINE, pipelineProto)
@@ -450,6 +452,7 @@ class Synapse:
                     pipeline_index=Synapse.kInstance.runtimeHandler.pipelineBindings[
                         cameraIndex
                     ],
+                    cameraid=cameraIndex,
                 )
             )
 
@@ -563,7 +566,7 @@ class Synapse:
 
             pipeline: Optional[Pipeline] = (
                 self.runtimeHandler.pipelineHandler.getPipeline(
-                    setSettingMSG.pipeline_index
+                    setSettingMSG.pipeline_index, setSettingMSG.cameraid
                 )
             )
 
@@ -590,7 +593,7 @@ class Synapse:
             setPipelineNameMsg: SetPipelineNameMessageProto = msgObj.set_pipeline_name
             pipeline: Optional[Pipeline] = (
                 self.runtimeHandler.pipelineHandler.getPipeline(
-                    setPipelineNameMsg.pipeline_index
+                    setPipelineNameMsg.pipeline_index, setPipelineNameMsg.cameraid
                 )
             )
             if pipeline is not None:
@@ -617,42 +620,40 @@ class Synapse:
             addPipelineMsg: PipelineProto = msgObj.pipeline_info
             if addPipelineMsg.type is not None and (
                 addPipelineMsg.type
-                in self.runtimeHandler.pipelineHandler.pipelineTypes.keys()
+                in self.runtimeHandler.pipelineHandler.pipelineTypesViaName.keys()
             ):
                 self.runtimeHandler.pipelineHandler.addPipeline(
                     index=addPipelineMsg.index,
                     name=addPipelineMsg.name,
                     typename=addPipelineMsg.type,
+                    cameraid=addPipelineMsg.cameraid,
                     settings={
                         key: protoToSettingValue(valueProto)
                         for key, valueProto in addPipelineMsg.settings_values.items()
                     },
                 )
 
-                for (
-                    cameraId,
-                    pipelineId,
-                ) in self.runtimeHandler.pipelineBindings.items():
-                    if pipelineId == addPipelineMsg.index:
-                        pipeline = self.runtimeHandler.pipelineHandler.getPipeline(
-                            pipelineId
-                        )
-                        if pipeline is not None:
-                            camera = self.runtimeHandler.cameraHandler.getCamera(
-                                cameraId
-                            )
-                            assert camera is not None
+                pipeline = self.runtimeHandler.pipelineHandler.getPipeline(
+                    addPipelineMsg.index, addPipelineMsg.cameraid
+                )
+                if pipeline is not None:
+                    camera = self.runtimeHandler.cameraHandler.getCamera(
+                        addPipelineMsg.cameraid
+                    )
+                    assert camera is not None
 
-                            pipeline.bind(cameraId, camera)
-                        break
+                    pipeline.bind(addPipelineMsg.cameraid, camera)
             else:
                 err(
                     f"Cannot add pipeline of type {addPipelineMsg.type}, it is an invalid typename"
                 )
         elif msgType == MessageTypeProto.DELETE_PIPELINE:
-            assert_set(msgObj.remove_pipeline_index)
-            removePipelineIndex: int = msgObj.remove_pipeline_index
-            self.runtimeHandler.pipelineHandler.removePipeline(removePipelineIndex)
+            assert_set(msgObj.remove_pipeline)
+            removePipelineMessage: RemovePipelineMessageProto = msgObj.remove_pipeline
+            self.runtimeHandler.pipelineHandler.removePipeline(
+                removePipelineMessage.remove_pipeline_index,
+                removePipelineMessage.cameraid,
+            )
         elif msgType == MessageTypeProto.SET_DEFAULT_PIPELINE:
             assert_set(msgObj.set_default_pipeline)
             defaultPipelineMsg: SetDefaultPipelineMessageProto = (

@@ -27,6 +27,7 @@ import {
   PipelineProto,
   PipelineResultProto,
   PipelineTypeProto,
+  RemovePipelineMessageProto,
   SetPipelineIndexMessageProto,
   SetPipelineNameMessageProto,
   SetPipelineTypeMessageProto,
@@ -241,8 +242,7 @@ export interface MessageProto {
   setPipelineName?: SetPipelineNameMessageProto | undefined;
   /** Message to set the default pipeline */
   setDefaultPipeline?: SetDefaultPipelineMessageProto | undefined;
-  /** Index of the pipeline to be removed */
-  removePipelineIndex?: number | undefined;
+  removePipeline?: RemovePipelineMessageProto | undefined;
   /** Log message containing log data */
   log?: LogMessageProto | undefined;
   /** Performance data for a camera */
@@ -279,7 +279,7 @@ function createBaseMessageProto(): MessageProto {
     setPipelineIndex: undefined,
     setPipelineName: undefined,
     setDefaultPipeline: undefined,
-    removePipelineIndex: undefined,
+    removePipeline: undefined,
     log: undefined,
     cameraPerformance: undefined,
     setNetworkSettings: undefined,
@@ -353,8 +353,11 @@ export const MessageProto: MessageFns<MessageProto> = {
         writer.uint32(82).fork(),
       ).join();
     }
-    if (message.removePipelineIndex !== undefined) {
-      writer.uint32(88).int32(message.removePipelineIndex);
+    if (message.removePipeline !== undefined) {
+      RemovePipelineMessageProto.encode(
+        message.removePipeline,
+        writer.uint32(90).fork(),
+      ).join();
     }
     if (message.log !== undefined) {
       LogMessageProto.encode(message.log, writer.uint32(98).fork()).join();
@@ -523,11 +526,14 @@ export const MessageProto: MessageFns<MessageProto> = {
           continue;
         }
         case 11: {
-          if (tag !== 88) {
+          if (tag !== 90) {
             break;
           }
 
-          message.removePipelineIndex = reader.int32();
+          message.removePipeline = RemovePipelineMessageProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 12: {
@@ -684,8 +690,8 @@ export const MessageProto: MessageFns<MessageProto> = {
       setDefaultPipeline: isSet(object.setDefaultPipeline)
         ? SetDefaultPipelineMessageProto.fromJSON(object.setDefaultPipeline)
         : undefined,
-      removePipelineIndex: isSet(object.removePipelineIndex)
-        ? globalThis.Number(object.removePipelineIndex)
+      removePipeline: isSet(object.removePipeline)
+        ? RemovePipelineMessageProto.fromJSON(object.removePipeline)
         : undefined,
       log: isSet(object.log) ? LogMessageProto.fromJSON(object.log) : undefined,
       cameraPerformance: isSet(object.cameraPerformance)
@@ -767,8 +773,10 @@ export const MessageProto: MessageFns<MessageProto> = {
         message.setDefaultPipeline,
       );
     }
-    if (message.removePipelineIndex !== undefined) {
-      obj.removePipelineIndex = Math.round(message.removePipelineIndex);
+    if (message.removePipeline !== undefined) {
+      obj.removePipeline = RemovePipelineMessageProto.toJSON(
+        message.removePipeline,
+      );
     }
     if (message.log !== undefined) {
       obj.log = LogMessageProto.toJSON(message.log);
@@ -869,7 +877,10 @@ export const MessageProto: MessageFns<MessageProto> = {
       object.setDefaultPipeline !== null
         ? SetDefaultPipelineMessageProto.fromPartial(object.setDefaultPipeline)
         : undefined;
-    message.removePipelineIndex = object.removePipelineIndex ?? undefined;
+    message.removePipeline =
+      object.removePipeline !== undefined && object.removePipeline !== null
+        ? RemovePipelineMessageProto.fromPartial(object.removePipeline)
+        : undefined;
     message.log =
       object.log !== undefined && object.log !== null
         ? LogMessageProto.fromPartial(object.log)
