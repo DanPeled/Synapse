@@ -154,17 +154,16 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.combinedApriltagPoseEstimator: ICombinedApriltagRobotPoseEstimator = (
             WeightedAverageMultiTagEstimator()
         )
+        self.setConfig(self.cameraIndex)
+
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
 
-    def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
-        super().bind(cameraIndex, camera)
-        self.cameraMatrix: List[List[float]] = (
-            self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
-        )
+    def setConfig(self, cameraIndex: CameraID) -> None:
+        self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
 
         self.distCoeffs = self.getDistCoeffs(cameraIndex)
         self.camera_transform = self.getCameraTransform(cameraIndex)
-        self.apriltagDetector: AprilTagDetector = RobotpyApriltagDetector()
+        self.apriltagDetector = RobotpyApriltagDetector()
 
         detectorConfig: AprilTagDetector.Config = AprilTagDetector.Config()
 
@@ -194,6 +193,10 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.camera_transform: Optional[Transform3d] = self.getCameraTransform(
             cameraIndex
         )
+
+    def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
+        super().bind(cameraIndex, camera)
+        self.setConfig(cameraIndex)
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
         if setting.key in [

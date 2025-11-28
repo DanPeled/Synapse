@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import faulthandler
-import os
 import threading
 import time
 import traceback
@@ -54,6 +53,7 @@ def sendWebUIIP():
 
 
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
+DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
 
 
 class RuntimeManager:
@@ -100,12 +100,29 @@ class RuntimeManager:
         self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
 
         def onAddCamera(cameraID: CameraID, name: str, camera: SynapseCamera):
+            if cameraID not in self.pipelineBindings:
+                self.pipelineBindings[cameraID] = DEFAULT_PIPELINE_FOR_NEW_CAMERA
+            if (
+                self.pipelineHandler.getPipeline(
+                    self.pipelineBindings[cameraID], cameraid=cameraID
+                )
+                is None
+            ):
+                self.pipelineHandler.addPipeline(
+                    self.pipelineBindings[cameraID],
+                    "New Pipeline",
+                    "ApriltagPipeline",  # TODO: maybe generate different pipeline?
+                    cameraID,
+                    {},
+                )
+                self.setPipelineByIndex(cameraID, self.pipelineBindings[cameraID])
             thread = threading.Thread(target=self.processCamera, args=(cameraID,))
             thread.daemon = True
             thread.start()
             self.cameraManagementThreads.append(thread)
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
+        self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
 
     def setup(self, directory: Path):
         """
@@ -128,8 +145,8 @@ class RuntimeManager:
 
         self.setupCallbacks()
 
-        self.cameraHandler.setup()
         self.pipelineHandler.setup(directory)
+        self.cameraHandler.setup()
 
         self.assignDefaultPipelines()
 
@@ -145,7 +162,7 @@ class RuntimeManager:
         Assigns the default pipeline to each connected camera based on predefined configuration.
         """
 
-        for cameraIndex in self.cameraHandler.cameras.keys():
+        for cameraIndex in self.cameraHandler.cameras:
             pipeline = self.pipelineHandler.getDefaultPipeline(cameraIndex)
             self.setPipelineByIndex(
                 cameraIndex=cameraIndex,
@@ -235,7 +252,7 @@ class RuntimeManager:
 
         # Create instances for each pipeline only when setting them
         currPipeline = self.pipelineHandler.getPipeline(
-            self.pipelineBindings[cameraIndex]
+            self.pipelineBindings[cameraIndex], cameraIndex
         )
 
         if currPipeline is None:
@@ -277,7 +294,7 @@ class RuntimeManager:
 
             self.onSettingChangedFromNT.call(prop, value, cameraIndex)
 
-        for key in pipeline_config.getMap().keys():
+        def addlistener(key: str) -> None:
             nt_table = getCameraTable(camera)
             if nt_table is not None:
                 entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
@@ -287,34 +304,42 @@ class RuntimeManager:
                         entry, EventFlags.kValueRemote, updateSettingListener
                     )
 
+        for key in pipeline_config.getMap().keys():
+            addlistener(key)
+        for key in CameraSettings().getAPI().settings.keys():
+            addlistener(key)
+
     def updateSetting(self, prop: str, cameraIndex: CameraID, value: Any) -> None:
-        pipeline = self.pipelineHandler.getPipeline(self.pipelineBindings[cameraIndex])
+        pipeline = self.pipelineHandler.getPipeline(
+            self.pipelineBindings[cameraIndex], cameraIndex
+        )
+        assert pipeline is not None
 
-        if pipeline is not None:
-            settings = self.pipelineHandler.getPipelineSettings(
-                self.pipelineBindings[cameraIndex]
+        settings = self.pipelineHandler.getPipelineSettings(
+            self.pipelineBindings[cameraIndex], cameraIndex
+        )
+        setting = settings.getAPI().getSetting(prop)
+        camera = self.cameraHandler.getCamera(cameraIndex)
+
+        if prop in CameraSettings().getAPI().settings.keys():
+            assert camera is not None
+            camera.setProperty(prop=prop, value=value)
+            pipeline.setCameraSetting(prop, value)
+        elif setting is not None:
+            settings.setSetting(prop, value)
+            pipeline.onSettingChanged(setting, settings.getSetting(prop))
+        else:
+            log.warn(
+                f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
             )
-            setting = settings.getAPI().getSetting(prop)
-            camera = self.cameraHandler.getCamera(cameraIndex)
-            if setting is not None:
-                settings.setSetting(prop, value)
-                pipeline.onSettingChanged(setting, settings.getSetting(prop))
-            elif prop in CameraSettings():
-                if camera is not None:
-                    camera.setProperty(prop=prop, value=value)
-                    pipeline.cameraSettings[cameraIndex].setSetting(prop, value)
-            else:
-                log.warn(
-                    f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
-                )
-                return
+            return
 
-            self.onSettingChanged.call(prop, value, cameraIndex)
+        self.onSettingChanged.call(prop, value, cameraIndex)
 
-            nt_table = getCameraTable(camera)
-            entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
-            if entry is not None and entry.getValue() != value:
-                entry.setValue(value)
+        nt_table = getCameraTable(camera)
+        entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
+        if entry is not None and entry.getValue() != value:
+            entry.setValue(value)
 
     @staticmethod
     def getEventDataValue(
@@ -375,32 +400,33 @@ class RuntimeManager:
             cameraIndex (int): The index of the target camera.
             pipelineIndex (int): The index of the pipeline to assign.
         """
-        if cameraIndex not in self.cameraHandler.cameras.keys():
+        if cameraIndex not in self.cameraHandler.cameras:
             log.err(
                 f"Invalid cameraIndex {cameraIndex}. Must be in {list(self.cameraHandler.cameras.keys())})."
             )
             return
 
-        if pipelineIndex not in self.pipelineHandler.pipelineTypeNames.keys():
-            log.err(
-                f"Invalid pipeline index {pipelineIndex}. Must be one of {list(self.pipelineHandler.pipelineTypeNames.keys())}."
+        if pipelineIndex not in self.pipelineHandler.pipelineTypeNames[cameraIndex]:
+            self.pipelineHandler.addPipeline(
+                self.pipelineBindings[cameraIndex],
+                "New Pipeline",
+                "ApriltagPipeline",  # TODO: maybe generate different pipeline?
+                cameraIndex,
+                {},
             )
-            self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
-            return
-
-        for cameraId, pipelineId in self.pipelineBindings.items():
-            if cameraId != cameraIndex and pipelineId == pipelineIndex:
-                log.err(
-                    f"Another camera is using this pipeline at the moment (camera=#{cameraId})"
-                )
-                return
+            self.setPipelineByIndex(cameraIndex, self.pipelineBindings[cameraIndex])
+            # log.err(
+            #     f"Invalid pipeline index {pipelineIndex}. Must be one of {list(self.pipelineHandler.pipelineTypeNames[cameraIndex].keys())}."
+            # )
+            # self.setNTPipelineIndex(cameraIndex, self.pipelineBindings[cameraIndex])
+            # return
 
         # If both indices are valid, proceed with the pipeline setting
         self.pipelineBindings[cameraIndex] = pipelineIndex
 
         self.setNTPipelineIndex(cameraIndex=cameraIndex, pipelineIndex=pipelineIndex)
 
-        settings = self.pipelineHandler.getPipelineSettings(pipelineIndex)
+        settings = self.pipelineHandler.getPipelineSettings(pipelineIndex, cameraIndex)
 
         self.__setupPipelineForCamera(
             cameraIndex=cameraIndex,
@@ -437,7 +463,9 @@ class RuntimeManager:
         getCameraTable(self.cameraHandler.getCamera(cameraIndex)).getEntry(
             "pipeline_type"
         ).setString(
-            self.pipelineHandler.pipelineTypeNames.get(pipelineIndex, "unknown")
+            self.pipelineHandler.pipelineTypeNames[cameraIndex].get(
+                pipelineIndex, "unknown"
+            )
         )
 
     def processCamera(self, cameraIndex: CameraID):
@@ -460,7 +488,7 @@ class RuntimeManager:
             process_start = Timer.getFPGATimestamp()
 
             pipeline = self.pipelineHandler.getPipeline(
-                self.pipelineBindings.get(cameraIndex, -1)
+                self.pipelineBindings.get(cameraIndex, -1), cameraIndex
             )
 
             processed_frame: Frame = frame
@@ -660,7 +688,7 @@ class RuntimeManager:
             in self.pipelineHandler.pipelineInstanceBindings
         ):
             pipeline = self.pipelineHandler.getPipeline(
-                self.pipelineBindings[cameraIndex]
+                self.pipelineBindings[cameraIndex], cameraIndex
             )
             if pipeline is None:
                 return frame
@@ -676,35 +704,23 @@ class RuntimeManager:
         return {
             "network": self.networkSettings.toJson(),
             "global": {
-                "camera_configs": {
-                    index: config.toDict()
-                    for index, config in self.cameraHandler.cameraConfigBindings.items()
-                }
-            },
-            "pipelines": {
-                key: pipeline.toDict(self.pipelineHandler.pipelineTypeNames[key])
-                for key, pipeline in (
-                    self.pipelineHandler.pipelineInstanceBindings.items()
-                )
-                if not (
-                    getPipelineTypename(type(pipeline)).startswith("$$")
-                    and getPipelineTypename(type(pipeline)).endswith("$$")
-                )
+                "cameras": [
+                    index for index in self.cameraHandler.cameraConfigBindings.keys()
+                ]
             },
         }
 
-    def saveCameraSettings(self) -> None:
-        cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}
+    def savePipelines(self) -> None:
+        cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}  # TODO
         for (
-            pipelineid,
-            pipeline,
+            cameraid,
+            pipelinesSet,
         ) in self.pipelineHandler.pipelineInstanceBindings.items():
-            for cameraid, camerasettings in pipeline.cameraSettings.items():
-                if cameraid not in cameraSettingsDict:
-                    cameraSettingsDict[cameraid] = {}
-                assert cameraid in cameraSettingsDict
-
-                cameraSettingsDict[cameraid][pipelineid] = camerasettings.toDict()
+            cameraSettingsDict[cameraid] = {}
+            for pipelineid, pipeline in pipelinesSet.items():
+                cameraSettingsDict[cameraid][pipelineid] = pipeline.toDict(
+                    (getPipelineTypename(type(pipeline))), cameraid
+                )
 
         for cameraid, data in cameraSettingsDict.items():
             y = yaml.safe_dump(
@@ -731,11 +747,11 @@ class RuntimeManager:
             indent=2,  # control indentation
             width=80,  # wrap width for long lists
         )
-        savefile = Path(os.getcwd()) / "config" / "settings.yml"
+        savefile = Config.getInstance().path
         with open(savefile, "w") as f:
             f.write(y)
 
-        self.saveCameraSettings()
+        self.savePipelines()
 
         log.log(
             MarkupColors.bold(
@@ -758,7 +774,9 @@ class RuntimeManager:
         log.log("Cleaned up all resources.")
 
     def setupCallbacks(self):
-        def onRemovePipeline(index: PipelineID, pipeline: Pipeline) -> None:
+        def onRemovePipeline(
+            index: PipelineID, pipeline: Pipeline, cameraid: CameraID
+        ) -> None:
             """
             Once A pipeline is removed, any camera using it will become
             invalidated and will need to switch to a different pipeline.
@@ -794,13 +812,13 @@ class RuntimeManager:
 
                 self.cameraHandler.setRecordingStatus(cameraIndex, value)
 
-            entry = camera.getSettingEntry(CameraSettingsKeys.kRecord.value)
-            assert entry is not None
+            recordEntry = camera.getSettingEntry(CameraSettingsKeys.kRecord.value)
+            assert recordEntry is not None
 
             NetworkTableInstance.getDefault().addListener(
-                entry, EventFlags.kValueRemote, listener
+                recordEntry, EventFlags.kValueRemote, listener
             )
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
-        self.pipelineHandler.onRemovePipeline.add(onRemovePipeline)
+        self.pipelineHandler.onRemovePipeline.add(onRemovePipeline)  # pyright: ignore
         NtClient.onConnect.add(onConnect)

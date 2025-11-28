@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { background, teamColor, baseCardColor } from "@/services/style";
@@ -14,20 +14,24 @@ import { ResultsView } from "./results_view";
 import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
 import { Activity, Camera } from "lucide-react";
-// import { CameraStepControl } from "./camera_step_control";
 import {
   CameraPerformanceProto,
   CameraProto,
   SetCameraRecordingStatusMessageProto,
 } from "@/proto/v1/camera";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import {
+  PipelineProto,
+  PipelineTypeProto,
   SetPipelineIndexMessageProto,
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
 } from "@/proto/v1/pipeline";
+import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { SaveActionsDialog } from "./save_actions";
-import { PipelineResultMap } from "@/services/backend/dataStractures";
+import {
+  PipelineID,
+  PipelineResultMap,
+} from "@/services/backend/dataStractures";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -40,29 +44,35 @@ function CameraView({ selectedCamera, cameraPerformance }: CameraViewProps) {
       style={{ backgroundColor: baseCardColor }}
       className="border-gray-700 flex flex-col h-full max-h-[400px]"
     >
+      {" "}
       <CardHeader>
+        {" "}
         <Row className="items-center justify-between">
           <CardTitle
             className="flex items-center gap-2"
             style={{ color: teamColor }}
           >
+            {" "}
             <Camera className="w-5 h-5" />
-            Camera Stream
-          </CardTitle>
+            Camera Stream{" "}
+          </CardTitle>{" "}
           <Row gap="gap-2" className="items-center">
             <Badge
               variant="secondary"
               className="bg-stone-700"
               style={{ color: teamColor }}
             >
+              {" "}
               <Activity className="w-3 h-3 mr-1" />
               Processing @ {cameraPerformance?.fps ?? 0} FPS –{" "}
-              {cameraPerformance?.latencyProcess.toFixed(2) ?? 0}ms latency
-            </Badge>
-          </Row>
-        </Row>
+              {cameraPerformance
+                ? cameraPerformance.latencyProcess.toFixed(2)
+                : "0.00"}
+              ms latency{" "}
+            </Badge>{" "}
+          </Row>{" "}
+        </Row>{" "}
       </CardHeader>
-
       <CardContent className="flex-grow flex flex-col items-center justify-center">
         <CameraStream stream={selectedCamera?.streamPath} />
       </CardContent>
@@ -79,226 +89,216 @@ export default function Dashboard() {
     setPipelines,
     pipelinetypes,
     pipelineresults,
-    cameraperformance: cameraPerformance,
+    cameraperformance,
     recordingstatuses,
   } = useBackendContext();
 
-  const [selectedPipeline, setSelectedPipeline] = useState(pipelines.get(0));
-  const [selectedPipelineType, setSelectedPipelineType] = useState(
-    Array.from(pipelinetypes.values()).at(0)!,
-  );
+  // ===== State: only indexes / minimal info =====
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
+  const [selectedPipelineIndex, setSelectedPipelineIndex] = useState(0);
+  const [locked, setLocked] = useState(false);
   const [selectedCameraRecordingStatus, setSelectedCameraRecordingStatus] =
     useState(false);
 
-  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
-  const [selectedCamera, setSelectedCamera] = useState<CameraProto | undefined>(
-    undefined,
-  );
-  const [locked, setLocked] = useState(false);
-  const [selectedCameraPerformance, setSelectedCameraPerformance] = useState<
-    CameraPerformanceProto | undefined
-  >(undefined);
-  const [selectedPipelineResults, setSelectedPipelineResults] = useState<
-    PipelineResultMap | undefined
-  >(undefined);
+  // ===== Derived objects =====
+  const selectedCamera = useMemo(() => {
+    if (!cameras) return undefined;
+    const camData = cameras.get(selectedCameraIndex);
+    return camData ? CameraProto.create(camData) : undefined;
+  }, [cameras, selectedCameraIndex]);
+
+  const selectedPipeline = pipelines
+    ?.get(selectedCameraIndex)
+    ?.get(selectedPipelineIndex);
+
+  const selectedPipelineType = selectedPipeline
+    ? pipelinetypes.get(selectedPipeline.type)
+    : undefined;
+
+  const selectedCameraPerformance = cameraperformance?.get(selectedCameraIndex);
+
+  const selectedPipelineResults =
+    selectedPipeline && pipelineresults?.get(selectedCameraIndex)
+      ? pipelineresults.get(selectedCameraIndex)?.get(selectedPipeline.index)
+      : undefined;
 
   useEffect(() => {
-    let pipelineIndex =
-      selectedCamera?.pipelineIndex ?? selectedPipeline?.index ?? 0;
-    let pipeline = pipelines.get(pipelineIndex);
-
-    if (!pipeline) {
-      pipelineIndex = selectedCamera?.defaultPipeline ?? 0;
-      pipeline = pipelines.get(pipelineIndex);
+    // reset pipeline index when switching cameras
+    if (!pipelines.get(selectedCameraIndex)?.has(selectedPipelineIndex)) {
+      setSelectedPipelineIndex(0);
     }
+  }, [selectedCameraIndex, pipelines]);
 
-    if (pipeline) {
-      setSelectedPipeline(pipeline);
-
-      const type = pipelinetypes.get(pipeline.type);
-      if (type) {
-        setSelectedPipelineType(type);
-      } else {
-        console.warn("Pipeline type not found for", pipeline.type);
+  // ===== Sync recording status =====
+  useEffect(() => {
+    if (selectedCamera) {
+      const status = recordingstatuses.get(selectedCamera.index) ?? false;
+      if (status !== selectedCameraRecordingStatus) {
+        setSelectedCameraRecordingStatus(status);
       }
-    } else {
-      console.warn("No valid pipeline found for camera", selectedCamera);
-    }
-  }, [pipelines, pipelinetypes, selectedCamera]);
-
-  useEffect(() => {
-    setSelectedCameraPerformance(cameraPerformance.get(selectedCameraIndex));
-  }, [cameraPerformance]);
-
-  useEffect(() => {
-    if (Array.from(cameras.keys()).length > 0) {
-      setSelectedCamera(CameraProto.create(cameras.get(selectedCameraIndex)));
-    }
-  }, [cameras]);
-
-  useEffect(() => {
-    if (selectedCamera !== undefined) {
-      setSelectedCameraRecordingStatus(
-        recordingstatuses.get(selectedCamera?.index) ?? false,
-      );
     }
   }, [selectedCamera, recordingstatuses]);
 
-  useEffect(() => {
-    if (selectedPipeline !== undefined) {
-      setSelectedPipelineResults(pipelineresults.get(selectedPipeline.index));
-    }
-  }, [selectedPipeline, pipelineresults, selectedPipelineType]);
-
+  // ===== Set document title once =====
   useEffect(() => {
     document.title = "Synapse Client";
   }, []);
 
+  // ===== Update pipelines immutably =====
+  function setPipelinesOfSelectedCamera(
+    newpipelines: Map<PipelineID, PipelineProto>,
+  ) {
+    setPipelines((prev) => {
+      const copy = new Map(prev);
+      copy.set(selectedCameraIndex, newpipelines);
+      return copy;
+    });
+  }
+
+  function setPipelineIndexForSelectedCamera(newIndex: number) {
+    const cameraPipelines = pipelines.get(selectedCameraIndex);
+    if (!cameraPipelines || !cameraPipelines.has(newIndex)) return;
+
+    setSelectedPipelineIndex(newIndex);
+
+    // Send proto to server
+    const payload = MessageProto.create({
+      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
+      setPipelineIndex: SetPipelineIndexMessageProto.create({
+        cameraIndex: selectedCameraIndex ?? 0,
+        pipelineIndex: newIndex,
+      }),
+    });
+    socket?.sendBinary(MessageProto.encode(payload).finish());
+  }
+  // === Immutable update of pipelines for the selected camera ===
+  function setPipelineTypeForSelectedCamera(newType?: PipelineTypeProto) {
+    if (newType === undefined) return;
+    if (selectedPipelineIndex === undefined) return;
+
+    const cameraPipelines = pipelines.get(selectedCameraIndex) ?? new Map();
+    const pipeline = cameraPipelines.get(selectedPipelineIndex);
+    if (!pipeline) return;
+
+    // Update pipeline locally
+    const updatedPipeline: PipelineProto = { ...pipeline, type: newType.type };
+    const updatedPipelines = new Map(cameraPipelines);
+    updatedPipelines.set(selectedPipelineIndex, updatedPipeline);
+
+    // Update top-level pipelines map immutably
+    setPipelines((prev) => {
+      const copy = new Map(prev);
+      copy.set(selectedCameraIndex, updatedPipelines);
+      return copy;
+    });
+
+    // Send type update to server
+    const payload = MessageProto.create({
+      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE,
+      setPipelineType: SetPipelineTypeMessageProto.create({
+        newType: newType.type,
+        cameraid: selectedCameraIndex,
+        pipelineIndex: selectedPipelineIndex,
+      }),
+    });
+    socket?.sendBinary(MessageProto.encode(payload).finish());
+  }
+
   return (
-    <>
+    <div
+      className="w-full min-h-screen text-pink-600"
+      style={{ backgroundColor: background, color: teamColor }}
+    >
       <div
-        className="w-full min-h-screen text-pink-600"
-        style={{ backgroundColor: background, color: teamColor }}
+        className="max-w-8xl mx-auto"
+        style={{
+          backgroundColor: background,
+          borderRadius: "12px",
+          padding: "10px",
+        }}
       >
-        <div
-          className="max-w-8xl mx-auto"
-          style={{
-            backgroundColor: background,
-            borderRadius: "12px",
-            padding: "10px",
-          }}
-        >
-          <Row gap="gap-2" className="h-full">
-            <Column className="flex-[2] space-y-2 h-full">
-              <CameraView
-                selectedCamera={cameras.get(selectedCameraIndex)}
-                cameraPerformance={selectedCameraPerformance}
-              />
-              <PipelineConfigControl
-                pipelines={pipelines}
-                cameraInfo={selectedCamera}
-                setPipelines={setPipelines}
-                selectedPipeline={selectedPipeline}
-                selectedPipelineType={selectedPipelineType}
-                backendConnected={connection.backend}
-                setSetting={(val, setting, pipeline) => {
-                  if (hasSettingValue(val)) {
-                    const payload = MessageProto.create({
-                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
-                      setPipelineSetting: SetPipleineSettingMessageProto.create(
-                        {
-                          pipelineIndex: pipeline.index,
-                          value: val,
-                          setting: setting,
-                        },
-                      ),
-                    });
-
-                    const binary = MessageProto.encode(payload).finish();
-                    socket?.sendBinary(binary);
-                  }
-                }}
-                locked={locked}
-              />
-            </Column>
-
-            <Column className="flex-[1.2] space-y-2 h-full">
-              <CameraAndPipelineControls
-                setpipelines={setPipelines}
-                pipelines={pipelines}
-                pipelinetypes={pipelinetypes}
-                socket={socket}
-                setSelectedPipeline={(val) => {
-                  if (val !== undefined) {
-                    setSelectedPipeline(val);
-                    setSelectedPipelineType(pipelinetypes.get(val.type)!);
-
-                    if (selectedCamera) {
-                      setTimeout(() => {
-                        const payload = MessageProto.create({
-                          type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
-                          setPipelineIndex: SetPipelineIndexMessageProto.create(
-                            {
-                              cameraIndex: selectedCamera.index,
-                              pipelineIndex: val.index,
-                            },
-                          ),
-                        });
-
-                        const binary = MessageProto.encode(payload).finish();
-                        socket?.sendBinary(binary);
-                      }, 0);
-                    }
-                  }
-                }}
-                selectedPipeline={selectedPipeline}
-                setSelectedPipelineType={(newType) => {
-                  setSelectedPipelineType(newType!);
-
-                  setTimeout(() => {
-                    if (selectedPipeline && newType) {
-                      const payload = MessageProto.create({
-                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE,
-                        setPipelineType: SetPipelineTypeMessageProto.create({
-                          newType: newType.type,
-                          pipelineIndex: selectedPipeline.index,
-                        }),
-                      });
-
-                      const binary = MessageProto.encode(payload).finish();
-                      socket?.sendBinary(binary);
-
-                      selectedPipeline.type = newType.type;
-                      const newPipelines = new Map(pipelines);
-                      newPipelines.set(
-                        selectedPipeline.index,
-                        selectedPipeline,
-                      );
-                      setPipelines(newPipelines);
-                    }
-                  }, 0);
-                }}
-                selectedPipelineType={selectedPipelineType}
-                cameras={cameras}
-                setSelectedCamera={(cam) => {
-                  setSelectedCameraIndex(cam?.index ?? 0);
-                }}
-                selectedCamera={cameras.get(selectedCameraIndex)}
-              />
-              <SaveActionsDialog
-                locked={locked}
-                setLocked={setLocked}
-                save={() => {
+        {" "}
+        <Row gap="gap-2" className="h-full">
+          {/* Camera + Pipeline Config */}{" "}
+          <Column className="flex-[2] space-y-2 h-full">
+            {" "}
+            <CameraView
+              selectedCamera={selectedCamera}
+              cameraPerformance={selectedCameraPerformance}
+            />
+            <PipelineConfigControl
+              pipelines={pipelines.get(selectedCameraIndex) ?? new Map()}
+              cameraInfo={selectedCamera}
+              setPipelines={setPipelinesOfSelectedCamera}
+              selectedPipeline={selectedPipeline}
+              selectedPipelineType={selectedPipelineType}
+              backendConnected={connection.backend}
+              setSetting={(val, setting, pipeline) => {
+                if (hasSettingValue(val)) {
                   const payload = MessageProto.create({
-                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE,
-                    removePipelineIndex: -1, // Forces me to put some payload
+                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
+                    setPipelineSetting: SetPipleineSettingMessageProto.create({
+                      pipelineIndex: pipeline.index,
+                      cameraid: selectedCameraIndex,
+                      value: val,
+                      setting: setting,
+                    }),
                   });
 
-                  const binary = MessageProto.encode(payload).finish();
-                  socket?.sendBinary(binary);
-                }}
-                recordingStatus={selectedCameraRecordingStatus}
-                setRecordingStatus={(status: boolean) => {
-                  if (selectedCamera !== undefined) {
-                    const payload = MessageProto.create({
-                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS,
-                      setCameraRecordingStatus:
-                        SetCameraRecordingStatusMessageProto.create({
-                          cameraIndex: selectedCamera.index,
-                          record: status,
-                        }),
-                    });
+                  socket?.sendBinary(MessageProto.encode(payload).finish());
+                }
+              }}
+              locked={locked}
+            />
+          </Column>
+          {/* Controls + Results */}
+          <Column className="flex-[1.2] space-y-2 h-full">
+            <CameraAndPipelineControls
+              cameras={cameras}
+              pipelines={pipelines.get(selectedCameraIndex) ?? new Map()}
+              pipelinetypes={pipelinetypes}
+              socket={socket}
+              selectedCameraIndex={selectedCameraIndex}
+              setSelectedCameraIndexAction={setSelectedCameraIndex}
+              selectedPipelineIndex={selectedPipelineIndex}
+              setSelectedPipelineIndexAction={setPipelineIndexForSelectedCamera}
+              selectedPipelineType={selectedPipelineType}
+              setSelectedPipelineTypeAction={setPipelineTypeForSelectedCamera}
+              setpipelinesAction={setPipelinesOfSelectedCamera}
+            />
 
-                    const binary = MessageProto.encode(payload).finish();
-                    socket?.sendBinary(binary);
-                  }
-                }}
-              />
-              <ResultsView results={selectedPipelineResults} />
-            </Column>
-          </Row>
-        </div>
+            <SaveActionsDialog
+              locked={locked}
+              setLocked={setLocked}
+              save={() => {
+                socket?.sendBinary(
+                  MessageProto.encode(
+                    MessageProto.create({
+                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE,
+                    }),
+                  ).finish(),
+                );
+              }}
+              recordingStatus={selectedCameraRecordingStatus}
+              setRecordingStatus={(status) => {
+                if (selectedCamera) {
+                  const payload = MessageProto.create({
+                    type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS,
+                    setCameraRecordingStatus:
+                      SetCameraRecordingStatusMessageProto.create({
+                        cameraIndex: selectedCamera.index,
+                        record: status,
+                      }),
+                  });
+                  socket?.sendBinary(MessageProto.encode(payload).finish());
+                }
+              }}
+            />
+
+            <ResultsView results={selectedPipelineResults} />
+          </Column>
+        </Row>
       </div>
-    </>
+    </div>
   );
 }

@@ -4,6 +4,7 @@ import { SettingValueProto } from "@/proto/settings/v1/value";
 import { CameraProto } from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { hasSettingValue } from "@/services/backend/backendContext";
+import { CameraID, PipelineID } from "@/services/backend/dataStractures";
 import {
   GenerateControl,
   settingValueToProto,
@@ -93,8 +94,8 @@ export function PipelineConfigControl({
     setting: string,
     pipeline: PipelineProto,
   ) => void;
-  setPipelines: (val: Map<number, PipelineProto>) => void;
-  pipelines: Map<number, PipelineProto>;
+  setPipelines: (val: Map<PipelineID, PipelineProto>) => void;
+  pipelines: Map<PipelineID, PipelineProto>;
   locked: boolean;
 }) {
   const [cameraControls, setCameraControls] = useState<

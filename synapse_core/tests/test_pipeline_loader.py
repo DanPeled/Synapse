@@ -30,13 +30,14 @@ class TestPipelineHandler(unittest.TestCase):
     def setUp(self):
         self.pipeline_dir = Path("/fake/path")
         self.loader = PipelineHandler(self.pipeline_dir)
+        # Ensure camera 0 is initialized since tests expect it
+        self.loader.onAddCamera(0, "cam0", MagicMock())
 
     @patch("synapse.core.pipeline_handler.importlib.util.spec_from_file_location")
     @patch("synapse.core.pipeline_handler.importlib.util.module_from_spec")
     def test_load_pipelines_loads_enabled_classes(
         self, mock_module_from_spec, mock_spec_from_file_location
     ):
-        # Prepare mocks
         dummy_module = MagicMock()
         dummy_module.DummyPipeline = DummyPipeline
         mock_spec = MagicMock()
@@ -56,40 +57,11 @@ class TestPipelineHandler(unittest.TestCase):
         self.assertIn("DummyPipeline", pipelines)
         self.assertEqual(pipelines["DummyPipeline"], DummyPipeline)
 
-    @patch("synapse.core.pipeline_handler.Config.getInstance")
-    @patch("synapse.core.pipeline_handler.GlobalSettings.getCameraConfigMap")
-    def test_load_pipeline_settings(self, mock_camera_config_map, mock_config_instance):
-        self.loader.pipelineTypes = {"DummyPipeline": DummyPipeline}
-
-        mock_camera_config_map.return_value = {0: MagicMock(defaultPipeline=1)}
-
-        mock_config = MagicMock()
-        mock_config.getConfigMap.return_value = {
-            "pipelines": [
-                {
-                    "type": "DummyPipeline",
-                    "name": "yeepy",
-                    "settings": {"threshold": 0.5},
-                }
-            ]
-        }
-        mock_config_instance.return_value = mock_config
-
-        with patch(
-            "synapse.core.pipeline_handler.resolveGenericArgument",
-            return_value=DummySettings,
-        ):
-            self.loader.loadPipelineSettings()
-
-        self.assertEqual(self.loader.defaultPipelineIndexes[0], 1)
-        self.assertIn(0, self.loader.pipelineSettings)
-        self.assertIsInstance(self.loader.pipelineSettings[0], DummySettings)
-
     def test_get_pipeline_type_by_index_and_name(self):
-        self.loader.pipelineTypes["DummyPipeline"] = DummyPipeline
-        self.loader.pipelineTypeNames[5] = "DummyPipeline"
+        self.loader.pipelineTypeNames[0][5] = "DummyPipeline"
+        self.loader.pipelineTypesViaName["DummyPipeline"] = DummyPipeline
 
-        self.assertEqual(self.loader.getPipelineTypeByIndex(5), DummyPipeline)
+        self.assertEqual(self.loader.getPipelineTypeByIndex(5, 0), DummyPipeline)
         self.assertEqual(
             self.loader.getPipelineTypeByName("DummyPipeline"), DummyPipeline
         )
@@ -100,126 +72,103 @@ class TestPipelineHandler(unittest.TestCase):
         self.assertEqual(self.loader.getDefaultPipeline(999), 0)
 
     def test_set_pipeline_while_running(self):
-        self.loader.pipelineTypes["DummyPipeline"] = DummyPipeline
-        self.loader.pipelineTypeNames[5] = "DummyPipeline"
+        self.loader.pipelineTypesViaName["DummyPipeline"] = DummyPipeline
+        self.loader.pipelineTypeNames[0][5] = "DummyPipeline"
 
-        self.assertEqual(self.loader.getPipelineTypeByIndex(5), DummyPipeline)
-        self.assertEqual(
-            self.loader.getPipelineTypeByName("DummyPipeline"), DummyPipeline
-        )
+        self.assertEqual(self.loader.getPipelineTypeByIndex(5, 0), DummyPipeline)
 
-        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.pipelineTypesViaName["AnotherDummy"] = DummyPipeline
         self.loader.addPipeline(
-            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+            index=5,
+            name="New Pipeline",
+            typename="AnotherDummy",
+            cameraid=0,
+            settings={},
         )
 
-        pipeline = self.loader.pipelineInstanceBindings.get(5, None)
+        pipeline = self.loader.pipelineInstanceBindings[0].get(5)
 
         self.assertIsNotNone(pipeline)
-        if pipeline is not None:
+        if pipeline:
             self.assertEqual(pipeline.name, "New Pipeline")
-            self.assertEqual(self.loader.pipelineTypeNames.get(5), "AnotherDummy")
+            self.assertEqual(self.loader.pipelineTypeNames[0].get(5), "AnotherDummy")
 
     def test_add_pipeline(self):
-        self.assertIsNone(self.loader.getPipeline(5))
+        self.assertIsNone(self.loader.getPipeline(5, 0))
 
-        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.pipelineTypesViaName["AnotherDummy"] = DummyPipeline
         self.loader.addPipeline(
-            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+            index=5,
+            name="New Pipeline",
+            typename="AnotherDummy",
+            cameraid=0,
+            settings={},
         )
 
-        pipeline = self.loader.pipelineInstanceBindings.get(5, None)
+        pipeline = self.loader.pipelineInstanceBindings[0].get(5)
 
         self.assertIsNotNone(pipeline)
-
-        if pipeline is not None:
+        if pipeline:
             self.assertEqual(pipeline.name, "New Pipeline")
-            self.assertEqual(self.loader.pipelineTypeNames.get(5), "AnotherDummy")
+            self.assertEqual(self.loader.pipelineTypeNames[0].get(5), "AnotherDummy")
 
     def test_add_then_remove_pipeline(self):
-        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.pipelineTypesViaName["AnotherDummy"] = DummyPipeline
         self.loader.addPipeline(
-            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+            index=5,
+            name="New Pipeline",
+            typename="AnotherDummy",
+            cameraid=0,
+            settings={},
         )
 
-        pipeline = self.loader.pipelineInstanceBindings.get(5, None)
-
+        pipeline = self.loader.pipelineInstanceBindings[0].get(5)
         self.assertIsNotNone(pipeline)
-        if pipeline is not None:
-            self.assertEqual(pipeline.name, "New Pipeline")
-            self.assertEqual(self.loader.pipelineTypeNames.get(5), "AnotherDummy")
 
-            removedpipeline = self.loader.removePipeline(5)
-            self.assertIsNotNone(removedpipeline)
+        removed = self.loader.removePipeline(5, cameraid=0)
+        self.assertIsNotNone(removed)
 
-            if removedpipeline is not None:
-                self.assertIsNone(self.loader.getPipeline(5))
-                self.assertEqual(removedpipeline.name, "New Pipeline")
+        if removed:
+            self.assertIsNone(self.loader.getPipeline(5, 0))
+            self.assertEqual(removed.name, "New Pipeline")
 
     def test_on_add_pipeline(self):
         on_add = Mock()
 
-        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.pipelineTypesViaName["AnotherDummy"] = DummyPipeline
         self.loader.addPipeline(
-            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+            index=5,
+            name="New Pipeline",
+            typename="AnotherDummy",
+            cameraid=0,
+            settings={},
         )
 
-        pipeline = self.loader.pipelineInstanceBindings.get(5, None)
+        self.loader.onAddPipeline.add(on_add)
 
-        on_add.assert_not_called()
-        self.assertIsNotNone(pipeline)
+        self.loader.addPipeline(
+            index=7, name="Another", typename="AnotherDummy", cameraid=0, settings={}
+        )
 
-        if pipeline is not None:
-            self.assertEqual(pipeline.name, "New Pipeline")
-            self.assertEqual(self.loader.pipelineTypeNames.get(5), "AnotherDummy")
-
-            self.loader.onAddPipeline.add(on_add)
-
-            self.loader.pipelineTypes["DummyPipeline"] = DummyPipeline
-            self.loader.pipelineTypeNames[5] = "DummyPipeline"
-
-            self.assertEqual(self.loader.getPipelineTypeByIndex(5), DummyPipeline)
-            self.assertEqual(
-                self.loader.getPipelineTypeByName("DummyPipeline"), DummyPipeline
-            )
-
-            self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
-            self.loader.addPipeline(
-                index=7, name="New Pipeline", typename="AnotherDummy", settings={}
-            )
-
-            on_add.assert_called_once()
-            called_args = on_add.call_args[0]
-            self.assertEqual(called_args[0], 7)
+        on_add.assert_called_once()
+        called_args = on_add.call_args[0]
+        self.assertEqual(called_args[0], 7)
 
     def test_on_remove_pipeline(self):
         on_removed = Mock()
 
-        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
+        self.loader.pipelineTypesViaName["AnotherDummy"] = DummyPipeline
         self.loader.addPipeline(
-            index=5, name="New Pipeline", typename="AnotherDummy", settings={}
+            index=5,
+            name="New Pipeline",
+            typename="AnotherDummy",
+            cameraid=0,
+            settings={},
         )
-
-        self.loader.pipelineInstanceBindings.get(5, None)
-
-        on_removed.assert_not_called()
 
         self.loader.onRemovePipeline.add(on_removed)
 
-        self.loader.pipelineTypes["DummyPipeline"] = DummyPipeline
-        self.loader.pipelineTypeNames[5] = "DummyPipeline"
-
-        self.assertEqual(self.loader.getPipelineTypeByIndex(5), DummyPipeline)
-        self.assertEqual(
-            self.loader.getPipelineTypeByName("DummyPipeline"), DummyPipeline
-        )
-
-        self.loader.pipelineTypes["AnotherDummy"] = DummyPipeline
-        self.loader.addPipeline(
-            index=7, name="New Pipeline", typename="AnotherDummy", settings={}
-        )
-        self.loader.removePipeline(7)
+        self.loader.removePipeline(5, cameraid=0)
 
         on_removed.assert_called_once()
-        called_args = on_removed.call_args[0]
-        self.assertEqual(called_args[0], 7)
+        self.assertEqual(on_removed.call_args[0][0], 5)

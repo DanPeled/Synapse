@@ -29,6 +29,7 @@ export interface PipelineProto {
   type: string;
   /** Map of setting keys to their actual configured values for this pipeline instance */
   settingsValues: { [key: string]: SettingValueProto };
+  cameraid: number;
 }
 
 export interface PipelineProto_SettingsValuesEntry {
@@ -42,6 +43,7 @@ export interface SetPipelineTypeMessageProto {
   newType: string;
   /** The index of the pipeline instance to update */
   pipelineIndex: number;
+  cameraid: number;
 }
 
 /** Message to request updating a single setting of a specific pipeline instance */
@@ -52,6 +54,7 @@ export interface SetPipleineSettingMessageProto {
   value: SettingValueProto | undefined;
   /** The index of the pipeline instance to update */
   pipelineIndex: number;
+  cameraid: number;
 }
 
 export interface SetPipelineIndexMessageProto {
@@ -61,6 +64,7 @@ export interface SetPipelineIndexMessageProto {
 
 export interface SetPipelineNameMessageProto {
   pipelineIndex: number;
+  cameraid: number;
   name: string;
 }
 
@@ -74,6 +78,13 @@ export interface PipelineResultProto {
   pipelineIndex: number;
   /** The value of the result */
   value: SettingValueProto | undefined;
+  cameraid: number;
+}
+
+export interface RemovePipelineMessageProto {
+  /** Index of the pipeline to be removed */
+  removePipelineIndex: number;
+  cameraid: number;
 }
 
 function createBasePipelineTypeProto(): PipelineTypeProto {
@@ -166,7 +177,7 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
 };
 
 function createBasePipelineProto(): PipelineProto {
-  return { name: "", index: 0, type: "", settingsValues: {} };
+  return { name: "", index: 0, type: "", settingsValues: {}, cameraid: 0 };
 }
 
 export const PipelineProto: MessageFns<PipelineProto> = {
@@ -189,6 +200,9 @@ export const PipelineProto: MessageFns<PipelineProto> = {
         writer.uint32(34).fork(),
       ).join();
     });
+    if (message.cameraid !== 0) {
+      writer.uint32(40).uint32(message.cameraid);
+    }
     return writer;
   },
 
@@ -238,6 +252,14 @@ export const PipelineProto: MessageFns<PipelineProto> = {
           }
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.cameraid = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -260,6 +282,7 @@ export const PipelineProto: MessageFns<PipelineProto> = {
             return acc;
           }, {})
         : {},
+      cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
     };
   },
 
@@ -282,6 +305,9 @@ export const PipelineProto: MessageFns<PipelineProto> = {
           obj.settingsValues[k] = SettingValueProto.toJSON(v);
         });
       }
+    }
+    if (message.cameraid !== 0) {
+      obj.cameraid = Math.round(message.cameraid);
     }
     return obj;
   },
@@ -306,6 +332,7 @@ export const PipelineProto: MessageFns<PipelineProto> = {
       }
       return acc;
     }, {});
+    message.cameraid = object.cameraid ?? 0;
     return message;
   },
 };
@@ -407,7 +434,7 @@ export const PipelineProto_SettingsValuesEntry: MessageFns<PipelineProto_Setting
   };
 
 function createBaseSetPipelineTypeMessageProto(): SetPipelineTypeMessageProto {
-  return { newType: "", pipelineIndex: 0 };
+  return { newType: "", pipelineIndex: 0, cameraid: 0 };
 }
 
 export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto> =
@@ -420,7 +447,10 @@ export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto
         writer.uint32(10).string(message.newType);
       }
       if (message.pipelineIndex !== 0) {
-        writer.uint32(16).int32(message.pipelineIndex);
+        writer.uint32(16).uint32(message.pipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        writer.uint32(24).uint32(message.cameraid);
       }
       return writer;
     },
@@ -449,7 +479,15 @@ export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto
               break;
             }
 
-            message.pipelineIndex = reader.int32();
+            message.pipelineIndex = reader.uint32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.cameraid = reader.uint32();
             continue;
           }
         }
@@ -467,6 +505,9 @@ export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto
         pipelineIndex: isSet(object.pipelineIndex)
           ? globalThis.Number(object.pipelineIndex)
           : 0,
+        cameraid: isSet(object.cameraid)
+          ? globalThis.Number(object.cameraid)
+          : 0,
       };
     },
 
@@ -477,6 +518,9 @@ export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto
       }
       if (message.pipelineIndex !== 0) {
         obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        obj.cameraid = Math.round(message.cameraid);
       }
       return obj;
     },
@@ -492,12 +536,13 @@ export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto
       const message = createBaseSetPipelineTypeMessageProto();
       message.newType = object.newType ?? "";
       message.pipelineIndex = object.pipelineIndex ?? 0;
+      message.cameraid = object.cameraid ?? 0;
       return message;
     },
   };
 
 function createBaseSetPipleineSettingMessageProto(): SetPipleineSettingMessageProto {
-  return { setting: "", value: undefined, pipelineIndex: 0 };
+  return { setting: "", value: undefined, pipelineIndex: 0, cameraid: 0 };
 }
 
 export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessageProto> =
@@ -516,7 +561,10 @@ export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessag
         ).join();
       }
       if (message.pipelineIndex !== 0) {
-        writer.uint32(24).int32(message.pipelineIndex);
+        writer.uint32(24).uint32(message.pipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        writer.uint32(32).uint32(message.cameraid);
       }
       return writer;
     },
@@ -553,7 +601,15 @@ export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessag
               break;
             }
 
-            message.pipelineIndex = reader.int32();
+            message.pipelineIndex = reader.uint32();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.cameraid = reader.uint32();
             continue;
           }
         }
@@ -574,6 +630,9 @@ export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessag
         pipelineIndex: isSet(object.pipelineIndex)
           ? globalThis.Number(object.pipelineIndex)
           : 0,
+        cameraid: isSet(object.cameraid)
+          ? globalThis.Number(object.cameraid)
+          : 0,
       };
     },
 
@@ -587,6 +646,9 @@ export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessag
       }
       if (message.pipelineIndex !== 0) {
         obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        obj.cameraid = Math.round(message.cameraid);
       }
       return obj;
     },
@@ -606,6 +668,7 @@ export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessag
           ? SettingValueProto.fromPartial(object.value)
           : undefined;
       message.pipelineIndex = object.pipelineIndex ?? 0;
+      message.cameraid = object.cameraid ?? 0;
       return message;
     },
   };
@@ -621,10 +684,10 @@ export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessagePro
       writer: BinaryWriter = new BinaryWriter(),
     ): BinaryWriter {
       if (message.pipelineIndex !== 0) {
-        writer.uint32(8).int32(message.pipelineIndex);
+        writer.uint32(8).uint32(message.pipelineIndex);
       }
       if (message.cameraIndex !== 0) {
-        writer.uint32(16).int32(message.cameraIndex);
+        writer.uint32(16).uint32(message.cameraIndex);
       }
       return writer;
     },
@@ -645,7 +708,7 @@ export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessagePro
               break;
             }
 
-            message.pipelineIndex = reader.int32();
+            message.pipelineIndex = reader.uint32();
             continue;
           }
           case 2: {
@@ -653,7 +716,7 @@ export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessagePro
               break;
             }
 
-            message.cameraIndex = reader.int32();
+            message.cameraIndex = reader.uint32();
             continue;
           }
         }
@@ -703,7 +766,7 @@ export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessagePro
   };
 
 function createBaseSetPipelineNameMessageProto(): SetPipelineNameMessageProto {
-  return { pipelineIndex: 0, name: "" };
+  return { pipelineIndex: 0, cameraid: 0, name: "" };
 }
 
 export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto> =
@@ -713,10 +776,13 @@ export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto
       writer: BinaryWriter = new BinaryWriter(),
     ): BinaryWriter {
       if (message.pipelineIndex !== 0) {
-        writer.uint32(8).int32(message.pipelineIndex);
+        writer.uint32(8).uint32(message.pipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        writer.uint32(16).uint32(message.cameraid);
       }
       if (message.name !== "") {
-        writer.uint32(18).string(message.name);
+        writer.uint32(26).string(message.name);
       }
       return writer;
     },
@@ -737,11 +803,19 @@ export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto
               break;
             }
 
-            message.pipelineIndex = reader.int32();
+            message.pipelineIndex = reader.uint32();
             continue;
           }
           case 2: {
-            if (tag !== 18) {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.cameraid = reader.uint32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
               break;
             }
 
@@ -762,6 +836,9 @@ export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto
         pipelineIndex: isSet(object.pipelineIndex)
           ? globalThis.Number(object.pipelineIndex)
           : 0,
+        cameraid: isSet(object.cameraid)
+          ? globalThis.Number(object.cameraid)
+          : 0,
         name: isSet(object.name) ? globalThis.String(object.name) : "",
       };
     },
@@ -770,6 +847,9 @@ export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto
       const obj: any = {};
       if (message.pipelineIndex !== 0) {
         obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        obj.cameraid = Math.round(message.cameraid);
       }
       if (message.name !== "") {
         obj.name = message.name;
@@ -787,13 +867,20 @@ export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto
     ): SetPipelineNameMessageProto {
       const message = createBaseSetPipelineNameMessageProto();
       message.pipelineIndex = object.pipelineIndex ?? 0;
+      message.cameraid = object.cameraid ?? 0;
       message.name = object.name ?? "";
       return message;
     },
   };
 
 function createBasePipelineResultProto(): PipelineResultProto {
-  return { isMsgpack: false, key: "", pipelineIndex: 0, value: undefined };
+  return {
+    isMsgpack: false,
+    key: "",
+    pipelineIndex: 0,
+    value: undefined,
+    cameraid: 0,
+  };
 }
 
 export const PipelineResultProto: MessageFns<PipelineResultProto> = {
@@ -808,10 +895,13 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
       writer.uint32(18).string(message.key);
     }
     if (message.pipelineIndex !== 0) {
-      writer.uint32(24).int32(message.pipelineIndex);
+      writer.uint32(24).uint32(message.pipelineIndex);
     }
     if (message.value !== undefined) {
       SettingValueProto.encode(message.value, writer.uint32(34).fork()).join();
+    }
+    if (message.cameraid !== 0) {
+      writer.uint32(40).uint32(message.cameraid);
     }
     return writer;
   },
@@ -848,7 +938,7 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
             break;
           }
 
-          message.pipelineIndex = reader.int32();
+          message.pipelineIndex = reader.uint32();
           continue;
         }
         case 4: {
@@ -857,6 +947,14 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
           }
 
           message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.cameraid = reader.uint32();
           continue;
         }
       }
@@ -880,6 +978,7 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
       value: isSet(object.value)
         ? SettingValueProto.fromJSON(object.value)
         : undefined,
+      cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
     };
   },
 
@@ -896,6 +995,9 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
     }
     if (message.value !== undefined) {
       obj.value = SettingValueProto.toJSON(message.value);
+    }
+    if (message.cameraid !== 0) {
+      obj.cameraid = Math.round(message.cameraid);
     }
     return obj;
   },
@@ -916,9 +1018,102 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
       object.value !== undefined && object.value !== null
         ? SettingValueProto.fromPartial(object.value)
         : undefined;
+    message.cameraid = object.cameraid ?? 0;
     return message;
   },
 };
+
+function createBaseRemovePipelineMessageProto(): RemovePipelineMessageProto {
+  return { removePipelineIndex: 0, cameraid: 0 };
+}
+
+export const RemovePipelineMessageProto: MessageFns<RemovePipelineMessageProto> =
+  {
+    encode(
+      message: RemovePipelineMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.removePipelineIndex !== 0) {
+        writer.uint32(8).uint32(message.removePipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        writer.uint32(16).uint32(message.cameraid);
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): RemovePipelineMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRemovePipelineMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.removePipelineIndex = reader.uint32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.cameraid = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): RemovePipelineMessageProto {
+      return {
+        removePipelineIndex: isSet(object.removePipelineIndex)
+          ? globalThis.Number(object.removePipelineIndex)
+          : 0,
+        cameraid: isSet(object.cameraid)
+          ? globalThis.Number(object.cameraid)
+          : 0,
+      };
+    },
+
+    toJSON(message: RemovePipelineMessageProto): unknown {
+      const obj: any = {};
+      if (message.removePipelineIndex !== 0) {
+        obj.removePipelineIndex = Math.round(message.removePipelineIndex);
+      }
+      if (message.cameraid !== 0) {
+        obj.cameraid = Math.round(message.cameraid);
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<RemovePipelineMessageProto>, I>>(
+      base?: I,
+    ): RemovePipelineMessageProto {
+      return RemovePipelineMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<I extends Exact<DeepPartial<RemovePipelineMessageProto>, I>>(
+      object: I,
+    ): RemovePipelineMessageProto {
+      const message = createBaseRemovePipelineMessageProto();
+      message.removePipelineIndex = object.removePipelineIndex ?? 0;
+      message.cameraid = object.cameraid ?? 0;
+      return message;
+    },
+  };
 
 type Builtin =
   | Date

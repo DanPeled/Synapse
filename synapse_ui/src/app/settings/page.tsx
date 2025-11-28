@@ -41,6 +41,7 @@ import {
   FILE_SERVER_URL,
 } from "@/services/backend/fileServer";
 import { DeviceInfoProto } from "@/proto/v1/device";
+import { RemovePipelineMessageProto } from "@/proto/v1/pipeline";
 
 async function downloadSettings(deviceInfo: DeviceInfoProto) {
   await downloadHttpDirectoryAsZip(
@@ -163,7 +164,6 @@ function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
           onClickAction={() => {
             const payload = MessageProto.create({
               type: MessageTypeProto.MESSAGE_TYPE_PROTO_RESTART_SYNAPSE,
-              removePipelineIndex: -1,
             });
 
             const binary = MessageProto.encode(payload).finish();
@@ -182,7 +182,6 @@ function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
           onClickAction={() => {
             const payload = MessageProto.create({
               type: MessageTypeProto.MESSAGE_TYPE_PROTO_REBOOT,
-              removePipelineIndex: -1,
             });
 
             const binary = MessageProto.encode(payload).finish();
@@ -202,7 +201,6 @@ function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
         onClickAction={() => {
           const payload = MessageProto.create({
             type: MessageTypeProto.MESSAGE_TYPE_PROTO_FORMAT,
-            removePipelineIndex: -1,
           });
 
           const binary = MessageProto.encode(payload).finish();
