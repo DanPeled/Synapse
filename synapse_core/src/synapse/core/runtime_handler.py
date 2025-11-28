@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import faulthandler
-import os
 import threading
 import time
 import traceback
@@ -116,7 +115,6 @@ class RuntimeManager:
                     cameraID,
                     {},
                 )
-                print(self.pipelineBindings[cameraID])
                 self.setPipelineByIndex(cameraID, self.pipelineBindings[cameraID])
             thread = threading.Thread(target=self.processCamera, args=(cameraID,))
             thread.daemon = True
@@ -407,8 +405,6 @@ class RuntimeManager:
                 f"Invalid cameraIndex {cameraIndex}. Must be in {list(self.cameraHandler.cameras.keys())})."
             )
             return
-
-        print(self.pipelineHandler.pipelineTypeNames)
 
         if pipelineIndex not in self.pipelineHandler.pipelineTypeNames[cameraIndex]:
             self.pipelineHandler.addPipeline(
@@ -705,57 +701,43 @@ class RuntimeManager:
         return frame
 
     def toDict(self) -> Dict:
-        return {}  # TODO
         return {
             "network": self.networkSettings.toJson(),
             "global": {
-                "camera_configs": {
-                    index: config.toDict()
-                    for index, config in self.cameraHandler.cameraConfigBindings.items()
-                }
-            },
-            "pipelines": {
-                key: pipeline.toDict(self.pipelineHandler.pipelineTypeNames[key])
-                for key, pipeline in (
-                    self.pipelineHandler.pipelineInstanceBindings.items()
-                )
-                if not (
-                    getPipelineTypename(type(pipeline)).startswith("$$")
-                    and getPipelineTypename(type(pipeline)).endswith("$$")
-                )
+                "cameras": [
+                    index for index in self.cameraHandler.cameraConfigBindings.keys()
+                ]
             },
         }
 
-    def saveCameraSettings(self) -> None:
-        ...
-        # cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {} # TODO
-        # for (
-        #     pipelineid,
-        #     pipeline,
-        # ) in self.pipelineHandler.pipelineInstanceBindings.items():
-        #     for cameraid, camerasettings in pipeline.cameraSettings.items():
-        #         if cameraid not in cameraSettingsDict:
-        #             cameraSettingsDict[cameraid] = {}
-        #         assert cameraid in cameraSettingsDict
-        #
-        #         cameraSettingsDict[cameraid][pipelineid] = camerasettings.toDict()
-        #
-        # for cameraid, data in cameraSettingsDict.items():
-        #     y = yaml.safe_dump(
-        #         {"pipeline_configs": data},
-        #         default_flow_style=None,
-        #         sort_keys=False,
-        #         indent=2,
-        #         width=80,
-        #     )
-        #     savefile = (
-        #         Config.getInstance().path.parent
-        #         / f"camera_{cameraid}"
-        #         / "pipeline_settings.yml"
-        #     )
-        #     savefile.parent.mkdir(parents=True, exist_ok=True)
-        #     with open(savefile, "w") as f:
-        #         f.write(y)
+    def savePipelines(self) -> None:
+        cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}  # TODO
+        for (
+            cameraid,
+            pipelinesSet,
+        ) in self.pipelineHandler.pipelineInstanceBindings.items():
+            cameraSettingsDict[cameraid] = {}
+            for pipelineid, pipeline in pipelinesSet.items():
+                cameraSettingsDict[cameraid][pipelineid] = pipeline.toDict(
+                    (getPipelineTypename(type(pipeline))), cameraid
+                )
+
+        for cameraid, data in cameraSettingsDict.items():
+            y = yaml.safe_dump(
+                {"pipeline_configs": data},
+                default_flow_style=None,
+                sort_keys=False,
+                indent=2,
+                width=80,
+            )
+            savefile = (
+                Config.getInstance().path.parent
+                / f"camera_{cameraid}"
+                / "pipeline_settings.yml"
+            )
+            savefile.parent.mkdir(parents=True, exist_ok=True)
+            with open(savefile, "w") as f:
+                f.write(y)
 
     def save(self) -> None:
         y = yaml.safe_dump(
@@ -765,11 +747,11 @@ class RuntimeManager:
             indent=2,  # control indentation
             width=80,  # wrap width for long lists
         )
-        savefile = Path(os.getcwd()) / "config" / "settings.yml"
+        savefile = Config.getInstance().path
         with open(savefile, "w") as f:
             f.write(y)
 
-        self.saveCameraSettings()
+        self.savePipelines()
 
         log.log(
             MarkupColors.bold(

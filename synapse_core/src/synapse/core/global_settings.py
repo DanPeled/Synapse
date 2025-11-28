@@ -4,8 +4,11 @@
 
 from typing import Dict, Optional, Union, overload
 
+import yaml
+
 from ..stypes import CameraID
 from .camera_factory import CameraConfig
+from .config import Config
 from .settings_api import (Setting, SettingsCollection, SettingsMap,
                            SettingsValue)
 
@@ -18,6 +21,7 @@ class GlobalSettingsMeta(type):
     """
 
     kCameraConfigsKey: str = "camera_configs"
+    kCamerasListKey: str = "cameras"
     __settings: Optional[SettingsCollection] = None
     __cameraConfigs: Dict[CameraID, CameraConfig] = {}
 
@@ -36,13 +40,23 @@ class GlobalSettingsMeta(type):
         cls.__settings = SettingsCollection(settings)
         cls.__cameraConfigs: Dict[CameraID, CameraConfig] = {}
 
-        if cls.kCameraConfigsKey in settings:
-            if settings[cls.kCameraConfigsKey] is not None:
-                for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
-                    camConfig: CameraConfig = CameraConfig.fromDict(camData)
-                    cls.__cameraConfigs[index] = camConfig
+        if cls.kCamerasListKey in settings:
+            cameras = settings[cls.kCamerasListKey]
+            for camera in cameras:
+                with open(
+                    Config.getInstance().path.parent
+                    / f"camera_{camera}"
+                    / "camera_configs.yml"
+                ) as f:
+                    camera_settings = yaml.full_load(f)
+                    cls.__cameraConfigs[camera] = CameraConfig.fromDict(
+                        camera_settings.get("camera_configs") or {}
+                    )
+            # for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
+            #     camConfig: CameraConfig = CameraConfig.fromDict(camData)
+            #     cls.__cameraConfigs[index] = camConfig
             return True
-        return True
+        return False
 
     def hasCameraData(cls, cameraIndex: CameraID) -> bool:
         """Checks if camera data exists for the given camera index.
