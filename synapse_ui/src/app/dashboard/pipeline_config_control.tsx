@@ -4,14 +4,14 @@ import { SettingValueProto } from "@/proto/settings/v1/value";
 import { CameraProto } from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
 import { hasSettingValue } from "@/services/backend/backendContext";
-import { CameraID, PipelineID } from "@/services/backend/dataStractures";
+import { PipelineID } from "@/services/backend/dataStractures";
 import {
   GenerateControl,
   settingValueToProto,
 } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
-import { Activity, Camera, Settings } from "lucide-react";
+import { Camera, Settings } from "lucide-react";
 import { JSX, useEffect, useState } from "react";
 
 function generateControlFromSettingMeta({
@@ -150,11 +150,13 @@ export function PipelineConfigControl({
 
   useEffect(() => {
     generateControls();
-  }, [selectedPipelineType, selectedPipeline, backendConnected, locked]);
-
-  useEffect(() => {
-    generateControls();
-  }, [locked]);
+  }, [
+    selectedPipelineType,
+    selectedPipeline,
+    backendConnected,
+    locked,
+    cameraInfo,
+  ]);
 
   return (
     <Card
