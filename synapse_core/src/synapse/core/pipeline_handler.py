@@ -89,21 +89,21 @@ class PipelineHandler:
                 / f"camera_{cameraid}"
                 / "pipeline_settings.yml"
             )
-            if path.exists():
-                with open(
-                    path,
-                    "r",
-                ) as f:
-                    config = yaml.full_load(f)
-                    camera_config_dict = {}
-                    for pipelineid, camerasettings in config[
-                        "pipeline_configs"
-                    ].items():
-                        camera_config_dict[pipelineid] = CameraSettings(camerasettings)
-                        self.cameraPipelineSettings[pipelineid] = {}
-                        self.cameraPipelineSettings[pipelineid][cameraid] = (
-                            camera_config_dict[pipelineid]
-                        )
+            if not path.exists():
+                continue
+
+            with open(path, "r") as f:
+                config = yaml.full_load(f) or {}
+
+            if cameraid not in self.cameraPipelineSettings:
+                self.cameraPipelineSettings[cameraid] = {}
+
+            for pipelineid, camerasettings in (
+                config.get("pipeline_configs") or {}
+            ).items():
+                self.cameraPipelineSettings[cameraid][pipelineid] = CameraSettings(
+                    camerasettings
+                )
 
     def loadPipelineInstances(self):
         for cameraid in self.pipelineSettings.keys():
@@ -144,22 +144,33 @@ class PipelineHandler:
     def removePipeline(
         self, index: PipelineID, cameraid: CameraID
     ) -> Optional[Pipeline]:
-        if index in self.pipelineInstanceBindings:
-            pipeline = self.pipelineInstanceBindings[cameraid].pop(index)
-            self.pipelineTypeNames.pop(index)
-            self.pipelineNames.pop(index)
-            self.pipelineSettings.pop(index)
+        # check inside the camera's pipeline instances
+        if (
+            cameraid in self.pipelineInstanceBindings
+            and index in self.pipelineInstanceBindings[cameraid]
+        ):
+            pipeline = self.pipelineInstanceBindings[cameraid].pop(index, None)
+            if pipeline is not None:
+                # remove metadata for that pipeline *for that camera*
+                if cameraid in self.pipelineTypeNames:
+                    self.pipelineTypeNames[cameraid].pop(index, None)
+                if cameraid in self.pipelineNames:
+                    self.pipelineNames[cameraid].pop(index, None)
+                if cameraid in self.pipelineSettings:
+                    self.pipelineSettings[cameraid].pop(index, None)
 
-            log.warn(f"Pipeline at index {index} was removed.")
+                log.warn(
+                    f"Pipeline at index {index} was removed from camera {cameraid}."
+                )
 
-            self.onRemovePipeline.call(index, pipeline, cameraid)
+                self.onRemovePipeline.call(index, pipeline, cameraid)
 
-            return pipeline
-        else:
-            log.warn(
-                f"Attempted to remove pipeline at index {index}, but it was not found."
-            )
-            return None
+                return pipeline
+
+        log.warn(
+            f"Attempted to remove pipeline at index {index} for camera {cameraid}, but it was not found."
+        )
+        return None
 
     def addPipeline(
         self,
