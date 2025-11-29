@@ -10,7 +10,7 @@ SOURCE_DIR: Final[str] = "src"
 
 setup(
     name="synapsefrclib",
-    version="2025.0.0a2",
+    version="2025.0.0a3",
     packages=find_packages(where=SOURCE_DIR),
     package_dir={"": SOURCE_DIR},
     python_requires=">=3.9, <3.12",
