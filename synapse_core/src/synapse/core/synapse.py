@@ -573,14 +573,13 @@ class Synapse:
             if pipeline is not None:
                 val = protoToSettingValue(setSettingMSG.value)
                 pipeline.setSetting(setSettingMSG.setting, val)
-                for (
-                    cameraid,
-                    pipelineid,
-                ) in self.runtimeHandler.pipelineBindings.items():
-                    if pipelineid == setSettingMSG.pipeline_index:
-                        self.runtimeHandler.updateSetting(
-                            setSettingMSG.setting, cameraid, val
-                        )
+                self.runtimeHandler.updateSetting(
+                    setSettingMSG.setting, setSettingMSG.cameraid, val
+                )
+            else:
+                err(
+                    f"Attempted to set setting on non-existing pipeline (id={setSettingMSG.pipeline_index}, cameraid={setSettingMSG.cameraid})"
+                )
         elif msgType == MessageTypeProto.SET_PIPELINE_INDEX:
             assert_set(msgObj.set_pipeline_index)
             setPipeIndexMSG: SetPipelineIndexMessageProto = msgObj.set_pipeline_index
