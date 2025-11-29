@@ -4,6 +4,6 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>synapse</groupId>
   <artifactId>Synapse-vendordep</artifactId>
-  <version>2025.0.0a3-dev</version>
+  <version>2025.0.0a3</version>
   <packaging>pom</packaging>
 </project>
