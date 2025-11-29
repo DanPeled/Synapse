@@ -3,11 +3,11 @@
   <groupId>synapse</groupId>
   <artifactId>Synapse-java</artifactId>
   <versioning>
-    <latest>2025.0.0a2-dev</latest>
-    <release>2025.0.0a2-dev</release>
+    <latest>2025.0.0a3-dev</latest>
+    <release>2025.0.0a3-dev</release>
     <versions>
-      <version>2025.0.0a2-dev</version>
+      <version>2025.0.0a3-dev</version>
     </versions>
-    <lastUpdated>20251031200823</lastUpdated>
+    <lastUpdated>20251129102146</lastUpdated>
   </versioning>
 </metadata>

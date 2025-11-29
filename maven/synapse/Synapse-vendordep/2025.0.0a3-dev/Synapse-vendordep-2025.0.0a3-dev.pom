@@ -3,6 +3,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <groupId>synapse</groupId>
-  <artifactId>Synapse-java</artifactId>
-  <version>2025.0.0a2-dev</version>
+  <artifactId>Synapse-vendordep</artifactId>
+  <version>2025.0.0a3-dev</version>
+  <packaging>pom</packaging>
 </project>
