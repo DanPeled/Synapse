@@ -94,6 +94,7 @@ class NtClient:
 
     def cleanup(self) -> None:
         """Stops the client and destroys NetworkTables instances."""
+        self.nt_inst.disconnect()
         self.nt_inst.stopClient()
         NetworkTableInstance.destroy(self.nt_inst)
         if self.server:

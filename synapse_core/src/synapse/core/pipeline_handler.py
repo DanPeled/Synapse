@@ -35,11 +35,8 @@ class PipelineHandler:
     kInvalidPipelineIndex: Final[int] = -1
 
     def __init__(self, pipelineDirectory: Path):
-        """Initializes the PipelineHandler with the specified directory.
+        """Initializes the PipelineHandler with the specified directory."""
 
-        Args:
-            pipelineDirectory (Path): Path to the directory containing pipeline files.
-        """
         self.pipelineTypeNames: CameraPipelineDict[PipelineTypeName] = {}
         self.pipelineSettings: CameraPipelineDict[PipelineSettings] = {}
         self.cameraPipelineSettings: CameraPipelineDict[CameraSettings] = {}
@@ -49,6 +46,10 @@ class PipelineHandler:
         self.pipelineTypesViaName: Dict[str, Type[Pipeline]] = {}
         self.defaultPipelineIndexes: Dict[CameraID, PipelineID] = {}
 
+        # Cached for latency optimization
+        self._cachedPipelineTypename: Dict[Type[Pipeline], str] = {}
+        self._cachedSettingsType: Dict[Type[Pipeline], Type[PipelineSettings]] = {}
+
         self.pipelineDirectory: Path = pipelineDirectory
 
         self.onAddPipeline: Callback[PipelineID, Pipeline, CameraID] = Callback()
@@ -56,11 +57,7 @@ class PipelineHandler:
         self.onDefaultPipelineSet: Callback[PipelineID, CameraID] = Callback()
 
     def setup(self, directory: Path):
-        """Initializes the pipeline system by loading pipeline classes and their settings.
-
-        Args:
-            directory (Path): The directory containing pipeline implementations.
-        """
+        """Initializes the pipeline system by loading pipeline classes and their settings."""
         self.pipelineDirectory = directory
         self.pipelineTypesViaName = self.loadPipelineTypes(directory)
         self.loadPipelineSettings()
@@ -184,21 +181,30 @@ class PipelineHandler:
             typename, None
         )
         if pipelineType is not None:
-            settingsType = resolveGenericArgument(pipelineType) or PipelineSettings
+            # Use cached settings type
+            if pipelineType not in self._cachedSettingsType:
+                self._cachedSettingsType[pipelineType] = (
+                    resolveGenericArgument(pipelineType) or PipelineSettings
+                )
+            settingsType = self._cachedSettingsType[pipelineType]
+
             settingsInst = settingsType(settings)
             currPipeline = pipelineType(settings=settingsInst)
-            currPipeline.cameraSettings = self.cameraPipelineSettings.get(index) or {}
+
+            # Use cached typename
+            if pipelineType not in self._cachedPipelineTypename:
+                self._cachedPipelineTypename[pipelineType] = getPipelineTypename(
+                    pipelineType
+                )
             currPipeline.name = name
             currPipeline.pipelineIndex = index
+            currPipeline.cameraSettings = self.cameraPipelineSettings.get(index) or {}
 
-            if cameraid not in self.pipelineInstanceBindings.keys():
-                self.pipelineInstanceBindings[cameraid] = {}
-            if cameraid not in self.pipelineNames:
-                self.pipelineNames[cameraid] = {}
-            if cameraid not in self.pipelineSettings:
-                self.pipelineSettings[cameraid] = {}
-            if cameraid not in self.pipelineTypeNames:
-                self.pipelineTypeNames[cameraid] = {}
+            # Ensure camera dictionaries exist
+            self.pipelineInstanceBindings.setdefault(cameraid, {})
+            self.pipelineNames.setdefault(cameraid, {})
+            self.pipelineSettings.setdefault(cameraid, {})
+            self.pipelineTypeNames.setdefault(cameraid, {})
 
             self.pipelineInstanceBindings[cameraid][index] = currPipeline
             self.pipelineNames[cameraid][index] = name
