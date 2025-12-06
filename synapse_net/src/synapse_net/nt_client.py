@@ -48,30 +48,20 @@ class NtClient:
         self.nt_inst.startClient4(name)
 
         def connectionListener(event: Event):
-            if event.is_(EventFlags.kConnected):
-                assert isinstance(event.data, ConnectionInfo)
+            assert isinstance(event.data, ConnectionInfo)
 
-                if event.data.remote_ip == teamNumberToIP(self.teamNumber):
-                    log(f"Connected to NetworkTables server ({event.data.remote_ip})")
-                    NtClient.onConnect.call(event.data.remote_ip)
+            if event.is_(EventFlags.kConnected):
+                log(f"Connected to NetworkTables server ({event.data.remote_ip})")
+                NtClient.onConnect.call(event.data.remote_ip)
 
             elif event.is_(EventFlags.kDisconnected):
-                assert isinstance(event.data, ConnectionInfo)
-
-                if event.data.remote_ip == teamNumberToIP(self.teamNumber):
-                    log(
-                        f"Disconnected from NetworkTables server {event.data.remote_ip}"
-                    )
-                    NtClient.onDisconnect.call(event.data.remote_ip)
+                log(f"Disconnected from NetworkTables server ({event.data.remote_ip})")
+                NtClient.onDisconnect.call(event.data.remote_ip)
 
         self.nt_inst.addConnectionListener(True, connectionListener)
 
         if self.server is not None:
             self.server.addConnectionListener(True, connectionListener)
-
-        # NOTE:
-        # Removed blocking wait loop here.
-        # Connection is now fully event-driven via listeners.
 
         return True
 
