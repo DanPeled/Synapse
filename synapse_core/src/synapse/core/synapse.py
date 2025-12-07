@@ -104,7 +104,6 @@ class Synapse:
     kInstance: "Synapse"
 
     def __init__(self) -> None:
-        self.isRunning: bool = False
         self.runtimeHandler: RuntimeManager
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
@@ -125,7 +124,6 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
-        self.isRunning = True
         Synapse.kInstance = self
 
         platform = Platform.getCurrentPlatform()
@@ -679,7 +677,7 @@ class Synapse:
             reboot()
         elif msgType == MessageTypeProto.RESTART_SYNAPSE:
             warn("Attempting to restart Synapse, may cause some unexpected results")
-            self.runtimeHandler.isRunning = False
+            self.runtimeHandler.running.clear()
             self.runtimeHandler.cleanup()
             restartRuntime()
         elif msgType == MessageTypeProto.RENAME_CAMERA:
@@ -756,7 +754,7 @@ class Synapse:
         self.runtimeHandler.save()
 
     def close(self):
-        self.runtimeHandler.isRunning = False
+        self.runtimeHandler.running.clear()
         self.cleanup()
         self.runtimeHandler.cleanup()
 
