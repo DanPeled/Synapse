@@ -2,12 +2,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import logging
 import os
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Tuple
-import logging
 
 logger = logging.getLogger(__name__)
 

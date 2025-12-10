@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import importlib.util
-from pathlib import Path
-from threading import Thread
 from http.server import SimpleHTTPRequestHandler
+from pathlib import Path
 from socketserver import TCPServer
+from threading import Thread
 
 from synapse.log import log
 from synapse.util import getIP
@@ -24,6 +24,11 @@ class MultiHTMLHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         # Remove query parameters from the path
         requested_path = self.path.split("?")[0].lstrip("/")
+
+        # Redirect root to dashboard.html
+        if requested_path == "":
+            self.path = "/dashboard.html"
+            return super().do_GET()
 
         # Determine the full paths for requested file, .html, and 404
         file_path = Path(self.directory) / requested_path

@@ -8,8 +8,8 @@ from unittest import mock
 
 import paramiko
 import pytest
-
-from synapse_installer.command_executor import LocalCommandExecutor, SSHCommandExecutor
+from synapse_installer.command_executor import (LocalCommandExecutor,
+                                                SSHCommandExecutor)
 
 
 class TestLocalCommandExecutor:

@@ -3,14 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import pytest
-
 from synapse_installer.command_executor import SSHCommandExecutor
-from synapse_installer.sync import (
-    installPipRequirements,
-    installSystemPackage,
-    setupSudoers,
-    syncRequirements,
-)
+from synapse_installer.sync import (installPipRequirements,
+                                    installSystemPackage, setupSudoers,
+                                    syncRequirements)
 
 
 @pytest.fixture

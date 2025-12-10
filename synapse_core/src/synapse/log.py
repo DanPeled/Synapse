@@ -4,8 +4,8 @@
 
 import datetime
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 from rich import print

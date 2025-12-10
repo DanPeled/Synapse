@@ -3,23 +3,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
-from pathlib import Path
 import sys
 import traceback
+from pathlib import Path
 from typing import List, Optional
 
+import yaml
 from rich import print as fprint
 from synapse import log
 from synapse_installer.deploy import addDeviceConfig
-from synapse_installer.util import (
-    NOT_IN_SYNAPSE_PROJECT_ERR,
-    SYNAPSE_PROJECT_FILE,
-    getDistRequirements,
-    getUserRequirements,
-)
-import yaml
+from synapse_installer.util import (NOT_IN_SYNAPSE_PROJECT_ERR,
+                                    SYNAPSE_PROJECT_FILE, getDistRequirements,
+                                    getUserRequirements)
 
-from .command_executor import CommandExecutor, LocalCommandExecutor, SSHCommandExecutor
+from .command_executor import (CommandExecutor, LocalCommandExecutor,
+                               SSHCommandExecutor)
 
 PackageManager = str
 CheckInstalledCmd = str
