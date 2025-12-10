@@ -4,15 +4,12 @@
 
 import sys
 from pathlib import Path
-
-from synapse_installer.deploy import addDeviceConfig
+from typing import Callable, Dict, List
 
 from .util import NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE
 
-COMMAND_ARGV_IDX = 1
-
 HELP_TEXT = """
-Usage: <python> -m synapse_installer <command> [options]
+Usage: python -m synapse_installer <command> [options]
 
 Commands:
   create       Create a new project
@@ -20,98 +17,100 @@ Commands:
   sync         Sync files or data
   install      Run sync then deploy
   device       Device actions (e.g. `add`)
-
-Use `<python> -m synapse_installer <command> -h` for more information on a command.
 """
 
 
-def main():
-    argv = sys.argv
+def cmd_create(args: List[str]) -> int:
+    if args and args[0] in ("-h", "--help"):
+        print("Usage: python -m synapse_installer create\nCreate a new project.")
+        return 0
 
-    if len(argv) <= COMMAND_ARGV_IDX:
+    from .create import createProject
+
+    createProject()
+    return 0
+
+
+def cmd_deploy(args: List[str]) -> int:
+    if args and args[0] in ("-h", "--help"):
+        print("Usage: python -m synapse_installer deploy [hostnames]")
+        return 0
+
+    from .deploy import setupAndRunDeploy
+
+    setupAndRunDeploy(args)
+    return 0
+
+
+def cmd_sync(args: List[str]) -> int:
+    from .sync import sync
+
+    return sync(args)
+
+
+def cmd_install(args: List[str]) -> int:
+    if args and args[0] in ("-h", "--help"):
+        print("Usage: python -m synapse_installer install [hostnames]")
+        return 0
+
+    from .deploy import setupAndRunDeploy
+    from .sync import sync
+
+    result_sync = sync(args)
+    result_deploy = setupAndRunDeploy(args)
+    return 0 if result_sync == 0 and result_deploy == 0 else 1
+
+
+def cmd_device(args: List[str]) -> int:
+    if not args or args[0] in ("-h", "--help"):
+        print("Usage: python -m synapse_installer device add")
+        return 0
+
+    config_path = Path.cwd() / SYNAPSE_PROJECT_FILE
+    if not config_path.exists():
+        print(NOT_IN_SYNAPSE_PROJECT_ERR)
+        return 1
+
+    action = args[0]
+
+    if action == "add":
+        from synapse_installer.deploy import addDeviceConfig
+
+        addDeviceConfig(config_path)
+        return 0
+
+    print(f"Unknown device action: `{action}`")
+    return 1
+
+
+COMMANDS: Dict[str, Callable[[List[str]], int]] = {
+    "create": cmd_create,
+    "deploy": cmd_deploy,
+    "sync": cmd_sync,
+    "install": cmd_install,
+    "device": cmd_device,
+}
+
+
+def main() -> None:
+    argv = sys.argv[1:]
+
+    if not argv or argv[0] in ("-h", "--help"):
         print(HELP_TEXT)
+        sys.exit(0)
+
+    cmd, *args = argv
+    handler = COMMANDS.get(cmd)
+
+    if not handler or handler is None:
+        print(f"Unknown command: `{cmd}`\n{HELP_TEXT}")
+        sys.exit(1)
         return
 
-    cmd = argv[COMMAND_ARGV_IDX]
+    print(f"holy shit: {args}")
+    print(f"cmd: {cmd}")
 
-    if cmd in ("-h", "--help"):
-        print(HELP_TEXT)
-        return
-
-    if cmd == "deploy":
-        from .deploy import setupAndRunDeploy
-
-        # If user requests help for deploy
-        if len(argv) > COMMAND_ARGV_IDX + 1 and argv[COMMAND_ARGV_IDX + 1] in (
-            "-h",
-            "--help",
-        ):
-            print(
-                "Usage: <python> -m synapse_installer deploy [hostnames]\nDeploy the project."
-            )
-            return
-
-        setupAndRunDeploy(argv[1:])
-    elif cmd == "create":
-        from .create import createProject
-
-        if len(argv) > COMMAND_ARGV_IDX + 1 and argv[COMMAND_ARGV_IDX + 1] in (
-            "-h",
-            "--help",
-        ):
-            print("Usage: <python> -m synapse_installer create\nCreate a new project.")
-            return
-
-        createProject()
-    elif cmd == "sync":
-        from .sync import sync
-
-        if len(argv) > COMMAND_ARGV_IDX + 1 and argv[COMMAND_ARGV_IDX + 1] in (
-            "-h",
-            "--help",
-        ):
-            print(
-                "Usage: <python> -m synapse_installer sync [hostnames]\nSync files or data."
-            )
-            return
-
-        sync(argv[1:])
-    elif cmd == "install":
-        from .deploy import setupAndRunDeploy
-        from .sync import sync
-
-        if len(argv) > COMMAND_ARGV_IDX + 1 and argv[COMMAND_ARGV_IDX + 1] in (
-            "-h",
-            "--help",
-        ):
-            print(
-                "Usage: <python> -m synapse_installer install [hostnames]\nRun sync then deploy."
-            )
-            return
-
-        sync(argv[1:])
-        setupAndRunDeploy(argv[1:])
-    elif cmd == "device":
-        configFilePath = Path.cwd() / SYNAPSE_PROJECT_FILE
-
-        if not configFilePath.exists():
-            print(NOT_IN_SYNAPSE_PROJECT_ERR)
-            return
-
-        if len(argv) <= 2 or argv[2] in ("-h", "--help"):
-            print(
-                "Usage: <python> -m synapse_installer device add\nAdd a device to the project."
-            )
-            return
-
-        deviceAction = argv[2]
-        if deviceAction == "add":
-            addDeviceConfig(configFilePath)
-        else:
-            print(f"Unknown device action: `{deviceAction}`! Only `add` is supported.")
-
-    else:
-        print(f"Unknown command: `{cmd}`!\n{HELP_TEXT}")
+    sys.exit(handler(args))
 
 
 if __name__ == "__main__":

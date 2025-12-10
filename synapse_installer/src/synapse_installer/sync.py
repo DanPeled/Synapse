@@ -1,132 +1,58 @@
 # SPDX-FileCopyrightText: 2025 Dan Peled
-#
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+from pathlib import Path
 import sys
 import traceback
-from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
-import paramiko
-import synapse.log as log
-import yaml
 from rich import print as fprint
+from synapse import log
+from synapse_installer.deploy import addDeviceConfig
+from synapse_installer.util import (
+    NOT_IN_SYNAPSE_PROJECT_ERR,
+    SYNAPSE_PROJECT_FILE,
+    getDistRequirements,
+    getUserRequirements,
+)
+import yaml
 
-from .deploy import addDeviceConfig
-from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
-                   getDistRequirements, getUserRequirements, getWPILibYear)
+from .command_executor import CommandExecutor, LocalCommandExecutor, SSHCommandExecutor
 
 PackageManager = str
 CheckInstalledCmd = str
 InstallCmd = str
 
 
-def syncRequirements(hostname: str, password: str, ip: str) -> None:
-    try:
-        print(f"Connecting to {hostname}@{ip}...")
-
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(
-            ip,
-            username="root",
-            password=password,
-            timeout=10,
-            banner_timeout=10,
-            auth_timeout=5,
-        )
-        transport = client.get_transport()
-        assert transport is not None
-
-        setupSudoers(client, hostname)
-        installSystemPackage(client, "libopencv-dev")
-        installSystemPackage(client, "npm")
-        installNpmPackage(client, "serve", True)
-
-        synapseRequirements = getDistRequirements()
-        userRequirements = getUserRequirements(Path.cwd() / "pyproject.toml")
-        synapseRequirements.extend(userRequirements)
-
-        installPipRequirements(client, synapseRequirements)
-
-        client.close()
-        print(f"Sync completed on {hostname}")
-    except Exception as e:
-        fprint(log.MarkupColors.fail(f"{e}\n{traceback.format_exc()}"))
-
-
-def sync(argv: Optional[List[str]]) -> None:
-    cwd: Path = Path(os.getcwd())
-
-    assert (cwd / SYNAPSE_PROJECT_FILE).exists(), NOT_IN_SYNAPSE_PROJECT_ERR
-
-    data = {}
-    deployConfigPath = cwd / SYNAPSE_PROJECT_FILE
-    with open(deployConfigPath, "r") as f:
-        data: dict = yaml.full_load(f)
-
-    if data is None:
-        data = {}
-
-    if "deploy" not in data:
-        addDeviceConfig(deployConfigPath)
-        with open(deployConfigPath, "r") as f:
-            data: dict = yaml.full_load(f) or {"deploy": {}}
-
-    if argv is None:
-        argv = sys.argv
-
-    argc = len(argv)
-    if argc < 2:
-        fprint(log.MarkupColors.fail("No hostname to deploy to specified!"))
-        return
-
-    for i in range(1, argc):
-        currHostname = argv[i]
-        if currHostname in data["deploy"]:
-            deviceData = data["deploy"][currHostname]
-            syncRequirements(
-                deviceData["hostname"],
-                deviceData["password"],
-                deviceData["ip"],
-            )
-        else:
-            fprint(
-                log.MarkupColors.fail(
-                    f"No device named: `{currHostname}` found! skipping..."
-                )
-            )
-
-
-def setupSudoers(client: paramiko.SSHClient, hostname: str) -> None:
-    # Add sudoers entry before doing anything else
-    sudoers_line = (
+def setupSudoers(executor: CommandExecutor, hostname: str) -> None:
+    """Add sudoers entry for passwordless commands."""
+    sudoersLine: str = (
         "root ALL=(ALL) NOPASSWD: "
         "/bin/hostname, /usr/bin/hostnamectl, /sbin/ip, "
         "/usr/bin/tee, /bin/cat, /bin/sh"
     )
-    sudoers_file = "/etc/sudoers.d/root-custom-host-config"
+    sudoersFile: str = "/etc/sudoers.d/root-custom-host-config"
 
-    setup_sudoers_cmd = (
-        f"echo '{sudoers_line}' | tee {sudoers_file} > /dev/null && "
-        f"chmod 440 {sudoers_file}"
+    setupSudoersCmd: str = (
+        f"echo '{sudoersLine}' | tee {sudoersFile} > /dev/null && "
+        f"chmod 440 {sudoersFile}"
     )
 
-    stdin, stdout, stderr = client.exec_command(setup_sudoers_cmd)
-    err_out = stderr.read().decode()
-    if err_out.strip():
-        fprint(
-            log.MarkupColors.fail(f"Failed to setup sudoers on {hostname}:\n{err_out}")
-        )
+    stdout, stderr, exitCode = executor.execCommand(setupSudoersCmd)
+    if stderr.strip():
+        fprint(f"[red]Failed to setup sudoers on {hostname}:\n{stderr}[/red]")
     else:
-        fprint(log.MarkupColors.okgreen(f"Sudoers rule added on {hostname}"))
+        fprint(f"[green]Sudoers rule added on {hostname}[/green]")
 
 
-def installSystemPackage(client, package: str, use_sudo: bool = True) -> None:
-    sudo = "sudo " if use_sudo else ""
+def installSystemPackage(
+    executor: CommandExecutor, package: str, useSudo: bool = True
+) -> None:
+    """Install a system package using the appropriate package manager."""
+    sudo: str = "sudo " if useSudo else ""
 
-    managers: List[Tuple[PackageManager, CheckInstalledCmd, InstallCmd]] = [
+    managers: List[tuple[PackageManager, CheckInstalledCmd, InstallCmd]] = [
         (
             "apt",
             f"dpkg -s {package} >/dev/null 2>&1",
@@ -146,82 +72,160 @@ def installSystemPackage(client, package: str, use_sudo: bool = True) -> None:
         ),
     ]
 
-    for mgr, check_cmd, install_cmd in managers:
-        stdin, stdout, stderr = client.exec_command(f"command -v {mgr} >/dev/null 2>&1")
-        if stdout.channel.recv_exit_status() == 0:
-            stdin, stdout, stderr = client.exec_command(check_cmd)
-            if stdout.channel.recv_exit_status() == 0:
+    for mgr, checkCmd, installCmd in managers:
+        stdout, stderr, exitCode = executor.execCommand(
+            f"command -v {mgr} >/dev/null 2>&1"
+        )
+        if exitCode == 0:
+            stdout, stderr, exitCode = executor.execCommand(checkCmd)
+            if exitCode == 0:
                 print(f"{package} is already installed.")
                 return
             print(f"Installing {package} with {mgr}...")
-            client.exec_command(install_cmd)
+            executor.execCommand(installCmd)
             return
 
     raise RuntimeError("No supported package manager found")
 
 
-def installNpmPackage(
-    client: paramiko.SSHClient, package: str, global_install: bool = True
+def installPipRequirements(
+    executor: CommandExecutor,
+    requirements: List[str],
+    wplibYear: Optional[str] = None,
 ) -> None:
-    """Install an npm package globally on the remote device if not already installed."""
-    check_cmd = f"npm list -g {package} >/dev/null 2>&1"
-    install_cmd = f"npm install {'-g ' if global_install else ''}{package}"
-
-    stdin, stdout, stderr = client.exec_command(check_cmd)
-    if stdout.channel.recv_exit_status() == 0:
-        print(f"npm package '{package}' is already installed.")
-        return
-
-    print(f"Installing npm package '{package}'...")
-    stdin, stdout, stderr = client.exec_command(install_cmd)
-    err = stderr.read().decode()
-    if err.strip():
-        fprint(log.MarkupColors.fail(f"npm install failed for {package}:\n{err}"))
-    else:
-        fprint(
-            log.MarkupColors.okgreen(f"npm package '{package}' installed successfully.")
-        )
-
-
-def installPipRequirements(client: paramiko.SSHClient, requirements) -> None:
-    # Get installed packages on remote device
-    stdin, stdout, stderr = client.exec_command("python3 -m pip freeze")
-    installed_packages = {}
-    for line in stdout.read().decode().splitlines():
+    """Install Python pip requirements using venv Python."""
+    stdout, stderr, exitCode = executor.execCommand("python -m pip freeze")
+    installedPackages: dict[str, str] = {}
+    for line in stdout.splitlines():
         if "==" in line:
             name, ver = line.strip().split("==", 1)
-            installed_packages[name.lower()] = ver
+            installedPackages[name.lower()] = ver
 
     for i, requirement in enumerate(requirements, start=1):
         if "==" in requirement:
-            pkg_name, req_ver = requirement.split("==", 1)
+            pkgName, reqVer = requirement.split("==", 1)
         else:
-            pkg_name, req_ver = requirement, None
+            pkgName, reqVer = requirement, None
 
-        pkg_name = pkg_name.lower()
-        installed_ver = installed_packages.get(pkg_name)
+        pkgName = pkgName.lower()
+        installedVer: Optional[str] = installedPackages.get(pkgName)
 
-        if installed_ver is not None and (req_ver is None or installed_ver == req_ver):
+        if installedVer is not None and (reqVer is None or installedVer == reqVer):
             fprint(
-                f"[OK] {pkg_name} already installed "
-                f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
+                f"[green][OK][/green] {pkgName} already installed "
+                f"[{i}/{len(requirements)}]"
             )
             continue
 
-        fprint(
-            f"Installing {pkg_name}... "
-            f"{log.MarkupColors.okgreen(f'[{i}/{len(requirements)}]')}"
-        )
+        fprint(f"Installing {pkgName}... [{i}/{len(requirements)}]")
 
-        cmd = f"python3 -m pip install {requirement} "
-        if getWPILibYear():
+        cmd: str = f"python -m pip install {requirement} "
+        if wplibYear:
             cmd += (
                 f"--extra-index-url=https://wpilib.jfrog.io/artifactory/api/pypi/"
-                f"wpilib-python-release-{getWPILibYear()}/simple/ "
+                f"wpilib-python-release-{wplibYear}/simple/ "
             )
         cmd += "--break-system-packages --upgrade-strategy only-if-needed"
 
-        stdin, stdout, stderr = client.exec_command(cmd)
-        err = stderr.read().decode()
-        if err.strip():
-            fprint(log.MarkupColors.fail(f"Install for {pkg_name} failed!\n{err}"))
+        stdout, stderr, exitCode = executor.execCommand(cmd)
+        if stderr.strip():
+            fprint(f"[red]Install for {pkgName} failed!\n{stderr}[/red]")
+
+
+def sync(argv: Optional[List[str]] = None) -> int:
+    """
+    Sync devices specified in argv (hostnames).
+    Returns 0 if all succeeded, 1 if any failure occurred.
+    """
+    cwd: Path = Path(os.getcwd())
+    if not (cwd / SYNAPSE_PROJECT_FILE).exists():
+        fprint(log.MarkupColors.fail(NOT_IN_SYNAPSE_PROJECT_ERR))
+        return 0
+
+    deployConfigPath = cwd / SYNAPSE_PROJECT_FILE
+    with open(deployConfigPath, "r") as f:
+        data: dict = yaml.full_load(f) or {}
+
+    if "deploy" not in data:
+        addDeviceConfig(deployConfigPath)
+        with open(deployConfigPath, "r") as f:
+            data = yaml.full_load(f) or {"deploy": {}}
+
+    if argv is None:
+        argv = sys.argv
+
+    argc = len(argv)
+    if argc < 2:
+        fprint(log.MarkupColors.fail("No hostname to deploy to specified!"))
+        return 1
+
+    any_failure = False
+
+    for i in range(1, argc):
+        currHostname = argv[i]
+        if currHostname in data["deploy"]:
+            deviceData = data["deploy"][currHostname]
+            try:
+                requirements = getDistRequirements()
+                userRequirements = getUserRequirements(Path.cwd() / "pyproject.toml")
+                requirements.extend(userRequirements)
+
+                executor = SSHCommandExecutor(
+                    hostname=deviceData["ip"],
+                    username="root",
+                    password=deviceData["password"],
+                )
+                syncRequirements(
+                    executor,
+                    deviceData["hostname"],
+                    requirements=requirements,
+                )
+                executor.close()
+            except Exception as e:
+                fprint(log.MarkupColors.fail(f"Failed to sync {currHostname}: {e}"))
+                any_failure = True
+        else:
+            fprint(
+                log.MarkupColors.fail(
+                    f"No device named: `{currHostname}` found! skipping..."
+                )
+            )
+            any_failure = True
+
+    return 1 if any_failure else 0
+
+
+def syncRequirements(
+    executor: CommandExecutor,
+    hostname: str,
+    requirements: List[str],
+    wplibYear: Optional[str] = None,
+) -> None:
+    """Sync requirements using the provided executor."""
+    try:
+        setupSudoers(executor, hostname)
+        installSystemPackage(executor, "libopencv-dev")
+        installPipRequirements(executor, requirements, wplibYear)
+        executor.close()
+        print(f"Sync completed on {hostname}")
+    except Exception as e:
+        fprint(f"[red]{e}\n{traceback.format_exc()}[/red]")
+
+
+def syncLocal(requirements: List[str], wplibYear: Optional[str] = None) -> None:
+    """Sync requirements locally."""
+    executor: CommandExecutor = LocalCommandExecutor()
+    syncRequirements(executor, "localhost", requirements, wplibYear)
+
+
+def syncRemote(
+    hostname: str,
+    ip: str,
+    password: str,
+    requirements: List[str],
+    wplibYear: Optional[str] = None,
+) -> None:
+    """Sync requirements on a remote machine via SSH."""
+    print(f"Connecting to {hostname}@{ip}...")
+    executor: CommandExecutor = SSHCommandExecutor(ip, "root", password)
+    syncRequirements(executor, hostname, requirements, wplibYear)
