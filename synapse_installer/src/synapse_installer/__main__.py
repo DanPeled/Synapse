@@ -107,9 +107,6 @@ def main() -> None:
         sys.exit(1)
         return
 
-    print(f"holy shit: {args}")
-    print(f"cmd: {cmd}")
-
     sys.exit(handler(args))
 
 

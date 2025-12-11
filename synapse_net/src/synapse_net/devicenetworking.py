@@ -59,12 +59,7 @@ class NetworkingManager:
 
     @staticmethod
     def __startDhcp(interface: InterfaceName):
-        if shutil.which("dhclient"):
-            NetworkingManager.__runCommand(["sudo", "dhclient", "-v", interface])
-        else:
-            warn(
-                "dhclient not found. DHCP will not be started unless handled externally."
-            )
+        NetworkingManager.__runCommand(["sudo", "dhclient", "-v", interface])
 
     @staticmethod
     def __networkThreadLoop(
