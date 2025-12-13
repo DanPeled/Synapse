@@ -55,8 +55,7 @@ class GlobalSettingsMeta(type):
             # for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
             #     camConfig: CameraConfig = CameraConfig.fromDict(camData)
             #     cls.__cameraConfigs[index] = camConfig
-            return True
-        return False
+        return True
 
     def hasCameraData(cls, cameraIndex: CameraID) -> bool:
         """Checks if camera data exists for the given camera index.

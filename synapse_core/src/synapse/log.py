@@ -5,6 +5,7 @@
 import datetime
 import os
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 from rich import print
@@ -76,7 +77,15 @@ def logInternal(text: str):
     if PRINTS:
         print(text)
 
-    # Write the log to the new file
+    # Ensure the parent directory exists
+    log_path = Path(LOG_FILE)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Ensure the file exists
+    if not log_path.exists():
+        log_path.touch()
+
+    # Write the log message
     with open(LOG_FILE, "a") as f:
         f.write(str(text) + "\n")
 

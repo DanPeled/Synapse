@@ -40,9 +40,11 @@ def getDistRequirements() -> List[str]:
 
 
 def getUserRequirements(pyprojectPath: Path) -> List[str]:
-    data = toml.load(pyprojectPath)
-    requires = data.get("tool", {}).get("synapse", {}).get("requires", [])
-    return requires
+    if pyprojectPath.exists():
+        data = toml.load(pyprojectPath)
+        requires = data.get("tool", {}).get("synapse", {}).get("requires", [])
+        return requires
+    return []
 
 
 def getWPILibVersion() -> str:

@@ -10,6 +10,8 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+from synapse.log import log
+
 
 # -------------------------
 # HTTP Handler
@@ -104,9 +106,7 @@ class FileServer:
             allow_reuse_address = True
 
         self._server = ReusableTCPServer((self.host, self.port), CustomHandler)
-        print(
-            f"Serving files from '{self.files_dir}' at http://{self.host}:{self.port}/"
-        )
+        log(f"Serving file server at http://{self.host}:{self.port}/")
 
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()

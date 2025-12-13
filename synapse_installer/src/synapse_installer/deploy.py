@@ -4,7 +4,6 @@
 
 import os
 import pathlib as pthl
-import sys
 import traceback
 from enum import Enum
 from typing import List, Optional
@@ -55,7 +54,7 @@ def addDeviceConfig(path: pthl.Path):
 
         while deviceNickname in baseFile.get("deploy", {}):
             print(
-                f"Device with nickname `{deviceNickname} already exists! Please provide another one`"
+                f"Device with nickname `{deviceNickname}` already exists! Please provide another one"
             )
             deviceNickname = questionary.text(
                 f"Device Nickname (Leave blank for `{hostname}`)", default=hostname
@@ -81,10 +80,7 @@ def addDeviceConfig(path: pthl.Path):
         ).__dict__
 
     with open(path, "w") as f:
-        yaml.dump(
-            baseFile,
-            f,
-        )
+        yaml.dump(baseFile, f)
 
 
 def _connectAndDeploy(
@@ -97,11 +93,10 @@ def _connectAndDeploy(
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(
             ip,
-            username="root",
+            username=hostname,
             password=password,
-            timeout=10,
-            banner_timeout=10,
-            auth_timeout=5,
+            look_for_keys=False,
+            allow_agent=False,
         )
         transport = client.get_transport()
 
@@ -112,21 +107,29 @@ def _connectAndDeploy(
                 remote_zip = f"/tmp/{zip_path.name}"
                 print(f"Uploading {zip_path.name} to {remote_zip}")
                 scp.put(str(zip_path), remote_zip)
-                unzip_cmd = f"mkdir -p ~/Synapse && unzip -o {remote_zip} -d ~/Synapse"
+
+                # Unzip while ignoring warnings about "../" paths
+                unzip_cmd = f"mkdir -p ~/Synapse && unzip -o {remote_zip} -d ~/Synapse 2>/dev/null"
                 stdin, stdout, stderr = client.exec_command(unzip_cmd)
                 exit_status = stdout.channel.recv_exit_status()
+                out = stdout.read().decode()
+                err = stderr.read().decode()
+
                 if exit_status == 0:
                     print(f"Unzipped {zip_path.name} on {hostname}")
+                    if out.strip():  # Optional: print stdout messages if any
+                        print(out.strip())
                 else:
-                    print(f"Error unzipping {zip_path.name}:\n{stderr.read().decode()}")
+                    print(f"Error unzipping {zip_path.name} (exit {exit_status}):")
+                    if out.strip():
+                        print("STDOUT:", out.strip())
+                    if err.strip():
+                        print("STDERR:", err.strip())
                     break
-            else:
-                if not isServiceSetup(client, SERVICE_NAME):
-                    setupServiceOnConnectedClient(
-                        client,
-                        hostname,
-                    )
-                restartService(client, SERVICE_NAME)
+            # Only run if all zip files were successfully unzipped
+            if not isServiceSetup(client, SERVICE_NAME):
+                setupServiceOnConnectedClient(client, hostname)
+            restartService(client, SERVICE_NAME)
 
         client.close()
         print(f"Deployment completed on {hostname}")
@@ -139,44 +142,55 @@ def _connectAndDeploy(
 
 
 def deploy(path: pthl.Path, cwd: pthl.Path, argv: Optional[List[str]]):
-    data = {}
-    with open(path, "r") as f:
-        data: dict = yaml.full_load(f)
+    deploys = loadDeviceData(path, argv)
 
-    if "deploy" not in data:
-        addDeviceConfig(path)
-        with open(path, "r") as f:
-            data: dict = yaml.full_load(f) or {"deploy": {}}
+    project_zip = cwd / BUILD_DIR / "project.zip"
+    package_zip = cwd / BUILD_DIR / "synapse.zip"
 
-    if argv is None:
-        argv = sys.argv
-
-    argc = len(argv)
-    if argc < 2:
-        ...  # Throw error
-
-    for i in range(1, argc):
-        currHostname = argv[i]
-        if currHostname in data["deploy"]:
-            data = data["deploy"][currHostname]
-            project_zip = cwd / BUILD_DIR / "project.zip"
-            package_zip = cwd / BUILD_DIR / "synapse.zip"
-            _connectAndDeploy(
-                data["hostname"],
-                data["ip"],
-                data["password"],
-                [project_zip, package_zip],
-            )
-        else:
-            fprint(
-                MarkupColors.fail(
-                    f"Device with hostname `{currHostname}` does not exist"
-                )
-            )
+    for deviceNickname, deviceData in deploys.items():
+        _connectAndDeploy(
+            deviceData["hostname"],
+            deviceData["ip"],
+            deviceData["password"],
+            [project_zip, package_zip],
+        )
 
 
-def loadDeviceData(deployConfigPath: pthl.Path):
-    addDeviceConfig(deployConfigPath)
+def loadDeviceData(
+    deployConfigPath: pthl.Path, argv: Optional[List[str]] = None
+) -> dict:
+    """
+    Load device deploy data from the YAML config.
+    If devices are missing, prompts to add them.
+
+    Args:
+        deployConfigPath: Path to the YAML deploy config file.
+        argv: Optional list of hostnames to filter deploys.
+
+    Returns:
+        Dictionary of deploy device configs, filtered if argv is provided.
+    """
+    if not deployConfigPath.exists():
+        addDeviceConfig(deployConfigPath)
+
+    with open(deployConfigPath, "r") as f:
+        data: dict = yaml.full_load(f) or {}
+
+    if "deploy" not in data or not data["deploy"]:
+        addDeviceConfig(deployConfigPath)
+        with open(deployConfigPath, "r") as f:
+            data = yaml.full_load(f) or {}
+
+    deploys = data.get("deploy", {})
+
+    if argv:
+        filtered = {name: cfg for name, cfg in deploys.items() if name in argv}
+        missing = [name for name in argv if name not in deploys]
+        for name in missing:
+            fprint(MarkupColors.fail(f"Device `{name}` not found in config."))
+        return filtered
+
+    return deploys
 
 
 def setupAndRunDeploy(argv: Optional[List[str]] = None):
@@ -185,14 +199,10 @@ def setupAndRunDeploy(argv: Optional[List[str]] = None):
     assert (cwd / SYNAPSE_PROJECT_FILE).exists(), NOT_IN_SYNAPSE_PROJECT_ERR
 
     def fileShouldDeploy(f: pthl.Path):
-        return (
-            str(f).endswith(".py")
-            or f.is_relative_to(cwd / "deploy")
-            or f.is_relative_to(cwd / "config")
-        )
+        return str(f).endswith(".py") or f.is_relative_to(cwd / "deploy")
 
     deployConfigPath = cwd / SYNAPSE_PROJECT_FILE
-    loadDeviceData(deployConfigPath)
+    loadDeviceData(deployConfigPath, argv)
 
     createPackageZIP(cwd / BUILD_DIR)
     createDirectoryZIP(

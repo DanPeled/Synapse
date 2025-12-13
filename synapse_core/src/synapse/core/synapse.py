@@ -3,10 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import asyncio
-import importlib
-import importlib.util
 import os
-import subprocess
 import threading
 import time
 import traceback
@@ -31,6 +28,7 @@ from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
+from synapse_net.ui_handle import UIHandle
 
 from synapse_net import devicenetworking
 
@@ -48,47 +46,6 @@ from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
 from .settings_api import (cameraToProto, protoToSettingValue, settingsToProto,
                            settingValueToProto)
-
-
-class UIHandle:
-    @staticmethod
-    def isPIDRunning(pid):
-        # Example implementation; replace with your actual method
-        import os
-
-        try:
-            os.kill(pid, 0)
-        except OSError:
-            return False
-        else:
-            return True
-
-    @staticmethod
-    def startUI():
-        spec = importlib.util.find_spec("synapse_ui")
-        if spec and spec.origin:
-            file_path = Path("./.uistart")
-            if not file_path.exists():
-                file_path.touch()
-
-            with open(file_path, "r+") as f:
-                content = f.read().strip()
-                pid = int(content) if content.isdigit() else None
-
-                if pid and UIHandle.isPIDRunning(pid):
-                    os.kill(pid, 1)
-                f.seek(0)
-                f.truncate()
-                print(f"Starting serve in directory: {Path(spec.origin).parent}")
-                proc = subprocess.Popen(
-                    ["serve", "."],
-                    cwd=Path(spec.origin).parent,
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                log(f"Started UI at: https://{getIP()}:3000")
-                f.write(str(proc.pid))
 
 
 class Synapse:

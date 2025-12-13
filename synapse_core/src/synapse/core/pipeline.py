@@ -166,7 +166,9 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
     def toDict(self, type_: str, cameraIndex: int) -> dict:
         settingsDict = self.settings.toDict()
-        settingsDict.update(self.cameraSettings[cameraIndex].toDict())
+        settingsDict.update(
+            self.cameraSettings.get(cameraIndex, CameraSettings()).toDict()
+        )
 
         return {
             "name": self.name,
