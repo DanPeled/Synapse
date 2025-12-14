@@ -9,13 +9,12 @@ import numpy as np
 from cv2.aruco import Dictionary
 from cv2.typing import MatLike
 from synapse import Pipeline, PipelineSettings
-from synapse.core import Synapse
 from synapse.core.camera_factory import CalibrationData
 from synapse.core.pipeline import (CameraSettings, FrameResult, PipelineResult,
                                    systemPipeline)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
-from synapse.core.synapse import RemovePipelineMessageProto
+from synapse.core.synapse import RemovePipelineMessageProto, Synapse
 from synapse_net.proto.v1 import (CalibrationDataProto, MessageProto,
                                   MessageTypeProto)
 
