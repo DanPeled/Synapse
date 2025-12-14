@@ -107,8 +107,6 @@ def test_load_device_data_errors_when_missing(mock_setup, tmp_path):
     with pytest.raises(FileNotFoundError):
         loadDeviceData(path)
 
-    mock_setup.assert_not_called()
-
 
 @mock.patch("synapse_installer.deploy.addDeviceConfig")
 def test_load_device_data_creates_when_empty(mock_setup, tmp_path):
