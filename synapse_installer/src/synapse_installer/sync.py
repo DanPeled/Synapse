@@ -122,8 +122,8 @@ def ensurePython310(executor: CommandExecutor) -> str:
         "tar xvf Python-3.10.12.tgz",
         "cd Python-3.10.12",
         "./configure --enable-optimizations",
-        f"make -j$(nproc)",
-        f"sudo make altinstall",
+        "make -j$(nproc)",
+        "sudo make altinstall",
     ]
     fullCmd = " && ".join(cmds)
     print("running thingamajig")

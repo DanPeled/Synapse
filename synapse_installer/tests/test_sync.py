@@ -25,7 +25,7 @@ class TestSetupSudoers:
         mocker.patch("synapse_installer.sync.fprint")
         mockExecutor.execCommand.return_value = ("", "", 0)
 
-        setupSudoers(mockExecutor, "robot")
+        setupSudoers(mockExecutor, "robot", "root", "")
 
         mockExecutor.execCommand.assert_called_once()
 
@@ -33,7 +33,7 @@ class TestSetupSudoers:
         fprintMock = mocker.patch("synapse_installer.sync.fprint")
         mockExecutor.execCommand.return_value = ("", "error", 1)
 
-        setupSudoers(mockExecutor, "robot")
+        setupSudoers(mockExecutor, "robot", "root", "")
 
         fprintMock.assert_called_once()
         assert "Failed to setup sudoers" in str(fprintMock.call_args)
@@ -84,7 +84,9 @@ class TestInstallPipRequirements:
         )
         fprintMock = mocker.patch("synapse_installer.sync.fprint")
 
-        installPipRequirements(mockExecutor, ["numpy==1.21.0", "pandas==1.3.0"])
+        installPipRequirements(
+            mockExecutor, ["numpy==1.21.0", "pandas==1.3.0"], "python3"
+        )
 
         # Should print OK for each package
         assert fprintMock.call_count == 2
@@ -97,7 +99,9 @@ class TestInstallPipRequirements:
         ]
         fprintMock = mocker.patch("synapse_installer.sync.fprint")
 
-        installPipRequirements(mockExecutor, ["numpy==1.21.0", "pandas==1.3.0"])
+        installPipRequirements(
+            mockExecutor, ["numpy==1.21.0", "pandas==1.3.0"], "python3"
+        )
 
         # numpy should be OK, pandas installed
         calls = [str(c) for c in fprintMock.call_args_list]
@@ -112,7 +116,9 @@ class TestInstallPipRequirements:
         ]
         fprintMock = mocker.patch("synapse_installer.sync.fprint")
 
-        installPipRequirements(mockExecutor, ["numpy==1.21.0", "pandas==1.3.0"])
+        installPipRequirements(
+            mockExecutor, ["numpy==1.21.0", "pandas==1.3.0"], "python3"
+        )
 
         calls = [str(c) for c in fprintMock.call_args_list]
         assert all("Installing" in c for c in calls)
@@ -126,23 +132,23 @@ class TestSyncRequirements:
 
         executor = mocker.Mock(spec=LocalCommandExecutor)
         executor.execCommand.return_value = ("", "", 0)
-        fprintMock = mocker.patch("synapse_installer.sync.fprint")
+        _ = mocker.patch("synapse_installer.sync.fprint")
         mocker.patch("synapse_installer.sync.setupSudoers")
         mocker.patch("synapse_installer.sync.installSystemPackage")
         mocker.patch("synapse_installer.sync.installPipRequirements")
 
-        syncRequirements(executor, "localhost", ["numpy"])
+        syncRequirements(executor, "localhost", "localhost", "", ["numpy"])
 
         executor.close.assert_called_once()
 
     def test_remote_executor(self, mocker):
         executor = mocker.Mock(spec=SSHCommandExecutor)
         executor.execCommand.return_value = ("", "", 0)
-        fprintMock = mocker.patch("synapse_installer.sync.fprint")
+        _ = mocker.patch("synapse_installer.sync.fprint")
         mocker.patch("synapse_installer.sync.setupSudoers")
         mocker.patch("synapse_installer.sync.installSystemPackage")
         mocker.patch("synapse_installer.sync.installPipRequirements")
 
-        syncRequirements(executor, "remotehost", ["numpy"])
+        syncRequirements(executor, "remotehost", "remotehost", "", ["numpy"])
 
         executor.close.assert_called_once()
