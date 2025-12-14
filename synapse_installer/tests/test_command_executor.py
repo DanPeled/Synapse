@@ -2,209 +2,199 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import io
-from pathlib import Path
-from unittest import mock
+import subprocess
+import sys
+import types
+from unittest.mock import MagicMock
 
-import paramiko
 import pytest
-from synapse_installer.command_executor import (LocalCommandExecutor,
+from synapse_installer.command_executor import (CommandExecutor,
+                                                LocalCommandExecutor,
                                                 SSHCommandExecutor)
 
-
-class TestLocalCommandExecutor:
-    """Tests for LocalCommandExecutor."""
-
-    def test_execute_success(self, mocker) -> None:
-        """Test successful local command execution."""
-        mockRun: mock.Mock = mocker.patch(
-            "subprocess.run",
-            return_value=mock.Mock(returncode=0, stdout="output", stderr=""),
-        )
-        mocker.patch.object(
-            LocalCommandExecutor, "_getVenvPython", return_value=Path("/mock/python")
-        )
-
-        executor: LocalCommandExecutor = LocalCommandExecutor(venvDir=Path(".venv"))
-        stdout: str
-        stderr: str
-        exitCode: int
-        stdout, stderr, exitCode = executor.execCommand("echo hello")
-
-        assert stdout == "output"
-        assert stderr == ""
-        assert exitCode == 0
-        mockRun.assert_called_once()
-
-    def test_execute_failure(self, mocker) -> None:
-        """Test local command execution with non-zero exit code."""
-        mocker.patch(
-            "subprocess.run",
-            return_value=mock.Mock(returncode=1, stdout="", stderr="error"),
-        )
-        mocker.patch.object(
-            LocalCommandExecutor, "_getVenvPython", return_value=Path("/mock/python")
-        )
-
-        executor: LocalCommandExecutor = LocalCommandExecutor(venvDir=Path(".venv"))
-        stdout: str
-        stderr: str
-        exitCode: int
-        stdout, stderr, exitCode = executor.execCommand("invalid command")
-
-        assert stderr == "error"
-        assert exitCode == 1
-
-    def test_venv_python_normalization(self, mocker) -> None:
-        """Test that python commands are normalized with venv path."""
-        mockRun: mock.Mock = mocker.patch(
-            "subprocess.run",
-            return_value=mock.Mock(returncode=0, stdout="3.11.0", stderr=""),
-        )
-        mocker.patch.object(
-            LocalCommandExecutor,
-            "_getVenvPython",
-            return_value=Path("/venv/bin/python"),
-        )
-
-        executor: LocalCommandExecutor = LocalCommandExecutor(venvDir=Path(".venv"))
-        executor.execCommand("python --version")
-
-        callArgs: str = mockRun.call_args[0][0]
-        assert "/venv/bin/python" in callArgs
-
-    def test_python3_normalization(self, mocker) -> None:
-        """Test that python3 commands are normalized with venv path."""
-        mockRun: mock.Mock = mocker.patch(
-            "subprocess.run",
-            return_value=mock.Mock(returncode=0, stdout="3.11.0", stderr=""),
-        )
-        mocker.patch.object(
-            LocalCommandExecutor,
-            "_getVenvPython",
-            return_value=Path("/venv/bin/python"),
-        )
-
-        executor: LocalCommandExecutor = LocalCommandExecutor(venvDir=Path(".venv"))
-        executor.execCommand("python3 script.py")
-
-        callArgs: str = mockRun.call_args[0][0]
-        assert "/venv/bin/python script.py" in callArgs
-
-    def test_close_noop(self, mocker) -> None:
-        """Test that close() is a no-op for local executor."""
-        mocker.patch.object(
-            LocalCommandExecutor, "_getVenvPython", return_value=Path("/mock/python")
-        )
-
-        executor: LocalCommandExecutor = LocalCommandExecutor(venvDir=Path(".venv"))
-        # Should not raise
-        executor.close()
+# ---------------------------
+# helpers
+# ---------------------------
 
 
-class TestSSHCommandExecutor:
-    """Tests for SSHCommandExecutor."""
+def infinite_readline(lines):
+    """Return a callable that mimics readline(): returns lines, then '' forever."""
+    it = iter(lines)
 
-    @pytest.fixture
-    def mockSSHClient(self, mocker) -> mock.Mock:
-        """Create a mock SSH client."""
-        client: mock.Mock = mocker.Mock(spec=paramiko.SSHClient)
-        mockChannel: mock.Mock = mocker.Mock()
-        mockChannel.recv_exit_status.return_value = 0
+    def _readline():
+        try:
+            return next(it)
+        except StopIteration:
+            return ""
 
-        stdout: io.BytesIO = io.BytesIO(b"output")
-        stdout.channel = mockChannel
-        stderr: io.BytesIO = io.BytesIO(b"")
+    return _readline
 
-        client.exec_command.return_value = (io.BytesIO(b""), stdout, stderr)
-        client.get_transport.return_value = mocker.Mock()
-        return client
 
-    def test_init_success(self, mocker, mockSSHClient) -> None:
-        """Test successful SSH initialization and connection."""
-        mocker.patch("paramiko.SSHClient", return_value=mockSSHClient)
+# ---------------------------
+# Abstract base class
+# ---------------------------
 
-        executor: SSHCommandExecutor = SSHCommandExecutor(
-            hostname="robot",
-            username="admin",
-            password="pass123",
-            venvDir=".venv",
-        )
 
-        mockSSHClient.connect.assert_called_once()
-        assert executor.hostname == "robot"
-        assert executor.venvPython == ".venv/bin/python"
+def test_command_executor_is_abstract():
+    with pytest.raises(TypeError):
+        CommandExecutor()  # pyright: ignore
 
-    def test_execute_remote_command(self, mocker, mockSSHClient) -> None:
-        """Test executing a command on remote machine."""
-        mocker.patch("paramiko.SSHClient", return_value=mockSSHClient)
 
-        executor: SSHCommandExecutor = SSHCommandExecutor(
-            hostname="robot",
-            username="admin",
-            password="pass123",
-            venvDir=".venv",
-        )
-        stdout: str
-        stderr: str
-        exitCode: int
-        stdout, stderr, exitCode = executor.execCommand("echo hello")
+# ---------------------------
+# LocalCommandExecutor
+# ---------------------------
 
-        mockSSHClient.exec_command.assert_called()
-        assert stdout == "output"
-        assert exitCode == 0
 
-    def test_close_connection(self, mocker, mockSSHClient) -> None:
-        """Test closing SSH connection."""
-        mocker.patch("paramiko.SSHClient", return_value=mockSSHClient)
+def test_local_exec_command_success(monkeypatch):
+    fake_process = MagicMock()
+    fake_process.stdout.readline.side_effect = infinite_readline(["hello\n"])
+    fake_process.stderr.readline.side_effect = infinite_readline([])
+    fake_process.poll.side_effect = [None, 0]
+    fake_process.returncode = 0
 
-        executor: SSHCommandExecutor = SSHCommandExecutor(
-            hostname="robot",
-            username="admin",
-            password="pass123",
-            venvDir=".venv",
-        )
-        executor.close()
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **kw: fake_process)
 
-        mockSSHClient.close.assert_called_once()
+    executor = LocalCommandExecutor()
+    out, err, code = executor.execCommand("echo hello")
 
-    def test_execute_with_venv_normalization(self, mocker, mockSSHClient) -> None:
-        """Test that remote venv path is used in python commands."""
-        mocker.patch("paramiko.SSHClient", return_value=mockSSHClient)
+    assert out == "hello\n"
+    assert err == ""
+    assert code == 0
 
-        executor: SSHCommandExecutor = SSHCommandExecutor(
-            hostname="robot",
-            username="admin",
-            password="pass123",
-            venvDir="/custom/venv",
-        )
-        executor.execCommand("python script.py")
 
-        callArgs: str = mockSSHClient.exec_command.call_args[0][0]
-        assert "/custom/venv/bin/python script.py" in callArgs
+def test_local_exec_command_stderr(monkeypatch):
+    fake_process = MagicMock()
+    fake_process.stdout.readline.side_effect = infinite_readline([])
+    fake_process.stderr.readline.side_effect = infinite_readline(["err\n"])
+    fake_process.poll.side_effect = [None, 1]
+    fake_process.returncode = 1
 
-    def test_connection_failure(self, mocker) -> None:
-        """Test handling of SSH connection failure."""
-        mockClient: mock.Mock = mocker.Mock(spec=paramiko.SSHClient)
-        mockClient.connect.side_effect = Exception("Connection refused")
-        mocker.patch("paramiko.SSHClient", return_value=mockClient)
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **kw: fake_process)
 
-        with pytest.raises(RuntimeError, match="Failed to connect"):
-            SSHCommandExecutor(
-                hostname="invalid",
-                username="admin",
-                password="pass",
-                venvDir=".venv",
-            )
+    executor = LocalCommandExecutor()
+    out, err, code = executor.execCommand("badcmd")
 
-    def test_missing_paramiko(self, mocker) -> None:
-        """Test ImportError when paramiko is not installed."""
-        mocker.patch.dict("sys.modules", {"paramiko": None})
+    assert out == ""
+    assert err == "err\n"
+    assert code == 1
 
-        with pytest.raises(ImportError, match="paramiko is required"):
-            SSHCommandExecutor(
-                hostname="robot",
-                username="admin",
-                password="pass",
-                venvDir=".venv",
-            )
+
+def test_local_close_is_noop():
+    LocalCommandExecutor().close()
+
+
+# ---------------------------
+# SSHCommandExecutor init
+# ---------------------------
+
+
+def test_ssh_init_missing_paramiko(monkeypatch):
+    monkeypatch.setitem(sys.modules, "paramiko", None)
+
+    with pytest.raises(ImportError):
+        SSHCommandExecutor("host", "user", "pass")
+
+
+def test_ssh_init_connects(monkeypatch):
+    fake_client = MagicMock()
+
+    fake_paramiko = types.SimpleNamespace(
+        SSHClient=lambda: fake_client,
+        AutoAddPolicy=lambda: None,
+    )
+
+    monkeypatch.setitem(sys.modules, "paramiko", fake_paramiko)
+
+    SSHCommandExecutor("host", "user", "pass")
+
+    fake_client.connect.assert_called()
+
+
+# ---------------------------
+# SSHCommandExecutor execCommand
+# ---------------------------
+
+
+def test_ssh_exec_command_success(monkeypatch):
+    fake_channel = MagicMock()
+    fake_channel.exit_status_ready.side_effect = [False, True]
+    fake_channel.recv_ready.return_value = True
+    fake_channel.recv.return_value = b"out\n"
+    fake_channel.recv_stderr_ready.return_value = False
+    fake_channel.recv_exit_status.return_value = 0
+
+    fake_stdout = MagicMock(channel=fake_channel)
+    fake_stdout.read.return_value = b""
+
+    fake_stderr = MagicMock(channel=fake_channel)
+    fake_stderr.read.return_value = b""
+
+    fake_client = MagicMock()
+    fake_client.exec_command.return_value = (None, fake_stdout, fake_stderr)
+
+    fake_paramiko = types.SimpleNamespace(
+        SSHClient=lambda: fake_client,
+        AutoAddPolicy=lambda: None,
+    )
+
+    monkeypatch.setitem(sys.modules, "paramiko", fake_paramiko)
+
+    executor = SSHCommandExecutor("host", "user", "pass")
+    out, err, code = executor.execCommand("ls")
+
+    assert out == "out\n"
+    assert err == ""
+    assert code == 0
+
+
+def test_ssh_exec_command_exception(monkeypatch):
+    fake_client = MagicMock()
+    fake_client.exec_command.side_effect = Exception("boom")
+
+    fake_paramiko = types.SimpleNamespace(
+        SSHClient=lambda: fake_client,
+        AutoAddPolicy=lambda: None,
+    )
+
+    monkeypatch.setitem(sys.modules, "paramiko", fake_paramiko)
+
+    executor = SSHCommandExecutor("host", "user", "pass")
+
+    with pytest.raises(RuntimeError):
+        executor.execCommand("ls")
+
+
+# ---------------------------
+# SSHCommandExecutor close
+# ---------------------------
+
+
+def test_ssh_close_success(monkeypatch):
+    fake_client = MagicMock()
+
+    fake_paramiko = types.SimpleNamespace(
+        SSHClient=lambda: fake_client,
+        AutoAddPolicy=lambda: None,
+    )
+
+    monkeypatch.setitem(sys.modules, "paramiko", fake_paramiko)
+
+    executor = SSHCommandExecutor("host", "user", "pass")
+    executor.close()
+
+    fake_client.close.assert_called()
+
+
+def test_ssh_close_exception(monkeypatch):
+    fake_client = MagicMock()
+    fake_client.close.side_effect = Exception("close failed")
+
+    fake_paramiko = types.SimpleNamespace(
+        SSHClient=lambda: fake_client,
+        AutoAddPolicy=lambda: None,
+    )
+
+    monkeypatch.setitem(sys.modules, "paramiko", fake_paramiko)
+
+    executor = SSHCommandExecutor("host", "user", "pass")
+    executor.close()  # should not raise
