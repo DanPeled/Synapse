@@ -5,7 +5,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from synapse.core import Synapse
+from synapse.core.synapse import Synapse
 from synapse.core.runtime_handler import RuntimeManager
 
 
