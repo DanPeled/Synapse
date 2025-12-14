@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
+import pytest
 import yaml
 from synapse_installer.deploy import (_connectAndDeploy, addDeviceConfig,
                                       deploy, loadDeviceData)
@@ -100,10 +101,13 @@ def test_deploy_runs_connect_deploy(mock_connect, tmp_path, monkeypatch):
 
 
 @mock.patch("synapse_installer.deploy.addDeviceConfig")
-def test_load_device_data_creates_when_missing(mock_setup, tmp_path):
+def test_load_device_data_errors_when_missing(mock_setup, tmp_path):
     path = tmp_path / "nonexistent.yaml"
-    loadDeviceData(path)
-    mock_setup.assert_called_once_with(path)
+
+    with pytest.raises(FileNotFoundError):
+        loadDeviceData(path)
+
+    mock_setup.assert_not_called()
 
 
 @mock.patch("synapse_installer.deploy.addDeviceConfig")
