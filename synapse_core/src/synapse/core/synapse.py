@@ -124,7 +124,7 @@ class Synapse:
                 config.network.ip is not None
                 and config.network.networkInterface is not None
             ):
-                self.networkingManager.configureStaticIP(
+                self.networkingManager.configureStaticIp(
                     config.network.ip, config.network.networkInterface
                 )
 
@@ -675,7 +675,7 @@ class Synapse:
                 IsValidIP(networkSettings.ip)
                 and networkSettings.network_interface in network_interfaces
             ):
-                self.networkingManager.configureStaticIP(
+                self.networkingManager.configureStaticIp(
                     networkSettings.ip, networkSettings.network_interface
                 )
                 self.runtimeHandler.networkSettings.ip = networkSettings.ip
@@ -686,9 +686,7 @@ class Synapse:
                 networkSettings.ip == "NULL"
             ):  # Don't configure static IP and remove if config exists
                 self.runtimeHandler.networkSettings.ip = None
-                self.networkingManager.removeStaticIPDecl(
-                    networkSettings.network_interface
-                )
+                self.networkingManager.removeStaticIp(networkSettings.network_interface)
             else:
                 err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")
 
