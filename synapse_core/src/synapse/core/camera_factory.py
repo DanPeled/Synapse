@@ -10,13 +10,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
 from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
                     VideoSource)
-from cv2.typing import Size
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import CalibrationDataProto
@@ -25,6 +24,7 @@ from wpimath import geometry
 from ..log import err, warn
 from ..stypes import CameraID, Frame, Resolution
 
+Size = Tuple[int, int]
 PropName = str
 PropertyMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
 ResolutionString = str
@@ -312,19 +312,27 @@ class CsCoreCamera(SynapseCamera):
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self.camera: VideoCamera
-        self.frameBuffer: np.ndarray
         self.sink: CvSink
         self.propertyMeta: PropertyMetaDict = {}
         self._properties: Dict[str, Any] = {}
         self._videoModes: List[Any] = []
         self._validVideoModes: List[VideoMode] = []
 
-        self._frameQueue: queue.Queue[Tuple[bool, Optional[np.ndarray]]] = queue.Queue(
-            maxsize=5
+        # --- FIX: Memory Recycling Implementation ---
+        # Pool of pre-allocated frame buffers
+        self._poolSize: Final[int] = 5
+        self._bufferPool: List[np.ndarray] = []
+
+        # Queue now holds the INDEX of the filled buffer, not a copy of the frame data
+        # Tuple[bool, Optional[int]]: (hasFrame, buffer_index)
+        self._frameQueue: queue.Queue[Tuple[bool, Optional[int]]] = queue.Queue(
+            maxsize=self._poolSize
         )
+        # --- END FIX ---
+
         self._running: bool = False
         self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()  # Add this
+        self._lock = threading.Lock()
 
     @classmethod
     def create(
@@ -359,11 +367,9 @@ class CsCoreCamera(SynapseCamera):
         # Cache video modes and valid resolutions
         inst._videoModes = inst.camera.enumerateVideoModes()
         inst._validVideoModes = [mode for mode in inst._videoModes]
-        inst.setVideoMode(1000, 1920, 1080)
 
-        # Initialize frame buffer to current resolution
-        mode = inst.camera.getVideoMode()
-        inst.frameBuffer = np.zeros((mode.height, mode.width, 3), dtype=np.uint8)
+        # This will call setVideoMode, which now initializes the buffer pool.
+        inst.setVideoMode(1000, 1920, 1080)
 
         # Start background frame grabbing thread
         inst._startFrameThread()
@@ -383,39 +389,59 @@ class CsCoreCamera(SynapseCamera):
     def _frameGrabberLoop(self) -> None:
         while not self.isConnected():
             time.sleep(0.1)
+
+        current_buffer_index = 0
+
         while self._running:
-            with self._lock:  # Protect frame operations
-                result = self.sink.grabFrame(self.frameBuffer)
-            if len(result) > 0:
-                ret, frame = result
-                hasFrame = ret != 0
-                if hasFrame:
-                    frame_copy = frame.copy()  # no lock needed here; copying is safe
+            # 1. Select the next buffer from the pool to be filled
+            current_buffer = self._bufferPool[current_buffer_index]
+
+            with self._lock:
+                # 2. grabFrame REUSES the pre-allocated memory buffer (NO new allocation)
+                # We only need the return value (timestamp/status), which is 'ret'.
+                ret = self.sink.grabFrame(current_buffer)
+
+            hasFrame = ret != 0
+            if hasFrame:
+                # 3. Put the INDEX of the filled buffer into the queue.
+                # Since the data is not copied, we avoid fragmentation.
+                try:
+                    self._frameQueue.put_nowait((hasFrame, current_buffer_index))
+                except queue.Full:
+                    # Drop the OLDEST index to make space for the NEW buffer index
                     try:
-                        self._frameQueue.put_nowait((hasFrame, frame_copy))
-                    except queue.Full:
-                        try:
-                            self._frameQueue.get_nowait()
-                        except queue.Empty:
-                            pass
-                        self._frameQueue.put_nowait((hasFrame, frame_copy))
-                else:
-                    self._waitForNextFrame()
+                        self._frameQueue.get_nowait()
+                    except queue.Empty:
+                        pass
+                    self._frameQueue.put_nowait((hasFrame, current_buffer_index))
+
+                # 4. Advance the index circularly for the next frame
+                current_buffer_index = (current_buffer_index + 1) % self._poolSize
+            else:
+                self._waitForNextFrame()
+
             self._waitForNextFrame()
 
     def _waitForNextFrame(self):
         if self.isConnected():
-            if self.camera.getVideoMode().fps > 0:
-                time.sleep(
-                    1.0 / self.camera.getVideoMode().fps / 2.0
-                )  # Half the expected frame interval
+            mode = self.camera.getVideoMode()
+            if mode.fps > 0:
+                time.sleep(1.0 / mode.fps / 2.0)
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        with self._lock:  # Protect frame buffer access
+        # --- FIX: Retrieve the buffer from the pool using the index ---
+        with self._lock:
             try:
-                return self._frameQueue.get_nowait()
+                # Get the index of the most recently filled buffer
+                hasFrame, buffer_index = self._frameQueue.get_nowait()
+                if hasFrame and buffer_index is not None:
+                    # Return the pre-allocated numpy array corresponding to the index
+                    return True, self._bufferPool[buffer_index]
+                else:
+                    return False, None
             except queue.Empty:
                 return False, None
+        # --- END FIX ---
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()
@@ -460,7 +486,18 @@ class CsCoreCamera(SynapseCamera):
                     fps=mode.fps,
                     pixelFormat=pixelFormat,
                 )
-                self.frameBuffer = np.zeros((height, width, 3), dtype=np.uint8)
+
+                # --- FIX: Resize and reinitialize the buffer pool on resolution change ---
+                H, W = mode.height, mode.width
+                self._bufferPool.clear()
+                for _ in range(self._poolSize):
+                    self._bufferPool.append(np.zeros((H, W, 3), dtype=np.uint8))
+
+                # Clear the queue on resolution change to prevent mismatched buffers
+                with self._frameQueue.mutex:
+                    self._frameQueue.queue.clear()
+                # --- END FIX ---
+
                 return
 
         if not _fallback:
@@ -481,10 +518,10 @@ class CsCoreCamera(SynapseCamera):
                 )
                 return
 
-        warn(
-            f"No valid video modes found for pixelFormat={pixelFormat}. "
-            f"Camera default settings will be used."
-        )
+            warn(
+                f"No valid video modes found for pixelFormat={pixelFormat}. "
+                f"Camera default settings will be used."
+            )
 
     def getResolution(self) -> Resolution:
         videoMode = self.camera.getVideoMode()

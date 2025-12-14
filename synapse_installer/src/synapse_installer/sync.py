@@ -196,6 +196,9 @@ def syncRequirements(
         executor.execCommand(
             f"{python_cmd} -m pip install --upgrade pip setuptools wheel"
         )
+        requirements = list(
+            filter(lambda requirement: "extra" not in requirement, requirements)
+        )
         installPipRequirements(executor, requirements, python_cmd, wplibYear)
         executor.close()
         fprint(f"[green]Sync completed on {hostname}[/green]")
@@ -278,4 +281,4 @@ def syncRemote(
     """Sync requirements on a remote machine via SSH."""
     fprint(f"Connecting to {hostname}@{ip}...")
     executor: CommandExecutor = SSHCommandExecutor(ip, "root", password)
-    syncRequirements(executor, hostname, "root", password, requirements, wplibYear)
+    syncRequirements(executor, hostname, hostname, password, requirements, wplibYear)
