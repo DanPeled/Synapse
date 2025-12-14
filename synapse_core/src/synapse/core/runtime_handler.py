@@ -197,30 +197,30 @@ class RuntimeManager:
 
             metricsManager: Final[MetricsManager] = MetricsManager()
 
-            entry = NetworkTableInstance.getDefault().getEntry(
-                f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
-            )
+            # entry = NetworkTableInstance.getDefault().getEntry(
+            #     f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
+            # )
 
             while self.running.is_set():
                 cpuTemp = metricsManager.getCpuTemp()
                 cpuUsage = metricsManager.getCpuUtilization()
                 memory = metricsManager.getMemory()
                 uptime = metricsManager.getUptime()
-                gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                # gpuMemorySplit = metricsManager.getGPUMemorySplit()
                 usedRam = metricsManager.getUsedRam()
                 usedDiskPct = metricsManager.getUsedDiskPct()
-                npuUsage = metricsManager.getNpuUsage()
+                # npuUsage = metricsManager.getNpuUsage()
 
-                metrics = [
-                    cpuTemp,
-                    cpuUsage,
-                    memory,
-                    uptime,
-                    gpuMemorySplit,
-                    usedRam,
-                    usedDiskPct,
-                    npuUsage,
-                ]
+                # metrics = [
+                #     cpuTemp,
+                #     cpuUsage,
+                #     memory,
+                #     uptime,
+                #     gpuMemorySplit,
+                #     usedRam,
+                #     usedDiskPct,
+                #     npuUsage,
+                # ]
 
                 if WebSocketServer.kInstance is not None:
                     metricsMessage = HardwareMetricsProto()
@@ -238,10 +238,10 @@ class RuntimeManager:
                         )
                     )
 
-                entry.setDoubleArray(metrics)
+                # entry.setDoubleArray(metrics)
 
                 try:
-                    time.sleep(1)
+                    time.sleep(1.4)
                 except Exception:
                     continue
 
@@ -498,7 +498,7 @@ class RuntimeManager:
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
         # Create per-camera frame queue and FPS history
-        self.frameQueues[cameraIndex] = Queue(maxsize=2)
+        self.frameQueues[cameraIndex] = Queue(maxsize=50)
         self.fpsHistory[cameraIndex] = Deque(maxlen=30)
         self.pipelineExecutors[cameraIndex] = ThreadPoolExecutor(max_workers=1)
 

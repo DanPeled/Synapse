@@ -7,7 +7,6 @@ from typing import List, NamedTuple, Optional, Sequence
 import cv2
 import numpy as np
 from cv2.aruco import Dictionary
-from cv2.typing import MatLike
 from synapse import Pipeline, PipelineSettings
 from synapse.core.camera_factory import CalibrationData
 from synapse.core.pipeline import (CameraSettings, FrameResult, PipelineResult,
@@ -23,8 +22,8 @@ class CalibrationResult(NamedTuple):
     mean_error: float
     camera_matrix: np.ndarray
     dist_coeffs: np.ndarray
-    rvecs: Sequence[MatLike]
-    tvecs: Sequence[MatLike]
+    rvecs: Sequence[np.ndarray]
+    tvecs: Sequence[np.ndarray]
 
 
 class CalibrationPipelineSettings(PipelineSettings):

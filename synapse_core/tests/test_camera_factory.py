@@ -6,7 +6,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import cv2
-import numpy as np
 import synapse.core.camera_factory
 from cscore import VideoMode
 from synapse.core.camera_factory import CsCoreCamera
@@ -93,14 +92,12 @@ class TestCsCoreCamera(unittest.TestCase):
     @patch("synapse.core.camera_factory.CvSink")
     def test_grabFrame_logic(self, mock_sink):
         cam = CsCoreCamera("mock")
-        mock_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         cam.sink = MagicMock()
         cam.sink.grabFrame.return_value = 10
-        cam.frameBuffer = mock_frame
         cam._running = False  # Skip the thread loop
 
         # Run a single iteration
-        result = cam.sink.grabFrame(cam.frameBuffer)
+        result = cam.sink.grabFrame()
         self.assertEqual(result, 10)
 
     def test_get_resolution(self):

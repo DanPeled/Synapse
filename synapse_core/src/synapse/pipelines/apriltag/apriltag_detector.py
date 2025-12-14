@@ -4,11 +4,10 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, List, Protocol, Tuple
+from typing import Iterable, List, Protocol, Sequence, Tuple
 
 import cv2
 import numpy as np
-from cv2.typing import Scalar
 from synapse.stypes import Frame
 from typing_extensions import Buffer
 from wpimath import units
@@ -16,6 +15,7 @@ from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 
 Homography = Tuple[float, float, float, float, float, float, float, float, float]
 Corners = Tuple[float, float, float, float, float, float, float, float]
+Scalar = Sequence[float | int]
 
 
 @dataclass
