@@ -189,6 +189,7 @@ export function CameraAndPipelineControls({
                       variant="outline"
                       size="sm"
                       className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
+                      style={{ color: teamColor }}
                     >
                       <MoreVertical
                         className="w-4 h-4"

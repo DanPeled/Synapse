@@ -1,4 +1,8 @@
-import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
+import {
+  DeviceInfoProto,
+  HardwareMetricsProto,
+  SetNetworkSettingsProto,
+} from "@/proto/v1/device";
 import { WebSocketWrapper } from "../websocket";
 import {
   CalibrationDataProto,
@@ -24,11 +28,9 @@ export namespace BackendStateSystem {
     deviceinfo: DeviceInfoProto;
     hardwaremetrics: HardwareMetricsProto;
     connection: ConnectionState;
-    networktable: string;
     logs: LogMessageProto[];
     socket?: WebSocketWrapper;
     stateRef?: RefObject<State>;
-    teamnumber: number;
     cameras: Map<CameraID, CameraProto>;
     cameraperformance: Map<CameraID, CameraPerformanceProto>;
     pipelines: Map<CameraID, Map<PipelineID, PipelineProto>>;
@@ -37,6 +39,7 @@ export namespace BackendStateSystem {
     calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;
     recordingstatuses: Map<CameraID, boolean>;
     calibrating: boolean;
+    networksettings: SetNetworkSettingsProto;
   }
 
   // Define action types with a discriminated union

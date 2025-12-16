@@ -248,6 +248,14 @@ class Synapse:
             await self.websocket.sendToClient(
                 ws,
                 createMessage(
+                    MessageTypeProto.SET_NETWORK_SETTINGS,
+                    self.runtimeHandler.networkSettings.toProto(),
+                ),
+            )
+
+            await self.websocket.sendToClient(
+                ws,
+                createMessage(
                     MessageTypeProto.SEND_DEVICE_INFO,
                     deviceInfo,
                 ),
@@ -686,7 +694,7 @@ class Synapse:
                 networkSettings.ip == "NULL"
             ):  # Don't configure static IP and remove if config exists
                 self.runtimeHandler.networkSettings.ip = None
-                self.networkingManager.removeStaticIp(networkSettings.network_interface)
+                self.networkingManager.removeStaticIp()
             else:
                 err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")
 
