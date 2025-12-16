@@ -10,7 +10,6 @@ from asyncio import Queue
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from queue import Empty, Full
 from typing import Any, Deque, Dict, Final, List, Optional, Tuple, TypeAlias
 
 import cv2
@@ -497,59 +496,55 @@ class RuntimeManager:
     def processCamera(self, cameraIndex: CameraID):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
-        # Create per-camera frame queue and FPS history
-        self.frameQueues[cameraIndex] = Queue(maxsize=50)
         self.fpsHistory[cameraIndex] = Deque(maxlen=30)
         self.pipelineExecutors[cameraIndex] = ThreadPoolExecutor(max_workers=1)
 
-        log.log(f"Started {camera.name} loop")
+        maxFps = float(camera.getMaxFPS())
+        minInterval = 1.0 / maxFps if maxFps > 0 else 0.0
+
+        log.log(f"Started {camera.name} loop (maxFPS={maxFps})")
 
         while self.running.is_set():
-            loopStart = Timer.getFPGATimestamp()
+            loopStart = time.perf_counter()
+
             ret, frame = camera.grabFrame()
             if not ret or frame is None:
                 continue
 
-            # Fix rotation / black level if needed
             frame = self.fixtureFrame(cameraIndex, frame)
 
-            # Try to enqueue frame for processing (drop if queue is full)
-            try:
-                self.frameQueues[cameraIndex].put_nowait(frame)
-            except Full:
-                continue  # Skip frame if previous processing hasn't finished
+            # Skip if executor is busy
+            executor = self.pipelineExecutors[cameraIndex]
+            if executor._work_queue.qsize() > 0:
+                continue
 
-            # Submit frame processing to pipeline executor
-            self.pipelineExecutors[cameraIndex].submit(
-                self._processAndPublishFrame, cameraIndex
-            )
+            # Submit frame for processing
+            executor.submit(self._processAndPublishFrame, cameraIndex, frame)
 
-            # Maintain FPS timing
-            maxFps = camera.getMaxFPS()
-            frameTime = 1.0 / float(maxFps)
-            elapsed = Timer.getFPGATimestamp() - loopStart
-            remaining = frameTime - elapsed
+            # Maintain camera FPS
+            elapsed = time.perf_counter() - loopStart
+            remaining = minInterval - elapsed
             if remaining > 0:
                 time.sleep(remaining)
 
-    def _processAndPublishFrame(self, cameraIndex: CameraID):
+    def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
-        try:
-            frame = self.frameQueues[cameraIndex].get_nowait()
-        except Empty:
-            return  # No frame to process
 
         processStart = Timer.getFPGATimestamp()
 
         pipeline = self.pipelineHandler.getPipeline(
             self.pipelineBindings.get(cameraIndex, -1), cameraIndex
         )
+
         processedFrame = frame
         if pipeline is not None:
             try:
                 result = pipeline.processFrame(frame, processStart)
-                processedFrame = self.handleResults(result, cameraIndex)
-                if processedFrame is None:
+
+                out = self.handleResults(result, cameraIndex)
+                if out is not None:
+                    processedFrame = out
+                else:
                     processedFrame = frame
             except Exception as e:
                 log.err(
@@ -558,17 +553,11 @@ class RuntimeManager:
 
         processLatency = Timer.getFPGATimestamp() - processStart
 
-        # Calculate smoothed FPS
-        loopEnd = Timer.getFPGATimestamp()
-        totalLoopTime = loopEnd - processStart
-        fps = 1.0 / totalLoopTime if totalLoopTime > 0 else 0
+        fps = 1.0 / processLatency if processLatency > 0 else 0
         self.fpsHistory[cameraIndex].append(fps)
         smoothedFps = sum(self.fpsHistory[cameraIndex]) / len(
             self.fpsHistory[cameraIndex]
         )
-
-        # Overlay FPS
-        assert processedFrame is not None
 
         cv2.putText(
             processedFrame,
@@ -581,10 +570,8 @@ class RuntimeManager:
             lineType=cv2.LINE_8,
         )
 
-        # Send latency to NT / WebSocket
         self.sendLatency(cameraIndex, 0, processLatency, smoothedFps)
 
-        # Publish frame asynchronously
         self.publishExecutor.submit(
             self.cameraHandler.publishFrame, processedFrame, camera
         )

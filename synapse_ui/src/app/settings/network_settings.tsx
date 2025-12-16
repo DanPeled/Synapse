@@ -21,17 +21,20 @@ export function NetworkSettings({}) {
   const [manageDeviceNetworking, setManageDeviceNetworking] = useState(true);
   const {
     deviceinfo,
-    networktable,
-    setNetworktable,
+    networksettings,
+    setNetworksettings,
     connection,
-    teamnumber,
-    setTeamnumber,
     socket,
   } = useBackendContext();
+
   const [selectedNetworkInterface, setSelectedNetworkInterface] = useState(
     deviceinfo.networkInterfaces[0],
   );
+  const [teamNumber, setteamNumber] = useState(networksettings.teamNumber);
   const [hostname, setPropHostname] = useState(deviceinfo.hostname);
+  const [networkTable, setNetworkTable] = useState(
+    networksettings.networkTable,
+  );
   const [ipMode, setIpMode] = useState(IPMode.dhcp.valueOf());
   const [staticIPAddr, setStaticIPAddr] = useState(deviceinfo.ip);
 
@@ -45,11 +48,23 @@ export function NetworkSettings({}) {
 
   useEffect(() => {
     if (connection.backend) {
-      setPropHostname(deviceinfo.hostname);
-      setStaticIPAddr(deviceinfo.ip);
-      setSelectedNetworkInterface(deviceinfo.networkInterfaces.at(0) ?? "");
+      setPropHostname(networksettings.hostname);
+      if (ipAddressRegex.match(networksettings.ip)) {
+        setStaticIPAddr(networksettings.ip);
+      } else {
+        setStaticIPAddr(deviceinfo.ip);
+      }
+      setteamNumber(networksettings.teamNumber);
+      if (
+        deviceinfo.networkInterfaces.includes(networksettings.networkInterface)
+      ) {
+        setSelectedNetworkInterface(networksettings.networkInterface);
+      } else {
+        setSelectedNetworkInterface(deviceinfo.networkInterfaces.at(0) ?? "");
+      }
+      setNetworkTable(networksettings.networkTable);
     }
-  }, [deviceinfo, connection]);
+  }, [deviceinfo, connection, networksettings]);
 
   return (
     <Card
@@ -67,18 +82,18 @@ export function NetworkSettings({}) {
           <TextInput
             label="Team Number"
             pattern={teamNumberRegex}
-            value={teamnumber.toString() ?? ""}
+            value={teamNumber.toString() ?? ""}
             errorMessage="The NetworkTables Server Address must be a valid Team Number"
             onChange={(val) => {
-              setTeamnumber(+val);
+              setteamNumber(+val);
             }}
             textSize="text-lg"
           />
           <TextInput
             label="NetworkTable"
-            value={networktable}
+            value={networkTable}
             onChange={(val) => {
-              setNetworktable(val);
+              setNetworkTable(val);
             }}
             textSize="text-lg"
           />
@@ -164,18 +179,21 @@ export function NetworkSettings({}) {
           <Button
             className="mt-8"
             onClickAction={() => {
+              const networkSettings = SetNetworkSettingsProto.create({
+                ip: staticIPAddr,
+                hostname: hostname,
+                networkInterface: selectedNetworkInterface,
+                networkTable: networkTable,
+                teamNumber: teamNumber ?? 0,
+              });
+
               const payload = MessageProto.create({
                 type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS,
-                setNetworkSettings: SetNetworkSettingsProto.create({
-                  ip: staticIPAddr,
-                  hostname: hostname,
-                  networkInterface: selectedNetworkInterface,
-                  networkTable: networktable,
-                  teamNumber: teamnumber ?? 0,
-                }),
+                setNetworkSettings: networkSettings,
               });
 
               const binary = MessageProto.encode(payload).finish();
+              setNetworksettings(networkSettings);
               socket?.sendBinary(binary);
             }}
             disabled={!connection.backend || !manageDeviceNetworking}
