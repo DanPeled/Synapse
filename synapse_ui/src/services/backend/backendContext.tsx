@@ -9,7 +9,11 @@ import React, {
   useRef,
 } from "react";
 import { BackendStateSystem } from "./dataStractures";
-import { DeviceInfoProto, HardwareMetricsProto } from "@/proto/v1/device";
+import {
+  DeviceInfoProto,
+  HardwareMetricsProto,
+  SetNetworkSettingsProto,
+} from "@/proto/v1/device";
 import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
@@ -65,7 +69,6 @@ const initialState: BackendStateSystem.State = {
     backend: false,
     networktables: false,
   },
-  networktable: "Synapse",
   logs: [],
   cameras: new Map(),
   cameraperformance: new Map(),
@@ -73,7 +76,13 @@ const initialState: BackendStateSystem.State = {
   recordingstatuses: new Map(),
   pipelineresults: new Map(),
   calibrating: false,
-  teamnumber: 0,
+  networksettings: SetNetworkSettingsProto.create({
+    teamNumber: 0,
+    hostname: "hostname",
+    ip: "localhost",
+    networkInterface: "interface",
+    networkTable: "Synapse",
+  }),
 };
 
 export const BackendStateKeys = Object.keys(initialState).reduce(
@@ -220,6 +229,11 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
         const uint8Array = new Uint8Array(message);
         const messageObj = MessageProto.decode(uint8Array);
         switch (messageObj.type) {
+          case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS: {
+            const networkSettings = messageObj.setNetworkSettings!;
+            setters.setNetworksettings(networkSettings);
+            break;
+          }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS: {
             assert(messageObj.setConnectionInfo !== undefined);
             const connectionInfo = messageObj.setConnectionInfo;

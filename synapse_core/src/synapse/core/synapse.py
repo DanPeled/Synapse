@@ -248,6 +248,14 @@ class Synapse:
             await self.websocket.sendToClient(
                 ws,
                 createMessage(
+                    MessageTypeProto.SET_NETWORK_SETTINGS,
+                    self.runtimeHandler.networkSettings.toProto(),
+                ),
+            )
+
+            await self.websocket.sendToClient(
+                ws,
+                createMessage(
                     MessageTypeProto.SEND_DEVICE_INFO,
                     deviceInfo,
                 ),

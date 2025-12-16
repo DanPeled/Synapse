@@ -5,8 +5,7 @@
 import shutil
 import subprocess
 import threading
-import time
-from typing import Callable, Dict
+from typing import Optional
 
 from synapse.log import err, log, warn
 
@@ -18,8 +17,9 @@ InterfaceName = str
 
 class NetworkingManager:
     def __init__(self) -> None:
-        self._threads: Dict[InterfaceName, threading.Thread] = {}
-        self._threadRunning: Dict[InterfaceName, bool] = {}
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
 
     # ------------------------
     # Internal helpers
@@ -65,33 +65,32 @@ class NetworkingManager:
 
     @staticmethod
     def _startDhcp(interface: InterfaceName) -> None:
-        NetworkingManager._runCommand(["sudo", "dhclient", "-v", interface])
+        # dhclient can block → fire and forget
+        subprocess.Popen(
+            ["dhclient", "-v", interface],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         log(f"DHCP started on {interface}")
 
     # ------------------------
     # Thread worker
     # ------------------------
 
-    @staticmethod
-    def _networkLoop(
-        interface: InterfaceName,
-        staticIp: str,
-        run: Callable[[], bool],
-    ) -> None:
+    def _networkLoop(self, interface: InterfaceName, staticIp: str) -> None:
         staticAssigned = False
         dhcpStarted = False
 
-        while run():
+        while not self._stop_event.is_set():
             try:
-                if NetworkingManager._interfaceIsUp(interface):
+                if self._interfaceIsUp(interface):
                     if not staticAssigned:
-                        NetworkingManager._setStaticIp(interface, staticIp)
+                        self._setStaticIp(interface, staticIp)
                         staticAssigned = True
 
                     if not dhcpStarted:
-                        NetworkingManager._startDhcp(interface)
+                        self._startDhcp(interface)
                         dhcpStarted = True
-
                 else:
                     warn(f"{interface} is down, waiting...")
                     staticAssigned = False
@@ -100,44 +99,48 @@ class NetworkingManager:
             except Exception as e:
                 err(f"Networking thread error: {e}")
 
-            time.sleep(CHECK_INTERVAL)
+            self._stop_event.wait(CHECK_INTERVAL)
 
     # ------------------------
     # Public API
     # ------------------------
 
     def configureStaticIp(self, staticIp: str, interface: InterfaceName) -> None:
-        """Launch a background thread that ensures the interface keeps the static IP."""
-        if interface in self._threads:
-            self._threadRunning[interface] = False
-            self._threads[interface].join()
+        """Start (or restart) the background worker."""
+        with self._lock:
+            self._stopWorkerLocked()
 
-        self._threadRunning[interface] = True
+            self._stop_event.clear()
+            self._thread = threading.Thread(
+                target=self._networkLoop,
+                args=(interface, staticIp),
+                daemon=True,
+            )
+            self._thread.start()
 
-        thread = threading.Thread(
-            target=lambda: NetworkingManager._networkLoop(
-                interface,
-                staticIp,
-                lambda: self._threadRunning[interface],
-            ),
-            daemon=True,
-        )
-
-        self._threads[interface] = thread
-        thread.start()
         log(f"Started static IP manager for {interface}")
 
-    def removeStaticIp(self, interface: InterfaceName) -> None:
-        if interface in self._threads:
-            self._threadRunning[interface] = False
-            self._threads[interface].join()
-            log(f"Stopped static IP manager for {interface}")
+    def removeStaticIp(self) -> None:
+        """Stop the background worker."""
+        with self._lock:
+            self._stopWorkerLocked()
+        log("Stopped static IP manager")
 
     def close(self) -> None:
-        for interface, thread in self._threads.items():
-            self._threadRunning[interface] = False
-            thread.join()
+        """Shutdown the manager cleanly."""
+        with self._lock:
+            self._stopWorkerLocked()
         log("NetworkingManager shut down")
+
+    # ------------------------
+    # Internal lifecycle
+    # ------------------------
+
+    def _stopWorkerLocked(self) -> None:
+        if self._thread and self._thread.is_alive():
+            self._stop_event.set()
+            self._thread.join(timeout=5)
+        self._thread = None
 
 
 # ------------------------
