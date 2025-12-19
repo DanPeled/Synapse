@@ -72,8 +72,9 @@ jobs:
           # Copy SynapseBridge.json
           cp synapse_lib/vendordep/SynapseBridge.json "$DEST_DIR/"
 
-          # Stage all changes
-          git add -A
+          # Only add Maven artifacts and SynapseBridge.json
+          git add maven/$VERSION
+          git add maven/$VERSION/SynapseBridge.json
 
           # Commit if changes exist
           git diff --cached --quiet || git commit -m "Add/Update vendordep Maven artifacts (dev) for version $VERSION"
