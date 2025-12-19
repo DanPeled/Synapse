@@ -5,6 +5,8 @@ on:
     paths:
       - "synapse_lib/**"
       - ".github/workflows/synapse_lib_dev_release.yml"
+    branches:
+      - main
 
 jobs:
   publish-dev:
