@@ -13,22 +13,25 @@ import {
   hasSettingValue,
   useBackendContext,
 } from "@/services/backend/backendContext";
+import { PipelineID } from "@/services/backend/dataStractures";
 import {
   GenerateControl,
+  generateControlFromSettingMeta,
   settingValueToProto,
 } from "@/services/controls_generator";
-import { teamColor } from "@/services/style";
+import { baseCardColor, teamColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";
 import { AlertDialog } from "@/widgets/alertDialog";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
-import { Barcode, Camera, LoaderPinwheel, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
+import { Barcode, Camera, LoaderPinwheel, Settings, X } from "lucide-react";
 import { JSX, useEffect, useRef, useState } from "react";
 
 const CALIBRATION_PIPELINE_ID = 9999;
 
 function setCalibrationPipeline(
-  socket?: WebSocketWrapper,
+  socket: WebSocketWrapper,
   camera?: CameraProto,
 ) {
   if (camera) {
@@ -43,7 +46,7 @@ function setCalibrationPipeline(
     });
 
     const binary = MessageProto.encode(payload).finish();
-    socket?.sendBinary(binary);
+    socket.sendBinary(binary);
 
     const setPipelinePayload = MessageProto.create({
       type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX,
@@ -54,7 +57,7 @@ function setCalibrationPipeline(
     });
 
     const setPipelineBinary = MessageProto.encode(setPipelinePayload).finish();
-    socket?.sendBinary(setPipelineBinary);
+    socket.sendBinary(setPipelineBinary);
   }
 }
 
@@ -63,14 +66,14 @@ export function CalibrationDialog({
   setVisible,
   initialResolution,
   camera,
-  socket,
 }: {
   visible: boolean;
   setVisible: (visible: boolean) => void;
   initialResolution?: string;
   camera?: CameraProto;
-  socket?: WebSocketWrapper;
 }) {
+  const { socket } = useBackendContext();
+
   const [prevPipelineIndex, setPrevPipelineIndex] = useState<
     number | undefined
   >(undefined);
@@ -96,10 +99,10 @@ export function CalibrationDialog({
   >();
 
   const {
-    stateRef,
     calibrationdata,
     calibrating,
     pipelines,
+    setPipelines,
     pipelinetypes,
     connection,
     cameras,
@@ -157,29 +160,30 @@ export function CalibrationDialog({
     val: SettingValueProto,
     setting: string,
     pipeline?: PipelineProto,
-    socket?: WebSocketWrapper,
   ) {
-    if (!pipeline) {
-      pipeline = pipelines
-        .get(camera?.index ?? -1)
-        ?.get(CALIBRATION_PIPELINE_ID);
+    if (hasSettingValue(val)) {
+      const payload = MessageProto.create({
+        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
+        setPipelineSetting: SetPipleineSettingMessageProto.create({
+          pipelineIndex: pipeline!.index,
+          cameraid: camera!.index,
+          value: val,
+          setting: setting,
+        }),
+      });
+      socket?.sendBinary(MessageProto.encode(payload).finish());
     }
+  }
 
-    if (pipeline !== undefined) {
-      if (hasSettingValue(val)) {
-        const payload = MessageProto.create({
-          type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING,
-          setPipelineSetting: SetPipleineSettingMessageProto.create({
-            cameraid: camera?.index,
-            pipelineIndex: CALIBRATION_PIPELINE_ID,
-            value: val,
-            setting: setting,
-          }),
-        });
-
-        const binary = MessageProto.encode(payload).finish();
-        socket?.sendBinary(binary);
-      }
+  function setPipelinesOfSelectedCamera(
+    newpipelines: Map<PipelineID, PipelineProto>,
+  ) {
+    if (camera !== undefined) {
+      setPipelines((prev) => {
+        const copy = new Map(prev);
+        copy.set(camera?.index ?? 0, newpipelines);
+        return copy;
+      });
     }
   }
 
@@ -193,53 +197,17 @@ export function CalibrationDialog({
     const cameraItems: (JSX.Element | undefined)[] = [];
     const pipelineItems: (JSX.Element | undefined)[] = [];
 
+    if (!camera) return;
+
     selectedPipelineType.settings.forEach((setting) => {
-      const control = (
-        <GenerateControl
-          key={setting.name + setting.category}
-          setting={setting}
-          setValue={(val) => {
-            if (hasSettingValue(val)) {
-              setTimeout(() => {
-                if (selectedPipeline) {
-                  const oldPipelines = pipelines;
-
-                  const newSettingsValues = {
-                    ...selectedPipeline.settingsValues,
-                    [setting.name]: val,
-                  };
-
-                  const updatedPipeline = {
-                    ...selectedPipeline,
-                    settingsValues: newSettingsValues,
-                  };
-
-                  const newPipelines = new Map(oldPipelines);
-                  newPipelines
-                    .get(camera?.index ?? -1)
-                    ?.set(selectedPipeline.index, updatedPipeline);
-                  // setPipelines(newPipelines);
-
-                  if (stateRef) {
-                    stateRef.current.pipelines = newPipelines;
-                  }
-                }
-              }, 10);
-
-              setTimeout(() => {
-                setSetting(val, setting.name, selectedPipeline, socket);
-              }, 10);
-            }
-          }}
-          value={
-            selectedPipeline?.settingsValues[setting.name] ??
-            setting.default ??
-            settingValueToProto("")
-          }
-          defaultValue={setting.default}
-          locked={false}
-        />
-      );
+      const control = generateControlFromSettingMeta({
+        setting: setting,
+        selectedPipeline: selectedPipeline,
+        setPipelines: setPipelinesOfSelectedCamera,
+        setSetting: setSetting,
+        locked: false,
+        pipelines: pipelines.get(camera!.index) ?? new Map(),
+      });
 
       if (setting.category === "Camera Properties") {
         cameraItems.push(control);
@@ -248,18 +216,32 @@ export function CalibrationDialog({
       }
     });
 
+    camera?.settings.forEach((setting) => {
+      const control = generateControlFromSettingMeta({
+        setting: setting,
+        selectedPipeline: selectedPipeline,
+        setPipelines: setPipelinesOfSelectedCamera,
+        setSetting: setSetting,
+        locked: false,
+        pipelines: pipelines.get(camera!.index) ?? new Map(),
+      });
+      cameraItems.push(control);
+    });
+
     setCameraControls(cameraItems);
     setPipelineControls(pipelineItems);
   }
 
   useEffect(() => {
-    if (visible) {
-      if (camera) {
-        generateControls();
-        if (camera.pipelineIndex !== CALIBRATION_PIPELINE_ID) {
-          setPrevPipelineIndex(camera.pipelineIndex);
+    if (socket) {
+      if (visible) {
+        if (camera) {
+          generateControls();
+          if (camera.pipelineIndex !== CALIBRATION_PIPELINE_ID) {
+            setPrevPipelineIndex(camera.pipelineIndex);
+          }
+          setCalibrationPipeline(socket, camera);
         }
-        setCalibrationPipeline(socket, camera);
       }
     }
   }, [visible]);
@@ -314,7 +296,7 @@ export function CalibrationDialog({
       }}
       className="w-[90vw] h-[90vh]"
     >
-      <div style={{ color: teamColor }}>
+      <Row style={{ color: teamColor }} className="items-center">
         <Button
           onClick={() => {
             if (
@@ -333,53 +315,97 @@ export function CalibrationDialog({
             Close
           </span>
         </Button>
-      </div>
+        <h1 className="text-xl pl-2 text-center" style={{ color: teamColor }}>
+          Camera #{camera?.index} Calibration:
+        </h1>
+      </Row>
 
-      <Row className="mt-4 w-full" gap="gap-10" style={{ color: teamColor }}>
+      <Row className="mt-4 w-full" gap="gap-2" style={{ color: teamColor }}>
         <Column className="flex-1" style={{ color: teamColor }}>
-          <h1 className="text-xl" style={{ color: teamColor }}>
-            Camera #{camera?.index} Config:
-          </h1>
-          {!calibrating ? (
-            cameraControls.length > 0 ? (
-              <div className="space-y-2 pr-4">{cameraControls}</div>
-            ) : (
-              <div className="text-center" style={{ color: teamColor }}>
-                <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
-                <p className="select-none">Camera Settings</p>
-                <p className="text-sm select-none">
-                  Configure camera parameters
-                </p>
+          <Tabs
+            defaultValue="input"
+            className="w-full"
+            style={{ color: teamColor }}
+          >
+            <TabsList
+              className="grid w-full grid-cols-2 border-gray-600 rounded-xl gap-2"
+              style={{ backgroundColor: baseCardColor }}
+            >
+              <TabsTrigger
+                value="input"
+                className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer h-8"
+              >
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <span>Camera Properties</span>
+                  <Camera />
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="pipeline"
+                className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
+              >
+                {selectedPipelineType?.type.replaceAll("$$", "") ?? "Pipeline"}
+              </TabsTrigger>
+              {/* <TabsTrigger */}
+              {/*   value="output" */}
+              {/*   className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer" */}
+              {/* > */}
+              {/*   Output */}
+              {/* </TabsTrigger> */}
+            </TabsList>
+
+            <TabsContent value="input" className="p-6 space-y-6">
+              <div style={{ color: teamColor }}>
+                {cameraControls.length > 0 ? (
+                  <div className="space-y-2">{cameraControls}</div>
+                ) : (
+                  <div className="text-center" style={{ color: teamColor }}>
+                    <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                    <p className="select-none">Camera Settings</p>
+                    <p className="text-sm select-none">
+                      Configure camera parameters
+                    </p>
+                  </div>
+                )}
               </div>
-            )
-          ) : undefined}
-          <div className="items-center">
-            {calibrating ? (
-              <LoaderPinwheel className="w-16 h-16" color={teamColor} />
-            ) : camera ? (
-              <p></p>
-            ) : undefined}
-          </div>
+            </TabsContent>
+
+            <TabsContent value="pipeline" className="p-6 space-y-6">
+              <div style={{ color: teamColor }}>
+                {pipelineControls.length > 0 ? (
+                  <div className="space-y-2">{pipelineControls}</div>
+                ) : (
+                  <div className="text-center" style={{ color: teamColor }}>
+                    <Settings className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                    <p className="select-none">Pipeline Settings</p>
+                    <p className="text-sm select-none">
+                      Configure pipeline-specific parameters
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* <TabsContent value="output" className="p-6"> */}
+            {/*   <div className="text-center" style={{ color: teamColor }}> */}
+            {/*     <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" /> */}
+            {/*     <p className="select-none">Output Configuration</p> */}
+            {/*     <p className="text-sm select-none"> */}
+            {/*       Configure output streams and data */}
+            {/*     </p> */}
+            {/*   </div> */}
+            {/* </TabsContent> */}
+          </Tabs>
         </Column>
 
         <Column className="flex-1 items-center space-y-10">
           <CameraStream stream={camera?.streamPath} maxWidth="max-w-[500px]" />
-          {!calibrating ? (
-            pipelineControls.length > 0 ? (
-              <div className="space-y-2">{pipelineControls}</div>
-            ) : (
-              <div
-                className="text-center items-center"
-                style={{ color: teamColor }}
-              >
-                <Barcode className="w-16 h-16 mx-auto mb-2 opacity-50" />
-                <p className="select-none">Calibration Settings</p>
-                <p className="text-sm select-none">
-                  Configure calibration parameters
-                </p>
-              </div>
-            )
-          ) : undefined}
         </Column>
       </Row>
     </AlertDialog>

@@ -15,6 +15,7 @@ RemoteConnectionIP = str
 
 @lru_cache
 def teamNumberToIP(teamNumber: int, lastOctet: int = 1) -> str:
+    """Convert FRC team number to the default 10.TE.AM.X IP format."""
     te = str(teamNumber // 100)
     am = str(teamNumber % 100).zfill(2)
     return f"10.{te}.{am}.{lastOctet}"
@@ -22,39 +23,31 @@ def teamNumberToIP(teamNumber: int, lastOctet: int = 1) -> str:
 
 class NtClient:
     NT_TABLE: str = "Synapse"
-    """
-    A class that handles the connection and communication with a NetworkTables server.
-    It can be configured as either a client or a server.
-
-    Attributes:
-        INSTANCE (Optional[NtClient]): A singleton instance of the NtClient class.
-        nt_inst (NetworkTableInstance): The instance of NetworkTableInstance used for communication.
-        server (Optional[NetworkTableInstance]): The server instance if the client is running as a server, otherwise None.
-    """
     TABLE: str = ""
     INSTANCE: Optional["NtClient"] = None
+
     onConnect: Callback[RemoteConnectionIP] = Callback()
     onDisconnect: Callback[RemoteConnectionIP] = Callback()
 
     def setup(self, teamNumber: int, name: str, isServer: bool, isSim: bool) -> bool:
         """
-        Sets up the NetworkTables client or server, and attempts to connect to the specified server.
+        Sets up a NetworkTables client or server.
 
         Args:
-            server_name (str): The name of the NetworkTables server to connect to or host.
-            name (str): The name of the client or server instance.
-            is_server (bool): Flag indicating whether the instance should act as a server (default is False).
+            teamNumber: FRC team number (for default server IP resolution).
+            name: Name of this client/server.
+            isServer: Whether to run as a local server.
+            isSim: Whether running in simulation (connects to localhost).
 
         Returns:
-            bool: True if the connection or server start was successful, False if it timed out.
+            True if setup completed (connection may still be in progress).
         """
         NtClient.INSTANCE = self
         NtClient.NT_TABLE = name
-        # Initialize NetworkTables instance
         self.nt_inst = NetworkTableInstance.getDefault()
         self.teamNumber = teamNumber
 
-        # If acting as a server, create and start the server instance
+        # Server setup
         if isServer:
             self.server = NetworkTableInstance.create()
             self.server.startServer("127.0.0.1")
@@ -66,51 +59,42 @@ class NtClient:
             else:
                 self.nt_inst.setServerTeam(teamNumber)
 
-        # Client mode: set the server and start the client
+        # Start client
         self.nt_inst.startClient4(name)
 
-        timeout = 10  # seconds
+        timeout = 10
         start_time = time.time()
 
+        # Connection listener accepts any IP
         def connectionListener(event: Event):
-            if event.is_(EventFlags.kConnected):
-                assert isinstance(event.data, ConnectionInfo)
+            if isinstance(event.data, ConnectionInfo):
+                ip = event.data.remote_ip
+                if event.is_(EventFlags.kConnected):
+                    log(f"Connected to NetworkTables server ({ip})")
+                    NtClient.onConnect.call(ip)
+                elif event.is_(EventFlags.kDisconnected):
+                    log(f"Disconnected from NetworkTables server ({ip})")
+                    NtClient.onDisconnect.call(ip)
 
-                if event.data.remote_ip == teamNumberToIP(self.teamNumber):
-                    log(f"Connected to NetworkTables server ({event.data.remote_ip})")
-                    NtClient.onConnect.call(event.data.remote_ip)
-            elif event.is_(EventFlags.kDisconnected):
-                assert isinstance(event.data, ConnectionInfo)
-
-                if event.data.remote_ip == teamNumberToIP(self.teamNumber):
-                    log(
-                        f"Disconnected from NetworkTables server {event.data.remote_ip}"
-                    )
-                    NtClient.onDisconnect.call(event.data.remote_ip)
-
-        NetworkTableInstance.getDefault().addConnectionListener(
-            True, connectionListener
-        )
-
-        if self.server is not None:
+        self.nt_inst.addConnectionListener(True, connectionListener)
+        if self.server:
             self.server.addConnectionListener(True, connectionListener)
 
+        # Low-latency wait loop (non-blocking, short sleeps)
         while not self.nt_inst.isConnected():
-            curr = time.time() - start_time
-            if curr > timeout:
+            elapsed = time.time() - start_time
+            if elapsed > timeout:
                 warn(
-                    f"connection to server ({'127.0.0.1' if isServer else teamNumber}) from client ({name}) timed out after {curr} seconds"
+                    f"Connection timed out after {elapsed:.2f}s (server: {'127.0.0.1' if isServer else teamNumber}, client: {name})"
                 )
                 break
-            if not isServer:
-                log(f"Trying to connect to {teamNumberToIP(teamNumber, 4)}...")
-            else:
-                log("Trying to establish connection with server...")
-            time.sleep(1)
+            time.sleep(0.02)  # 20ms interval for faster reaction
 
         return True
 
     def cleanup(self) -> None:
+        """Stops the client and destroys NetworkTables instances."""
+        self.nt_inst.disconnect()
         self.nt_inst.stopClient()
         NetworkTableInstance.destroy(self.nt_inst)
         if self.server:

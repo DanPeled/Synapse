@@ -3,10 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import asyncio
-import importlib
-import importlib.util
 import os
-import subprocess
 import threading
 import time
 import traceback
@@ -31,6 +28,7 @@ from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
                                   SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
+from synapse_net.ui_handle import UIHandle
 
 from synapse_net import devicenetworking
 
@@ -50,47 +48,6 @@ from .settings_api import (cameraToProto, protoToSettingValue, settingsToProto,
                            settingValueToProto)
 
 
-class UIHandle:
-    @staticmethod
-    def isPIDRunning(pid):
-        # Example implementation; replace with your actual method
-        import os
-
-        try:
-            os.kill(pid, 0)
-        except OSError:
-            return False
-        else:
-            return True
-
-    @staticmethod
-    def startUI():
-        spec = importlib.util.find_spec("synapse_ui")
-        if spec and spec.origin:
-            file_path = Path("./.uistart")
-            if not file_path.exists():
-                file_path.touch()
-
-            with open(file_path, "r+") as f:
-                content = f.read().strip()
-                pid = int(content) if content.isdigit() else None
-
-                if pid and UIHandle.isPIDRunning(pid):
-                    os.kill(pid, 1)
-                f.seek(0)
-                f.truncate()
-                print(f"Starting serve in directory: {Path(spec.origin).parent}")
-                proc = subprocess.Popen(
-                    ["serve", "."],
-                    cwd=Path(spec.origin).parent,
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                log(f"Started UI at: https://{getIP()}:3000")
-                f.write(str(proc.pid))
-
-
 class Synapse:
     """
     handles the initialization and running of the Synapse runtime, including network setup and loading global settings.
@@ -104,7 +61,6 @@ class Synapse:
     kInstance: "Synapse"
 
     def __init__(self) -> None:
-        self.isRunning: bool = False
         self.runtimeHandler: RuntimeManager
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
@@ -125,7 +81,6 @@ class Synapse:
         Returns:
             bool: True if initialization was successful, False otherwise.
         """
-        self.isRunning = True
         Synapse.kInstance = self
 
         platform = Platform.getCurrentPlatform()
@@ -169,7 +124,7 @@ class Synapse:
                 config.network.ip is not None
                 and config.network.networkInterface is not None
             ):
-                self.networkingManager.configureStaticIP(
+                self.networkingManager.configureStaticIp(
                     config.network.ip, config.network.networkInterface
                 )
 
@@ -289,6 +244,14 @@ class Synapse:
             )
 
             deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
+
+            await self.websocket.sendToClient(
+                ws,
+                createMessage(
+                    MessageTypeProto.SET_NETWORK_SETTINGS,
+                    self.runtimeHandler.networkSettings.toProto(),
+                ),
+            )
 
             await self.websocket.sendToClient(
                 ws,
@@ -573,14 +536,13 @@ class Synapse:
             if pipeline is not None:
                 val = protoToSettingValue(setSettingMSG.value)
                 pipeline.setSetting(setSettingMSG.setting, val)
-                for (
-                    cameraid,
-                    pipelineid,
-                ) in self.runtimeHandler.pipelineBindings.items():
-                    if pipelineid == setSettingMSG.pipeline_index:
-                        self.runtimeHandler.updateSetting(
-                            setSettingMSG.setting, cameraid, val
-                        )
+                self.runtimeHandler.updateSetting(
+                    setSettingMSG.setting, setSettingMSG.cameraid, val
+                )
+            else:
+                err(
+                    f"Attempted to set setting on non-existing pipeline (id={setSettingMSG.pipeline_index}, cameraid={setSettingMSG.cameraid})"
+                )
         elif msgType == MessageTypeProto.SET_PIPELINE_INDEX:
             assert_set(msgObj.set_pipeline_index)
             setPipeIndexMSG: SetPipelineIndexMessageProto = msgObj.set_pipeline_index
@@ -680,7 +642,7 @@ class Synapse:
             reboot()
         elif msgType == MessageTypeProto.RESTART_SYNAPSE:
             warn("Attempting to restart Synapse, may cause some unexpected results")
-            self.runtimeHandler.isRunning = False
+            self.runtimeHandler.running.clear()
             self.runtimeHandler.cleanup()
             restartRuntime()
         elif msgType == MessageTypeProto.RENAME_CAMERA:
@@ -721,7 +683,7 @@ class Synapse:
                 IsValidIP(networkSettings.ip)
                 and networkSettings.network_interface in network_interfaces
             ):
-                self.networkingManager.configureStaticIP(
+                self.networkingManager.configureStaticIp(
                     networkSettings.ip, networkSettings.network_interface
                 )
                 self.runtimeHandler.networkSettings.ip = networkSettings.ip
@@ -732,9 +694,7 @@ class Synapse:
                 networkSettings.ip == "NULL"
             ):  # Don't configure static IP and remove if config exists
                 self.runtimeHandler.networkSettings.ip = None
-                self.networkingManager.removeStaticIPDecl(
-                    networkSettings.network_interface
-                )
+                self.networkingManager.removeStaticIp()
             else:
                 err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")
 
@@ -757,7 +717,7 @@ class Synapse:
         self.runtimeHandler.save()
 
     def close(self):
-        self.runtimeHandler.isRunning = False
+        self.runtimeHandler.running.clear()
         self.cleanup()
         self.runtimeHandler.cleanup()
 

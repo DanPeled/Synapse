@@ -6,15 +6,17 @@ import faulthandler
 import threading
 import time
 import traceback
+from asyncio import Queue
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, TypeAlias
+from typing import Any, Deque, Dict, Final, List, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableInstance,
-                    NetworkTableType, ValueEventData)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
+                    NetworkTableInstance, NetworkTableType, ValueEventData)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
                                   MessageTypeProto)
@@ -25,7 +27,7 @@ from wpimath.units import seconds, secondsToMilliseconds
 from ..bcolors import MarkupColors
 from ..callback import Callback
 from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
-from ..util import getIP
+from ..util import Publisher, getIP, getPublisher
 from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
@@ -76,13 +78,25 @@ class RuntimeManager:
         """
 
         faulthandler.enable()
+
         self.pipelineHandler: PipelineHandler = PipelineHandler(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
+        self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
+        self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
+        self.publishExecutor = ThreadPoolExecutor(max_workers=2)
+        self.pipelineExecutors: Dict[CameraID, ThreadPoolExecutor] = {}
+        self.frameQueues: Dict[CameraID, Queue] = {}
+        self.fpsHistory: Dict[CameraID, Deque] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
-        self.isRunning: bool = True
+
+        self.running = threading.Event()
+        self.running.set()
+
         self.isSetup: bool = False
         self.lastLatencyReportTime: float = time.time()
+
+        self.DEFAULT_STEP = "step_0"
 
         self.metricsThread: Optional[threading.Thread]
 
@@ -182,30 +196,30 @@ class RuntimeManager:
 
             metricsManager: Final[MetricsManager] = MetricsManager()
 
-            entry = NetworkTableInstance.getDefault().getEntry(
-                f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
-            )
+            # entry = NetworkTableInstance.getDefault().getEntry(
+            #     f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
+            # )
 
-            while self.isRunning:
+            while self.running.is_set():
                 cpuTemp = metricsManager.getCpuTemp()
                 cpuUsage = metricsManager.getCpuUtilization()
                 memory = metricsManager.getMemory()
                 uptime = metricsManager.getUptime()
-                gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                # gpuMemorySplit = metricsManager.getGPUMemorySplit()
                 usedRam = metricsManager.getUsedRam()
                 usedDiskPct = metricsManager.getUsedDiskPct()
-                npuUsage = metricsManager.getNpuUsage()
+                # npuUsage = metricsManager.getNpuUsage()
 
-                metrics = [
-                    cpuTemp,
-                    cpuUsage,
-                    memory,
-                    uptime,
-                    gpuMemorySplit,
-                    usedRam,
-                    usedDiskPct,
-                    npuUsage,
-                ]
+                # metrics = [
+                #     cpuTemp,
+                #     cpuUsage,
+                #     memory,
+                #     uptime,
+                #     gpuMemorySplit,
+                #     usedRam,
+                #     usedDiskPct,
+                #     npuUsage,
+                # ]
 
                 if WebSocketServer.kInstance is not None:
                     metricsMessage = HardwareMetricsProto()
@@ -223,10 +237,10 @@ class RuntimeManager:
                         )
                     )
 
-                entry.setDoubleArray(metrics)
+                # entry.setDoubleArray(metrics)
 
                 try:
-                    time.sleep(1)
+                    time.sleep(1.4)
                 except Exception:
                     continue
 
@@ -337,9 +351,20 @@ class RuntimeManager:
         self.onSettingChanged.call(prop, value, cameraIndex)
 
         nt_table = getCameraTable(camera)
-        entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(prop)
-        if entry is not None and entry.getValue() != value:
-            entry.setValue(value)
+        key = (cameraIndex, prop)
+
+        if key not in self.propPubs:
+            settings = nt_table.getSubTable(NTKeys.kSettings.value)
+            try:
+                self.propPubs[key] = getPublisher(settings, prop, value)
+            except Exception as e:
+                log.err(
+                    f"Failed to create publisher for prop '{prop}' "
+                    f"(camera={cameraIndex}, value_type={type(value)}): {e}"
+                )
+                return
+
+        self.propPubs[key].set(value)
 
     @staticmethod
     def getEventDataValue(
@@ -471,66 +496,92 @@ class RuntimeManager:
     def processCamera(self, cameraIndex: CameraID):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
-        log.log(f"Started {camera.name} loop")
+        self.fpsHistory[cameraIndex] = Deque(maxlen=30)
+        self.pipelineExecutors[cameraIndex] = ThreadPoolExecutor(max_workers=1)
 
-        while self.isRunning:
-            maxFps = camera.getMaxFPS()
-            frame_time = 1.0 / float(maxFps)
-            loop_start = Timer.getFPGATimestamp()
+        maxFps = float(camera.getMaxFPS())
+        minInterval = 1.0 / maxFps if maxFps > 0 else 0.0
+
+        log.log(f"Started {camera.name} loop (maxFPS={maxFps})")
+
+        while self.running.is_set():
+            loopStart = time.perf_counter()
 
             ret, frame = camera.grabFrame()
-            captureLatency = Timer.getFPGATimestamp() - loop_start
             if not ret or frame is None:
                 continue
 
             frame = self.fixtureFrame(cameraIndex, frame)
 
-            process_start = Timer.getFPGATimestamp()
+            # Skip if executor is busy
+            executor = self.pipelineExecutors[cameraIndex]
+            if executor._work_queue.qsize() > 0:
+                continue
 
-            pipeline = self.pipelineHandler.getPipeline(
-                self.pipelineBindings.get(cameraIndex, -1), cameraIndex
-            )
+            # Submit frame for processing
+            executor.submit(self._processAndPublishFrame, cameraIndex, frame)
 
-            processed_frame: Frame = frame
-
-            if pipeline is not None:
-                result = None
-                try:
-                    result = pipeline.processFrame(frame, loop_start)
-                except Exception as e:
-                    log.err(
-                        f"While processing pipeline #{self.pipelineBindings.get(cameraIndex)} for {self.cameraHandler.cameras[cameraIndex].name}: {e}\n{traceback.format_exc()}"
-                    )
-                frame = self.handleResults(result, cameraIndex)
-                if frame is not None:
-                    processed_frame = frame
-
-            processLatency = Timer.getFPGATimestamp() - process_start
-
-            # Sleep to enforce max FPS
-            elapsed = Timer.getFPGATimestamp() - loop_start
-            remaining = frame_time - elapsed
+            # Maintain camera FPS
+            elapsed = time.perf_counter() - loopStart
+            remaining = minInterval - elapsed
             if remaining > 0:
                 time.sleep(remaining)
-            loop_end = Timer.getFPGATimestamp()
-            total_loop_time = loop_end - loop_start
 
-            fps = 1.0 / total_loop_time if total_loop_time > 0 else 0
-            self.sendLatency(cameraIndex, captureLatency, processLatency, fps)
+    def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
+        camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
-            # Overlay FPS on the frame
-            cv2.putText(
-                processed_frame,
-                f"{int(fps)}",
-                FPSView.position,
-                FPSView.font,
-                FPSView.fontScale,
-                FPSView.color,
-                FPSView.thickness,
-                lineType=cv2.LINE_8,
-            )
+        processStart = Timer.getFPGATimestamp()
 
-            self.cameraHandler.publishFrame(processed_frame, camera)
+        pipeline = self.pipelineHandler.getPipeline(
+            self.pipelineBindings.get(cameraIndex, -1), cameraIndex
+        )
+
+        processedFrame = frame
+        if pipeline is not None:
+            try:
+                result = pipeline.processFrame(frame, processStart)
+
+                out = self.handleResults(result, cameraIndex)
+                if out is not None:
+                    processedFrame = out
+                else:
+                    processedFrame = frame
+            except Exception as e:
+                log.err(
+                    f"Pipeline error for camera {camera.name}: {e}\n{traceback.format_exc()}"
+                )
+
+        processLatency = Timer.getFPGATimestamp() - processStart
+
+        fps = 1.0 / processLatency if processLatency > 0 else 0
+        self.fpsHistory[cameraIndex].append(fps)
+        smoothedFps = sum(self.fpsHistory[cameraIndex]) / len(
+            self.fpsHistory[cameraIndex]
+        )
+
+        cv2.putText(
+            processedFrame,
+            f"{int(smoothedFps)}",
+            FPSView.position,
+            FPSView.font,
+            FPSView.fontScale,
+            FPSView.color,
+            FPSView.thickness,
+            lineType=cv2.LINE_8,
+        )
+
+        self.sendLatency(cameraIndex, 0, processLatency, smoothedFps)
+
+        self.publishExecutor.submit(
+            self.cameraHandler.publishFrame, processedFrame, camera
+        )
+
+    def publishFrameAsync(self, frame: Frame, camera: SynapseCamera):
+        if WebSocketServer.kInstance is not None:
+            threading.Thread(
+                target=lambda: self.cameraHandler.publishFrame(frame, camera),
+                daemon=True,
+            ).start()
 
     def run(self):
         """
@@ -543,15 +594,8 @@ class RuntimeManager:
             )
         )
 
-        while self.isRunning:
-            if NtClient.INSTANCE:
-                NtClient.INSTANCE.nt_inst.flush()
-                if NtClient.INSTANCE.server:
-                    NtClient.INSTANCE.server.flush()
-            try:
-                time.sleep(0.05)
-            except Exception:
-                continue
+        while self.running.is_set():
+            time.sleep(0.05)
 
     def handleResults(
         self, result: PipelineProcessFrameResult, cameraIndex: CameraID
@@ -561,29 +605,28 @@ class RuntimeManager:
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        entry = getCameraTable(self.cameraHandler.getCamera(cameraIndex)).getEntry(
-            CameraSettingsKeys.kViewID.value
-        )
-        DEFAULT_STEP = "step_0"
+        if cameraIndex not in self.cameraFrameEntries:
+            entry = getCameraTable(self.cameraHandler.getCamera(cameraIndex)).getEntry(
+                CameraSettingsKeys.kViewID.value
+            )
+            if not entry.exists():
+                entry.setString(self.DEFAULT_STEP)
+            self.cameraFrameEntries[cameraIndex] = entry
+        entry = self.cameraFrameEntries[cameraIndex]
 
         if result is None:
             return
 
         entry_exists = entry.exists()
         entry_value = (
-            entry.getString(defaultValue=DEFAULT_STEP) if entry_exists else DEFAULT_STEP
+            entry.getString(defaultValue=self.DEFAULT_STEP)
+            if entry_exists
+            else self.DEFAULT_STEP
         )
 
-        if not entry_exists:
-            entry.setString(DEFAULT_STEP)
-
         if isinstance(result, Frame):
-            if entry_value == DEFAULT_STEP:
+            if entry_value == self.DEFAULT_STEP:
                 return result
-        else:
-            for i, var in enumerate(result):
-                if entry_value == f"step_{i}":
-                    return var
 
     def sendLatency(
         self,
@@ -766,7 +809,7 @@ class RuntimeManager:
         cv2.destroyAllWindows()
 
         self.cameraHandler.cleanup()
-        self.isRunning = False
+        self.running.clear()
         for thread in self.cameraManagementThreads:
             thread.join()
         if self.metricsThread:

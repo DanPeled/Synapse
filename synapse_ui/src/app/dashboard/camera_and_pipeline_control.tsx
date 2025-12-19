@@ -31,12 +31,7 @@ import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { AddPipelineDialog } from "./addPipelineDialog";
 import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
 import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
-import {
-  teamColor,
-  baseCardColor,
-  hoverBg,
-  borderColor,
-} from "@/services/style";
+import { teamColor, baseCardColor, borderColor } from "@/services/style";
 import { CameraID } from "@/services/backend/dataStractures";
 import { WebSocketWrapper } from "@/services/websocket";
 
@@ -194,6 +189,7 @@ export function CameraAndPipelineControls({
                       variant="outline"
                       size="sm"
                       className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
+                      style={{ color: teamColor }}
                     >
                       <MoreVertical
                         className="w-4 h-4"

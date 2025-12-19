@@ -125,7 +125,6 @@ function ResolutionSelector({
           setVisible={setCalibrateResolutionVisible}
           initialResolution={selected?.resolution}
           camera={selectedCamera}
-          socket={socket}
         />
       </CardContent>
     </Card>

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
+from synapse_net.proto.v1 import SetNetworkSettingsProto
 
 
 @dataclass
@@ -66,6 +67,15 @@ class NetworkConfig:
             "ip": self.ip,
             "interface": self.networkInterface,
         }
+
+    def toProto(self) -> SetNetworkSettingsProto:
+        return SetNetworkSettingsProto(
+            hostname=self.hostname,
+            ip=self.ip or "localhost",
+            network_interface=self.networkInterface or "null",
+            network_table=self.name,
+            team_number=self.teamNumber,
+        )
 
 
 class Config:

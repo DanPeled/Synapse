@@ -12,8 +12,70 @@ import { Button } from "@/components/ui/button";
 import { teamColor } from "./style";
 import { RefreshCcw } from "lucide-react";
 import assert from "assert";
-import { FloatValue } from "@/google/protobuf/wrappers";
+import { hasSettingValue } from "./backend/backendContext";
+import { PipelineProto } from "@/proto/v1/pipeline";
+import { PipelineID } from "./backend/dataStractures";
 
+export function generateControlFromSettingMeta({
+  setting,
+  selectedPipeline,
+  pipelines,
+  setPipelines,
+  setSetting,
+  locked,
+}: {
+  setting: SettingMetaProto;
+  selectedPipeline?: PipelineProto;
+  setSetting: (
+    val: SettingValueProto,
+    setting: string,
+    pipeline: PipelineProto,
+  ) => void;
+  setPipelines: (val: Map<PipelineID, PipelineProto>) => void;
+  pipelines: Map<number, PipelineProto>;
+  locked: boolean;
+}) {
+  return (
+    <GenerateControl
+      key={setting.name + setting.category}
+      setting={setting}
+      setValue={(val) => {
+        if (hasSettingValue(val)) {
+          setTimeout(() => {
+            if (selectedPipeline !== undefined) {
+              const oldPipelines = pipelines;
+
+              const newSettingsValues = {
+                ...selectedPipeline.settingsValues,
+                [setting.name]: val,
+              };
+
+              const updatedPipeline = {
+                ...selectedPipeline,
+                settingsValues: newSettingsValues,
+              };
+
+              const newPipelines = new Map(oldPipelines);
+              newPipelines.set(selectedPipeline.index, updatedPipeline);
+              setPipelines(newPipelines);
+            }
+          }, 0);
+
+          setTimeout(() => {
+            setSetting(val, setting.name, selectedPipeline!);
+          }, 0);
+        }
+      }}
+      value={
+        selectedPipeline?.settingsValues[setting.name] ??
+        setting.default ??
+        settingValueToProto("")
+      }
+      defaultValue={setting.default}
+      locked={locked}
+    />
+  );
+}
 interface ControlGeneratorProps {
   setting: SettingMetaProto;
   setValue: (val: SettingValueProto) => void;

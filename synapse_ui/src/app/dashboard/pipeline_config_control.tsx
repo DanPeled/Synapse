@@ -1,79 +1,13 @@
 import { Card, CardHeader } from "@/components/ui/card";
-import { SettingMetaProto } from "@/proto/settings/v1/settings";
 import { SettingValueProto } from "@/proto/settings/v1/value";
 import { CameraProto } from "@/proto/v1/camera";
 import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
-import { hasSettingValue } from "@/services/backend/backendContext";
-import { CameraID, PipelineID } from "@/services/backend/dataStractures";
-import {
-  GenerateControl,
-  settingValueToProto,
-} from "@/services/controls_generator";
+import { PipelineID } from "@/services/backend/dataStractures";
+import { generateControlFromSettingMeta } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
-import { Activity, Camera, Settings } from "lucide-react";
+import { Camera, Settings } from "lucide-react";
 import { JSX, useEffect, useState } from "react";
-
-function generateControlFromSettingMeta({
-  setting,
-  selectedPipeline,
-  pipelines,
-  setPipelines,
-  setSetting,
-  locked,
-}: {
-  setting: SettingMetaProto;
-  selectedPipeline?: PipelineProto;
-  setSetting: (
-    val: SettingValueProto,
-    setting: string,
-    pipeline: PipelineProto,
-  ) => void;
-  setPipelines: (val: Map<number, PipelineProto>) => void;
-  pipelines: Map<number, PipelineProto>;
-  locked: boolean;
-}) {
-  return (
-    <GenerateControl
-      key={setting.name + setting.category}
-      setting={setting}
-      setValue={(val) => {
-        if (hasSettingValue(val)) {
-          setTimeout(() => {
-            if (selectedPipeline !== undefined) {
-              const oldPipelines = pipelines;
-
-              const newSettingsValues = {
-                ...selectedPipeline.settingsValues,
-                [setting.name]: val,
-              };
-
-              const updatedPipeline = {
-                ...selectedPipeline,
-                settingsValues: newSettingsValues,
-              };
-
-              const newPipelines = new Map(oldPipelines);
-              newPipelines.set(selectedPipeline.index, updatedPipeline);
-              setPipelines(newPipelines);
-            }
-          }, 0);
-
-          setTimeout(() => {
-            setSetting(val, setting.name, selectedPipeline!);
-          }, 0);
-        }
-      }}
-      value={
-        selectedPipeline?.settingsValues[setting.name] ??
-        setting.default ??
-        settingValueToProto("")
-      }
-      defaultValue={setting.default}
-      locked={locked}
-    />
-  );
-}
 
 export function PipelineConfigControl({
   selectedPipeline,
@@ -150,11 +84,13 @@ export function PipelineConfigControl({
 
   useEffect(() => {
     generateControls();
-  }, [selectedPipelineType, selectedPipeline, backendConnected, locked]);
-
-  useEffect(() => {
-    generateControls();
-  }, [locked]);
+  }, [
+    selectedPipelineType,
+    selectedPipeline,
+    backendConnected,
+    locked,
+    cameraInfo,
+  ]);
 
   return (
     <Card

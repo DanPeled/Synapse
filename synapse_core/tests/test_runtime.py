@@ -5,8 +5,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from synapse.core import Synapse
 from synapse.core.runtime_handler import RuntimeManager
+from synapse.core.synapse import Synapse
 
 
 def test_synapse_run_called_when_init_succeeds():

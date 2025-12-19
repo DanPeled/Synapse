@@ -7,7 +7,7 @@ ext.licenseFile = files("$rootDir/LICENSE.txt")
 
 def templateVendorFile = "SynapseBridge.json"
 
-def pubVersion = '2025.0.0a2'
+def pubVersion = '2025.0.0a3'
 
 def outputsFolder = file("$buildDir/outputs")
 

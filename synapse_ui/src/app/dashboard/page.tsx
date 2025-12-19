@@ -123,11 +123,8 @@ export default function Dashboard() {
       : undefined;
 
   useEffect(() => {
-    // reset pipeline index when switching cameras
-    if (!pipelines.get(selectedCameraIndex)?.has(selectedPipelineIndex)) {
-      setSelectedPipelineIndex(0);
-    }
-  }, [selectedCameraIndex, pipelines]);
+    setSelectedPipelineIndex(selectedCamera?.pipelineIndex ?? 0);
+  }, [selectedCamera?.pipelineIndex]);
 
   // ===== Sync recording status =====
   useEffect(() => {

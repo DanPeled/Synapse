@@ -5,153 +5,202 @@
 import shutil
 import subprocess
 import threading
-import time
-from typing import Callable, Dict, List
+from typing import Optional
 
 from synapse.log import err, log, warn
 
-virtualLabel = "static"
-checkInterval = 5
+CHECK_INTERVAL: int = 5
+
 
 InterfaceName = str
 
 
 class NetworkingManager:
-    def __init__(self):
-        self.staticIpThreads: Dict[InterfaceName, threading.Thread] = {}
-        self.threadsStatus: Dict[InterfaceName, bool] = {}
+    def __init__(self) -> None:
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
+
+    # ------------------------
+    # Internal helpers
+    # ------------------------
 
     @staticmethod
-    def __runCommand(command: List[str]):
+    def _runCommand(command: list[str]) -> None:
         try:
             subprocess.run(
                 command,
                 check=True,
-                stdout=subprocess.DEVNULL,  # Hide stdout
-                stderr=subprocess.PIPE,  # Capture stderr
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
             )
         except subprocess.CalledProcessError as e:
             err(f"Command failed: {e}\n{e.stderr.strip()}")
 
     @staticmethod
-    def __interfaceIsUp(interface: InterfaceName):
+    def _interfaceIsUp(interface: InterfaceName) -> bool:
         try:
-            with open(f"/sys/class/net/{interface}/operstate") as f:
+            with open(f"/sys/class/net/{interface}/operstate", "r") as f:
                 return f.read().strip() == "up"
         except Exception:
             return False
 
     @staticmethod
-    def __ipIsConfigured(interface: InterfaceName, staticIp):
+    def _ipIsConfigured(interface: InterfaceName, staticIp: str) -> bool:
+        """Check if *exact* static IP (with mask) is present."""
         try:
             output = subprocess.check_output(["ip", "addr", "show", interface])
-            return staticIp.split("/")[0].encode() in output
+            return staticIp.encode() in output
         except Exception:
             return False
 
     @staticmethod
-    def __setStaticIp(interface: InterfaceName, staticIp):
-        if not NetworkingManager.__ipIsConfigured(interface, staticIp):
-            NetworkingManager.__runCommand(
-                ["sudo", "ip", "addr", "add", f"{staticIp}/24", "dev", interface]
+    def _setStaticIp(interface: InterfaceName, staticIp: str) -> None:
+        if not NetworkingManager._ipIsConfigured(interface, staticIp):
+            NetworkingManager._runCommand(
+                ["sudo", "ip", "addr", "add", staticIp, "dev", interface]
             )
+            log(f"Static IP {staticIp} applied on {interface}")
 
     @staticmethod
-    def __startDhcp(interface: InterfaceName):
-        if shutil.which("dhclient"):
-            NetworkingManager.__runCommand(["sudo", "dhclient", "-v", interface])
-        else:
-            warn(
-                "dhclient not found. DHCP will not be started unless handled externally."
-            )
-
-    @staticmethod
-    def __networkThreadLoop(
-        interface: InterfaceName, staticIp: str, run: Callable[[], bool]
-    ) -> None:
-        while run():
-            if NetworkingManager.__interfaceIsUp(interface):
-                try:
-                    NetworkingManager.__setStaticIp(interface, staticIp)
-                    NetworkingManager.__startDhcp(interface)
-                except subprocess.CalledProcessError as e:
-                    err(f"Command failed: {e}")
-            else:
-                warn(f"{interface} is down. Waiting...")
-
-            time.sleep(checkInterval)
-
-    def configureStaticIP(self, ip: str, interface: InterfaceName) -> None:
-        if interface in self.staticIpThreads:
-            self.threadsStatus[interface] = False
-            self.staticIpThreads[interface].join()
-        self.threadsStatus[interface] = True
-        self.staticIpThreads[interface] = threading.Thread(
-            target=lambda: NetworkingManager.__networkThreadLoop(
-                interface, ip, lambda: self.threadsStatus[interface]
-            )
+    def _startDhcp(interface: InterfaceName) -> None:
+        # dhclient can block → fire and forget
+        subprocess.Popen(
+            ["dhclient", "-v", interface],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-        self.staticIpThreads[interface].start()
+        log(f"DHCP started on {interface}")
 
-    def removeStaticIPDecl(self, interface: InterfaceName) -> None:
-        if interface in self.staticIpThreads:
-            thread = self.staticIpThreads[interface]
-            self.threadsStatus[interface] = False
-            thread.join()
+    # ------------------------
+    # Thread worker
+    # ------------------------
 
-    def close(self):
-        for interface, thread in self.staticIpThreads.items():
-            self.threadsStatus[interface] = False
-            thread.join()
+    def _networkLoop(self, interface: InterfaceName, staticIp: str) -> None:
+        staticAssigned = False
+        dhcpStarted = False
+
+        while not self._stop_event.is_set():
+            try:
+                if self._interfaceIsUp(interface):
+                    if not staticAssigned:
+                        self._setStaticIp(interface, staticIp)
+                        staticAssigned = True
+
+                    if not dhcpStarted:
+                        self._startDhcp(interface)
+                        dhcpStarted = True
+                else:
+                    warn(f"{interface} is down, waiting...")
+                    staticAssigned = False
+                    dhcpStarted = False
+
+            except Exception as e:
+                err(f"Networking thread error: {e}")
+
+            self._stop_event.wait(CHECK_INTERVAL)
+
+    # ------------------------
+    # Public API
+    # ------------------------
+
+    def configureStaticIp(self, staticIp: str, interface: InterfaceName) -> None:
+        """Start (or restart) the background worker."""
+        with self._lock:
+            self._stopWorkerLocked()
+
+            self._stop_event.clear()
+            self._thread = threading.Thread(
+                target=self._networkLoop,
+                args=(interface, staticIp),
+                daemon=True,
+            )
+            self._thread.start()
+
+        log(f"Started static IP manager for {interface}")
+
+    def removeStaticIp(self) -> None:
+        """Stop the background worker."""
+        with self._lock:
+            self._stopWorkerLocked()
+        log("Stopped static IP manager")
+
+    def close(self) -> None:
+        """Shutdown the manager cleanly."""
+        with self._lock:
+            self._stopWorkerLocked()
+        log("NetworkingManager shut down")
+
+    # ------------------------
+    # Internal lifecycle
+    # ------------------------
+
+    def _stopWorkerLocked(self) -> None:
+        if self._thread and self._thread.is_alive():
+            self._stop_event.set()
+            self._thread.join(timeout=5)
+        self._thread = None
+
+
+# ------------------------
+# Hostname helpers
+# ------------------------
 
 
 def setHostname(hostname: str) -> None:
     try:
-        # Set temporary hostname
         subprocess.run(["sudo", "hostname", hostname], check=True)
 
-        # Persistently set hostname
         if shutil.which("hostnamectl"):
             subprocess.run(
                 ["sudo", "hostnamectl", "set-hostname", hostname], check=True
             )
         else:
             subprocess.run(
-                ["sudo", "sh", "-c", f"echo '{hostname}' > /etc/hostname"], check=True
+                ["sudo", "sh", "-c", f"echo '{hostname}' > /etc/hostname"],
+                check=True,
             )
 
         updateHostsFile(hostname)
+        log(f"Hostname set to '{hostname}'")
 
-        log(f"Hostname successfully set to '{hostname}'")
     except Exception as e:
         err(f"Failed to set hostname: {e}")
 
 
-def updateHostsFile(new_hostname: str):
+def updateHostsFile(newHostname: str) -> None:
     try:
-        # Read /etc/hosts using sudo
         result = subprocess.run(
-            ["sudo", "cat", "/etc/hosts"], check=True, capture_output=True, text=True
+            ["sudo", "cat", "/etc/hosts"],
+            check=True,
+            capture_output=True,
+            text=True,
         )
+
         lines = result.stdout.splitlines()
 
-        new_lines = []
+        updatedLines: list[str] = []
         replaced = False
+
         for line in lines:
             if line.startswith("127.0.1.1"):
-                new_lines.append(f"127.0.1.1\t{new_hostname}")
+                updatedLines.append(f"127.0.1.1\t{newHostname}")
                 replaced = True
             else:
-                new_lines.append(line)
+                updatedLines.append(line)
 
         if not replaced:
-            new_lines.append(f"127.0.1.1\t{new_hostname}")
+            updatedLines.append(f"127.0.1.1\t{newHostname}")
 
-        # Write back using tee and sudo
-        content = "\n".join(new_lines) + "\n"
+        content = "\n".join(updatedLines) + "\n"
+
         subprocess.run(
-            ["sudo", "tee", "/etc/hosts"], input=content, text=True, check=True
+            ["sudo", "tee", "/etc/hosts"],
+            input=content,
+            text=True,
+            stdout=subprocess.DEVNULL,
+            check=True,
         )
 
     except Exception as e:
