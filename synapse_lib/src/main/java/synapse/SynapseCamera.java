@@ -341,6 +341,25 @@ public class SynapseCamera {
   }
 
   /**
+   * Retrieve and deserialize results from the given pipeline.
+   *
+   * <p>This method fetches the raw serialized results for the specified pipeline, and deserializes
+   * them using the pipeline's associated TypeReference.
+   *
+   * @param <T> type of the result
+   * @param pipelineType the pipeline type whose results are to be retrieved
+   * @return Optional containing deserialized results if available, otherwise empty
+   */
+  public <T> Optional<T> getResults(SynapsePipelineType<T> pipelineType) {
+    byte[] data = getResultsEntry().getRaw(new byte[0]);
+    if (data.length > 0) {
+      return getResults(pipelineType.getTypeReference(), data);
+    } else {
+      return Optional.empty();
+    }
+  }
+
+  /**
    * Returns the camera name.
    *
    * @return camera name
