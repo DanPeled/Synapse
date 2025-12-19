@@ -3,8 +3,7 @@ name: Publish SynapseLib Dev Vendordep
 on:
   push:
     paths:
-      - "synapse_lib/src/**"
-      - "synapse_lib/*.gradle"
+      - "synapse_lib/**"
       - ".github/workflows/synapse_lib_dev_release.yml"
 
 jobs:
