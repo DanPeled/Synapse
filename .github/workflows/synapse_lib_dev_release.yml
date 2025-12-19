@@ -41,16 +41,13 @@ jobs:
         working-directory: synapse_lib
         run: ./gradlew publish
 
-      - name: Prepare gh-pages branch
+      - name: Prepare and push gh-pages branch with artifacts
         run: |
-          # Save old git config
-          OLD_NAME=$(git config --local user.name || echo "")
-          OLD_EMAIL=$(git config --local user.email || echo "")
-
-          # Set temporary Git config
+          # Set GitHub bot user/email
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Fetch gh-pages branch or create it if missing
           git fetch origin gh-pages
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
@@ -59,12 +56,6 @@ jobs:
             git checkout -b gh-pages
           fi
 
-          # Restore old git config
-          if [ -n "$OLD_NAME" ]; then git config user.name "$OLD_NAME"; else git config --unset user.name; fi
-          if [ -n "$OLD_EMAIL" ]; then git config user.email "$OLD_EMAIL"; else git config --unset user.email; fi
-
-      - name: Copy Maven artifacts to versioned folder
-        run: |
           # Read version from publish.gradle
           VERSION=$(grep "def pubVersion" synapse_lib/publish.gradle | sed "s/def pubVersion = '\(.*\)'/\1/")
           echo "Publishing artifacts to maven/$VERSION"
@@ -82,24 +73,16 @@ jobs:
           cp synapse_lib/vendordep/SynapseBridge.json "$DEST_DIR/"
 
           # Stage all changes
-          git add -A  
+          git add -A
 
-          # Commit if there are changes
-          git commit -m "Add/Update vendordep Maven artifacts (dev) for version $VERSION" || echo "No changes to commit"
+          # Commit if changes exist
+          git diff --cached --quiet || git commit -m "Add/Update vendordep Maven artifacts (dev) for version $VERSION"
 
-          # Temporarily set git config for pushing
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Rebase remote preferring local changes
+          # Rebase remote preferring our changes
           git pull --rebase -X ours origin gh-pages || true
 
-          # Push updates
+          # Push updates as GitHub bot
           git push origin gh-pages
-
-          # Restore old git config
-          git config --unset user.name
-          git config --unset user.email
 
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
