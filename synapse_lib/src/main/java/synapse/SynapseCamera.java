@@ -1,93 +1,65 @@
 package synapse;
 
-import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableType;
+import edu.wpi.first.wpilibj.DriverStation;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
-// import synapse.util.deserializers.WPILibGeometryModule;
-
 /**
- * Represents a camera in the Synapse system, providing methods to manage settings and retrieve
- * results from NetworkTables.
+ * Represents a Synapse camera with fully cached NetworkTables entries, type-safe settings, and
+ * methods for retrieving results and metrics.
  */
 public class SynapseCamera {
-  /**
-   * A container class holding the standard NetworkTables topic keys used for communication between
-   * Synapse and coprocessors.
-   *
-   * <p>These constants define the names of NetworkTables topics for pipeline configuration, status
-   * reporting, and result data.
-   */
-  public static class NetworkTableTopics {
-    /** The topic for pipeline-related data. */
-    public static final String kPipelineTopic = "pipeline";
 
-    /** The topic for recording status. */
-    public static final String kRecordStatusTopic = "record";
+  /** Camera name */
+  protected final String m_cameraName;
 
-    /** The topic for pipeline type. */
-    public static final String kPipelineTypeTopic = "pipeline_type";
-
-    /** The topic for results data. */
-    public static final String kResultsTopic = "results";
-
-    /** The topic for capture latency. */
-    public static final String kCaptureLatencyTopic = "captureLatency";
-
-    /** The topic for processing latency. */
-    public static final String kProcessLatencyTopic = "processLatency";
-
-    /** Prevents instantiation. */
-    private NetworkTableTopics() {}
-  }
-
-  /** Jackson ObjectMapper configured for MessagePack and WPILib geometry. */
-  private static final ObjectMapper s_ObjectMapper = createMapper();
-
-  /** The name of the Synapse table in the NetworkTables */
+  /** Name of the Synapse NetworkTables table */
   public final String synapseTableName;
 
-  /** Unique identifier for this SynapseCamera instance */
-  private final String m_cameraName;
+  /** Root table for this camera */
+  protected NetworkTable m_table;
 
-  /** Main NetworkTable instance for this camera. */
-  private NetworkTable m_table;
+  /** Subtable containing camera settings */
+  protected NetworkTable m_settingsTable;
 
-  /** Subtable storing detection and result data. */
-  private NetworkTable m_dataTable;
+  /** Subtable containing camera data/results */
+  protected NetworkTable m_dataTable;
 
-  /** Subtable storing camera and pipeline settings. */
-  private NetworkTable m_settingsTable;
+  /** Cache of all NetworkTableEntries for quick access */
+  protected final Map<String, NetworkTableEntry> m_entryCache = new ConcurrentHashMap<>();
 
-  /** NetworkTableEntry representing the selected vision processing pipeline. */
-  private NetworkTableEntry m_pipelineEntry;
+  /** Cached entry for the current pipeline ID */
+  protected NetworkTableEntry m_pipelineEntry;
 
-  /** NetworkTableEntry storing the pipeline type string. */
-  private NetworkTableEntry m_pipelineTypeEntry;
+  /** Entry for storing or retrieving the camera's current pipeline type */
+  protected NetworkTableEntry m_pipelineTypeEntry;
 
-  /** NetworkTableEntry storing the raw results data. */
-  private NetworkTableEntry m_resultsTopic;
+  /** Entry for storing the latest processing results from the camera */
+  protected NetworkTableEntry m_resultsEntry;
 
-  /** NetworkTableEntry representing the camera's recording status. */
-  private NetworkTableEntry m_recordStateEntry;
+  /** Entry that indicates whether recording is currently active */
+  protected NetworkTableEntry m_recordStateEntry;
 
-  /** NetworkTableEntry representing the camera's capture latency (ms). */
-  private NetworkTableEntry m_captureLatencyEntry;
+  /** Entry for tracking the latency of frame capture (in milliseconds) */
+  protected NetworkTableEntry m_captureLatencyEntry;
 
-  /** NetworkTableEntry representing the camera's processing latency (ms). */
-  private NetworkTableEntry m_processLatencyEntry;
+  /** Entry for tracking the latency of frame processing (in milliseconds) */
+  protected NetworkTableEntry m_processLatencyEntry;
+
+  /** ObjectMapper configured for MessagePack serialization/deserialization */
+  protected static final ObjectMapper s_ObjectMapper = new ObjectMapper(new MessagePackFactory());
 
   /**
-   * Constructs a new {@code SynapseCamera} instance with the given camera name. Uses the default
-   * coprocessor name {@code "Synapse"}.
+   * Constructs a new SynapseCamera using the default coprocessor table name "Synapse".
    *
    * @param cameraName the camera's name
    */
@@ -96,199 +68,166 @@ public class SynapseCamera {
   }
 
   /**
-   * Constructs a new {@code SynapseCamera} instance with the given camera name and coprocessor
-   * name.
+   * Constructs a new SynapseCamera with a specific coprocessor table name.
    *
    * @param cameraName the camera's name
-   * @param coprocessorName the coprocessor table name
+   * @param coprocessorName the NetworkTables root table for this camera
    */
   public SynapseCamera(String cameraName, String coprocessorName) {
     m_cameraName = cameraName;
     synapseTableName = coprocessorName;
 
-    if (!isJUnitTest()) { // JUnit crashes ntcore for some reason
+    if (!isJUnitTest())
       m_table =
           NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
-    }
+  }
+
+  /** Standardized NetworkTables topic keys for pipelines, results, recording, and latency. */
+  public static final class NetworkTableTopics {
+
+    /** Topic for the current pipeline ID */
+    public static final String kPipelineTopic = "pipeline";
+
+    /** Topic for recording state */
+    public static final String kRecordStatusTopic = "record";
+
+    /** Topic for the pipeline type string */
+    public static final String kPipelineTypeTopic = "pipeline_type";
+
+    /** Topic for results data */
+    public static final String kResultsTopic = "results";
+
+    /** Topic for camera capture latency (ms) */
+    public static final String kCaptureLatencyTopic = "captureLatency";
+
+    /** Topic for camera processing latency (ms) */
+    public static final String kProcessLatencyTopic = "processLatency";
+
+    /** Prevent instantiation */
+    protected NetworkTableTopics() {}
   }
 
   /**
-   * Sets the camera pipeline ID.
+   * Returns the settings subtable.
    *
-   * @param pipeline The pipeline ID to set.
+   * @return the NetworkTable storing camera settings
    */
-  public void setPipeline(long pipeline) {
-    if (m_pipelineEntry == null) {
-      m_pipelineEntry = m_table.getEntry(NetworkTableTopics.kPipelineTopic);
-    }
-    assert m_pipelineEntry != null;
-    m_pipelineEntry.setInteger(pipeline);
-  }
-
-  /**
-   * Gets the current pipeline ID.
-   *
-   * @return The current pipeline ID, or -1 if not set.
-   */
-  public long getPipeline() {
-    if (m_pipelineEntry == null) {
-      m_pipelineEntry = m_table.getEntry(NetworkTableTopics.kPipelineTopic);
-    }
-    assert m_pipelineEntry != null;
-    return m_pipelineEntry.getInteger(-1);
-  }
-
-  /**
-   * Gets the current recording status of the camera.
-   *
-   * @return True if the camera is recording, false otherwise.
-   */
-  public boolean getRecordingStatus() {
-    if (m_recordStateEntry == null) {
-      m_recordStateEntry = m_table.getEntry(NetworkTableTopics.kRecordStatusTopic);
-    }
-    assert m_recordStateEntry != null;
-    return m_recordStateEntry.getBoolean(false);
-  }
-
-  /**
-   * Sets the recording status of the camera.
-   *
-   * @param status True to start recording, false to stop.
-   */
-  public void setRecordStatus(boolean status) {
-    if (m_recordStateEntry == null) {
-      m_recordStateEntry = m_table.getEntry(NetworkTableTopics.kRecordStatusTopic);
-    }
-    assert m_recordStateEntry != null;
-    m_recordStateEntry.setBoolean(status);
-  }
-
-  /**
-   * Retrieves the camera name.
-   *
-   * @return The camera name.
-   */
-  public String getCameraName() {
-    return m_cameraName;
-  }
-
-  /**
-   * Fetches and deserializes the results for a given SynapsePipeline in a type-safe way.
-   *
-   * @param pipeline The SynapsePipeline to fetch results from.
-   * @param <T> The expected result type of the pipeline.
-   * @return The deserialized result.
-   * @throws IOException if reading or deserialization fails.
-   */
-  public <T> T getResults(SynapsePipeline<T> pipeline) throws IOException {
-    return getResults(pipeline.getTypeReference(), pipeline.typestring);
-  }
-
-  /**
-   * Fetches and deserializes data from the NetworkTables results topic into the specified type.
-   *
-   * @param <T> The type of the object to deserialize.
-   * @param typeref The TypeReference describing the target type.
-   * @param typestring The expected pipeline type string; used to validate the entry.
-   * @return An object of type {@code T}, deserialized from the raw NetworkTables data.
-   * @throws StreamReadException If the input stream cannot be read properly.
-   * @throws DatabindException If there is a problem mapping the JSON bytes to the target type.
-   * @throws IOException If there is a low-level I/O problem accessing the NetworkTables data.
-   */
-  public <T> T getResults(TypeReference<T> typeref, String typestring)
-      throws StreamReadException, DatabindException, IOException {
-    if (m_resultsTopic == null) {
-      m_resultsTopic = getDataEntry(NetworkTableTopics.kResultsTopic);
-    }
-    if (m_resultsTopic == null) {
-      throw new IllegalStateException("Results topic is null");
-    }
-    if (!getPipelineType().equals(typestring)) {
-      throw new IllegalArgumentException(
-          "Pipeline type mismatch: expected " + typestring + " but got " + getPipelineType());
-    }
-
-    byte[] data = m_resultsTopic.getRaw(new byte[0]);
-    return getResults(typeref, data);
-  }
-
-  /**
-   * Deserializes the given byte array into an object of the specified type.
-   *
-   * <p>This method supports both JSON and MessagePack formats, depending on the configured
-   * ObjectMapper.
-   *
-   * @param <T> The type of the result object.
-   * @param typeref The TypeReference describing the expected type of the result.
-   * @param data The serialized data as a byte array.
-   * @return An instance of type T deserialized from the provided data.
-   * @throws StreamReadException If there is a low-level I/O or format problem while reading.
-   * @throws DatabindException If there is a problem mapping the data to the specified type.
-   * @throws IOException If a general I/O error occurs during deserialization.
-   */
-  public <T> T getResults(TypeReference<T> typeref, byte[] data)
-      throws StreamReadException, DatabindException, IOException {
-    return s_ObjectMapper.readValue(data, typeref);
-  }
-
-  /**
-   * Gets the pipeline type string from the camera.
-   *
-   * @return The pipeline type string; "unknown" if not set.
-   */
-  public String getPipelineType() {
-    if (m_pipelineTypeEntry == null) {
-      m_pipelineTypeEntry = m_table.getEntry(NetworkTableTopics.kPipelineTypeTopic);
-    }
-    assert m_pipelineTypeEntry != null;
-    return m_pipelineTypeEntry.getString("unknown");
-  }
-
-  /**
-   * Retrieves a specific entry from the camera's data table.
-   *
-   * @param dataKey The key of the data entry.
-   * @return The NetworkTableEntry associated with the key.
-   */
-  private NetworkTableEntry getDataEntry(String dataKey) {
-    return getDataResultsTable().getEntry(dataKey);
-  }
-
-  /**
-   * Retrieves the data table for this camera.
-   *
-   * @return The NetworkTable representing the data table.
-   */
-  private NetworkTable getDataResultsTable() {
-    if (m_dataTable == null) {
-      m_dataTable = m_table.getSubTable("data");
-    }
-    assert m_dataTable != null;
-    return m_dataTable;
-  }
-
-  /**
-   * Retrieves the settings table for this camera.
-   *
-   * @return The NetworkTable representing the settings table.
-   */
-  private NetworkTable getSettingsTable() {
+  protected NetworkTable getSettingsTable() {
     if (m_settingsTable == null) {
       m_settingsTable = m_table.getSubTable("settings");
     }
-    assert m_settingsTable != null;
     return m_settingsTable;
   }
 
   /**
-   * Retrieves a setting value from the camera.
+   * Returns the data/results subtable.
    *
-   * @param key The setting key.
-   * @return An Optional containing the setting value, if present.
+   * @return the NetworkTable storing camera results
    */
+  protected NetworkTable getDataTable() {
+    if (m_dataTable == null) {
+      m_dataTable = m_table.getSubTable("data");
+    }
+    return m_dataTable;
+  }
+
+  /**
+   * Retrieves a cached NetworkTableEntry for a given key.
+   *
+   * @param key the entry key
+   * @param table the table to fetch the entry from
+   * @return the cached or newly fetched NetworkTableEntry
+   */
+  public NetworkTableEntry getCachedEntry(String key, NetworkTable table) {
+    return m_entryCache.computeIfAbsent(key, table::getEntry);
+  }
+
+  /**
+   * Returns the current pipeline ID or -1 if unset.
+   *
+   * @return the pipeline index
+   */
+  public long getPipeline() {
+    if (m_pipelineEntry == null)
+      m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
+    return m_pipelineEntry.getInteger(-1);
+  }
+
+  /**
+   * Sets the current pipeline ID.
+   *
+   * @param pipeline pipeline index
+   */
+  public void setPipeline(long pipeline) {
+    if (m_pipelineEntry == null)
+      m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
+    m_pipelineEntry.setInteger(pipeline);
+  }
+
+  /**
+   * Returns the pipeline type string.
+   *
+   * @return the pipeline type
+   */
+  public String getPipelineType() {
+    if (m_pipelineTypeEntry == null)
+      m_pipelineTypeEntry = getCachedEntry(NetworkTableTopics.kPipelineTypeTopic, m_table);
+    return m_pipelineTypeEntry.getString("unknown");
+  }
+
+  /**
+   * Returns whether the camera is currently recording.
+   *
+   * @return true if recording, false otherwise
+   */
+  public boolean getRecordingStatus() {
+    if (m_recordStateEntry == null)
+      m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
+    return m_recordStateEntry.getBoolean(false);
+  }
+
+  /**
+   * Sets the camera recording status.
+   *
+   * @param status true to start recording, false to stop
+   */
+  public void setRecordStatus(boolean status) {
+    if (m_recordStateEntry == null)
+      m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
+    m_recordStateEntry.setBoolean(status);
+  }
+
+  /**
+   * Returns the latest capture latency in milliseconds.
+   *
+   * @return capture latency
+   */
+  public double getCaptureLatency() {
+    if (m_captureLatencyEntry == null)
+      m_captureLatencyEntry = getCachedEntry(NetworkTableTopics.kCaptureLatencyTopic, m_table);
+    return m_captureLatencyEntry.getDouble(-1);
+  }
+
+  /**
+   * Returns the latest processing latency in milliseconds.
+   *
+   * @return processing latency
+   */
+  public double getProcessLatency() {
+    if (m_processLatencyEntry == null)
+      m_processLatencyEntry = getCachedEntry(NetworkTableTopics.kProcessLatencyTopic, m_table);
+    return m_processLatencyEntry.getDouble(-1);
+  }
+
+  /**
+   * Deprecated untyped setting retrieval.
+   *
+   * @param key the setting key
+   * @return an Optional containing the value if present
+   */
+  @Deprecated(forRemoval = true, since = "2025.0.0b4")
   public Optional<Object> getSetting(String key) {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
+    NetworkTableEntry entry = getCachedEntry(key, getSettingsTable());
     if (!entry.exists()) return Optional.empty();
 
     return switch (entry.getType()) {
@@ -298,125 +237,258 @@ public class SynapseCamera {
       case kStringArray -> Optional.of(entry.getStringArray(new String[0]));
       case kInteger -> Optional.of(entry.getInteger(0));
       case kIntegerArray -> Optional.of(entry.getIntegerArray(new long[0]));
+      case kBoolean -> Optional.of(entry.getBoolean(false));
+      case kBooleanArray -> Optional.of(entry.getBooleanArray(new boolean[0]));
       default -> Optional.empty();
     };
   }
 
   /**
-   * Sets a double setting value in the camera's settings table.
+   * Typed getter for camera settings.
    *
-   * @param key The setting key.
-   * @param value The double value to set.
-   * @throws RuntimeException If the setting type does not match.
+   * @param setting the typed setting
+   * @param <T> the value type
+   * @return Optional containing value if present and type matches
    */
-  public void setSetting(String key, double value) throws RuntimeException {
-    NetworkTableEntry entry = getSettingsTable().getEntry(key);
-    if (entry.getType() == NetworkTableType.kDouble) {
-      entry.setDouble(value);
-    } else {
-      throwTypeMismatchException(key, entry.getType(), "double");
+  public <T> Optional<T> getSetting(Setting<T> setting) {
+    NetworkTableEntry entry = getCachedEntry(setting.getKey(), getSettingsTable());
+
+    if (!entry.exists()) return Optional.empty();
+
+    Object value =
+        switch (entry.getType()) {
+          case kDouble -> entry.getDouble(0.0);
+          case kDoubleArray -> entry.getDoubleArray(new double[0]);
+          case kString -> entry.getString("");
+          case kStringArray -> entry.getStringArray(new String[0]);
+          case kInteger -> entry.getInteger(0);
+          case kIntegerArray -> entry.getIntegerArray(new long[0]);
+          case kBoolean -> entry.getBoolean(false);
+          case kBooleanArray -> entry.getBooleanArray(new boolean[0]);
+          default -> {
+            DriverStation.reportWarning(
+                "[SynapseCamera] Unsupported NT type for key '" + setting.getKey() + "'", false);
+            yield null;
+          }
+        };
+
+    if (value == null
+        || !setting.getValueType().isInstance(value)
+        || !setting.getNtType().equals(entry.getType())) {
+      DriverStation.reportWarning(
+          "[SynapseCamera] Type mismatch for key '"
+              + setting.getKey()
+              + "', expected "
+              + setting.getValueType().getSimpleName()
+              + " but received "
+              + (value == null ? "null" : value.getClass().getSimpleName()),
+          false);
+      return Optional.empty();
     }
+
+    @SuppressWarnings("unchecked")
+    T casted = (T) value;
+    return Optional.of(casted);
   }
 
   /**
-   * Throws a standardized runtime exception for type mismatches.
+   * Typed setter for camera settings.
    *
-   * @param key The setting key.
-   * @param actual The actual NetworkTableType found.
-   * @param expected The expected type as a string.
+   * @param setting the typed setting
+   * @param value the value to set
+   * @param <T> type of the value
    */
-  private void throwTypeMismatchException(String key, NetworkTableType actual, String expected) {
+  public <T> void setSetting(Setting<T> setting, T value) {
+    NetworkTableEntry entry = getCachedEntry(setting.getKey(), getSettingsTable());
+    if (!entry.exists() || entry.getType() == setting.getNtType()) {
+      entry.setValue(value);
+      return;
+    }
+
     throw new RuntimeException(
         String.format(
-            "[Synapse]: Type mismatch for setting (%s). Expected: %s, but found: %s",
-            key, expected, actual.toString()));
+            "[SynapseCamera]: Type mismatch for setting '%s'. Expected: %s, but found: %s",
+            setting.getKey(), setting.getNtType(), entry.getType()));
   }
 
   /**
-   * Creates and configures the ObjectMapper for MessagePack and WPILib geometry support.
+   * Returns the results entry.
    *
-   * @return A configured ObjectMapper instance.
+   * @return cached results NetworkTableEntry
    */
-  private static ObjectMapper createMapper() {
-    ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
-    // mapper.registerModule(new WPILibGeometryModule());
-    return mapper;
-  }
-
-  /**
-   * Gets the latest capture latency from the camera in milliseconds.
-   *
-   * @return The capture latency, or -1 if not available.
-   */
-  public double getCaptureLatency() {
-    if (m_captureLatencyEntry == null) {
-      m_captureLatencyEntry = m_table.getEntry(NetworkTableTopics.kCaptureLatencyTopic);
+  protected NetworkTableEntry getResultsEntry() {
+    if (m_resultsEntry == null) {
+      m_resultsEntry = getCachedEntry(NetworkTableTopics.kResultsTopic, getDataTable());
     }
-    return m_captureLatencyEntry.getDouble(-1);
+    return m_resultsEntry;
   }
 
   /**
-   * Gets the latest processing latency from the camera in milliseconds.
+   * Deserialize results from serialized MessagePack data.
    *
-   * @return The processing latency, or -1 if not available.
+   * @param <T> type of the result
+   * @param typeref TypeReference describing the expected type
+   * @param data serialized data
+   * @return Optional containing deserialized results
    */
-  public double getProcessLatency() {
-    if (m_processLatencyEntry == null) {
-      m_processLatencyEntry = m_table.getEntry(NetworkTableTopics.kProcessLatencyTopic);
-    }
-    return m_processLatencyEntry.getDouble(-1);
-  }
-
-  /**
-   * Enum representing the camera setting keys. These keys are used to configure and retrieve
-   * specific camera settings from a configuration system or camera interface.
-   */
-  public static enum CameraSettings {
-
-    /** Key for controlling the camera's brightness setting. */
-    kBrightness("brightness"),
-
-    /** Key for controlling the camera's gain setting. */
-    kGain("gain"),
-
-    /** Key for controlling the camera's exposure setting. */
-    kExposure("exposure"),
-
-    /** Key for controlling the camera's orientation setting. */
-    kOrientation("orientation");
-
-    /** The key string representing the specific camera setting. */
-    public final String key;
-
-    /**
-     * Constructor for the CameraSettings enum.
-     *
-     * @param key The string key associated with the camera setting.
-     */
-    CameraSettings(String key) {
-      this.key = key;
+  public <T> Optional<T> getResults(TypeReference<T> typeref, byte[] data) {
+    try {
+      return Optional.of(s_ObjectMapper.readValue(data, typeref));
+    } catch (IOException e) {
+      e.printStackTrace();
+      return Optional.empty();
     }
   }
 
   /**
-   * Checks if the current code is running inside a unit test framework.
+   * Returns the camera name.
    *
-   * <p>This method inspects the current thread's stack trace and looks for class names associated
-   * with popular test frameworks, such as JUnit 4/5 and TestNG. If any stack frame indicates that a
-   * test framework is active, it returns {@code true}.
+   * @return camera name
+   */
+  public String getCameraName() {
+    return m_cameraName;
+  }
+
+  /**
+   * Checks whether the current execution is in a JUnit or TestNG test.
    *
-   * @return {@code true} if the current code is executing inside a unit test, {@code false}
-   *     otherwise
+   * @return true if running inside a test framework
    */
   public static boolean isJUnitTest() {
     for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
       String className = element.getClassName();
-      if (className.startsWith("org.junit.") // JUnit 4 internal
-          || className.startsWith("org.junit.jupiter.") // JUnit 5
-          || className.startsWith("org.testng.")) { // Optional: TestNG
+      if (className.startsWith("org.junit.")
+          || className.startsWith("org.junit.jupiter.")
+          || className.startsWith("org.testng.")) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Represents a typed Synapse setting that can be stored in a NetworkTable.
+   *
+   * @param <T> The type of the setting value (e.g., Double, String, arrays, etc.)
+   */
+  public static final class Setting<T> {
+
+    /** The key used to identify this setting in the NetworkTable. */
+    protected final String key;
+
+    /** The Java class of the value type for this setting. */
+    protected final Class<T> valueType;
+
+    /** The NetworkTableType corresponding to this setting (e.g., kDouble, kString). */
+    protected final NetworkTableType ntType;
+
+    /**
+     * Constructs a new Setting.
+     *
+     * @param key The key used to store this setting in the NetworkTable
+     * @param valueType The Java type of the setting value
+     * @param ntType The NetworkTableType corresponding to this setting
+     */
+    protected Setting(String key, Class<T> valueType, NetworkTableType ntType) {
+      this.key = key;
+      this.valueType = valueType;
+      this.ntType = ntType;
+    }
+
+    /**
+     * @return The key for this setting
+     */
+    public String getKey() {
+      return key;
+    }
+
+    /**
+     * @return The Java class type of this setting's value
+     */
+    public Class<T> getValueType() {
+      return valueType;
+    }
+
+    /**
+     * @return The NetworkTableType of this setting
+     */
+    public NetworkTableType getNtType() {
+      return ntType;
+    }
+
+    /**
+     * Creates a Setting representing a Double value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for Double values
+     */
+    public static Setting<Double> doubleSetting(String key) {
+      return new Setting<>(key, Double.class, NetworkTableType.kDouble);
+    }
+
+    /**
+     * Creates a Setting representing an Integer (Long) value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for Long values
+     */
+    public static Setting<Long> integerSetting(String key) {
+      return new Setting<>(key, Long.class, NetworkTableType.kInteger);
+    }
+
+    /**
+     * Creates a Setting representing a String value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for String values
+     */
+    public static Setting<String> stringSetting(String key) {
+      return new Setting<>(key, String.class, NetworkTableType.kString);
+    }
+
+    /**
+     * Creates a Setting representing a double array value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for double array values
+     */
+    public static Setting<double[]> doubleArraySetting(String key) {
+      return new Setting<>(key, double[].class, NetworkTableType.kDoubleArray);
+    }
+
+    /**
+     * Creates a Setting representing a string array value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for string array values
+     */
+    public static Setting<String[]> stringArraySetting(String key) {
+      return new Setting<>(key, String[].class, NetworkTableType.kStringArray);
+    }
+
+    /**
+     * Creates a generic Setting with a custom type and NetworkTableType.
+     *
+     * @param key The key for this setting
+     * @param type The Java class of the value type
+     * @param ntType The NetworkTableType corresponding to the value type
+     * @param <T> The type of the setting value
+     * @return A new generic Setting instance
+     */
+    public static <T> Setting<T> generic(String key, Class<T> type, NetworkTableType ntType) {
+      return new Setting<>(key, type, ntType);
+    }
+
+    /** Predefined setting for camera brightness */
+    public static final Setting<Double> kBrightness = doubleSetting("brightness");
+
+    /** Predefined setting for camera gain */
+    public static final Setting<Double> kGain = doubleSetting("gain");
+
+    /** Predefined setting for camera exposure */
+    public static final Setting<Double> kExposure = doubleSetting("exposure");
+
+    /** Predefined setting for camera orientation */
+    public static final Setting<String> kOrientation = stringSetting("orientation");
   }
 }
