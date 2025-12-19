@@ -43,8 +43,14 @@ jobs:
 
       - name: Prepare gh-pages branch
         run: |
+          # Save old git config
+          OLD_NAME=$(git config --local user.name || echo "")
+          OLD_EMAIL=$(git config --local user.email || echo "")
+
+          # Set temporary Git config
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git fetch origin gh-pages
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
@@ -53,27 +59,47 @@ jobs:
             git checkout -b gh-pages
           fi
 
-      - name: Copy Maven artifacts while keeping old files
-        run: |
-          mkdir -p maven
+          # Restore old git config
+          if [ -n "$OLD_NAME" ]; then git config user.name "$OLD_NAME"; else git config --unset user.name; fi
+          if [ -n "$OLD_EMAIL" ]; then git config user.email "$OLD_EMAIL"; else git config --unset user.email; fi
 
-          # Merge new artifacts into existing maven folder without deleting old files
-          rsync -a synapse_lib/vendordep/maven/ maven/
+      - name: Copy Maven artifacts to versioned folder
+        run: |
+          # Read version from publish.gradle
+          VERSION=$(grep "def pubVersion" synapse_lib/publish.gradle | sed "s/def pubVersion = '\(.*\)'/\1/")
+          echo "Publishing artifacts to maven/$VERSION"
+
+          DEST_DIR="maven/$VERSION"
+
+          # Remove old folder completely
+          rm -rf "$DEST_DIR"
+          mkdir -p "$DEST_DIR"
+
+          # Copy new artifacts
+          cp -r synapse_lib/vendordep/maven/* "$DEST_DIR/"
 
           # Copy SynapseBridge.json
-          cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
+          cp synapse_lib/vendordep/SynapseBridge.json "$DEST_DIR/"
 
-          # Stage all changes (new, modified, deleted)
+          # Stage all changes
           git add -A  
 
           # Commit if there are changes
-          git commit -m "Add/Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
+          git commit -m "Add/Update vendordep Maven artifacts (dev) for version $VERSION" || echo "No changes to commit"
 
-          # Rebase to handle remote updates, prefer our changes
+          # Temporarily set git config for pushing
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Rebase remote preferring local changes
           git pull --rebase -X ours origin gh-pages || true
 
           # Push updates
           git push origin gh-pages
+
+          # Restore old git config
+          git config --unset user.name
+          git config --unset user.email
 
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
