@@ -3,8 +3,7 @@ name: Publish SynapseLib Dev Vendordep
 on:
   push:
     paths:
-      - "synapse_lib/src/**"
-      - "synapse_lib/*.gradle"
+      - "synapse_lib/**"
       - ".github/workflows/synapse_lib_dev_release.yml"
 
 jobs:
@@ -40,50 +39,40 @@ jobs:
         working-directory: synapse_lib
         run: ./gradlew publish
 
-      - name: Prepare and push gh-pages branch
+      - name: Prepare gh-pages branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Copy artifacts to temporary location
-          mkdir -p /tmp/maven
-          cp -r synapse_lib/vendordep/maven/* /tmp/maven/
-          cp synapse_lib/vendordep/SynapseBridge.json /tmp/SynapseBridge.json
-
-          # Stash all local changes (including untracked files)
-          git stash push -m "workflow stash" --include-untracked
-
-          # Fetch gh-pages branch
           git fetch origin gh-pages
-
-          # Checkout gh-pages (create if missing)
           if git show-ref --verify --quiet refs/heads/gh-pages; then
             git checkout gh-pages
-          elif git ls-remote --exit-code --heads origin gh-pages; then
-            git checkout -b gh-pages origin/gh-pages
+            git pull --rebase origin gh-pages
           else
             git checkout -b gh-pages
           fi
 
-          # Rebase remote changes, prefer local changes for conflicts
+      - name: Copy Maven artifacts while keeping old files
+        run: |
+          mkdir -p maven
+
+          # Merge new artifacts into existing maven folder without deleting old files
+          rsync -a synapse_lib/vendordep/maven/ maven/
+
+          # Copy SynapseBridge.json
+          cp synapse_lib/vendordep/SynapseBridge.json SynapseBridge.json
+
+          # Stage all changes (new, modified, deleted)
+          git add -A  
+
+          # Commit if there are changes
+          git commit -m "Add/Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
+
+          # Rebase to handle remote updates, prefer our changes
           git pull --rebase -X ours origin gh-pages || true
 
-          # Remove old artifacts
-          rm -rf maven SynapseBridge.json || true
-
-          # Restore copied artifacts
-          mkdir -p maven
-          cp -r /tmp/maven/* maven/
-          cp /tmp/SynapseBridge.json SynapseBridge.json
-
-          # Stage, commit, and push
-          git add -A maven SynapseBridge.json
-          git commit -m "Update vendordep Maven artifacts (dev)" || echo "No changes to commit"
+          # Push updates
           git push origin gh-pages
 
-          # Switch back to previous branch and restore stashed changes
-          git checkout -
-          git stash pop || echo "Nothing to pop"
       - name: Upload SynapseBridge.json as artifact
         uses: actions/upload-artifact@v4
         with:
