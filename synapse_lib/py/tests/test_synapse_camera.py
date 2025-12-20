@@ -5,15 +5,15 @@
 import unittest
 from unittest.mock import MagicMock
 
-from synapselib import SynapseCamera, SynapsePipeline
+from synapselib import SynapseCamera, SynapsePipelineType
 from synapselib.pipelines.apriltag import ApriltagResult
 
 
 class TestSynapsePipeline(unittest.TestCase):
     def test_pipeline_properties(self):
-        pipeline = SynapsePipeline(ApriltagResult, "TestPipeline")
+        pipeline = SynapsePipelineType(ApriltagResult, "TestPipeline")
         self.assertEqual(pipeline.typestring, "TestPipeline")
-        self.assertEqual(pipeline.typeref.__class__.__name__, "type")  # pyright: ignore
+        self.assertEqual(pipeline.getResultType().__class__.__name__, "type")  # pyright: ignore
 
 
 class TestSynapseCamera(unittest.TestCase):
@@ -45,7 +45,7 @@ class TestSynapseCamera(unittest.TestCase):
     def test_recording_status(self):
         self.mock_entry.getBoolean.return_value = True
         self.assertTrue(self.camera.getRecordingStatus())
-        self.camera.setRecordingStatus(False)
+        self.camera.setRecordStatus(False)
         self.mock_entry.setBoolean.assert_called_with(False)
 
     def test_get_pipeline_type(self):

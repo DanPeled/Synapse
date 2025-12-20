@@ -2,87 +2,106 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from enum import Enum
-from typing import (Any, Final, Generic, Optional, Type, TypeVar, Union,
-                    overload)
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
-import ntcore
+from ntcore import (NetworkTable, NetworkTableEntry, NetworkTableInstance,
+                    NetworkTableType)
 
 from ._deserialization import dataclass_object_hook
 from .pipelines.apriltag import ApriltagResult
 
-TResultType = TypeVar("TResultType")
+T = TypeVar("T")
 
 
-class SynapsePipeline(Generic[TResultType]):
+TPipelineResult = TypeVar("TPipelineResult")
+
+
+class SynapsePipelineType(Generic[TPipelineResult]):
     """
-    Represents a Synapse pipeline. Each pipeline is associated with a result class
-    that defines the type of data returned.
+    Represents a Synapse pipeline. Each pipeline is associated with a result class that defines the
+    type of data returned.
 
-    Type parameter:
-        TResultType: The type of result data returned by this pipeline, typically a
-        collection of results such as a list or map.
+    :param T: the type of result data returned by this pipeline, typically a dataclass or list of results
     """
 
-    kApriltag: "SynapsePipeline['ApriltagResult']"
-    """The AprilTag pipeline. This pipeline uses the `ApriltagResult` class to store the result data. """
+    # -----------------------------
+    # Predefined pipelines
+    # -----------------------------
+    kApriltag: SynapsePipelineType[ApriltagResult]
 
-    def __init__(self, typeref: Type[TResultType], typestring: str):
+    def __init__(self, resultType: Type[TPipelineResult], typestring: str) -> None:
         """
-        Constructor for the SynapsePipeline class.
+        Constructor for the SynapsePipelineType class.
 
-        Args:
-            typeref: The Python type associated with this pipeline's result data.
-            typestring: The string identifier for this pipeline (topic name).
+        :param resultType: The class associated with this pipeline's result data
+        :param typestring: The string identifier for this pipeline
         """
-        self._typeref: Type[TResultType] = typeref
+        self._resultType: Type[TPipelineResult] = resultType
         self.typestring: str = typestring
 
-    @property
-    def typeref(self) -> Type[TResultType]:
+    # -----------------------------
+    # Accessors
+    # -----------------------------
+    def getResultType(self) -> Type[TPipelineResult]:
         """
-        Gets the Python type reference for this pipeline.
+        Gets the result type for this pipeline.
 
-        Returns:
-            The Python type representing the result type (TResultType).
+        :return: The class representing the result type T
         """
-        return self._typeref
-
-    def __eq__(self, other: object) -> bool:
-        """
-        Compares this SynapsePipeline with another object for equality.
-
-        Two pipelines are considered equal if both their `typeref` and `typestring`
-        are equal.
-        """
-        if not isinstance(other, SynapsePipeline):
-            return False
-        return self._typeref == other._typeref and self.typestring == other.typestring
-
-    def __hash__(self) -> int:
-        """
-        Computes a hash code for this SynapsePipeline.
-
-        The hash code is based on the same fields used in equality:
-        `typeref` and `typestring`.
-        """
-        return hash((self._typeref, self.typestring))
+        return self._resultType
 
 
-SynapsePipeline.kApriltag = SynapsePipeline(ApriltagResult, "ApriltagPipeline")
+# Define the static pipelines
+SynapsePipelineType.kApriltag = SynapsePipelineType(ApriltagResult, "ApriltagPipeline")
 
 
 class SynapseCamera:
     """
-    Represents a camera in the Synapse system, providing methods to manage settings
-    and retrieve results from NetworkTables.
+    Represents a Synapse camera with fully cached NetworkTables entries, type-safe settings,
+    and methods for retrieving results and metrics.
     """
 
-    class NetworkTableTopics(Enum):
+    # ---------------------------------------
+    # Construction
+    # ---------------------------------------
+
+    def __init__(self, cameraName: str, coprocessorName: str = "Synapse") -> None:
         """
-        Standard NetworkTables topic keys used for communication between Synapse
-        and coprocessors.
+        Constructs a new SynapseCamera with a specific coprocessor table name.
+
+        :param cameraName: the camera's name
+        :param coprocessorName: the NetworkTables root table for this camera
+        """
+        self.cameraName: str = cameraName
+        self.synapseTableName: str = coprocessorName
+
+        self.table: Optional[NetworkTable] = None
+        self.settingsTable: Optional[NetworkTable] = None
+        self.dataTable: Optional[NetworkTable] = None
+
+        self.entryCache: Dict[str, NetworkTableEntry] = {}
+
+        self.pipelineEntry: Optional[NetworkTableEntry] = None
+        self.pipelineTypeEntry: Optional[NetworkTableEntry] = None
+        self.resultsEntry: Optional[NetworkTableEntry] = None
+        self.recordStateEntry: Optional[NetworkTableEntry] = None
+        self.captureLatencyEntry: Optional[NetworkTableEntry] = None
+        self.processLatencyEntry: Optional[NetworkTableEntry] = None
+
+        inst = NetworkTableInstance.getDefault()
+        self.table = inst.getTable(self.synapseTableName).getSubTable(self.cameraName)
+
+    # ---------------------------------------
+    # Topics
+    # ---------------------------------------
+
+    class NetworkTableTopics:
+        """
+        Standardized NetworkTables topic keys for pipelines, results, recording, and latency.
         """
 
         kPipelineTopic = "pipeline"
@@ -91,196 +110,338 @@ class SynapseCamera:
         kResultsTopic = "results"
         kCaptureLatencyTopic = "captureLatency"
         kProcessLatencyTopic = "processLatency"
-        kDataTableName = "data"
-        kSettingsTableName = "settings"
 
-    def __init__(self, cameraName: str, coprocessorName: str = "Synapse") -> None:
+    # ---------------------------------------
+    # Subtables
+    # ---------------------------------------
+
+    def getSettingsTable(self) -> NetworkTable:
         """
-        Constructs a new SynapseCamera instance.
+        Returns the settings subtable.
 
-        Args:
-            cameraName: The camera's name.
-            coprocessorName: The coprocessor table name (default: "Synapse").
+        :return: the NetworkTable storing camera settings
         """
-        self.synapseTableName: Final[str] = coprocessorName
-        self.cameraName: Final[str] = cameraName
+        assert self.table is not None
+        if self.settingsTable is None:
+            self.settingsTable = self.table.getSubTable("settings")
+        return self.settingsTable
 
-        self.__table: Final[ntcore.NetworkTable] = (
-            ntcore.NetworkTableInstance.getDefault()
-            .getTable(coprocessorName)
-            .getSubTable(cameraName)
-        )
+    def getDataTable(self) -> NetworkTable:
+        """
+        Returns the data/results subtable.
 
-        self.__dataTable: Optional[ntcore.NetworkTable] = None
-        self.__settingsTable: Optional[ntcore.NetworkTable] = None
-        self.__pipelineEntry: Optional[ntcore.NetworkTableEntry] = None
-        self.__pipelineTypeEntry: Optional[ntcore.NetworkTableEntry] = None
-        self.__resultsEntry: Optional[ntcore.NetworkTableEntry] = None
-        self.__recordStateEntry: Optional[ntcore.NetworkTableEntry] = None
-        self.__processLatencyEntry: Optional[ntcore.NetworkTableEntry] = None
-        self.__captureLatencyEntry: Optional[ntcore.NetworkTableEntry] = None
+        :return: the NetworkTable storing camera results
+        """
+        assert self.table is not None
+        if self.dataTable is None:
+            self.dataTable = self.table.getSubTable("data")
+        return self.dataTable
 
-    def setPipeline(self, pipeline: int) -> None:
-        """Sets the camera pipeline ID."""
-        if self.__pipelineEntry is None:
-            self.__pipelineEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kPipelineTopic.value
-            )
-        assert self.__pipelineEntry is not None
-        self.__pipelineEntry.setInteger(pipeline)
+    # ---------------------------------------
+    # Entry caching
+    # ---------------------------------------
+
+    def getCachedEntry(
+        self, key: str, table: Optional[NetworkTable]
+    ) -> NetworkTableEntry:
+        """
+        Retrieves a cached NetworkTableEntry for a given key.
+
+        :param key: the entry key
+        :param table: the table to fetch the entry from
+        :return: the cached or newly fetched NetworkTableEntry
+        """
+
+        assert table is not None
+        if key not in self.entryCache:
+            self.entryCache[key] = table.getEntry(key)
+        return self.entryCache[key]
+
+    # ---------------------------------------
+    # Pipeline getters / setters
+    # ---------------------------------------
 
     def getPipeline(self) -> int:
-        """Gets the current pipeline ID. Returns -1 if not set."""
-        if self.__pipelineEntry is None:
-            self.__pipelineEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kPipelineTopic.value
-            )
-        assert self.__pipelineEntry is not None
-        return self.__pipelineEntry.getInteger(-1)
+        """
+        Returns the current pipeline ID or -1 if unset.
 
-    def getRecordingStatus(self) -> bool:
-        """Gets the current recording status of the camera."""
-        if self.__recordStateEntry is None:
-            self.__recordStateEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kRecordStatusTopic.value
+        :return: the pipeline index
+        """
+        if self.pipelineEntry is None:
+            self.pipelineEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kPipelineTopic, self.table
             )
-        assert self.__recordStateEntry is not None
-        return self.__recordStateEntry.getBoolean(False)
+        return self.pipelineEntry.getInteger(-1)
 
-    def setRecordingStatus(self, status: bool) -> None:
-        """Sets the recording status of the camera."""
-        if self.__recordStateEntry is None:
-            self.__recordStateEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kRecordStatusTopic.value
+    def setPipeline(self, pipeline: int) -> None:
+        """
+        Sets the current pipeline ID.
+
+        :param pipeline: pipeline index
+        """
+        if self.pipelineEntry is None:
+            self.pipelineEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kPipelineTopic, self.table
             )
-        assert self.__recordStateEntry is not None
-        self.__recordStateEntry.setBoolean(status)
+        self.pipelineEntry.setInteger(pipeline)
 
-    def getCameraName(self) -> str:
-        """Retrieves the camera name."""
-        return self.cameraName
+    # ---------------------------------------
+    # Pipeline type string
+    # ---------------------------------------
 
     def getPipelineType(self) -> str:
-        """Gets the pipeline type string from the camera. Returns 'unknown' if not set."""
-        if self.__pipelineTypeEntry is None:
-            self.__pipelineTypeEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kPipelineTypeTopic.value
+        """
+        Returns the pipeline type string.
+
+        :return: the pipeline type
+        """
+        if self.pipelineTypeEntry is None:
+            self.pipelineTypeEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kPipelineTypeTopic, self.table
             )
-        assert self.__pipelineTypeEntry is not None
-        return self.__pipelineTypeEntry.getString("unknown")
+        return self.pipelineTypeEntry.getString("unknown")
+
+    # ---------------------------------------
+    # Recording
+    # ---------------------------------------
+
+    def getRecordingStatus(self) -> bool:
+        """
+        Returns whether the camera is currently recording.
+
+        :return: true if recording, false otherwise
+        """
+        if self.recordStateEntry is None:
+            self.recordStateEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kRecordStatusTopic, self.table
+            )
+        return self.recordStateEntry.getBoolean(False)
+
+    def setRecordStatus(self, status: bool) -> None:
+        """
+        Sets the camera recording status.
+
+        :param status: true to start recording, false to stop
+        """
+        if self.recordStateEntry is None:
+            self.recordStateEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kRecordStatusTopic, self.table
+            )
+        self.recordStateEntry.setBoolean(status)
+
+    # ---------------------------------------
+    # Latencies
+    # ---------------------------------------
 
     def getCaptureLatency(self) -> float:
-        """Gets the latest capture latency from the camera in milliseconds."""
-        if self.__captureLatencyEntry is None:
-            self.__captureLatencyEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kCaptureLatencyTopic.value
+        """
+        Returns the latest capture latency in milliseconds.
+
+        :return: capture latency
+        """
+        if self.captureLatencyEntry is None:
+            self.captureLatencyEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kCaptureLatencyTopic, self.table
             )
-        assert self.__captureLatencyEntry is not None
-        return self.__captureLatencyEntry.getDouble(-1)
+        return self.captureLatencyEntry.getDouble(-1)
 
     def getProcessLatency(self) -> float:
-        """Gets the latest processing latency from the camera in milliseconds."""
-        if self.__processLatencyEntry is None:
-            self.__processLatencyEntry = self.__table.getEntry(
-                self.NetworkTableTopics.kProcessLatencyTopic.value
+        """
+        Returns the latest processing latency in milliseconds.
+
+        :return: processing latency
+        """
+        if self.processLatencyEntry is None:
+            self.processLatencyEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kProcessLatencyTopic, self.table
             )
-        assert self.__processLatencyEntry is not None
-        return self.__processLatencyEntry.getDouble(-1)
+        return self.processLatencyEntry.getDouble(-1)
 
-    @overload
-    def getResults(self, t: Type[TResultType]) -> TResultType:
+    # ---------------------------------------
+    # Untyped deprecated setting getter
+    # ---------------------------------------
+
+    def getSettingDeprecated(self, key: str) -> Optional[object]:
         """
-        Fetches and deserializes the camera's results as a specific type.
+        Deprecated untyped setting retrieval.
 
-        Args:
-            t: The class type representing the expected result.
-
-        Returns:
-            An instance of TResultType deserialized from the camera's data.
-
-        Raises:
-            AssertionError: If the pipeline type does not match the currently active pipeline.
+        :param key: the setting key
+        :return: Optional containing the value if present
         """
-        ...
+        entry = self.getCachedEntry(key, self.getSettingsTable())
 
-    @overload
-    def getResults(self, t: SynapsePipeline[TResultType]) -> TResultType:
-        """
-        Fetches and deserializes the camera's results for a given SynapsePipeline.
+        t = entry.getType()
 
-        Args:
-            t: A SynapsePipeline object representing the pipeline whose results to fetch.
-
-        Returns:
-            An instance of TResultType deserialized from the pipeline's results.
-        """
-        ...
-
-    def getResults(
-        self, t: Union[Type[TResultType], SynapsePipeline[TResultType]]
-    ) -> TResultType:
-        if isinstance(t, SynapsePipeline):
-            assert self.getPipelineType() == t.typestring
-
-        typeref = t.typeref if isinstance(t, SynapsePipeline) else t
-
-        return msgpack.unpackb(
-            self.__getDataEntry(self.NetworkTableTopics.kResultsTopic.value).getRaw(
-                msgpack.packb({})
-            ),
-            raw=False,
-            object_hook=dataclass_object_hook(typeref),
-        )
-
-    def __getDataEntry(self, dataKey: str) -> ntcore.NetworkTableEntry:
-        """Retrieves a specific entry from the camera's data table."""
-        return self.__getDataResultsTable().getEntry(dataKey)
-
-    def __getDataResultsTable(self) -> ntcore.NetworkTable:
-        """Retrieves the data table for this camera."""
-        if self.__dataTable is None:
-            self.__dataTable = self.__table.getSubTable(
-                self.NetworkTableTopics.kDataTableName.value
-            )
-        assert self.__dataTable is not None
-        return self.__dataTable
-
-    def getSetting(self, key: str) -> Optional[Any]:
-        """Retrieves a camera setting value from the settings table."""
-        entry: ntcore.NetworkTableEntry = self.__getSettingsTable().getEntry(key)
-        if not entry.exists():
-            return None
-
-        entryType = entry.getType()
-        if entryType == ntcore.NetworkTableType.kDouble:
+        if t == NetworkTableType.kDouble:
             return entry.getDouble(0.0)
-        elif entryType == ntcore.NetworkTableType.kDoubleArray:
-            return entry.getDoubleArray([])
-        elif entryType == ntcore.NetworkTableType.kString:
+        if t == NetworkTableType.kString:
             return entry.getString("")
-        elif entryType == ntcore.NetworkTableType.kStringArray:
-            return entry.getStringArray([])
-        elif entryType == ntcore.NetworkTableType.kInteger:
+        if t == NetworkTableType.kBoolean:
+            return entry.getBoolean(False)
+        if t == NetworkTableType.kInteger:
             return entry.getInteger(0)
-        elif entryType == ntcore.NetworkTableType.kIntegerArray:
-            return entry.getIntegerArray([])
-        elif entryType == ntcore.NetworkTableType.kFloat:
-            return entry.getFloat(0.0)
-        elif entryType == ntcore.NetworkTableType.kFloatArray:
-            return entry.getFloatArray([])
+        if t == NetworkTableType.kDoubleArray:
+            return entry.getDoubleArray([])
+        if t == NetworkTableType.kStringArray:
+            return entry.getStringArray([])
+        if t == NetworkTableType.kBooleanArray:
+            return entry.getBooleanArray([])
 
         return None
 
-    def setSetting(self, key: str, value: Any) -> None:
-        """Sets a camera setting value in the settings table."""
-        entry: ntcore.NetworkTableEntry = self.__getSettingsTable().getEntry(key)
-        entry.setValue(value)
+    # ---------------------------------------
+    # Typed settings
+    # ---------------------------------------
 
-    def __getSettingsTable(self) -> ntcore.NetworkTable:
-        """Retrieves the settings table for this camera."""
-        if self.__settingsTable is None:
-            self.__settingsTable = self.__table.getSubTable(
-                self.NetworkTableTopics.kSettingsTableName.value
+    def getSetting(self, setting: "Setting[T]") -> Optional[T]:
+        """
+        Typed getter for camera settings.
+
+        :param setting: the typed setting
+        :param <T>: the value type
+        :return: Optional containing value if present and type matches
+        """
+        entry = self.getCachedEntry(setting.key, self.getSettingsTable())
+
+        if entry.getType() != setting.ntType:
+            return None
+
+        if entry.getType() == NetworkTableType.kDouble:
+            val = entry.getDouble(0.0)
+        elif entry.getType() == NetworkTableType.kInteger:
+            val = entry.getInteger(0)
+        elif entry.getType() == NetworkTableType.kString:
+            val = entry.getString("")
+        elif entry.getType() == NetworkTableType.kBoolean:
+            val = entry.getBoolean(False)
+        elif entry.getType() == NetworkTableType.kDoubleArray:
+            val = entry.getDoubleArray([])
+        elif entry.getType() == NetworkTableType.kStringArray:
+            val = entry.getStringArray([])
+        elif entry.getType() == NetworkTableType.kBooleanArray:
+            val = entry.getBooleanArray([])
+        else:
+            return None
+
+        if isinstance(val, setting.valueType):
+            return val
+        return None
+
+    def setSetting(self, setting: "Setting[T]", value: T) -> None:
+        """
+        Typed setter for camera settings.
+
+        :param setting: the typed setting
+        :param value: the value to set
+        :param <T>: type of the value
+        :raises TypeError: if the value type does not match the expected NetworkTableType
+        """
+        entry = self.getCachedEntry(setting.key, self.getSettingsTable())
+
+        if setting.ntType == NetworkTableType.kDouble:
+            entry.setDouble(float(value))  # pyright: ignore
+        elif setting.ntType == NetworkTableType.kInteger:
+            entry.setInteger(int(value))  # pyright: ignore
+        elif setting.ntType == NetworkTableType.kString:
+            entry.setString(str(value))
+        elif setting.ntType == NetworkTableType.kBoolean:
+            entry.setBoolean(bool(value))
+        elif setting.ntType == NetworkTableType.kDoubleArray:
+            entry.setDoubleArray(value)  # type: ignore
+        elif setting.ntType == NetworkTableType.kStringArray:
+            entry.setStringArray(value)  # type: ignore
+        elif setting.ntType == NetworkTableType.kBooleanArray:
+            entry.setBooleanArray(value)  # type: ignore
+        else:
+            raise TypeError(f"Unsupported NT type for setting '{setting.key}'")
+
+    # ---------------------------------------
+    # Results
+    # ---------------------------------------
+
+    def getResultsEntry(self) -> NetworkTableEntry:
+        """
+        Returns the results entry.
+
+        :return: cached results NetworkTableEntry
+        """
+        if self.resultsEntry is None:
+            self.resultsEntry = self.getCachedEntry(
+                self.NetworkTableTopics.kResultsTopic, self.getDataTable()
             )
-        assert self.__settingsTable is not None
-        return self.__settingsTable
+        return self.resultsEntry
+
+    def getResults(self, resultType: Type[T], data: bytes) -> Optional[T]:
+        """
+        Deserialize results from serialized MessagePack data into the given dataclass type.
+
+        :param resultType: type of the result (dataclass)
+        :param data: serialized MessagePack bytes
+        :return: Optional containing deserialized results
+        """
+        if not data:
+            return None
+
+        try:
+            result = msgpack.loads(
+                data, raw=False, object_hook=dataclass_object_hook(resultType)
+            )
+            return cast(Optional[T], result)
+        except Exception as e:
+            print(f"[SynapseCamera] Failed to decode results: {e}")
+            return None
+
+    # ---------------------------------------
+    # Name
+    # ---------------------------------------
+
+    def getCameraName(self) -> str:
+        """
+        Returns the camera name.
+
+        :return: camera name
+        """
+        return self.cameraName
+
+
+@dataclass
+class Setting(Generic[T]):
+    """
+    Represents a typed Synapse setting that can be stored in a NetworkTable.
+
+    :param <T>: The type of the setting value (e.g., Double, String, arrays, etc.)
+    """
+
+    key: str
+    valueType: Type[T]
+    ntType: NetworkTableType
+
+    @staticmethod
+    def doubleSetting(key: str) -> "Setting[float]":
+        return Setting(key, float, NetworkTableType.kDouble)
+
+    @staticmethod
+    def integerSetting(key: str) -> "Setting[int]":
+        return Setting(key, int, NetworkTableType.kInteger)
+
+    @staticmethod
+    def stringSetting(key: str) -> "Setting[str]":
+        return Setting(key, str, NetworkTableType.kString)
+
+    @staticmethod
+    def doubleArraySetting(key: str) -> "Setting[list[float]]":
+        return Setting(key, list, NetworkTableType.kDoubleArray)
+
+    @staticmethod
+    def stringArraySetting(key: str) -> "Setting[list[str]]":
+        return Setting(key, list, NetworkTableType.kStringArray)
+
+    @staticmethod
+    def booleanSetting(key: str) -> "Setting[bool]":
+        return Setting(key, bool, NetworkTableType.kBoolean)
+
+
+Setting.kBrightness = Setting.doubleSetting("brightness")  # pyright: ignore
+Setting.kGain = Setting.doubleSetting("gain")  # pyright: ignore
+Setting.kExposure = Setting.doubleSetting("exposure")  # pyright: ignore
+Setting.kOrientation = Setting.stringSetting("orientation")  # pyright: ignore
