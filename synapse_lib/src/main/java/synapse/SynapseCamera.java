@@ -65,7 +65,7 @@ public class SynapseCamera {
    * camera's coordinate frame.
    *
    * <p>This is used to convert between camera poses and robot poses, where the transform defines
-   * the camera’s position and orientation relative to the robot.
+   * the camera's position and orientation relative to the robot.
    */
   protected Transform3d m_robotToCameraOffset;
 
