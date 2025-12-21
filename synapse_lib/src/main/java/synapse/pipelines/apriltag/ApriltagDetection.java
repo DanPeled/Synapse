@@ -8,7 +8,7 @@ import java.util.Objects;
  * Represents a single detected AprilTag along with its associated metadata and pose estimates.
  *
  * <p>This class contains the tag's ID, detection accuracy metrics, and the estimated poses of the
- * robot and tag in multiple coordinate systems. It is typically produced by an AprilTag detection
+ * camera and tag in multiple coordinate systems. It is typically produced by an AprilTag detection
  * pipeline.
  */
 public class ApriltagDetection {
@@ -29,18 +29,18 @@ public class ApriltagDetection {
   public float hamming;
 
   /**
-   * The estimated pose of the robot in the <b>field coordinate system</b>.
+   * The estimated pose of the camera in the <b>field coordinate system</b>.
    *
    * <p>Format: {@code [x, y, z, roll, pitch, yaw]}.
    */
-  public double[] robotPose_fieldSpace;
+  public double[] cameraPose_fieldSpace;
 
   /**
-   * The estimated pose of the robot relative to the <b>detected tag</b>.
+   * The estimated pose of the camera relative to the <b>detected tag</b>.
    *
    * <p>Format: {@code [x, y, z, roll, pitch, yaw]}.
    */
-  public double[] robotPose_tagSpace;
+  public double[] cameraPose_tagSpace;
 
   /**
    * The estimated pose of the tag in <b>screen coordinates</b>.
@@ -71,7 +71,7 @@ public class ApriltagDetection {
    * <ul>
    *   <li>Their {@link #tagID} values are the same.
    *   <li>Their {@link #hamming} values are numerically equal.
-   *   <li>Their {@link #robotPose_fieldSpace}, {@link #robotPose_tagSpace}, and {@link
+   *   <li>Their {@link #cameraPose_fieldSpace}, {@link #cameraPose_tagSpace}, and {@link
    *       #tagPose_screenSpace} arrays contain the same elements in the same order.
    *   <li>Their {@link #tag_estimate} objects are equal according to {@link
    *       ApriltagPoseEstimate#equals(Object)}.
@@ -87,8 +87,8 @@ public class ApriltagDetection {
     ApriltagDetection that = (ApriltagDetection) o;
     return tagID == that.tagID
         && Float.compare(that.hamming, hamming) == 0
-        && Arrays.equals(robotPose_fieldSpace, that.robotPose_fieldSpace)
-        && Arrays.equals(robotPose_tagSpace, that.robotPose_tagSpace)
+        && Arrays.equals(cameraPose_fieldSpace, that.cameraPose_fieldSpace)
+        && Arrays.equals(cameraPose_tagSpace, that.cameraPose_tagSpace)
         && Arrays.equals(tagPose_screenSpace, that.tagPose_screenSpace)
         && Objects.equals(tag_estimate, that.tag_estimate);
   }
@@ -97,7 +97,7 @@ public class ApriltagDetection {
    * Computes a hash code for this {@code ApriltagDetection}.
    *
    * <p>The hash code is based on the same fields used in {@link #equals(Object)}: {@link #tagID},
-   * {@link #hamming}, {@link #robotPose_fieldSpace}, {@link #robotPose_tagSpace}, {@link
+   * {@link #hamming}, {@link #cameraPose_fieldSpace}, {@link #cameraPose_tagSpace}, {@link
    * #tagPose_screenSpace}, and {@link #tag_estimate}.
    *
    * @return a hash code value for this object
@@ -105,8 +105,8 @@ public class ApriltagDetection {
   @Override
   public int hashCode() {
     int result = Objects.hash(tagID, hamming, tag_estimate);
-    result = 31 * result + Arrays.hashCode(robotPose_fieldSpace);
-    result = 31 * result + Arrays.hashCode(robotPose_tagSpace);
+    result = 31 * result + Arrays.hashCode(cameraPose_fieldSpace);
+    result = 31 * result + Arrays.hashCode(cameraPose_tagSpace);
     result = 31 * result + Arrays.hashCode(tagPose_screenSpace);
     return result;
   }

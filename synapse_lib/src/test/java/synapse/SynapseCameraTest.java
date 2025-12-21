@@ -39,11 +39,11 @@ class SynapseCameraTest {
     ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
 
     ApriltagResult original = new ApriltagResult();
-    original.robotEstimate_fieldSpace = new double[] {1, 2, 3};
+    original.cameraEstimate_fieldSpace = new double[] {1, 2, 3};
     original.tags = new ApriltagDetection[] {new ApriltagDetection()};
     original.tags[0].hamming = 2;
     original.tags[0].tagID = 7;
-    original.tags[0].robotPose_fieldSpace = new double[] {1, 2, 3, 4, 5, 6};
+    original.tags[0].cameraPose_fieldSpace = new double[] {1, 2, 3, 4, 5, 6};
 
     byte[] serialized = mapper.writeValueAsBytes(original);
 

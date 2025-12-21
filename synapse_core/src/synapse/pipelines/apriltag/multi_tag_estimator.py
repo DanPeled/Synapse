@@ -7,13 +7,12 @@ from typing import Iterable
 
 from wpimath.geometry import Pose3d, Quaternion, Rotation3d
 
-from .apriltag_detector import (ICombinedApriltagRobotPoseEstimator,
-                                RobotPoseEstimate)
+from .apriltag_detector import ICombinedApriltagCameraPoseEstimator, CameraPoseEstimate
 
 
-class WeightedAverageMultiTagEstimator(ICombinedApriltagRobotPoseEstimator):
+class WeightedAverageMultiTagEstimator(ICombinedApriltagCameraPoseEstimator):
     @staticmethod
-    def estimate(tags: Iterable[RobotPoseEstimate], **kwargs) -> Pose3d:
+    def estimate(tags: Iterable[CameraPoseEstimate], **kwargs) -> Pose3d:
         tags = list(tags)
         if not tags:
             return Pose3d()  # identity if no detections
@@ -26,9 +25,9 @@ class WeightedAverageMultiTagEstimator(ICombinedApriltagRobotPoseEstimator):
         weighted_quats = []
 
         for t in tags:
-            pose = t.robotPose_fieldSpace
+            pose = t.cameraPose_fieldSpace
 
-            # Distance from robot to tag (in field space)
+            # Distance from Camera to tag (in field space)
             # (You could also use camera-to-tag transform length here)
             dist = pose.translation().norm()
 
