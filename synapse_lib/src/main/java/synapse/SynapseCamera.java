@@ -2,6 +2,8 @@ package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -59,6 +61,15 @@ public class SynapseCamera {
   protected static final ObjectMapper s_ObjectMapper = new ObjectMapper(new MessagePackFactory());
 
   /**
+   * Transform representing the physical offset between the robot's coordinate frame and the
+   * camera's coordinate frame.
+   *
+   * <p>This is used to convert between camera poses and robot poses, where the transform defines
+   * the camera's position and orientation relative to the robot.
+   */
+  protected Transform3d m_robotToCameraOffset;
+
+  /**
    * Constructs a new SynapseCamera using the default coprocessor table name "Synapse".
    *
    * @param cameraName the camera's name
@@ -82,29 +93,53 @@ public class SynapseCamera {
           NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
   }
 
-  /** Standardized NetworkTables topic keys for pipelines, results, recording, and latency. */
-  public static final class NetworkTableTopics {
+  /**
+   * Sets the transform offset between the robot reference frame and the camera, and returns this
+   * instance for chaining.
+   *
+   * <p>The offset defines where the camera is located relative to the robot, enabling conversion
+   * between camera poses and robot poses.
+   *
+   * @param robotToCameraOffset the transform from robot space to camera space
+   * @return this SynapseCamera instance for fluent chaining
+   */
+  public SynapseCamera withRobotToCameraOffset(Transform3d robotToCameraOffset) {
+    m_robotToCameraOffset = robotToCameraOffset;
+    return this;
+  }
 
-    /** Topic for the current pipeline ID */
-    public static final String kPipelineTopic = "pipeline";
+  /**
+   * Assigns the transform offset between the robot and camera coordinate frames.
+   *
+   * <p>This offset is used when estimating robot pose based on camera pose measurements.
+   *
+   * @param robotToCameraOffset the transform from robot to camera
+   */
+  public void setRobotToCameraOffset(Transform3d robotToCameraOffset) {
+    m_robotToCameraOffset = robotToCameraOffset;
+  }
 
-    /** Topic for recording state */
-    public static final String kRecordStatusTopic = "record";
+  /**
+   * Returns the transform offset from the robot frame to the camera frame.
+   *
+   * @return the robot-to-camera Transform3d, or null if not configured
+   */
+  public Transform3d getRobotToCameraOffset() {
+    return m_robotToCameraOffset;
+  }
 
-    /** Topic for the pipeline type string */
-    public static final String kPipelineTypeTopic = "pipeline_type";
-
-    /** Topic for results data */
-    public static final String kResultsTopic = "results";
-
-    /** Topic for camera capture latency (ms) */
-    public static final String kCaptureLatencyTopic = "captureLatency";
-
-    /** Topic for camera processing latency (ms) */
-    public static final String kProcessLatencyTopic = "processLatency";
-
-    /** Prevent instantiation */
-    protected NetworkTableTopics() {}
+  /**
+   * Converts a given camera pose into a robot pose using the configured robot-to-camera offset.
+   *
+   * <p>This performs the inverse transform of the stored offset and applies it to the camera pose,
+   * yielding an estimated robot pose in the same coordinate frame.
+   *
+   * @param cameraPose the camera pose in a shared coordinate system
+   * @return estimated robot pose
+   * @throws NullPointerException if the offset has not been set
+   */
+  public Pose3d estimateRobotPose(Pose3d cameraPose) {
+    return cameraPose.transformBy(m_robotToCameraOffset.inverse());
   }
 
   /**
@@ -225,7 +260,7 @@ public class SynapseCamera {
    * @param key the setting key
    * @return an Optional containing the value if present
    */
-  @Deprecated(forRemoval = true, since = "2025.0.0b4")
+  @Deprecated(forRemoval = true, since = "2025.0.1")
   public Optional<Object> getSetting(String key) {
     NetworkTableEntry entry = getCachedEntry(key, getSettingsTable());
     if (!entry.exists()) return Optional.empty();
@@ -509,5 +544,30 @@ public class SynapseCamera {
 
     /** Predefined setting for camera orientation */
     public static final Setting<String> kOrientation = stringSetting("orientation");
+  }
+
+  /** Standardized NetworkTables topic keys for pipelines, results, recording, and latency. */
+  public static final class NetworkTableTopics {
+
+    /** Topic for the current pipeline ID */
+    public static final String kPipelineTopic = "pipeline";
+
+    /** Topic for recording state */
+    public static final String kRecordStatusTopic = "record";
+
+    /** Topic for the pipeline type string */
+    public static final String kPipelineTypeTopic = "pipeline_type";
+
+    /** Topic for results data */
+    public static final String kResultsTopic = "results";
+
+    /** Topic for camera capture latency (ms) */
+    public static final String kCaptureLatencyTopic = "captureLatency";
+
+    /** Topic for camera processing latency (ms) */
+    public static final String kProcessLatencyTopic = "processLatency";
+
+    /** Prevent instantiation */
+    protected NetworkTableTopics() {}
   }
 }

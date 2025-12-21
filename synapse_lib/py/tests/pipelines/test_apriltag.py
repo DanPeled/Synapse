@@ -43,10 +43,10 @@ class TestApriltagClasses(unittest.TestCase):
             1, 0.0, [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [1, 1, 1, 0, 0, 0], pose
         )
         r1 = ApriltagResult(
-            tags=[detection], robotEstimate_fieldSpace=[0, 0, 0, 0, 0, 0]
+            tags=[detection], cameraEstimate_fieldSpace=[0, 0, 0, 0, 0, 0]
         )
         r2 = ApriltagResult(
-            tags=[detection], robotEstimate_fieldSpace=[0, 0, 0, 0, 0, 0]
+            tags=[detection], cameraEstimate_fieldSpace=[0, 0, 0, 0, 0, 0]
         )
         self.assertEqual(r1, r2)
         self.assertEqual(hash(r1), hash(r2))

@@ -12,7 +12,6 @@ from ntcore import NetworkTable
 from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
                                   PipelineResultProto)
 from synapse_net.socketServer import WebSocketServer
-from wpimath.geometry import Transform3d
 
 from ..log import createMessage, err
 from ..stypes import CameraID, Frame, PipelineID
@@ -230,12 +229,6 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
     def getCurrentCameraSettingCollection(self) -> Optional[CameraSettings]:
         return self.cameraSettings.get(self.cameraIndex)
-
-    def getCameraTransform(self, cameraIndex: CameraID) -> Optional[Transform3d]:
-        data = GlobalSettings.getCameraConfig(cameraIndex)
-        if data:
-            return data.transform
-        return None
 
 
 def disabled(cls):

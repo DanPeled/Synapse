@@ -27,7 +27,7 @@ class ApriltagPoseEstimate:
     """The error metric associated with `rejectedPose`. Lower values indicate higher confidence."""
 
     acceptedPose: List[float]
-    """The first possible 3D pose of the AprilTag relative to the camera/robot frame."""
+    """The first possible 3D pose of the AprilTag relative to the camera frame."""
 
     rejectedPose: List[float]
     """The second possible 3D pose, typically the ambiguous alternative."""
@@ -49,7 +49,7 @@ class ApriltagDetection:
     Represents a single detected AprilTag along with its associated metadata and pose estimates.
 
     This class contains the tag's ID, detection accuracy metrics, and the estimated
-    poses of the robot and tag in multiple coordinate systems. It is typically
+    poses of the camera and tag in multiple coordinate systems. It is typically
     produced by an AprilTag detection pipeline.
     """
 
@@ -59,11 +59,11 @@ class ApriltagDetection:
     hamming: float
     """The Hamming distance of the detected tag. Lower values indicate a more accurate detection."""
 
-    robotPose_fieldSpace: List[float]
-    """The estimated pose of the robot in the field coordinate system."""
+    cameraPose_fieldSpace: List[float]
+    """The estimated pose of the camera in the field coordinate system."""
 
-    robotPose_tagSpace: List[float]
-    """The estimated pose of the robot relative to the detected tag."""
+    cameraPose_tagSpace: List[float]
+    """The estimated pose of the camera relative to the detected tag."""
 
     tagPose_screenSpace: List[float]
     """The estimated pose of the tag in screen coordinates."""
@@ -76,8 +76,8 @@ class ApriltagDetection:
             (
                 self.tag_id,
                 self.hamming,
-                tuple(self.robotPose_fieldSpace),
-                tuple(self.robotPose_tagSpace),
+                tuple(self.cameraPose_fieldSpace),
+                tuple(self.cameraPose_tagSpace),
                 tuple(self.tagPose_screenSpace),
                 self.tag_estimate,
             )
@@ -89,15 +89,15 @@ class ApriltagResult:
     """
     Represents the result of detecting AprilTags in a single frame or input source.
 
-    This class contains the list of detected tags and an estimate of the robot's
+    This class contains the list of detected tags and an estimate of the camera's
     pose in field space. It is typically produced by an AprilTag pipeline.
     """
 
     tags: List[ApriltagDetection]
     """The detected AprilTags with their associated detection data."""
 
-    robotEstimate_fieldSpace: List[float]
-    """The estimated robot pose in field space, format (x, y, z, roll, pitch, yaw)."""
+    cameraEstimate_fieldSpace: List[float]
+    """The estimated camera pose in field space, format (x, y, z, roll, pitch, yaw)."""
 
     def __hash__(self) -> int:
-        return hash((tuple(self.tags), tuple(self.robotEstimate_fieldSpace)))
+        return hash((tuple(self.tags), tuple(self.cameraEstimate_fieldSpace)))
