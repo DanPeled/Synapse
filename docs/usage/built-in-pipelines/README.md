@@ -1,20 +1,6 @@
 ---
-icon: browsers
-layout:
-  width: default
-  title:
-    visible: true
-  description:
-    visible: true
-  tableOfContents:
-    visible: true
-  outline:
-    visible: true
-  pagination:
-    visible: true
-  metadata:
-    visible: true
+icon: pipe-section
 ---
 
-# UI Interaction
+# Built In Pipelines
 

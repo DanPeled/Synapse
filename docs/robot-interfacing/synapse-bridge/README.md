@@ -1,3 +1,2 @@
-# Synapse Bridge : Robot Code Interface
+# SynapseLib : Robot Code Interface
 
-##

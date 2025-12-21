@@ -27,7 +27,7 @@ We _STRONGLY_ recommends the usage of a network switch on your robot. This is be
 {% endtabs %}
 
 {% hint style="info" %}
-In order to configure robot communication and network identity for the coprocessor, read [#network-settings](../../usage/built-in-pipelines/settings-page.md#network-settings "mention")
+In order to configure robot communication and network identity for the coprocessor, read [#network-settings](../../usage/built-in-pipelines-1/settings-page.md#network-settings "mention")
 {% endhint %}
 
 ## Camera Stream Ports

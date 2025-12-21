@@ -7,5 +7,6 @@ In order to deploy onto custom hardware, make sure the hardware you choose for y
 * Have a supported version of `robotpy` able to be installed onto it
 * SSH capabilities, required in order to deploy code onto the coprocessor
 * `netplan` in order to be able to set a [Static IP](#user-content-fn-1)[^1] on the device.
+* `dhclient` for simmilar reasons
 
 [^1]: a permanent, unchanging network address assigned to a device

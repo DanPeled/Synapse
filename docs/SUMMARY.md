@@ -18,13 +18,13 @@
 
 * [Project Management](usage/project-management/README.md)
   * [Setting up CI for a Synapse Project using GitHub Actions](usage/project-management/setting-up-ci-for-a-synapse-project-using-github-actions.md)
-* [UI Interaction](usage/built-in-pipelines/README.md)
-  * [Pipeline Settings](usage/built-in-pipelines/pipeline-settings.md)
-  * [Camera Page](usage/built-in-pipelines/camera-page.md)
-  * [Settings Page](usage/built-in-pipelines/settings-page.md)
-* [Built In Pipelines](usage/built-in-pipelines-1/README.md)
-  * [Apriltag Detection](usage/built-in-pipelines-1/apriltag-detection.md)
-  * [Color Detection](usage/built-in-pipelines-1/color-detection.md)
+* [Built In Pipelines](usage/built-in-pipelines/README.md)
+  * [Apriltag Pipeline](usage/built-in-pipelines/apriltag-pipeline.md)
+  * [Color Detection Pipeline](usage/built-in-pipelines/color-detection-pipeline.md)
+* [UI Interaction](usage/built-in-pipelines-1/README.md)
+  * [Pipeline Settings](usage/built-in-pipelines-1/pipeline-settings.md)
+  * [Camera Page](usage/built-in-pipelines-1/camera-page.md)
+  * [Settings Page](usage/built-in-pipelines-1/settings-page.md)
 * [Working without a robot](usage/working-without-a-robot.md)
 * [Custom Pipelines](usage/custom-pipelines/README.md)
   * [Settings API](usage/custom-pipelines/settings-api.md)
@@ -34,7 +34,7 @@
 ## Robot Interfacing
 
 * [SynapseLib : Robot Code Interface](robot-interfacing/synapse-bridge/README.md)
-  * [Installing Synapse Bridge](robot-interfacing/synapse-bridge/installing-synapse-bridge.md)
+  * [Installing SynapseLib](robot-interfacing/synapse-bridge/installing-synapse-bridge.md)
   * [Getting Target Data](robot-interfacing/synapse-bridge/getting-target-data.md)
   * [Runtime Camera Settings](robot-interfacing/synapse-bridge/runtime-camera-settings.md)
   * [Custom Pipeline Data](robot-interfacing/synapse-bridge/custom-pipeline-data.md)
@@ -44,3 +44,7 @@
 * [Troubleshooting](additional-resources/troubleshooting.md)
 * [NetworkTables API](additional-resources/networktables-api.md)
 * [Known Issues](additional-resources/known-issues.md)
+
+***
+
+* [Java API Docs](https://danpeled.github.io/Synapse/docs/)
