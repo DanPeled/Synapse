@@ -7,13 +7,9 @@ from typing import List
 import robotpy_apriltag as rpy_apriltag
 from typing_extensions import Buffer
 
-from .apriltag_detector import (
-    AprilTagDetection,
-    AprilTagDetector,
-    ApriltagPoseEstimate,
-    ApriltagPoseEstimator,
-    makeCorners,
-)
+from .apriltag_detector import (AprilTagDetection, AprilTagDetector,
+                                ApriltagPoseEstimate, ApriltagPoseEstimator,
+                                makeCorners)
 
 
 class RobotpyApriltagDetector(AprilTagDetector):

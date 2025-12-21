@@ -5,39 +5,23 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    Iterable,
-    List,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-    overload,
-)
+from typing import (Any, Callable, Dict, Generic, Iterable, List, Optional,
+                    Type, TypeVar, Union, overload)
 
 from ntcore import NetworkTable
-from synapse_net.proto.v1 import MessageTypeProto, PipelineProto, PipelineResultProto
+from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
+                                  PipelineResultProto)
 from synapse_net.socketServer import WebSocketServer
 
 from ..log import createMessage, err
 from ..stypes import CameraID, Frame, PipelineID
 from .camera_factory import SynapseCamera
 from .global_settings import GlobalSettings
-from .results_api import PipelineResult, parsePipelineResult, serializePipelineResult
-from .settings_api import (
-    CameraSettings,
-    PipelineSettings,
-    Setting,
-    SettingsAPI,
-    SettingsValue,
-    TConstraintType,
-    TSettingValueType,
-    settingValueToProto,
-)
+from .results_api import (PipelineResult, parsePipelineResult,
+                          serializePipelineResult)
+from .settings_api import (CameraSettings, PipelineSettings, Setting,
+                           SettingsAPI, SettingsValue, TConstraintType,
+                           TSettingValueType, settingValueToProto)
 
 FrameResult = Optional[Frame]
 
