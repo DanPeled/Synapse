@@ -179,7 +179,7 @@ build.dependsOn outputJar
 
 libraryBuild.dependsOn build
 
-def releasesRepoUrl = "$buildDir/../vendordep/maven/"
+def releasesRepoUrl = "$buildDir/../vendordep/maven/$pubVersion/"
 
 publishing {
     repositories {
