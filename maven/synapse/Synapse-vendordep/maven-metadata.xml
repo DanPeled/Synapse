@@ -3,11 +3,11 @@
   <groupId>synapse</groupId>
   <artifactId>Synapse-vendordep</artifactId>
   <versioning>
-    <latest>2025.0.1</latest>
-    <release>2025.0.1</release>
+    <latest>dev</latest>
+    <release>dev</release>
     <versions>
-      <version>2025.0.1</version>
+      <version>dev</version>
     </versions>
-    <lastUpdated>20251223125828</lastUpdated>
+    <lastUpdated>20251223130255</lastUpdated>
   </versioning>
 </metadata>
