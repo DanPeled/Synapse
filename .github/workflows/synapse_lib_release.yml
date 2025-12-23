@@ -7,9 +7,18 @@ on:
         description: "Release version number"
         type: string
         required: true
-      publish:
+      forceDev:
+        description: "Force pubVersion=dev"
         type: boolean
-        description: "Publish to WPILib"
+        default: false
+
+  workflow_call:
+    inputs:
+      releaseVersion:
+        type: string
+        required: true
+      forceDev:
+        type: boolean
         default: false
 
 jobs:
@@ -26,23 +35,35 @@ jobs:
 
     env:
       releaseVersion: ${{ inputs.releaseVersion }}
-      workingDirectory: ${{ github.workspace }}/synapse_lib
-      name: github-pages
+      workingDirectory: ${{ github.workspace }}/synapse_lib }
 
     steps:
-      - run: git config --global user.name "github-actions[bot]" && git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Configure git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v3
-        with:
-          distribution: "temurin"
-          java-version: 17
-
-      - run: chmod +x gradlew
+      - name: Force pubVersion to dev
+        if: ${{ inputs.forceDev }}
+        run: |
+          sed -i 's/pubVersion *= *".*"/pubVersion = "dev"/' publish.gradle
+          echo "Using pubVersion=dev"
         working-directory: ${{ env.workingDirectory }}
 
-      - name: Install roboRio toolchain
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+        working-directory: ${{ env.workingDirectory }}
+
+      - name: Install RoboRIO toolchain
         run: ./gradlew installRoboRioToolchain
         working-directory: ${{ env.workingDirectory }}
 
@@ -56,30 +77,33 @@ jobs:
           ref: gh-pages
           path: ${{ env.workingDirectory }}/vendordep/
 
-      - name: Publish synapse_lib
+      - name: Gradle Publish
         run: ./gradlew publish
         working-directory: ${{ env.workingDirectory }}
 
-      - name: Create new vendor JSON
-        run: cp ${{ env.workingDirectory }}/vendordep/SynapseLib.json ${{ env.workingDirectory }}/vendordep/SynapseLib-${{ inputs.releaseVersion }}.json
+      - name: Create versioned vendor JSON
+        run: |
+          cp SynapseLib.json SynapseLib-${{ inputs.releaseVersion }}.json
+        working-directory: ${{ env.workingDirectory }}/vendordep/
 
-      - name: Upload pages
-        run: git add . && git commit -m "Automatically add SynapseLib version ${{ inputs.releaseVersion }}" && git push
+      - name: Commit and push gh-pages updates
+        run: |
+          git add .
+          git commit -m "Automatically add SynapseLib version ${{ inputs.releaseVersion }}"
+          git push
         working-directory: ${{ env.workingDirectory }}/vendordep/
 
       - name: Setup Pages
-        id: pages
         uses: actions/configure-pages@v5
 
-      - name: Upload JSON, maven repository, and javadocs
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          name: "github-pages"
-          retention-days: "90"
+          name: github-pages
+          retention-days: 90
           path: ${{ env.workingDirectory }}/vendordep/
 
       - name: Deploy to GitHub Pages
-        id: deployment
         uses: actions/deploy-pages@v4
 
       - name: Output Pages Tree
