@@ -35,7 +35,7 @@ jobs:
 
     env:
       releaseVersion: ${{ inputs.releaseVersion }}
-      workingDirectory: ${{ github.workspace }}/synapse_lib }
+      workingDirectory: ${{ github.workspace }}/synapse_lib
 
     steps:
       - name: Configure git user
