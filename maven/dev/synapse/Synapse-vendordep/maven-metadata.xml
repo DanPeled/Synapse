@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>synapse</groupId>
+  <artifactId>Synapse-vendordep</artifactId>
+  <versioning>
+    <latest>dev</latest>
+    <release>dev</release>
+    <versions>
+      <version>dev</version>
+    </versions>
+    <lastUpdated>20251223131247</lastUpdated>
+  </versioning>
+</metadata>
