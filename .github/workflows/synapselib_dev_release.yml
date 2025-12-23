@@ -12,5 +12,4 @@ jobs:
     uses: ./.github/workflows/synapse_lib_release.yml
     with:
       releaseVersion: dev
-      publish: true
       forceDev: true
