@@ -49,8 +49,8 @@ jobs:
       - name: Force pubVersion to dev
         if: ${{ inputs.forceDev }}
         run: |
-          sed -i 's/pubVersion *= *".*"/pubVersion = "dev"/' publish.gradle
-          echo "Using pubVersion=dev"
+          sed -i "s/def pubVersion *= *'.*'/def pubVersion = 'dev'/" publish.gradle
+          echo "Forced pubVersion=dev"
         working-directory: ${{ env.workingDirectory }}
 
       - name: Set up Java
