@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
