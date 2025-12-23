@@ -4,7 +4,7 @@
   "version": "${version}",
   "frcYear": "2025",
   "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
-  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/"],
+  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/${version}/"],
   "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-${version}.json",
   "javaDependencies": [
     {
