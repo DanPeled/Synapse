@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
@@ -13,6 +12,7 @@ from ntcore import (NetworkTable, NetworkTableEntry, NetworkTableInstance,
 
 from ._deserialization import dataclass_object_hook
 from .pipelines.apriltag import ApriltagResult
+from .pipelines.color import ColorResult
 
 T = TypeVar("T")
 
@@ -32,6 +32,7 @@ class SynapsePipelineType(Generic[TPipelineResult]):
     # Predefined pipelines
     # -----------------------------
     kApriltag: SynapsePipelineType[ApriltagResult]
+    kColor: SynapsePipelineType[ColorResult]
 
     def __init__(self, resultType: Type[TPipelineResult], typestring: str) -> None:
         """
@@ -57,6 +58,7 @@ class SynapsePipelineType(Generic[TPipelineResult]):
 
 # Define the static pipelines
 SynapsePipelineType.kApriltag = SynapsePipelineType(ApriltagResult, "ApriltagPipeline")
+SynapsePipelineType.kColor = SynapsePipelineType(ColorResult, "ColorPipeline")
 
 
 class SynapseCamera:
@@ -404,7 +406,6 @@ class SynapseCamera:
         return self.cameraName
 
 
-@dataclass
 class Setting(Generic[T]):
     """
     Represents a typed Synapse setting that can be stored in a NetworkTable.
@@ -415,6 +416,16 @@ class Setting(Generic[T]):
     key: str
     valueType: Type[T]
     ntType: NetworkTableType
+
+    def __init__(self, key: str, valueType: Type[T], ntType: NetworkTableType):
+        self.key = key
+        self.valueType = valueType
+        self.ntType = ntType
+
+    kBrightness: Setting[float]
+    kGain: Setting[float]
+    kExposure: Setting[float]
+    kOrientation: Setting[int]
 
     @staticmethod
     def doubleSetting(key: str) -> "Setting[float]":
@@ -441,7 +452,7 @@ class Setting(Generic[T]):
         return Setting(key, bool, NetworkTableType.kBoolean)
 
 
-Setting.kBrightness = Setting.doubleSetting("brightness")  # pyright: ignore
-Setting.kGain = Setting.doubleSetting("gain")  # pyright: ignore
-Setting.kExposure = Setting.doubleSetting("exposure")  # pyright: ignore
-Setting.kOrientation = Setting.stringSetting("orientation")  # pyright: ignore
+Setting.kBrightness = Setting.doubleSetting("brightness")
+Setting.kGain = Setting.doubleSetting("gain")
+Setting.kExposure = Setting.doubleSetting("exposure")
+Setting.kOrientation = Setting.integerSetting("orientation")
