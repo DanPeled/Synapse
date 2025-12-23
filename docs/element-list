@@ -1,3 +1,4 @@
 synapse
 synapse.pipelines.apriltag
+synapse.pipelines.color
 synapse.util.deserializers

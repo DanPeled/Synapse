@@ -101,9 +101,14 @@ loadScripts(document, 'script');</script>
 <div class="col-last even-row-color">
 <div class="block">The AprilTag pipeline.</div>
 </div>
-<div class="col-first odd-row-color"><code>final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
-<div class="col-second odd-row-color"><code><a href="#typestring" class="member-name-link">typestring</a></code></div>
+<div class="col-first odd-row-color"><code>static final <a href="SynapsePipelineType.html" title="class in synapse">SynapsePipelineType</a>&lt;<a href="pipelines/color/ColorResult.html" title="class in synapse.pipelines.color">ColorResult</a>&gt;</code></div>
+<div class="col-second odd-row-color"><code><a href="#kColor" class="member-name-link">kColor</a></code></div>
 <div class="col-last odd-row-color">
+<div class="block">The color detection pipeline.</div>
+</div>
+<div class="col-first even-row-color"><code>final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
+<div class="col-second even-row-color"><code><a href="#typestring" class="member-name-link">typestring</a></code></div>
+<div class="col-last even-row-color">
 <div class="block">The string identifier for this pipeline, used as the topic name.</div>
 </div>
 </div>
@@ -164,6 +169,14 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="SynapsePipelineType.html" title="class in synapse">SynapsePipelineType</a>&lt;<a href="pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a>&gt;</span>&nbsp;<span class="element-name">kApriltag</span></div>
 <div class="block">The AprilTag pipeline. This pipeline uses the <a href="pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag"><code>ApriltagResult</code></a> class to store the result
  data.</div>
+</section>
+</li>
+<li>
+<section class="detail" id="kColor">
+<h3>kColor</h3>
+<div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="SynapsePipelineType.html" title="class in synapse">SynapsePipelineType</a>&lt;<a href="pipelines/color/ColorResult.html" title="class in synapse.pipelines.color">ColorResult</a>&gt;</span>&nbsp;<span class="element-name">kColor</span></div>
+<div class="block">The color detection pipeline. This pipeline detects colored regions in the camera feed and
+ stores the result using the <a href="pipelines/color/ColorResult.html" title="class in synapse.pipelines.color"><code>ColorResult</code></a> class.</div>
 </section>
 </li>
 <li>
