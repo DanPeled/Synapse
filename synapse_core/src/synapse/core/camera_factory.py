@@ -471,56 +471,72 @@ class CsCoreCamera(SynapseCamera):
             return self._properties[prop].get()
         return None
 
-    def setVideoMode(self, fps: int, width: int, height: int, _fallback=False) -> None:
-        pixelFormat = VideoMode.PixelFormat.kMJPEG
-
+    def _selectBestVideoMode(
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        pixelFormat: VideoMode.PixelFormat,
+    ) -> VideoMode:
+        # 1. Exact match
         for mode in self._validVideoModes:
             if (
-                width == mode.width
-                and height == mode.height
+                mode.width == width
+                and mode.height == height
                 and mode.pixelFormat == pixelFormat
             ):
-                self.camera.setVideoMode(
-                    width=width,
-                    height=height,
-                    fps=mode.fps,
-                    pixelFormat=pixelFormat,
-                )
+                return mode
 
-                # --- FIX: Resize and reinitialize the buffer pool on resolution change ---
-                H, W = mode.height, mode.width
-                self._bufferPool.clear()
-                for _ in range(self._poolSize):
-                    self._bufferPool.append(np.zeros((H, W, 3), dtype=np.uint8))
+        # 2. Same resolution, closest FPS
+        same_res = [
+            m
+            for m in self._validVideoModes
+            if m.width == width and m.height == height and m.pixelFormat == pixelFormat
+        ]
+        if same_res:
+            return max(same_res, key=lambda m: m.fps)
 
-                # Clear the queue on resolution change to prevent mismatched buffers
-                with self._frameQueue.mutex:
-                    self._frameQueue.queue.clear()
-                # --- END FIX ---
+        # 3. Closest resolution by area
+        def area(m):
+            return m.width * m.height
 
-                return
+        return max(
+            (m for m in self._validVideoModes if m.pixelFormat == pixelFormat),
+            key=area,
+        )
 
-        if not _fallback:
-            # Find the largest available resolution and try again
-            largest_mode = max(
-                (m for m in self._validVideoModes if m.pixelFormat == pixelFormat),
-                key=lambda m: m.width * m.height,
-                default=None,
-            )
+    def setVideoMode(self, fps: int, width: int, height: int) -> None:
+        pixelFormat = VideoMode.PixelFormat.kMJPEG
 
-            if largest_mode:
-                warn(
-                    f"Invalid video mode (width={width}, height={height}). "
-                    f"Falling back to largest available mode ({largest_mode.width}x{largest_mode.height})."
-                )
-                self.setVideoMode(
-                    fps, largest_mode.width, largest_mode.height, _fallback=True
-                )
-                return
+        # Always select a valid mode
+        mode = self._selectBestVideoMode(width, height, fps, pixelFormat)
 
+        # Apply it
+        self.camera.setVideoMode(
+            width=mode.width,
+            height=mode.height,
+            fps=mode.fps,
+            pixelFormat=pixelFormat,
+        )
+
+        H, W = mode.height, mode.width
+
+        # Atomically rebuild buffers
+        with self._lock:
+            self._bufferPool = [
+                np.zeros((H, W, 3), dtype=np.uint8) for _ in range(self._poolSize)
+            ]
+
+            with self._frameQueue.mutex:
+                self._frameQueue.queue.clear()
+
+        requested = (width, height, fps)
+        selected = (mode.width, mode.height, mode.fps)
+
+        if requested != selected:
             warn(
-                f"No valid video modes found for pixelFormat={pixelFormat}. "
-                f"Camera default settings will be used."
+                f"Using video mode {mode.width}x{mode.height}@{mode.fps} "
+                f"(requested {width}x{height}@{fps})"
             )
 
     def getResolution(self) -> Resolution:
