@@ -161,6 +161,7 @@ class SynapseCamera(ABC):
     def __init__(self, name: str) -> None:
         self.name: str = name
         self.stream: str = ""
+        self.cameraIndex: CameraID = -1
 
     @classmethod
     @abstractmethod
@@ -382,45 +383,67 @@ class CsCoreCamera(SynapseCamera):
     def _startFrameThread(self) -> None:
         if self._running:
             return
+
+        if not self._bufferPool:
+            warn(f"Camera {self.cameraIndex}: frame thread not started (no buffers)")
+            return
+
         self._running = True
-        self._thread = threading.Thread(target=self._frameGrabberLoop, daemon=True)
+        self._thread = threading.Thread(
+            target=self._frameGrabberLoop,
+            daemon=True,
+            name=f"FrameGrabber-{self.cameraIndex}",
+        )
         self._thread.start()
 
     def _frameGrabberLoop(self) -> None:
-        while not self.isConnected():
+        # Wait until the camera reports connected
+        while self._running and not self.isConnected():
             time.sleep(0.1)
 
-        current_buffer_index = 0
+        buffer_index = 0
 
         while self._running:
-            # 1. Select the next buffer from the pool to be filled
-            current_buffer = self._bufferPool[current_buffer_index]
+            # ---- HARD SAFETY GUARD ----
+            if not self._bufferPool:
+                time.sleep(0.1)
+                continue
 
+            # Get current video mode (used for pacing)
+            mode = self.camera.getVideoMode()
+            fps = mode.fps if mode and mode.fps > 0 else 30
+
+            # Select buffer (safe: bufferPool is non-empty)
+            try:
+                buffer = self._bufferPool[buffer_index]
+            except IndexError:
+                # Pool changed while running (video mode switch)
+                buffer_index = 0
+                time.sleep(0.01)
+                continue
+
+            # Grab frame into pre-allocated buffer
             with self._lock:
-                # 2. grabFrame REUSES the pre-allocated memory buffer (NO new allocation)
-                # We only need the return value (timestamp/status), which is 'ret'.
-                ret = self.sink.grabFrame(current_buffer)
+                timestamp = self.sink.grabFrame(buffer)
 
-            hasFrame = ret != 0
-            if hasFrame:
-                # 3. Put the INDEX of the filled buffer into the queue.
-                # Since the data is not copied, we avoid fragmentation.
+            if timestamp != 0:
+                # Push buffer index (drop oldest if queue full)
                 try:
-                    self._frameQueue.put_nowait((hasFrame, current_buffer_index))
+                    self._frameQueue.put_nowait((True, buffer_index))
                 except queue.Full:
-                    # Drop the OLDEST index to make space for the NEW buffer index
                     try:
                         self._frameQueue.get_nowait()
                     except queue.Empty:
                         pass
-                    self._frameQueue.put_nowait((hasFrame, current_buffer_index))
+                    self._frameQueue.put_nowait((True, buffer_index))
 
-                # 4. Advance the index circularly for the next frame
-                current_buffer_index = (current_buffer_index + 1) % self._poolSize
-            else:
-                self._waitForNextFrame()
+                # Advance buffer index circularly
+                buffer_index = (buffer_index + 1) % len(self._bufferPool)
 
-            self._waitForNextFrame()
+            # ---- FRAME PACING (NO SPINNING) ----
+            # Sleep for half-frame period to reduce latency
+            sleep_time = max(0.002, 1.0 / fps / 2.0)
+            time.sleep(sleep_time)
 
     def _waitForNextFrame(self):
         if self.isConnected():
@@ -429,19 +452,14 @@ class CsCoreCamera(SynapseCamera):
                 time.sleep(1.0 / mode.fps / 2.0)
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        # --- FIX: Retrieve the buffer from the pool using the index ---
         with self._lock:
             try:
-                # Get the index of the most recently filled buffer
-                hasFrame, buffer_index = self._frameQueue.get_nowait()
-                if hasFrame and buffer_index is not None:
-                    # Return the pre-allocated numpy array corresponding to the index
-                    return True, self._bufferPool[buffer_index]
-                else:
-                    return False, None
+                hasFrame, index = self._frameQueue.get_nowait()
+                if hasFrame and index is not None and index < len(self._bufferPool):
+                    return True, self._bufferPool[index]
             except queue.Empty:
-                return False, None
-        # --- END FIX ---
+                pass
+        return False, None
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()
@@ -477,8 +495,11 @@ class CsCoreCamera(SynapseCamera):
         height: int,
         fps: int,
         pixelFormat: VideoMode.PixelFormat,
-    ) -> VideoMode:
+    ) -> Optional[VideoMode]:
         # 1. Exact match
+        if self._videoModes is None or len(self._videoModes) == 0:
+            return None
+
         for mode in self._validVideoModes:
             if (
                 mode.width == width
@@ -506,10 +527,15 @@ class CsCoreCamera(SynapseCamera):
         )
 
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
+        if self._videoModes is None or len(self._videoModes) == 0:
+            warn(f"No video modes on camera: {self.cameraIndex}")
+            return
         pixelFormat = VideoMode.PixelFormat.kMJPEG
 
         # Always select a valid mode
         mode = self._selectBestVideoMode(width, height, fps, pixelFormat)
+
+        assert mode is not None
 
         # Apply it
         self.camera.setVideoMode(
