@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "synapse_lib/**"
+      - "synapse_lib/src/**"
 
 jobs:
   dev:
