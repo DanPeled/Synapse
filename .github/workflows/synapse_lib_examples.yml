@@ -32,6 +32,7 @@ jobs:
         run: ./gradlew spotlessCheck
 
   build_synapse:
+    name: "Build Synapse Processor Project"
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
