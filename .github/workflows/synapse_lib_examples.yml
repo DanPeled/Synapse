@@ -10,9 +10,13 @@ on:
       - "examples/**"
 
 jobs:
-  build_robot:
+  build_robot_example:
+    name: Build Robot - ${{ matrix.example }}
     runs-on: ubuntu-22.04
     container: wpilib/roborio-cross-ubuntu:2025-22.04
+    strategy:
+      matrix:
+        example: [aimAtTarget]
     steps:
       - uses: actions/checkout@v4
       - name: Add repository to git safe directories
@@ -20,9 +24,9 @@ jobs:
       - name: Grant execute permission for gradlew
         working-directory: examples/robotproject
         run: chmod +x gradlew
-      - name: Compile and run tests on robot code
+      - name: Build with example
         working-directory: examples/robotproject
-        run: ./gradlew build
+        run: ./gradlew build -Pexample=${{ matrix.example }}
       - name: Spotless Check
         working-directory: examples/robotproject
         run: ./gradlew spotlessCheck
