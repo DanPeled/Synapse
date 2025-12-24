@@ -1,113 +1,60 @@
-import { useState, useRef, useEffect } from "react";
-import { baseCardColor, teamColor } from "@/services/style";
+import { useState, useRef } from "react";
 import { Eye, Fullscreen } from "lucide-react";
 import { darken } from "polished";
-import { Row } from "./containers";
 import { cn } from "@/lib/utils";
+import { baseCardColor, teamColor } from "@/services/style";
 
 export function CameraStream({
-  stream,
-  maxWidth = "max-w-[435px]",
+  stream = "localhost",
+  className,
 }: {
-  stream: string | undefined;
-  maxWidth?: string;
+  stream?: string;
+  className?: string;
 }) {
   const [loaded, setLoaded] = useState(false);
-  const [contextPos, setContextPos] = useState<{ x: number; y: number } | null>(
-    null,
-  );
   const imgRef = useRef<HTMLImageElement>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  if (!stream) {
-    stream = "localhost";
-  }
-
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // setContextPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleFullscreen = () => {
-    if (imgRef.current) {
-      imgRef.current.requestFullscreen?.();
-    }
-    setContextPos(null); // hide menu
-  };
-
-  // Close context menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(event.target as Node)
-      ) {
-        setContextPos(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   return (
     <div
       className={cn(
-        "aspect-[3/2] w-full flex flex-col items-center justify-center rounded-lg border border-zinc-700",
-        maxWidth,
+        "relative w-full h-full overflow-hidden rounded-lg",
+        className,
       )}
-      style={{
-        maxHeight: "290px",
-        height: "auto",
-        backgroundColor: darken(0.2, baseCardColor),
-        position: "relative",
-      }}
+      style={{ backgroundColor: "transparent" }}
     >
+      {/* Loading overlay */}
       {!loaded && (
-        <>
-          <Eye
-            className="w-16 h-16 mb-2 opacity-100 animate-spin"
-            color={teamColor}
-          />
-          <p style={{ color: teamColor }}>Camera Stream</p>
-        </>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
+          <Eye className="h-16 w-16 animate-spin" color={teamColor} />
+          <p className="mt-2" style={{ color: teamColor }}>
+            Camera Stream
+          </p>
+        </div>
       )}
 
+      {/* Stream */}
       <img
         ref={imgRef}
         src={stream}
         alt="Camera Stream"
         onLoad={() => setLoaded(true)}
         onError={() => setLoaded(false)}
-        onContextMenu={handleContextMenu}
-        style={{
-          display: loaded ? "block" : "none",
-          width: "100%",
-          height: "auto",
-          objectFit: "cover",
-          cursor: "context-menu",
-        }}
-        key={stream}
+        className={cn(
+          "absolute inset-0 w-full h-full transition-opacity",
+          loaded ? "opacity-100" : "opacity-0",
+          "object-contain", // 👈 change to cover if you want cropping
+        )}
       />
 
-      {/* Custom context menu */}
-      {contextPos && (
-        <Row
-          gap="gap-2"
-          ref={contextMenuRef}
-          className="z-50 bg-zinc-800 text-white px-2 py-1 rounded shadow cursor-pointer hover:bg-zinc-700"
-          style={{
-            top: contextPos.y,
-            left: contextPos.x,
-            position: "fixed",
-            color: teamColor,
-          }}
-          onClick={handleFullscreen}
+      {/* Fullscreen */}
+      {loaded && (
+        <button
+          onClick={() => imgRef.current?.requestFullscreen?.()}
+          style={{ color: teamColor }}
+          className="absolute bottom-2 right-2 z-20 rounded bg-zinc-800/80 p-2 hover:bg-zinc-700 cursor-pointer"
         >
-          <Fullscreen /> <span className="select-none">Fullscreen</span>
-        </Row>
+          <Fullscreen className="h-5 w-5" />
+        </button>
       )}
     </div>
   );

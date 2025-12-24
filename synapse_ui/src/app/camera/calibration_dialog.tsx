@@ -14,18 +14,14 @@ import {
   useBackendContext,
 } from "@/services/backend/backendContext";
 import { PipelineID } from "@/services/backend/dataStractures";
-import {
-  GenerateControl,
-  generateControlFromSettingMeta,
-  settingValueToProto,
-} from "@/services/controls_generator";
+import { generateControlFromSettingMeta } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";
 import { AlertDialog } from "@/widgets/alertDialog";
 import { CameraStream } from "@/widgets/cameraStream";
 import { Column, Row } from "@/widgets/containers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
-import { Barcode, Camera, LoaderPinwheel, Settings, X } from "lucide-react";
+import { Camera, Settings, X } from "lucide-react";
 import { JSX, useEffect, useRef, useState } from "react";
 
 const CALIBRATION_PIPELINE_ID = 9999;
@@ -352,12 +348,6 @@ export function CalibrationDialog({
               >
                 {selectedPipelineType?.type.replaceAll("$$", "") ?? "Pipeline"}
               </TabsTrigger>
-              {/* <TabsTrigger */}
-              {/*   value="output" */}
-              {/*   className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer" */}
-              {/* > */}
-              {/*   Output */}
-              {/* </TabsTrigger> */}
             </TabsList>
 
             <TabsContent value="input" className="p-6 space-y-6">
@@ -405,7 +395,7 @@ export function CalibrationDialog({
         </Column>
 
         <Column className="flex-1 items-center space-y-10">
-          <CameraStream stream={camera?.streamPath} maxWidth="max-w-[500px]" />
+          <CameraStream stream={camera?.streamPath} />
         </Column>
       </Row>
     </AlertDialog>
