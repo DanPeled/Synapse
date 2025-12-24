@@ -11,6 +11,9 @@ plugins {
     id 'com.diffplug.spotless' version '6.20.0'
 }
 
+group = 'synapse.vision'
+version = '2025.0.1'
+
 // WPILib Version
 ext.wpilibVersion = "2025.3.1"
 
