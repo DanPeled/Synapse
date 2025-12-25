@@ -1,16 +1,16 @@
 {
-  "fileName": "SynapseBridge.json",
-  "name": "SynapseBridge",
-  "version": "${version}",
+  "fileName": "SynapseLib.json",
+  "name": "SynapseLib",
+  "version": "2025.0.1",
   "frcYear": "2025",
   "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
-  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/"],
-  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseBridge.json",
+  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/2025.0.1/"],
+  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-2025.0.1.json",
   "javaDependencies": [
     {
-      "groupId": "${groupId}",
-      "artifactId": "${artifactId}-java",
-      "version": "${version}"
+      "groupId": "synapse",
+      "artifactId": "Synapse-java",
+      "version": "2025.0.1"
     },
     {
       "groupId": "com.fasterxml.jackson.core",
@@ -51,9 +51,9 @@
   "jniDependencies": [],
   "cppDependencies": [
     {
-      "groupId": "${groupId}",
-      "artifactId": "${artifactId}-cpp",
-      "version": "${version}",
+      "groupId": "synapse",
+      "artifactId": "Synapse-cpp",
+      "version": "2025.0.1",
       "libName": "Vendor",
       "headerClassifier": "headers",
       "sharedLibrary": false,

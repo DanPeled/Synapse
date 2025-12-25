@@ -2,6 +2,7 @@ package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import synapse.pipelines.apriltag.ApriltagResult;
+import synapse.pipelines.color.ColorResult;
 
 /**
  * Represents a Synapse pipeline. Each pipeline is associated with a result class that defines the
@@ -9,14 +10,21 @@ import synapse.pipelines.apriltag.ApriltagResult;
  *
  * @param <T> the type of result data returned by this pipeline, typically a List or Map of results
  */
-public class SynapsePipeline<T> {
+public class SynapsePipelineType<T> {
 
   /**
    * The AprilTag pipeline. This pipeline uses the {@link ApriltagResult} class to store the result
    * data.
    */
-  public static final SynapsePipeline<ApriltagResult> kApriltag =
-      new SynapsePipeline<>(new TypeReference<ApriltagResult>() {}, "ApriltagPipeline");
+  public static final SynapsePipelineType<ApriltagResult> kApriltag =
+      new SynapsePipelineType<>(new TypeReference<ApriltagResult>() {}, "ApriltagPipeline");
+
+  /**
+   * The color detection pipeline. This pipeline detects colored regions in the camera feed and
+   * stores the result using the {@link ColorResult} class.
+   */
+  public static final SynapsePipelineType<ColorResult> kColor =
+      new SynapsePipelineType<>(new TypeReference<ColorResult>() {}, "ColorPipeline");
 
   /** The TypeReference representing the result type for this pipeline. */
   private final TypeReference<T> typeRef;
@@ -30,7 +38,7 @@ public class SynapsePipeline<T> {
    * @param typeRef The TypeReference associated with this pipeline's result data.
    * @param typestring The string identifier for this pipeline.
    */
-  public SynapsePipeline(TypeReference<T> typeRef, String typestring) {
+  public SynapsePipelineType(TypeReference<T> typeRef, String typestring) {
     this.typeRef = typeRef;
     this.typestring = typestring;
   }

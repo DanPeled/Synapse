@@ -13,7 +13,6 @@ import cscore as cs
 import cv2
 import synapse.log as log
 from synapse_net.nt_client import NtClient
-from wpimath.geometry import Transform3d
 
 from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, Frame,
@@ -151,7 +150,6 @@ class CameraHandler:
                 cameraConfig = CameraConfig(
                     name=info.name,
                     id=f"{info.name}_{info.productId}",
-                    transform=Transform3d(),
                     defaultPipeline=0,
                     calibration={},
                     streamRes=self.DEFAULT_STREAM_SIZE,

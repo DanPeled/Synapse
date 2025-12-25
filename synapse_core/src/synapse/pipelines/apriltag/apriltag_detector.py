@@ -19,16 +19,16 @@ Scalar = Sequence[float | int]
 
 
 @dataclass
-class RobotPoseEstimate:
-    """Represents a robot pose estimate in both tag space and field space.
+class CameraPoseEstimate:
+    """Represents a Camera pose estimate in both tag space and field space.
 
     Attributes:
-        robotPose_tagSpace (Transform3d): The robot pose relative to the AprilTag (tag space).
-        robotPose_fieldSpace (Pose3d): The robot pose relative to the field (field space).
+        cameraPose_tagSpace (Transform3d): The Camera pose relative to the AprilTag (tag space).
+        cameraPose_fieldSpace (Pose3d): The Camera pose relative to the field (field space).
     """
 
-    robotPose_tagSpace: Transform3d
-    robotPose_fieldSpace: Pose3d
+    cameraPose_tagSpace: Transform3d
+    cameraPose_fieldSpace: Pose3d
 
 
 def makeCorners(
@@ -199,9 +199,9 @@ class ApriltagPoseEstimator(ABC):
     def getConfig(self) -> Config: ...
 
 
-class ICombinedApriltagRobotPoseEstimator(Protocol):
+class ICombinedApriltagCameraPoseEstimator(Protocol):
     @staticmethod
-    def estimate(tags: Iterable[RobotPoseEstimate], **kwargs) -> Pose3d: ...
+    def estimate(tags: Iterable[CameraPoseEstimate], **kwargs) -> Pose3d: ...
 
 
 def drawTagDetectionMarker(
@@ -243,26 +243,22 @@ def drawTagDetectionMarker(
     )
 
 
-def tagToRobotPose(
+def tagToCameraPose(
     tagFieldPose: Pose3d,
-    cameraToRobotTransform: Transform3d,
     cameraToTagTransform: Transform3d,
-) -> RobotPoseEstimate:
-    """Compute the robot's pose on the field given a tag's field pose.
+) -> CameraPoseEstimate:
+    """Compute the Camera's pose on the field given a tag's field pose.
 
     Args:
         tagFieldPose (Pose3d): AprilTag pose in field coordinates.
-        cameraToRobotTransform (Transform3d): Transform from camera to robot coordinates.
         cameraToTagTransform (Transform3d): Transform from camera to tag coordinates.
 
     Returns:
-        RobotPoseEstimate: Robot pose in both tag and field spaces.
+        CameraPoseEstimate: Camera pose in both tag and field spaces.
     """
-    robotInTagSpace: Transform3d = (
-        cameraToTagTransform.inverse() + cameraToRobotTransform
-    )
-    robotInField: Pose3d = tagFieldPose.transformBy(robotInTagSpace)
-    return RobotPoseEstimate(robotInTagSpace, robotInField)
+    cameraInTagSpace = cameraToTagTransform.inverse()
+    cameraInField: Pose3d = tagFieldPose.transformBy(cameraInTagSpace)
+    return CameraPoseEstimate(cameraInTagSpace, cameraInField)
 
 
 def opencvToWPI(opencv: Transform3d) -> Transform3d:

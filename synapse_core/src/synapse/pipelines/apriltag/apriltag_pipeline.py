@@ -17,8 +17,9 @@ from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
-    ApriltagPoseEstimator, ICombinedApriltagRobotPoseEstimator,
-    RobotPoseEstimate, drawTagDetectionMarker, opencvToWPI, tagToRobotPose)
+    ApriltagPoseEstimator, CameraPoseEstimate,
+    ICombinedApriltagCameraPoseEstimator, drawTagDetectionMarker, opencvToWPI,
+    tagToCameraPose)
 from synapse.pipelines.apriltag.apriltag_robotpy import (
     RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
@@ -125,13 +126,13 @@ class ApriltagPipelineSettings(PipelineSettings):
 class ApriltagDetectionResult:
     detection: AprilTagDetection
     timestamp: float
-    robotPoseEstimate: RobotPoseEstimate
+    cameraPoseEstimate: CameraPoseEstimate
     tagPoseEstimate: ApriltagPoseEstimate
 
 
 @pipelineResult
 class ApriltagResult:
-    robotPoseEstimate: Optional[Pose3d]
+    cameraPoseEstimate: Optional[Pose3d]
     tagDetections: List[ApriltagDetectionResult]
 
 
@@ -139,19 +140,19 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kHammingKey: Final[str] = "hamming"
     kTagIDKey: Final[str] = "tag_id"
     kMeasuredMatrixResolutionKey: Final[str] = "measured_res"
-    kRobotPoseFieldSpaceKey: Final[str] = "robotPose_fieldSpace"
-    kRobotPoseTagSpaceKey: Final[str] = "robotPose_tagSpace"
+    kCameraPoseFieldSpaceKey: Final[str] = "cameraPose_fieldSpace"
+    kCameraPoseTagSpaceKey: Final[str] = "cameraPose_tagSpace"
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
     kTagPoseEstimateErrorKey: Final[str] = "tag_error"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
-    kRobotPoseEstimateKey: Final[str] = "robotEstimate_fieldSpace"
+    kCameraPoseEstimateKey: Final[str] = "cameraEstimate_fieldSpace"
     kTagDetectionsKey: Final[str] = "tags"
 
     def __init__(self, settings: ApriltagPipelineSettings):
         super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
-        self.combinedApriltagPoseEstimator: ICombinedApriltagRobotPoseEstimator = (
+        self.combinedApriltagPoseEstimator: ICombinedApriltagCameraPoseEstimator = (
             WeightedAverageMultiTagEstimator()
         )
         self.setConfig(self.cameraIndex)
@@ -162,7 +163,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
 
         self.distCoeffs = self.getDistCoeffs(cameraIndex)
-        self.camera_transform = self.getCameraTransform(cameraIndex)
         self.apriltagDetector = RobotpyApriltagDetector()
 
         detectorConfig: AprilTagDetector.Config = AprilTagDetector.Config()
@@ -189,10 +189,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
 
         self.distCoeffs = self.getDistCoeffs(cameraIndex)
-
-        self.camera_transform: Optional[Transform3d] = self.getCameraTransform(
-            cameraIndex
-        )
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         super().bind(cameraIndex, camera)
@@ -238,7 +234,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setResults(ApriltagResult(None, []))
+            self.setResults(None)
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:
@@ -265,16 +261,12 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
             )
 
-            if (
-                self.getSetting(ApriltagPipelineSettings.fieldpose)
-                and self.camera_transform
-            ):
+            if self.getSetting(ApriltagPipelineSettings.fieldpose):
                 tagFieldPose = self.fmap.getTagPose(tag.tagID)
 
                 if tagFieldPose:
-                    robotPoseEstimate = tagToRobotPose(
+                    cameraPoseEstimate = tagToCameraPose(
                         tagFieldPose=tagFieldPose,
-                        cameraToRobotTransform=self.camera_transform,
                         cameraToTagTransform=Transform3d(
                             translation=tagRelativePose.translation(),
                             rotation=tagRelativePose.rotation(),
@@ -282,15 +274,15 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                     )
 
                     self.setDataValue(
-                        self.kRobotPoseFieldSpaceKey,
-                        robotPoseEstimate.robotPose_fieldSpace,
+                        self.kCameraPoseFieldSpaceKey,
+                        cameraPoseEstimate.cameraPose_fieldSpace,
                     )
 
                     tagEstimates.append(
                         ApriltagDetectionResult(
                             detection=tag,
                             timestamp=timestamp,
-                            robotPoseEstimate=robotPoseEstimate,
+                            cameraPoseEstimate=cameraPoseEstimate,
                             tagPoseEstimate=tagPoseEstimate,
                         )
                     )
@@ -301,7 +293,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 ApriltagResult(
                     self.combinedApriltagPoseEstimator.estimate(
                         map(
-                            lambda estimate: estimate.robotPoseEstimate,
+                            lambda estimate: estimate.cameraPoseEstimate,
                             tagEstimates,
                         )
                     ),
@@ -324,14 +316,14 @@ class ApriltagsJson:
                 {
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
-                    ApriltagPipeline.kRobotPoseFieldSpaceKey: tag.robotPoseEstimate.robotPose_fieldSpace,
+                    ApriltagPipeline.kCameraPoseFieldSpaceKey: tag.cameraPoseEstimate.cameraPose_fieldSpace,
                     ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
                 }
             )
 
         return {
-            ApriltagPipeline.kRobotPoseEstimateKey: result.robotPoseEstimate,
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,
             ApriltagPipeline.kTagDetectionsKey: tags,
         }
 

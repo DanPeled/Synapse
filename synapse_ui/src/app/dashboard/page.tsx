@@ -42,38 +42,34 @@ function CameraView({ selectedCamera, cameraPerformance }: CameraViewProps) {
   return (
     <Card
       style={{ backgroundColor: baseCardColor }}
-      className="border-gray-700 flex flex-col h-full max-h-[400px]"
+      className="flex flex-col h-[400px] border-gray-700"
     >
-      {" "}
-      <CardHeader>
-        {" "}
+      <CardHeader className="shrink-0">
         <Row className="items-center justify-between">
           <CardTitle
             className="flex items-center gap-2"
             style={{ color: teamColor }}
           >
-            {" "}
             <Camera className="w-5 h-5" />
-            Camera Stream{" "}
-          </CardTitle>{" "}
-          <Row gap="gap-2" className="items-center">
-            <Badge
-              variant="secondary"
-              className="bg-stone-700"
-              style={{ color: teamColor }}
-            >
-              {" "}
-              <Activity className="w-3 h-3 mr-1" />
-              Processing @ {cameraPerformance?.fps ?? 0} FPS –{" "}
-              {cameraPerformance
-                ? cameraPerformance.latencyProcess.toFixed(2)
-                : "0.00"}
-              ms latency{" "}
-            </Badge>{" "}
-          </Row>{" "}
-        </Row>{" "}
+            Camera Stream
+          </CardTitle>
+
+          <Badge
+            variant="secondary"
+            className="bg-stone-700"
+            style={{ color: teamColor }}
+          >
+            <Activity className="w-3 h-3 mr-1" />
+            Processing @ {cameraPerformance?.fps ?? 0} FPS –{" "}
+            {cameraPerformance
+              ? cameraPerformance.latencyProcess.toFixed(2)
+              : "0.00"}
+            ms latency
+          </Badge>
+        </Row>
       </CardHeader>
-      <CardContent className="flex-grow flex flex-col items-center justify-center">
+
+      <CardContent className="flex-1 min-h-0 p-0">
         <CameraStream stream={selectedCamera?.streamPath} />
       </CardContent>
     </Card>
