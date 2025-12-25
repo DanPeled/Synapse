@@ -9,7 +9,6 @@ import traceback
 from asyncio import Queue
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from os import pipe
 from pathlib import Path
 from typing import Any, Deque, Dict, Final, List, Optional, Tuple, TypeAlias
 
@@ -32,6 +31,7 @@ from ..util import Publisher, getIP, getPublisher
 from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
+from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
 from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
                        PipelineSettings, getPipelineTypename)
@@ -797,12 +797,30 @@ class RuntimeManager:
             f.write(y)
 
         self.savePipelines()
+        self.saveCameras()
 
         log.log(
             MarkupColors.bold(
                 MarkupColors.okblue(f"Saved into {savefile.absolute().__str__()}")
             )
         )
+
+    def saveCameras(self):
+        for cameraid, config in self.cameraHandler.cameraConfigBindings.items():
+            savefile = (
+                Config.getInstance().path.parent
+                / f"camera_{cameraid}"
+                / "camera_configs.yml"
+            )
+            with open(savefile, "w") as f:
+                y = yaml.safe_dump(
+                    {"camera_configs": config.toDict()},
+                    default_flow_style=None,  # use block style by default
+                    sort_keys=False,  # preserve key order
+                    indent=2,  # control indentation
+                    width=80,  # wrap width for long lists
+                )
+                f.write(y)
 
     def cleanup(self) -> None:
         """
@@ -848,6 +866,11 @@ class RuntimeManager:
         def onConnect(_: RemoteConnectionIP) -> None:
             sendWebUIIP()
 
+        def onSetDefaultPipeline(pipelineindex: PipelineID, cameraid: CameraID):
+            self.cameraHandler.cameraConfigBindings[
+                cameraid
+            ].defaultPipeline = pipelineindex
+
         def onAddCamera(
             cameraIndex: CameraID, name: CameraName, camera: SynapseCamera
         ) -> None:
@@ -866,4 +889,6 @@ class RuntimeManager:
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.pipelineHandler.onRemovePipeline.add(onRemovePipeline)  # pyright: ignore
+        self.pipelineHandler.onDefaultPipelineSet.add(onSetDefaultPipeline)
+
         NtClient.onConnect.add(onConnect)

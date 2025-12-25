@@ -101,7 +101,6 @@ class CalibrationData:
 class CameraConfig:
     name: str
     id: str
-    transform: geometry.Transform3d
     calibration: Dict[ResolutionString, CalibrationData]
     defaultPipeline: int
     streamRes: Resolution
@@ -110,7 +109,6 @@ class CameraConfig:
         return {
             CameraConfigKey.kName.value: self.name,
             CameraConfigKey.kPath.value: self.id,
-            CameraConfigKey.kTransform.value: transform3dToList(self.transform),
             CameraConfigKey.kDefaultPipeline.value: self.defaultPipeline,
             CameraConfigKey.kStreamRes.value: list(self.streamRes),
             CameraConfigKey.kCalibration.value: {
@@ -130,7 +128,6 @@ class CameraConfig:
             name=data[CameraConfigKey.kName.value],
             id=data[CameraConfigKey.kPath.value],
             streamRes=data[CameraConfigKey.kStreamRes.value],
-            transform=listToTransform3d(data[CameraConfigKey.kTransform.value]),
             defaultPipeline=data[CameraConfigKey.kDefaultPipeline.value],
             calibration=calib,
         )
@@ -144,7 +141,6 @@ class CameraConfigKey(Enum):
     kDistCoeff = "distCoeffs"
     kMeasuredRes = "measured_res"
     kStreamRes = "stream_res"
-    kTransform = "transform"
     kCalibration = "calibration"
     kMeanErr = "mean_err"
 
