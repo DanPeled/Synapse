@@ -127,7 +127,7 @@ class PipelineHandler:
     def setDefaultPipeline(
         self, cameraIndex: CameraID, pipelineIndex: PipelineID
     ) -> None:
-        if pipelineIndex in self.pipelineSettings.keys():
+        if pipelineIndex in self.pipelineSettings[cameraIndex].keys():
             self.defaultPipelineIndexes[cameraIndex] = pipelineIndex
             log.log(
                 f"Default Pipeline set (#{pipelineIndex}) for Camera #{cameraIndex}"
