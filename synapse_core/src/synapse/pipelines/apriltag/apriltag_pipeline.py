@@ -234,7 +234,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         if not tags:
             self.setDataValue("hasResults", False)
-            self.setResults(ApriltagResult(None, []))
+            self.setResults(None)
             return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
         for tag in tags:

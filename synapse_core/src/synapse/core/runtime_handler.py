@@ -9,6 +9,7 @@ import traceback
 from asyncio import Queue
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from os import pipe
 from pathlib import Path
 from typing import Any, Deque, Dict, Final, List, Optional, Tuple, TypeAlias
 
@@ -293,7 +294,7 @@ class RuntimeManager:
             camera,
         )
 
-        currPipeline.nt_table = cameraTable
+        currPipeline.ntTable = cameraTable
         settingsSubtable = cameraTable.getSubTable(NTKeys.kSettings.value)
         pipeline_config.sendSettings(settingsSubtable)
 
@@ -539,6 +540,7 @@ class RuntimeManager:
         processedFrame = frame
         if pipeline is not None:
             try:
+                pipeline.preProcessCleanup()
                 result = pipeline.processFrame(frame, processStart)
 
                 out = self.handleResults(result, cameraIndex)

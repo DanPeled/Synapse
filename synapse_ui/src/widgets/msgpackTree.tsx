@@ -114,23 +114,18 @@ export function MsgPackTree({
 }) {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
-  let decoded: unknown;
+  let decoded: unknown = null; // default to null
   try {
     decoded = decode(
       encoded instanceof ArrayBuffer ? new Uint8Array(encoded) : encoded,
     );
   } catch (e) {
-    return (
-      <TableRow
-        key={String(encoded)}
-        className="hover:bg-zinc-800/60 transition-colors"
-        style={{ borderColor: teamColor }}
-      >
-        <TableCell colSpan={2} className="text-red-500">
-          Failed to decode MsgPack: {String(e)}
-        </TableCell>
-      </TableRow>
-    );
+    if (e instanceof TypeError) {
+      decoded = null; // silently fallback to null
+    } else {
+      // re-throw other errors
+      throw e;
+    }
   }
 
   return (

@@ -22,8 +22,10 @@ function RenderPrimitiveResult({
   copiedKey: string | null;
   copyToClipboard: (key: string, text: string) => void;
 }) {
+  // Render `null` if value.value is undefined
   const val =
-    value.value === undefined ? "" : String(protoToSettingValue(value.value));
+    value.value === undefined ? null : String(protoToSettingValue(value.value));
+
   return (
     <>
       <TableCell className="font-medium">{dataKey}</TableCell>
