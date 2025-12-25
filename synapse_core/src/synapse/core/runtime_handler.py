@@ -31,7 +31,6 @@ from ..util import Publisher, getIP, getPublisher
 from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
-from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
 from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
                        PipelineSettings, getPipelineTypename)
