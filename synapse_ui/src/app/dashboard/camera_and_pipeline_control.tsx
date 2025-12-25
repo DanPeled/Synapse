@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Star,
   Ban,
+  Trash,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -189,7 +190,7 @@ export function CameraAndPipelineControls({
                       variant="outline"
                       size="sm"
                       className="rounded-md cursor-pointer bg-zinc-900 hover:bg-zinc-700"
-                      style={{ color: teamColor }}
+                      style={{ color: teamColor, borderColor: borderColor }}
                     >
                       <MoreVertical
                         className="w-4 h-4"
@@ -202,25 +203,32 @@ export function CameraAndPipelineControls({
                     align="end"
                     alignOffset={20}
                     className="rounded-md shadow-lg bg-zinc-800"
-                    style={{ borderColor: borderColor, borderWidth: "1px" }}
+                    style={{
+                      borderColor: borderColor,
+                      borderWidth: "1px",
+                      color: teamColor,
+                    }}
                   >
                     <DropdownMenuItem
                       onClick={() => setRenamingPipeline(true)}
                       disabled={!selectedPipeline}
                     >
-                      Rename
+                      <Edit className="w-4 h-4 mr-2" /> Rename
                     </DropdownMenuItem>
+
                     <DropdownMenuItem
                       onClick={() => setAddPipelineDialogVisible(true)}
                     >
-                      Add Pipeline
+                      <Plus className="w-4 h-4 mr-2" /> Add Pipeline
                     </DropdownMenuItem>
+
                     <DropdownMenuItem
                       onClick={setDefaultPipeline}
                       disabled={!selectedPipeline}
                     >
-                      Set As Default
+                      <Star className="w-4 h-4 mr-2" /> Set As Default
                     </DropdownMenuItem>
+
                     <DropdownMenuItem
                       onClick={() => {
                         if (!selectedPipeline || !selectedPipelineType) return;
@@ -241,8 +249,9 @@ export function CameraAndPipelineControls({
                       }}
                       disabled={!selectedPipeline}
                     >
-                      Duplicate
+                      <Copy className="w-4 h-4 mr-2" /> Duplicate
                     </DropdownMenuItem>
+
                     <DropdownMenuItem
                       onClick={() => setDeletePipelineDialogVisible(true)}
                       disabled={
@@ -251,7 +260,7 @@ export function CameraAndPipelineControls({
                           selectedCamera?.defaultPipeline
                       }
                     >
-                      Delete
+                      <Trash className="w-4 h-4 mr-2" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
