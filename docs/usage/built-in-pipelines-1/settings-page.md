@@ -35,6 +35,8 @@ Metrics in the image are not taken from a coprocessor but instead from a laptop 
 
 Allows for downloading and uploading of settings, downloading and viewing logs.
 
+Logs Window can also be opened by pressing the tilde key (\~) or (\`)
+
 ### Danger Zone
 
 Holds dangerous actions such as restarting the device or factory resetting the runtime (Deleting all the settings and persistent values from the device and returning to defaults)
