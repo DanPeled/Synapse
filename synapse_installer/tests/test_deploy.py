@@ -46,12 +46,9 @@ def test_setup_config_file_manual(mock_password, mock_text, mock_select, tmp_pat
 
 @mock.patch("synapse_installer.deploy.paramiko.SSHClient")
 @mock.patch("synapse_installer.deploy.SCPClient")
-@mock.patch("synapse_installer.deploy.isServiceSetup")
 @mock.patch("synapse_installer.deploy.restartService")
 @mock.patch("synapse_installer.deploy.setupServiceOnConnectedClient")
-def test_connect_and_deploy_success(
-    mock_setup, mock_restart, mock_is_setup, mock_scp, mock_ssh
-):
+def test_connect_and_deploy_success(mock_setup, mock_restart, mock_scp, mock_ssh):
     mock_client = mock.Mock()
     mock_transport = mock.Mock()
     mock_stdout = mock.Mock()
@@ -62,7 +59,6 @@ def test_connect_and_deploy_success(
     mock_client.get_transport.return_value = mock_transport
     mock_client.exec_command.return_value = (None, mock_stdout, mock_stderr)
     mock_ssh.return_value = mock_client
-    mock_is_setup.return_value = False
 
     zip_path = Path(tempfile.mktemp(suffix=".zip"))
     zip_path.write_text("dummy")
