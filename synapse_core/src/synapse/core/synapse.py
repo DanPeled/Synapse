@@ -33,7 +33,7 @@ from synapse_net.ui_handle import UIHandle
 from synapse_net import devicenetworking
 
 from ..bcolors import MarkupColors
-from ..hardware.deviceactions import reboot, restartRuntime
+from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
 from ..log import err, log, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
@@ -381,6 +381,8 @@ class Synapse:
         if self.websocketThread is not threading.current_thread():
             self.websocketThread.join(timeout=5)
 
+        self.runtimeHandler.cleanup()
+
     def setupRuntimeCallbacks(self):
         def onAddPipeline(id: PipelineID, inst: Pipeline, cameraid: CameraID) -> None:
             pipelineProto = pipelineToProto(inst, id, cameraid)
@@ -632,19 +634,18 @@ class Synapse:
             networkSettings: SetNetworkSettingsProto = msgObj.set_network_settings
             self.setNetworkSettings(networkSettings)
         elif msgType == MessageTypeProto.REBOOT:
-            self.close()
             reboot()
         elif msgType == MessageTypeProto.FORMAT:
-            configFilePath = Path.cwd() / "config" / "settings.yml"
+            configFilePath = Config.getInstance().path
             os.remove(configFilePath)
             warn("Config file deleted! all settings will be lost")
             self.close()
             reboot()
         elif msgType == MessageTypeProto.RESTART_SYNAPSE:
-            warn("Attempting to restart Synapse, may cause some unexpected results")
-            self.runtimeHandler.running.clear()
-            self.runtimeHandler.cleanup()
-            restartRuntime()
+            warn(
+                "Attempting to restart Synapse, may cause some unexpected results\nCurrently works only for robot coprocessors"
+            )
+            self.close()
         elif msgType == MessageTypeProto.RENAME_CAMERA:
             assert_set(msgObj.rename_camera)
             renameCameraMsg = msgObj.rename_camera
@@ -719,7 +720,6 @@ class Synapse:
     def close(self):
         self.runtimeHandler.running.clear()
         self.cleanup()
-        self.runtimeHandler.cleanup()
 
     @staticmethod
     def createAndRunRuntime(root: Path) -> None:
