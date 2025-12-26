@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-mono">
         <BackendContextProvider>
-          <App children={children} />
+          <App>{children}</App>
         </BackendContextProvider>
       </body>
     </html>
