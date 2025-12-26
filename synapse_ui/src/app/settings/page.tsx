@@ -169,7 +169,7 @@ function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
             const binary = MessageProto.encode(payload).finish();
             socket?.sendBinary(binary);
           }}
-          disabled={true}
+          disabled={false}
         >
           <span className="flex items-center justify-center gap-2">
             <RotateCcw size={iconSize} />
