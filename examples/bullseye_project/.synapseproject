@@ -1,6 +1,6 @@
 deploy:
   ionic:
     hostname: ionic
-    ip: 10.72.176.5
+    ip: 10.97.38.200
     password: '9738'
 name: example

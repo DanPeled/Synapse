@@ -127,8 +127,7 @@ def _connectAndDeploy(
                         print("STDERR:", err.strip())
                     break
             # Only run if all zip files were successfully unzipped
-            if not isServiceSetup(client, SERVICE_NAME):
-                setupServiceOnConnectedClient(client, hostname)
+            setupServiceOnConnectedClient(client, hostname)
             restartService(client, SERVICE_NAME)
 
         client.close()
