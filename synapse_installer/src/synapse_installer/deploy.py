@@ -16,7 +16,7 @@ from scp import SCPClient
 from synapse.bcolors import MarkupColors
 
 from .lockfile import createDirectoryZIP, createPackageZIP
-from .setup_service import (SERVICE_NAME, isServiceSetup, restartService,
+from .setup_service import (SERVICE_NAME, restartService,
                             setupServiceOnConnectedClient)
 from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
                    DeployDeviceConfig, IsValidIP)
