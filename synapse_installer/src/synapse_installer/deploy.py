@@ -16,7 +16,7 @@ from scp import SCPClient
 from synapse.bcolors import MarkupColors
 
 from .lockfile import createDirectoryZIP, createPackageZIP
-from .setup_service import (SERVICE_NAME, isServiceSetup, restartService,
+from .setup_service import (SERVICE_NAME, restartService,
                             setupServiceOnConnectedClient)
 from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
                    DeployDeviceConfig, IsValidIP)
@@ -127,8 +127,7 @@ def _connectAndDeploy(
                         print("STDERR:", err.strip())
                     break
             # Only run if all zip files were successfully unzipped
-            if not isServiceSetup(client, SERVICE_NAME):
-                setupServiceOnConnectedClient(client, hostname)
+            setupServiceOnConnectedClient(client, hostname)
             restartService(client, SERVICE_NAME)
 
         client.close()

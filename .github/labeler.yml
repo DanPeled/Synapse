@@ -58,3 +58,7 @@ workflows:
 apriltags:
   - changed-files:
       - any-glob-to-any-file: ["synapse_core/src/synapse/pipelines/apriltag/**"]
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file: ["examples/**"]

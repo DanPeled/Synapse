@@ -56,7 +56,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart={pythonPath} {mainPath.as_posix()} --server
+ExecStart={pythonPath} {mainPath.as_posix()}
 WorkingDirectory={workingDir.as_posix()}
 Restart=always
 RestartSec=5
