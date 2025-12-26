@@ -632,10 +632,9 @@ class Synapse:
             networkSettings: SetNetworkSettingsProto = msgObj.set_network_settings
             self.setNetworkSettings(networkSettings)
         elif msgType == MessageTypeProto.REBOOT:
-            self.close()
             reboot()
         elif msgType == MessageTypeProto.FORMAT:
-            configFilePath = Path.cwd() / "config" / "settings.yml"
+            configFilePath = Config.getInstance().path
             os.remove(configFilePath)
             warn("Config file deleted! all settings will be lost")
             self.close()

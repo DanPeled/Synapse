@@ -13,7 +13,7 @@ from .metrics import Platform
 def reboot():
     if Platform.getCurrentPlatform().isLinux():
         try:
-            subprocess.run(["reboot"], check=True)
+            subprocess.run(["sudo", "reboot"], check=True)
         except subprocess.CalledProcessError as e:
             err(f"Failed to reboot: {e}")
     else:
