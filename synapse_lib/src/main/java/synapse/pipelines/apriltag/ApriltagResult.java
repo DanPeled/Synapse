@@ -1,5 +1,6 @@
 package synapse.pipelines.apriltag;
 
+import edu.wpi.first.math.geometry.Pose3d;
 import java.util.Arrays;
 
 /**
@@ -27,6 +28,10 @@ public class ApriltagResult {
    * instantiation when no initial values are provided.
    */
   public ApriltagResult() {}
+
+  public Pose3d cameraEstimateFieldSpace3D() {
+    return ApriltagPoseUtil.toPose3d(cameraEstimate_fieldSpace);
+  }
 
   /**
    * Compares this result to another object for equality. Two results are considered equal if both
