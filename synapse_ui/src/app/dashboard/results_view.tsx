@@ -16,11 +16,13 @@ function RenderPrimitiveResult({
   value,
   copiedKey,
   copyToClipboard,
+  textSize = "text-base",
 }: {
   dataKey: string;
   value: PipelineResultProto;
   copiedKey: string | null;
   copyToClipboard: (key: string, text: string) => void;
+  textSize?: string;
 }) {
   // Render `null` if value.value is undefined
   const val =
@@ -28,8 +30,8 @@ function RenderPrimitiveResult({
 
   return (
     <>
-      <TableCell className="font-medium">{dataKey}</TableCell>
-      <TableCell className="truncate max-w-xs">{val}</TableCell>
+      <TableCell className={cn("font-medium", textSize)}>{dataKey}</TableCell>
+      <TableCell className={cn("truncate max-w-xs", textSize)}>{val}</TableCell>
       <TableCell className="text-right">
         {val && (
           <Button
@@ -51,6 +53,51 @@ function RenderPrimitiveResult({
 }
 
 export function ResultsView({ results }: { results?: PipelineResultMap }) {
+  return (
+    <>
+      <Card
+        style={{ backgroundColor: baseCardColor }}
+        className="border-gray-700 min-h-0 flex flex-col shadow-lg rounded-2xl"
+      >
+        <CardContent
+          className={cn(
+            "flex-grow flex min-h-132 overflow-x-auto",
+            results && results.size > 0 ? "" : "items-center justify-center",
+          )}
+          style={{ color: teamColor }}
+        >
+          {results && results.size > 0 && (
+            <div
+              className="text-center justify-center flex font-bold flex-col"
+              style={{ color: teamColor }}
+            >
+              <div className="flex items-center gap-2 justify-center">
+                <Activity
+                  className="w-5 opacity-50"
+                  style={{ color: teamColor }}
+                />
+                <h1 className="text-2xl">Pipeline Results</h1>
+              </div>
+              <div
+                className="flex h-1 w-full rounded-full mt-2"
+                style={{ backgroundColor: teamColor }}
+              />
+            </div>
+          )}
+          <ResultsViewContent results={results} />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+export function ResultsViewContent({
+  results,
+  textSize = "text-base",
+}: {
+  results?: PipelineResultMap;
+  textSize?: string;
+}) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const copyToClipboard = (key: string, text: string) => {
@@ -68,89 +115,57 @@ export function ResultsView({ results }: { results?: PipelineResultMap }) {
   };
 
   return (
-    <>
-      <Card
-        style={{ backgroundColor: baseCardColor }}
-        className="border-gray-700 min-h-0 flex flex-col shadow-lg rounded-2xl"
-      >
-        <CardContent
-          className={cn(
-            "flex-grow flex min-h-132 overflow-x-auto",
-            results && results.size > 0 ? "" : "items-center justify-center",
-          )}
-          style={{ color: teamColor }}
-        >
-          <div className="flex-grow flex-col">
-            {results && results.size > 0 && (
-              <div
-                className="text-center justify-center flex font-bold flex-col"
-                style={{ color: teamColor }}
-              >
-                <div className="flex items-center gap-2 justify-center">
-                  <Activity
-                    className="w-5 opacity-50"
-                    style={{ color: teamColor }}
-                  />
-                  <h1 className="text-2xl">Pipeline Results</h1>
-                </div>
-                <div
-                  className="flex h-1 w-full rounded-full mt-2"
-                  style={{ backgroundColor: teamColor }}
-                />
-              </div>
-            )}
-            {results && results.size > 0 ? (
-              <Table>
-                <TableBody>
-                  {Array.from(results.entries()).map(([key, value]) => {
-                    if (value.isMsgpack) {
-                      return (
-                        <TableRow
-                          key={key}
-                          className="hover:bg-zinc-800/60 transition-colors"
-                          style={{
-                            borderColor: teamColor,
-                          }}
-                        >
-                          <TableCell colSpan={3}>
-                            <MsgPackTree
-                              encoded={value.value!.bytesValue!}
-                              name={key}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    } else {
-                      return (
-                        <TableRow
-                          key={key}
-                          className="hover:bg-zinc-800/60 transition-colors"
-                          style={{
-                            borderColor: teamColor,
-                          }}
-                        >
-                          <RenderPrimitiveResult
-                            dataKey={key}
-                            value={value}
-                            copiedKey={copiedKey}
-                            copyToClipboard={copyToClipboard}
-                          />
-                        </TableRow>
-                      );
-                    }
-                  })}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-center">
-                <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" />
-                <p className="select-none">Pipeline Results</p>
-                <p className="text-sm select-none">Results will appear here</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </>
+    <div className="flex-grow flex-col">
+      {results && results.size > 0 ? (
+        <Table>
+          <TableBody>
+            {Array.from(results.entries()).map(([key, value]) => {
+              if (value.isMsgpack) {
+                return (
+                  <TableRow
+                    key={key}
+                    className="hover:bg-zinc-800/60 transition-colors"
+                    style={{
+                      borderColor: teamColor,
+                    }}
+                  >
+                    <TableCell colSpan={3}>
+                      <MsgPackTree
+                        encoded={value.value!.bytesValue!}
+                        name={key}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              } else {
+                return (
+                  <TableRow
+                    key={key}
+                    className="hover:bg-zinc-800/60 transition-colors"
+                    style={{
+                      borderColor: teamColor,
+                    }}
+                  >
+                    <RenderPrimitiveResult
+                      dataKey={key}
+                      value={value}
+                      copiedKey={copiedKey}
+                      copyToClipboard={copyToClipboard}
+                      textSize={textSize}
+                    />
+                  </TableRow>
+                );
+              }
+            })}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="text-center">
+          <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" />
+          <p className="select-none">Pipeline Results</p>
+          <p className="text-sm select-none">Results will appear here</p>
+        </div>
+      )}
+    </div>
   );
 }
