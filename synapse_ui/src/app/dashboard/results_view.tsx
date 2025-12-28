@@ -61,7 +61,7 @@ export function ResultsView({ results }: { results?: PipelineResultMap }) {
       >
         <CardContent
           className={cn(
-            "flex-grow flex min-h-132 overflow-x-auto",
+            "flex-grow flex min-h-132 overflow-x-auto flex-col",
             results && results.size > 0 ? "" : "items-center justify-center",
           )}
           style={{ color: teamColor }}
