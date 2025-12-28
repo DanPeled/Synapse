@@ -23,6 +23,7 @@ import { Column, Row } from "@/widgets/containers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Camera, Settings, X } from "lucide-react";
 import { JSX, useEffect, useRef, useState } from "react";
+import { ResultsViewContent } from "../dashboard/results_view";
 
 const CALIBRATION_PIPELINE_ID = 9999;
 
@@ -102,6 +103,7 @@ export function CalibrationDialog({
     pipelinetypes,
     connection,
     cameras,
+    pipelineresults,
   } = useBackendContext();
 
   useEffect(() => {
@@ -284,6 +286,11 @@ export function CalibrationDialog({
     setVisible(false);
   }
 
+  const selectedPipelineResults =
+    selectedPipeline && pipelineresults?.get(camera?.index ?? 0)
+      ? pipelineresults.get(camera?.index ?? 0)?.get(selectedPipeline.index)
+      : undefined;
+
   return (
     <AlertDialog
       visible={visible}
@@ -396,6 +403,10 @@ export function CalibrationDialog({
 
         <Column className="flex-1 items-center space-y-10">
           <CameraStream stream={camera?.streamPath} />
+          <ResultsViewContent
+            results={selectedPipelineResults}
+            textSize="text-3xl"
+          />
         </Column>
       </Row>
     </AlertDialog>

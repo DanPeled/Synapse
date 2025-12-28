@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from dataclasses import dataclass
 from typing import List, NamedTuple, Optional, Sequence
 
 import cv2
@@ -163,6 +164,8 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
             img, text, position, font, font_scale, color, thickness, cv2.LINE_AA
         )
 
+        self.setDataValue("Pictures Left", f"{pics_left} / {total_pics}")
+
         img = cv2.aruco.drawDetectedMarkers(
             image=img,
             corners=corners,
@@ -204,6 +207,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
 
                 cv2.line(img, pt1, pt2, check_color, thickness)
                 cv2.line(img, pt2, pt3, check_color, thickness)
+                self.setDataValue("Can Take Picture", True)
 
                 if self.getSetting(self.settings.take_picture):
                     self.all_corners.append(charuco_corners)
@@ -218,6 +222,10 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
 
                 if not self.imageSize:
                     self.imageSize = gray.shape[::-1]
+            else:
+                self.setDataValue("Can Take Picture", False)
+        else:
+            self.setDataValue("Can Take Picture", False)
 
         if (
             self.all_imgs > self.getSetting(self.settings.calibration_images_count)
