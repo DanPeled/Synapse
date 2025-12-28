@@ -269,8 +269,14 @@ class PipelineHandler:
                         )
             return pipelineClasses
 
+        def is_inside(child, parent):
+            child = Path(child).resolve()
+            parent = Path(parent).resolve()
+            return parent in child.parents
+
         pipelines = loadPipelineClasses(directory)
-        pipelines.update(loadPipelineClasses(Path(__file__).parent.parent))
+        if not is_inside(Path(__file__), directory):
+            pipelines.update(loadPipelineClasses(Path(__file__).parent.parent))
 
         log.log("Loaded pipeline classes successfully")
         return pipelines

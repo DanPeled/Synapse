@@ -151,15 +151,22 @@ class RuntimeManager:
             directory (Path): Path to directory containing pipelines and configurations.
         """
 
+        self.setupCallbacks()
+
         log.log(
             MarkupColors.header(
-                "\n" + "=" * 20 + " Loading Pipelines & Camera Configs... " + "=" * 20
+                "\n" + "=" * 20 + " Loading Pipeline Types & Instances... " + "=" * 20
             )
         )
 
-        self.setupCallbacks()
-
         self.pipelineHandler.setup(directory)
+
+        log.log(
+            MarkupColors.header(
+                "\n" + "=" * 20 + " Loading Camera Bindings & Settings... " + "=" * 20
+            )
+        )
+
         self.cameraHandler.setup()
 
         self.assignDefaultPipelines()
@@ -245,6 +252,7 @@ class RuntimeManager:
                     continue
 
         self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
+        log.log("Startig metrics thread")
         self.metricsThread.start()
 
     def __setupPipelineForCamera(
