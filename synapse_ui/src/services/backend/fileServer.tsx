@@ -55,3 +55,41 @@ export async function downloadHttpDirectoryAsZip(
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+export async function uploadFileReplace(
+  device: DeviceInfoProto,
+  file: File,
+  targetPath: string,
+) {
+  const res = await fetch(`${FILE_SERVER_URL(device)}/${targetPath}`, {
+    method: "PUT",
+    body: file,
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+}
+
+export async function uploadZipReplaceFolder(
+  device: DeviceInfoProto,
+  zipFile: File,
+  targetFolder: string,
+) {
+  const form = new FormData();
+  form.append("file", zipFile);
+
+  const res = await fetch(
+    `${FILE_SERVER_URL(device)}/extract?target=${encodeURIComponent(
+      targetFolder,
+    )}&replace=true`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+}
