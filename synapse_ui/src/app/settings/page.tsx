@@ -41,7 +41,7 @@ import {
   FILE_SERVER_URL,
 } from "@/services/backend/fileServer";
 import { DeviceInfoProto } from "@/proto/v1/device";
-import { RemovePipelineMessageProto } from "@/proto/v1/pipeline";
+import ImportSettingsButton from "./import_settings_button";
 
 async function downloadSettings(deviceInfo: DeviceInfoProto) {
   await downloadHttpDirectoryAsZip(
@@ -234,12 +234,7 @@ function DeviceControls({}) {
       <CardContent>
         <Column gap="gap-4">
           <Row gap="gap-6">
-            <Button className="w-full">
-              <span className="flex items-center justify-center gap-2">
-                <Import size={iconSize} />
-                Import Settings
-              </span>
-            </Button>
+            <ImportSettingsButton deviceinfo={deviceinfo} socket={socket} />
             <Button
               className="w-full"
               onClickAction={() => downloadSettings(deviceinfo)}
