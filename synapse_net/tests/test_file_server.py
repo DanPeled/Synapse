@@ -2,46 +2,36 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import io
 import tempfile
 import threading
-# test_file_server.py
+import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 import requests
 from synapse_net.file_server import FileServer
 
 
-# -------------------------
-# Helper: start server in background for tests
-# -------------------------
 @pytest.fixture
 def server():
     with tempfile.TemporaryDirectory() as tmpdir:
         files_dir = Path(tmpdir)
-        srv = FileServer(
-            files_dir, host="127.0.0.1", port=0
-        )  # port=0 -> random free port
+        srv = FileServer(files_dir, host="127.0.0.1", port=0)
         srv.start()
-
-        # Wait for thread to start
         threading.Event().wait(0.1)
-
         yield srv
-
         srv.stop()
 
 
-# -------------------------
-# Helper: get server URL
-# -------------------------
 def server_url(srv: FileServer) -> str:
     host, port = srv._server.server_address  # pyright: ignore
     return f"http://{host}:{port}"
 
 
 # -------------------------
-# Test: OPTIONS request
+# OPTIONS request
 # -------------------------
 def test_options(server):
     url = server_url(server)
@@ -52,26 +42,58 @@ def test_options(server):
 
 
 # -------------------------
-# Test: upload file via POST
+# File upload with overwrite
 # -------------------------
-def test_file_upload(server):
+def test_file_upload_overwrite(server):
     url = server_url(server)
-    files = {"file": ("test.txt", b"hello world")}
-    resp = requests.post(url, files=files)
+    upload_url = f"{url}/?filename={quote('test.txt')}&overwrite=true"
+    files = {"file": ("ignored_name", b"hello world")}
+    resp = requests.post(upload_url, files=files)
     assert resp.status_code == 200
     assert resp.content == b"Upload successful"
 
-    # Confirm file saved
     saved_file = server.files_dir / "test.txt"
     assert saved_file.exists()
     assert saved_file.read_bytes() == b"hello world"
 
+    # Overwrite test
+    files = {"file": ("ignored_name", b"new content")}
+    resp = requests.post(upload_url, files=files)
+    assert resp.status_code == 200
+    assert saved_file.read_bytes() == b"new content"
+
 
 # -------------------------
-# Test: download file via GET
+# Upload without overwrite when file exists
+# -------------------------
+def test_file_upload_no_overwrite_conflict(server):
+    upload_url = (
+        f"{server_url(server)}/?filename={quote('conflict.txt')}&overwrite=false"
+    )
+    file_path = server.files_dir / "conflict.txt"
+    file_path.write_bytes(b"existing")
+
+    files = {"file": ("ignored_name", b"new content")}
+    resp = requests.post(upload_url, files=files)
+    assert resp.status_code == 409
+    assert file_path.read_bytes() == b"existing"
+
+
+# -------------------------
+# Upload missing filename
+# -------------------------
+def test_file_upload_missing_filename(server):
+    url = server_url(server)
+    files = {"file": ("ignored_name", b"hello")}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 400
+    assert b"Missing filename" in resp.content
+
+
+# -------------------------
+# File download
 # -------------------------
 def test_file_download(server):
-    # Create a file
     test_file = server.files_dir / "download.txt"
     test_file.write_bytes(b"download content")
 
@@ -82,23 +104,104 @@ def test_file_download(server):
 
 
 # -------------------------
-# Test: POST without multipart
+# POST non-multipart
 # -------------------------
 def test_post_non_multipart(server):
-    url = server_url(server)
+    url = server_url(server) + "/?filename=test.txt"
     resp = requests.post(url, data={"foo": "bar"})
     assert resp.status_code == 400
-    assert b"not multipart/form-data" in resp.content
+    assert b"Invalid multipart upload" in resp.content
 
 
 # -------------------------
-# Test: start/stop server
+# ZIP extraction with replace
 # -------------------------
-def test_server_start_stop():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        srv = FileServer(Path(tmpdir))
-        srv.start()
-        assert srv._thread.is_alive()  # pyright: ignore
-        assert srv._server is not None
-        srv.stop()
-        assert not srv._thread.is_alive()  # pyright: ignore
+def test_zip_extract_replace(server):
+    zip_bytes = io.BytesIO()
+    with zipfile.ZipFile(zip_bytes, "w") as zf:
+        zf.writestr("file1.txt", b"hello")
+        zf.writestr("dir/file2.txt", b"world")
+    zip_bytes.seek(0)
+
+    url = server_url(server) + "/extract?target=config&replace=true"
+    files = {"file": ("ignored.zip", zip_bytes.read())}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 200
+    assert resp.content == b"ZIP extracted"
+
+    assert (server.files_dir / "config" / "file1.txt").read_bytes() == b"hello"
+    assert (server.files_dir / "config" / "dir" / "file2.txt").read_bytes() == b"world"
+
+
+# -------------------------
+# ZIP extraction without target
+# -------------------------
+def test_zip_extract_missing_target(server):
+    zip_bytes = io.BytesIO()
+    with zipfile.ZipFile(zip_bytes, "w") as zf:
+        zf.writestr("file1.txt", b"hello")
+    zip_bytes.seek(0)
+
+    url = server_url(server) + "/extract?replace=true"
+    files = {"file": ("ignored.zip", zip_bytes.read())}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 400
+    assert b"Missing target" in resp.content
+
+
+# -------------------------
+# ZIP extraction without replace when target exists
+# -------------------------
+def test_zip_extract_no_replace_conflict(server):
+    target_dir = server.files_dir / "config"
+    target_dir.mkdir()
+    (target_dir / "existing.txt").write_bytes(b"data")
+
+    zip_bytes = io.BytesIO()
+    with zipfile.ZipFile(zip_bytes, "w") as zf:
+        zf.writestr("file1.txt", b"hello")
+    zip_bytes.seek(0)
+
+    url = server_url(server) + "/extract?target=config&replace=false"
+    files = {"file": ("ignored.zip", zip_bytes.read())}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 409
+
+
+# -------------------------
+# Path traversal protection
+# -------------------------
+def test_upload_path_traversal(server):
+    url = server_url(server) + f"/?filename={quote('../outside.txt')}&overwrite=true"
+    files = {"file": ("ignored_name", b"hello")}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 403
+
+
+def test_zip_path_traversal(server):
+    zip_bytes = io.BytesIO()
+    with zipfile.ZipFile(zip_bytes, "w") as zf:
+        zf.writestr("../../evil.txt", b"malicious")
+    zip_bytes.seek(0)
+
+    url = server_url(server) + "/extract?target=config&replace=true"
+    files = {"file": ("ignored.zip", zip_bytes.read())}
+    resp = requests.post(url, files=files)
+    assert resp.status_code == 400
+
+
+# -------------------------
+# PUT atomic write
+# -------------------------
+def test_put_atomic_write(server):
+    url = server_url(server) + "/atomic.txt"
+    resp = requests.put(url, data=b"hello put")
+    assert resp.status_code == 200
+    saved_file = server.files_dir / "atomic.txt"
+    assert saved_file.exists()
+    assert saved_file.read_bytes() == b"hello put"
+
+    # Overwrite
+    resp = requests.put(url, data=b"new content")
+    assert resp.status_code == 200
+    assert saved_file.read_bytes() == b"new content"
