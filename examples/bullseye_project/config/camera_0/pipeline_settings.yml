@@ -1,37 +1,15 @@
 pipeline_configs:
   0:
-    type: ApriltagPipeline
-    settings:
-      {
-        fieldpose: true,
-        iteration_count: 4.0,
-        num_threads: 4.0,
-        quad_decimate: 2.0,
-        quad_sigma: 0.0,
-        refine_edges: true,
-        stick_to_ground: true,
-        tag_family: tag36h11,
-        tag_size: 0.1651,
-        verbosity: 1,
-        brightness: 50,
-        exposure: 50,
-        gain: 50,
-        orientation: 0,
-        resolution: 1920x1080,
-        saturation: 50,
-        sharpness: 50,
-      }
     name: FieldPose
+    type: ApriltagPipeline
+    settings: {fieldpose: true, iteration_count: 4.0, num_threads: 4.0, quad_decimate: 2.0,
+      quad_sigma: 0.0, refine_edges: true, stick_to_ground: true, tag_family: tag36h11,
+      tag_size: 0.1651, verbosity: 1, brightness: 50, exposure: 50, gain: 50, orientation: 0,
+      resolution: 1920x1080, saturation: 50, sharpness: 50}
   1:
-    type: ColorPipeline
-    settings:
-      {
-        brightness: 50,
-        exposure: 50,
-        gain: 50,
-        orientation: 0,
-        resolution: 1920x1080,
-        saturation: 50,
-        sharpness: 50,
-      }
     name: Cheese
+    type: ColorPipeline
+    settings: {h_lower: 0, h_upper: 10.0, min_area: 500.0, morph_kernel: 5.0, publish_all_detections: true,
+      result_strategy: largest_area, s_lower: 100.0, s_upper: 255.0, v_lower: 100.0,
+      v_upper: 255.0, brightness: 50, exposure: 50, gain: 50, orientation: 0, resolution: 1920x1080,
+      saturation: 50, sharpness: 50}

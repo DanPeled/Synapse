@@ -16,6 +16,7 @@ modules = {
     "synapse_net": "synapse_net/src",
     "synapse_installer": "synapse_installer/src",
     "synapse": "synapse_core/src",
+    "synapse_peripherals": "synapse_peripherals/src",
     "synapse_ui": "synapse_ui/out",
 }
 
@@ -25,6 +26,10 @@ def wpilibDep(name: str, version: str = WPILIB_VERSION) -> str:
 
 
 def synapseInstallerDep(name: str) -> str:
+    return name
+
+
+def synapsePeripheralsDep(name: str) -> str:
     return name
 
 
@@ -86,6 +91,7 @@ setup(
         synapseNetDep("protobuf"),
         synapseNetDep("betterproto==2.0.0b7"),
         synapseNetDep("websockets"),
+        synapsePeripheralsDep("gpiod"),
     ],
     extras_require={
         "dev": [

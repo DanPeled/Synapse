@@ -24,6 +24,8 @@ from synapse_net.socketServer import WebSocketServer, createMessage
 from wpilib import Timer
 from wpimath.units import seconds, secondsToMilliseconds
 
+from synapse_peripherals import SynapsePeripheralManager
+
 from ..bcolors import MarkupColors
 from ..callback import Callback
 from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
@@ -81,6 +83,7 @@ class RuntimeManager:
 
         self.pipelineHandler: PipelineHandler = PipelineHandler(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
+        self.peripheralHandler: SynapsePeripheralManager = SynapsePeripheralManager()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
@@ -803,12 +806,18 @@ class RuntimeManager:
         with open(savefile, "w") as f:
             f.write(y)
 
+        log.log(MarkupColors.okblue("Saving pipelines..."))
         self.savePipelines()
+        log.log(MarkupColors.okblue("Saving Cameras..."))
         self.saveCameras()
+        log.log(MarkupColors.okblue("Saving Peripherals..."))
+        self.peripheralHandler.saveToFile(savefile.parent / "peripherals.yml")
 
         log.log(
             MarkupColors.bold(
-                MarkupColors.okblue(f"Saved into {savefile.absolute().__str__()}")
+                MarkupColors.okblue(
+                    f"Saved successfully into {savefile.parent.absolute().__str__()}"
+                )
             )
         )
 
