@@ -97,8 +97,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         Cleanup before processing a new frame.
         Resets results and invalidates NT cache.
         """
-        self.setResults(None)
-        # self.invalidateCachedEntries()
+        ...
 
     def invalidateCachedEntries(self) -> None:
         """
@@ -132,7 +131,9 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         Set a value in NetworkTables and optionally send via WebSocket.
         Supports all NT-compatible types.
         """
-        if isinstance(value, (bytes, int, float, str, bool)):
+        if value == bytes():
+            parsed = 0
+        elif isinstance(value, (bytes, int, float, str, bool)):
             parsed: Any = value
         elif isinstance(value, (list, tuple)) and all(
             isinstance(x, (int, float, bytes, bool)) for x in value
@@ -162,7 +163,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         """Set the pipeline result in NT."""
         self.setDataValue(
             ResultsTopicKey,
-            serializePipelineResult(value) if value is not None else 0,
+            serializePipelineResult(value) if value is not None else bytes(),
             isMsgpack=True,
         )
 
