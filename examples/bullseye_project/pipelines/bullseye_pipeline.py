@@ -43,6 +43,7 @@ class CircleData:
 @dataclass
 class BullseyeResult(PipelineResult):
     hasResult: bool
+    area: float
     position: List[float]
     axisRatios: List[float]
     circularities: List[float]
@@ -218,6 +219,8 @@ class BullseyeTrackerPipeline(Pipeline[BullseyeTrackerSettings, BullseyeResult])
         if bestBullseye:
             dx = bestBullseye.cx - screenCx
             dy = bestBullseye.cy - screenCy
-            return BullseyeResult(True, [dx, dy], axisRatios, circularities)
+            return BullseyeResult(
+                True, bestBullseye.area, [dx, dy], axisRatios, circularities
+            )
 
-        return BullseyeResult(False, [], axisRatios, circularities)
+        return BullseyeResult(False, 0, [], axisRatios, circularities)
