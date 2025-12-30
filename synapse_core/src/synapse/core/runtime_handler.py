@@ -455,6 +455,12 @@ class RuntimeManager:
             # return
 
         # If both indices are valid, proceed with the pipeline setting
+        prev = self.pipelineHandler.getPipeline(
+            self.pipelineBindings[cameraIndex], cameraIndex
+        )
+        if prev is not None:
+            prev.invalidateCachedEntries()
+
         self.pipelineBindings[cameraIndex] = pipelineIndex
 
         self.setNTPipelineIndex(cameraIndex=cameraIndex, pipelineIndex=pipelineIndex)
