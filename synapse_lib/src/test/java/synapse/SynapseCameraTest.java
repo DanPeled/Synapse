@@ -28,7 +28,7 @@ class SynapseCameraTest {
     byte[] serialized =
         new ObjectMapper(new MessagePackFactory()).writeValueAsBytes(new int[] {1, 2, 3});
 
-    Optional<int[]> results = camera.getResults(new TypeReference<int[]>() {}, serialized);
+    Optional<int[]> results = camera.deserializeResults(new TypeReference<int[]>() {}, serialized);
 
     assertTrue(results.isPresent());
     assertArrayEquals(new int[] {1, 2, 3}, results.get());
@@ -48,7 +48,7 @@ class SynapseCameraTest {
     byte[] serialized = mapper.writeValueAsBytes(original);
 
     Optional<ApriltagResult> results =
-        camera.getResults(new TypeReference<ApriltagResult>() {}, serialized);
+        camera.deserializeResults(new TypeReference<ApriltagResult>() {}, serialized);
 
     assertTrue(results.isPresent());
     assertEquals(results.get(), original);

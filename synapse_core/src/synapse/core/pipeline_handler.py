@@ -276,6 +276,9 @@ class PipelineHandler:
 
         pipelines = loadPipelineClasses(directory)
         if not is_inside(Path(__file__), directory):
+            # When running on coprocessor, this file's root dir
+            # is as the same as the main.py file which will result
+            # in reading this file twice when reading from the project dir and this dir
             pipelines.update(loadPipelineClasses(Path(__file__).parent.parent))
 
         log.log("Loaded pipeline classes successfully")

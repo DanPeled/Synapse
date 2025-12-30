@@ -4,10 +4,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.networktables.FloatSubscriber;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableType;
+import edu.wpi.first.networktables.PubSubOption;
+import edu.wpi.first.networktables.RawSubscriber;
+import edu.wpi.first.networktables.StringSubscriber;
 import edu.wpi.first.wpilibj.DriverStation;
 import java.io.IOException;
 import java.util.Map;
@@ -19,7 +23,7 @@ import org.msgpack.jackson.dataformat.MessagePackFactory;
  * Represents a Synapse camera with fully cached NetworkTables entries, type-safe settings, and
  * methods for retrieving results and metrics.
  */
-public class SynapseCamera {
+public class SynapseCamera implements AutoCloseable {
 
   /** Camera name */
   protected final String m_cameraName;
@@ -43,19 +47,19 @@ public class SynapseCamera {
   protected NetworkTableEntry m_pipelineEntry;
 
   /** Entry for storing or retrieving the camera's current pipeline type */
-  protected NetworkTableEntry m_pipelineTypeEntry;
+  protected StringSubscriber m_pipelineTypeSubscriber;
 
   /** Entry for storing the latest processing results from the camera */
-  protected NetworkTableEntry m_resultsEntry;
+  protected RawSubscriber m_resultsSubscriber;
 
   /** Entry that indicates whether recording is currently active */
   protected NetworkTableEntry m_recordStateEntry;
 
   /** Entry for tracking the latency of frame capture (in milliseconds) */
-  protected NetworkTableEntry m_captureLatencyEntry;
+  protected FloatSubscriber m_captureLatencySubscriber;
 
   /** Entry for tracking the latency of frame processing (in milliseconds) */
-  protected NetworkTableEntry m_processLatencyEntry;
+  protected FloatSubscriber m_processLatencySubscriber;
 
   /** ObjectMapper configured for MessagePack serialization/deserialization */
   protected static final ObjectMapper s_ObjectMapper = new ObjectMapper(new MessagePackFactory());
@@ -88,9 +92,36 @@ public class SynapseCamera {
     m_cameraName = cameraName;
     synapseTableName = coprocessorName;
 
-    if (!isJUnitTest())
+    if (!isJUnitTest()) {
       m_table =
           NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
+
+      m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
+      m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
+      m_pipelineTypeSubscriber =
+          m_table
+              .getStringTopic(NetworkTableTopics.kPipelineTypeTopic)
+              .subscribe(
+                  "Unknown", PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+      m_captureLatencySubscriber =
+          m_table
+              .getFloatTopic(NetworkTableTopics.kCaptureLatencyTopic)
+              .subscribe(0, PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+      m_processLatencySubscriber =
+          m_table
+              .getFloatTopic(NetworkTableTopics.kProcessLatencyTopic)
+              .subscribe(0, PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+      m_resultsSubscriber =
+          m_table
+              .getRawTopic(NetworkTableTopics.kResultsTopic)
+              .subscribe(
+                  "bytes",
+                  new byte[0],
+                  PubSubOption.keepDuplicates(true),
+                  PubSubOption.pollStorage(10));
+      m_settingsTable = m_table.getSubTable("settings");
+      m_dataTable = m_table.getSubTable("data");
+    }
   }
 
   /**
@@ -148,9 +179,6 @@ public class SynapseCamera {
    * @return the NetworkTable storing camera settings
    */
   protected NetworkTable getSettingsTable() {
-    if (m_settingsTable == null) {
-      m_settingsTable = m_table.getSubTable("settings");
-    }
     return m_settingsTable;
   }
 
@@ -160,9 +188,6 @@ public class SynapseCamera {
    * @return the NetworkTable storing camera results
    */
   protected NetworkTable getDataTable() {
-    if (m_dataTable == null) {
-      m_dataTable = m_table.getSubTable("data");
-    }
     return m_dataTable;
   }
 
@@ -183,8 +208,6 @@ public class SynapseCamera {
    * @return the pipeline index
    */
   public long getPipeline() {
-    if (m_pipelineEntry == null)
-      m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
     return m_pipelineEntry.getInteger(-1);
   }
 
@@ -194,8 +217,6 @@ public class SynapseCamera {
    * @param pipeline pipeline index
    */
   public void setPipeline(long pipeline) {
-    if (m_pipelineEntry == null)
-      m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
     m_pipelineEntry.setInteger(pipeline);
   }
 
@@ -205,9 +226,7 @@ public class SynapseCamera {
    * @return the pipeline type
    */
   public String getPipelineType() {
-    if (m_pipelineTypeEntry == null)
-      m_pipelineTypeEntry = getCachedEntry(NetworkTableTopics.kPipelineTypeTopic, m_table);
-    return m_pipelineTypeEntry.getString("unknown");
+    return m_pipelineTypeSubscriber.get("unknown");
   }
 
   /**
@@ -216,8 +235,6 @@ public class SynapseCamera {
    * @return true if recording, false otherwise
    */
   public boolean getRecordingStatus() {
-    if (m_recordStateEntry == null)
-      m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
     return m_recordStateEntry.getBoolean(false);
   }
 
@@ -227,8 +244,6 @@ public class SynapseCamera {
    * @param status true to start recording, false to stop
    */
   public void setRecordStatus(boolean status) {
-    if (m_recordStateEntry == null)
-      m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
     m_recordStateEntry.setBoolean(status);
   }
 
@@ -238,9 +253,7 @@ public class SynapseCamera {
    * @return capture latency
    */
   public double getCaptureLatency() {
-    if (m_captureLatencyEntry == null)
-      m_captureLatencyEntry = getCachedEntry(NetworkTableTopics.kCaptureLatencyTopic, m_table);
-    return m_captureLatencyEntry.getDouble(-1);
+    return m_captureLatencySubscriber.get(0);
   }
 
   /**
@@ -249,9 +262,7 @@ public class SynapseCamera {
    * @return processing latency
    */
   public double getProcessLatency() {
-    if (m_processLatencyEntry == null)
-      m_processLatencyEntry = getCachedEntry(NetworkTableTopics.kProcessLatencyTopic, m_table);
-    return m_processLatencyEntry.getDouble(-1);
+    return m_processLatencySubscriber.get(0);
   }
 
   /**
@@ -347,15 +358,12 @@ public class SynapseCamera {
   }
 
   /**
-   * Returns the results entry.
+   * Returns the results subscriber.
    *
-   * @return cached results NetworkTableEntry
+   * @return results subscriber
    */
-  protected NetworkTableEntry getResultsEntry() {
-    if (m_resultsEntry == null) {
-      m_resultsEntry = getCachedEntry(NetworkTableTopics.kResultsTopic, getDataTable());
-    }
-    return m_resultsEntry;
+  protected RawSubscriber getResultsSubscriber() {
+    return m_resultsSubscriber;
   }
 
   /**
@@ -366,7 +374,7 @@ public class SynapseCamera {
    * @param data serialized data
    * @return Optional containing deserialized results
    */
-  public <T> Optional<T> getResults(TypeReference<T> typeref, byte[] data) {
+  public <T> Optional<T> deserializeResults(TypeReference<T> typeref, byte[] data) {
     try {
       return Optional.of(s_ObjectMapper.readValue(data, typeref));
     } catch (IOException e) {
@@ -386,9 +394,9 @@ public class SynapseCamera {
    * @return Optional containing deserialized results if available, otherwise empty
    */
   public <T> Optional<T> getResults(SynapsePipelineType<T> pipelineType) {
-    byte[] data = getResultsEntry().getRaw(new byte[0]);
+    byte[] data = m_resultsSubscriber.get();
     if (data.length > 0) {
-      return getResults(pipelineType.getTypeReference(), data);
+      return deserializeResults(pipelineType.getTypeReference(), data);
     } else {
       return Optional.empty();
     }
@@ -569,5 +577,13 @@ public class SynapseCamera {
 
     /** Prevent instantiation */
     protected NetworkTableTopics() {}
+  }
+
+  @Override
+  public void close() throws Exception {
+    m_captureLatencySubscriber.close();
+    m_processLatencySubscriber.close();
+    m_pipelineTypeSubscriber.close();
+    m_resultsSubscriber.close();
   }
 }
