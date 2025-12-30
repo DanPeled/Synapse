@@ -75,9 +75,14 @@ loadScripts(document, 'script');</script>
 <div class="inheritance">synapse.SynapseCamera</div>
 </div>
 <section class="class-description" id="class-description">
+<dl class="notes">
+<dt>All Implemented Interfaces:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/AutoCloseable.html" title="class or interface in java.lang" class="external-link">AutoCloseable</a></code></dd>
+</dl>
 <hr>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">SynapseCamera</span>
-<span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
+<span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>
+implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/AutoCloseable.html" title="class or interface in java.lang" class="external-link">AutoCloseable</a></span></div>
 <div class="block">Represents a Synapse camera with fully cached NetworkTables entries, type-safe settings, and
  methods for retrieving results and metrics.</div>
 </section>
@@ -119,8 +124,8 @@ loadScripts(document, 'script');</script>
 <div class="col-last even-row-color">
 <div class="block">Camera name</div>
 </div>
-<div class="col-first odd-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></code></div>
-<div class="col-second odd-row-color"><code><a href="#m_captureLatencyEntry" class="member-name-link">m_captureLatencyEntry</a></code></div>
+<div class="col-first odd-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></code></div>
+<div class="col-second odd-row-color"><code><a href="#m_captureLatencySubscriber" class="member-name-link">m_captureLatencySubscriber</a></code></div>
 <div class="col-last odd-row-color">
 <div class="block">Entry for tracking the latency of frame capture (in milliseconds)</div>
 </div>
@@ -139,13 +144,13 @@ loadScripts(document, 'script');</script>
 <div class="col-last even-row-color">
 <div class="block">Cached entry for the current pipeline ID</div>
 </div>
-<div class="col-first odd-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></code></div>
-<div class="col-second odd-row-color"><code><a href="#m_pipelineTypeEntry" class="member-name-link">m_pipelineTypeEntry</a></code></div>
+<div class="col-first odd-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/StringSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">StringSubscriber</a></code></div>
+<div class="col-second odd-row-color"><code><a href="#m_pipelineTypeSubscriber" class="member-name-link">m_pipelineTypeSubscriber</a></code></div>
 <div class="col-last odd-row-color">
 <div class="block">Entry for storing or retrieving the camera's current pipeline type</div>
 </div>
-<div class="col-first even-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></code></div>
-<div class="col-second even-row-color"><code><a href="#m_processLatencyEntry" class="member-name-link">m_processLatencyEntry</a></code></div>
+<div class="col-first even-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></code></div>
+<div class="col-second even-row-color"><code><a href="#m_processLatencySubscriber" class="member-name-link">m_processLatencySubscriber</a></code></div>
 <div class="col-last even-row-color">
 <div class="block">Entry for tracking the latency of frame processing (in milliseconds)</div>
 </div>
@@ -154,8 +159,8 @@ loadScripts(document, 'script');</script>
 <div class="col-last odd-row-color">
 <div class="block">Entry that indicates whether recording is currently active</div>
 </div>
-<div class="col-first even-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></code></div>
-<div class="col-second even-row-color"><code><a href="#m_resultsEntry" class="member-name-link">m_resultsEntry</a></code></div>
+<div class="col-first even-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/RawSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">RawSubscriber</a></code></div>
+<div class="col-second even-row-color"><code><a href="#m_resultsSubscriber" class="member-name-link">m_resultsSubscriber</a></code></div>
 <div class="col-last even-row-color">
 <div class="block">Entry for storing the latest processing results from the camera</div>
 </div>
@@ -219,6 +224,15 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-first">Modifier and Type</div>
 <div class="table-header col-second">Method</div>
 <div class="table-header col-last">Description</div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#close()" class="member-name-link">close</a>()</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#deserializeResults(com.fasterxml.jackson.core.type.TypeReference,byte%5B%5D)" class="member-name-link">deserializeResults</a><wbr>(com.fasterxml.jackson.core.type.TypeReference&lt;T&gt;&nbsp;typeref,
+ byte[]&nbsp;data)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Deserialize results from serialized MessagePack data.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Pose3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Pose3d</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#estimateRobotPose(edu.wpi.first.math.geometry.Pose3d)" class="member-name-link">estimateRobotPose</a><wbr>(<a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Pose3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Pose3d</a>&nbsp;cameraPose)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
@@ -266,70 +280,64 @@ loadScripts(document, 'script');</script>
 <div class="block">Returns whether the camera is currently recording.</div>
 </div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getResults(com.fasterxml.jackson.core.type.TypeReference,byte%5B%5D)" class="member-name-link">getResults</a><wbr>(com.fasterxml.jackson.core.type.TypeReference&lt;T&gt;&nbsp;typeref,
- byte[]&nbsp;data)</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getResults(synapse.SynapsePipelineType)" class="member-name-link">getResults</a><wbr>(<a href="SynapsePipelineType.html" title="class in synapse">SynapsePipelineType</a>&lt;T&gt;&nbsp;pipelineType)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Deserialize results from serialized MessagePack data.</div>
-</div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getResults(synapse.SynapsePipelineType)" class="member-name-link">getResults</a><wbr>(<a href="SynapsePipelineType.html" title="class in synapse">SynapsePipelineType</a>&lt;T&gt;&nbsp;pipelineType)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Retrieve and deserialize results from the given pipeline.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getResultsEntry()" class="member-name-link">getResultsEntry</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Returns the results entry.</div>
-</div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Transform3d</a></code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getRobotToCameraOffset()" class="member-name-link">getRobotToCameraOffset</a>()</code></div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/RawSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">RawSubscriber</a></code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getResultsSubscriber()" class="member-name-link">getResultsSubscriber</a>()</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the results subscriber.</div>
+</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Transform3d</a></code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getRobotToCameraOffset()" class="member-name-link">getRobotToCameraOffset</a>()</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Returns the transform offset from the robot frame to the camera frame.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4 method-summary-table-tab6"><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&gt;</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4 method-summary-table-tab6"><code><a href="#getSetting(java.lang.String)" class="member-name-link">getSetting</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;key)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4 method-summary-table-tab6">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4 method-summary-table-tab6"><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&gt;</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4 method-summary-table-tab6"><code><a href="#getSetting(java.lang.String)" class="member-name-link">getSetting</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;key)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4 method-summary-table-tab6">
 <div class="block"><span class="deprecated-label">Deprecated, for removal: This API element is subject to removal in a future version.</span></div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSetting(synapse.SynapseCamera.Setting)" class="member-name-link">getSetting</a><wbr>(<a href="SynapseCamera.Setting.html" title="class in synapse">SynapseCamera.Setting</a>&lt;T&gt;&nbsp;setting)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSetting(synapse.SynapseCamera.Setting)" class="member-name-link">getSetting</a><wbr>(<a href="SynapseCamera.Setting.html" title="class in synapse">SynapseCamera.Setting</a>&lt;T&gt;&nbsp;setting)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Typed getter for camera settings.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTable.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTable</a></code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSettingsTable()" class="member-name-link">getSettingsTable</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTable.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTable</a></code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSettingsTable()" class="member-name-link">getSettingsTable</a>()</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Returns the settings subtable.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code>static boolean</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code><a href="#isJUnitTest()" class="member-name-link">isJUnitTest</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4">
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code>static boolean</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code><a href="#isJUnitTest()" class="member-name-link">isJUnitTest</a>()</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4">
 <div class="block">Checks whether the current execution is in a JUnit or TestNG test.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setPipeline(long)" class="member-name-link">setPipeline</a><wbr>(long&nbsp;pipeline)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setPipeline(long)" class="member-name-link">setPipeline</a><wbr>(long&nbsp;pipeline)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the current pipeline ID.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRecordStatus(boolean)" class="member-name-link">setRecordStatus</a><wbr>(boolean&nbsp;status)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRecordStatus(boolean)" class="member-name-link">setRecordStatus</a><wbr>(boolean&nbsp;status)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the camera recording status.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRobotToCameraOffset(edu.wpi.first.math.geometry.Transform3d)" class="member-name-link">setRobotToCameraOffset</a><wbr>(<a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Transform3d</a>&nbsp;robotToCameraOffset)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRobotToCameraOffset(edu.wpi.first.math.geometry.Transform3d)" class="member-name-link">setRobotToCameraOffset</a><wbr>(<a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Transform3d</a>&nbsp;robotToCameraOffset)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Assigns the transform offset between the robot and camera coordinate frames.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;void</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setSetting(synapse.SynapseCamera.Setting,T)" class="member-name-link">setSetting</a><wbr>(<a href="SynapseCamera.Setting.html" title="class in synapse">SynapseCamera.Setting</a>&lt;T&gt;&nbsp;setting,
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;void</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setSetting(synapse.SynapseCamera.Setting,T)" class="member-name-link">setSetting</a><wbr>(<a href="SynapseCamera.Setting.html" title="class in synapse">SynapseCamera.Setting</a>&lt;T&gt;&nbsp;setting,
  T&nbsp;value)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Typed setter for camera settings.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="SynapseCamera.html" title="class in synapse">SynapseCamera</a></code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#withRobotToCameraOffset(edu.wpi.first.math.geometry.Transform3d)" class="member-name-link">withRobotToCameraOffset</a><wbr>(<a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Transform3d</a>&nbsp;robotToCameraOffset)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="SynapseCamera.html" title="class in synapse">SynapseCamera</a></code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#withRobotToCameraOffset(edu.wpi.first.math.geometry.Transform3d)" class="member-name-link">withRobotToCameraOffset</a><wbr>(<a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link">Transform3d</a>&nbsp;robotToCameraOffset)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the transform offset between the robot reference frame and the camera, and returns this
  instance for chaining.</div>
 </div>
@@ -400,16 +408,16 @@ loadScripts(document, 'script');</script>
 </section>
 </li>
 <li>
-<section class="detail" id="m_pipelineTypeEntry">
-<h3>m_pipelineTypeEntry</h3>
-<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></span>&nbsp;<span class="element-name">m_pipelineTypeEntry</span></div>
+<section class="detail" id="m_pipelineTypeSubscriber">
+<h3>m_pipelineTypeSubscriber</h3>
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/StringSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">StringSubscriber</a></span>&nbsp;<span class="element-name">m_pipelineTypeSubscriber</span></div>
 <div class="block">Entry for storing or retrieving the camera's current pipeline type</div>
 </section>
 </li>
 <li>
-<section class="detail" id="m_resultsEntry">
-<h3>m_resultsEntry</h3>
-<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></span>&nbsp;<span class="element-name">m_resultsEntry</span></div>
+<section class="detail" id="m_resultsSubscriber">
+<h3>m_resultsSubscriber</h3>
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/RawSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">RawSubscriber</a></span>&nbsp;<span class="element-name">m_resultsSubscriber</span></div>
 <div class="block">Entry for storing the latest processing results from the camera</div>
 </section>
 </li>
@@ -421,16 +429,16 @@ loadScripts(document, 'script');</script>
 </section>
 </li>
 <li>
-<section class="detail" id="m_captureLatencyEntry">
-<h3>m_captureLatencyEntry</h3>
-<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></span>&nbsp;<span class="element-name">m_captureLatencyEntry</span></div>
+<section class="detail" id="m_captureLatencySubscriber">
+<h3>m_captureLatencySubscriber</h3>
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></span>&nbsp;<span class="element-name">m_captureLatencySubscriber</span></div>
 <div class="block">Entry for tracking the latency of frame capture (in milliseconds)</div>
 </section>
 </li>
 <li>
-<section class="detail" id="m_processLatencyEntry">
-<h3>m_processLatencyEntry</h3>
-<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></span>&nbsp;<span class="element-name">m_processLatencyEntry</span></div>
+<section class="detail" id="m_processLatencySubscriber">
+<h3>m_processLatencySubscriber</h3>
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></span>&nbsp;<span class="element-name">m_processLatencySubscriber</span></div>
 <div class="block">Entry for tracking the latency of frame processing (in milliseconds)</div>
 </section>
 </li>
@@ -712,20 +720,20 @@ loadScripts(document, 'script');</script>
 </section>
 </li>
 <li>
-<section class="detail" id="getResultsEntry()">
-<h3>getResultsEntry</h3>
-<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></span>&nbsp;<span class="element-name">getResultsEntry</span>()</div>
-<div class="block">Returns the results entry.</div>
+<section class="detail" id="getResultsSubscriber()">
+<h3>getResultsSubscriber</h3>
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/RawSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">RawSubscriber</a></span>&nbsp;<span class="element-name">getResultsSubscriber</span>()</div>
+<div class="block">Returns the results subscriber.</div>
 <dl class="notes">
 <dt>Returns:</dt>
-<dd>cached results NetworkTableEntry</dd>
+<dd>results subscriber</dd>
 </dl>
 </section>
 </li>
 <li>
-<section class="detail" id="getResults(com.fasterxml.jackson.core.type.TypeReference,byte[])">
-<h3>getResults</h3>
-<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="type-parameters">&lt;T&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</span>&nbsp;<span class="element-name">getResults</span><wbr><span class="parameters">(com.fasterxml.jackson.core.type.TypeReference&lt;T&gt;&nbsp;typeref,
+<section class="detail" id="deserializeResults(com.fasterxml.jackson.core.type.TypeReference,byte[])">
+<h3>deserializeResults</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="type-parameters">&lt;T&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Optional.html" title="class or interface in java.util" class="external-link">Optional</a>&lt;T&gt;</span>&nbsp;<span class="element-name">deserializeResults</span><wbr><span class="parameters">(com.fasterxml.jackson.core.type.TypeReference&lt;T&gt;&nbsp;typeref,
  byte[]&nbsp;data)</span></div>
 <div class="block">Deserialize results from serialized MessagePack data.</div>
 <dl class="notes">
@@ -776,6 +784,19 @@ loadScripts(document, 'script');</script>
 <dl class="notes">
 <dt>Returns:</dt>
 <dd>true if running inside a test framework</dd>
+</dl>
+</section>
+</li>
+<li>
+<section class="detail" id="close()">
+<h3>close</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">close</span>()
+           throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+<dl class="notes">
+<dt>Specified by:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/AutoCloseable.html#close()" title="class or interface in java.lang" class="external-link">close</a></code>&nbsp;in interface&nbsp;<code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/AutoCloseable.html" title="class or interface in java.lang" class="external-link">AutoCloseable</a></code></dd>
+<dt>Throws:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code></dd>
 </dl>
 </section>
 </li>

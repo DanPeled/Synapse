@@ -117,6 +117,8 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Center of the detected color region as [x, y].</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#close()" class="member-name-link">close()</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>&nbsp;</dd>
 <dt><a href="synapse/pipelines/color/ColorDetection.html" class="type-name-link" title="class in synapse.pipelines.color">ColorDetection</a> - Class in <a href="synapse/pipelines/color/package-summary.html">synapse.pipelines.color</a></dt>
 <dd>
 <div class="block">Represents the result of a color detection pipeline.</div>
@@ -137,6 +139,10 @@ loadScripts(document, 'script');</script>
 <dt><a href="synapse/util/deserializers/GeometryDeserializer.html#deserialize(com.fasterxml.jackson.core.JsonParser,com.fasterxml.jackson.databind.DeserializationContext)" class="member-name-link">deserialize(JsonParser, DeserializationContext)</a> - Method in class synapse.util.deserializers.<a href="synapse/util/deserializers/GeometryDeserializer.html" title="class in synapse.util.deserializers">GeometryDeserializer</a></dt>
 <dd>
 <div class="block">Deserializes a JSON object into the target WPILib geometry type.</div>
+</dd>
+<dt><a href="synapse/SynapseCamera.html#deserializeResults(com.fasterxml.jackson.core.type.TypeReference,byte%5B%5D)" class="member-name-link">deserializeResults(TypeReference&lt;T&gt;, byte[])</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Deserialize results from serialized MessagePack data.</div>
 </dd>
 <dt><a href="synapse/pipelines/color/ColorResult.html#detections" class="member-name-link">detections</a> - Variable in class synapse.pipelines.color.<a href="synapse/pipelines/color/ColorResult.html" title="class in synapse.pipelines.color">ColorResult</a></dt>
 <dd>
@@ -229,17 +235,13 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Returns whether the camera is currently recording.</div>
 </dd>
-<dt><a href="synapse/SynapseCamera.html#getResults(com.fasterxml.jackson.core.type.TypeReference,byte%5B%5D)" class="member-name-link">getResults(TypeReference&lt;T&gt;, byte[])</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
-<dd>
-<div class="block">Deserialize results from serialized MessagePack data.</div>
-</dd>
 <dt><a href="synapse/SynapseCamera.html#getResults(synapse.SynapsePipelineType)" class="member-name-link">getResults(SynapsePipelineType&lt;T&gt;)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Retrieve and deserialize results from the given pipeline.</div>
 </dd>
-<dt><a href="synapse/SynapseCamera.html#getResultsEntry()" class="member-name-link">getResultsEntry()</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dt><a href="synapse/SynapseCamera.html#getResultsSubscriber()" class="member-name-link">getResultsSubscriber()</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">Returns the results entry.</div>
+<div class="block">Returns the results subscriber.</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#getRobotToCameraOffset()" class="member-name-link">getRobotToCameraOffset()</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
@@ -364,7 +366,7 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Camera name</div>
 </dd>
-<dt><a href="synapse/SynapseCamera.html#m_captureLatencyEntry" class="member-name-link">m_captureLatencyEntry</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dt><a href="synapse/SynapseCamera.html#m_captureLatencySubscriber" class="member-name-link">m_captureLatencySubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Entry for tracking the latency of frame capture (in milliseconds)</div>
 </dd>
@@ -380,11 +382,11 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Cached entry for the current pipeline ID</div>
 </dd>
-<dt><a href="synapse/SynapseCamera.html#m_pipelineTypeEntry" class="member-name-link">m_pipelineTypeEntry</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dt><a href="synapse/SynapseCamera.html#m_pipelineTypeSubscriber" class="member-name-link">m_pipelineTypeSubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Entry for storing or retrieving the camera's current pipeline type</div>
 </dd>
-<dt><a href="synapse/SynapseCamera.html#m_processLatencyEntry" class="member-name-link">m_processLatencyEntry</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dt><a href="synapse/SynapseCamera.html#m_processLatencySubscriber" class="member-name-link">m_processLatencySubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Entry for tracking the latency of frame processing (in milliseconds)</div>
 </dd>
@@ -392,7 +394,7 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Entry that indicates whether recording is currently active</div>
 </dd>
-<dt><a href="synapse/SynapseCamera.html#m_resultsEntry" class="member-name-link">m_resultsEntry</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dt><a href="synapse/SynapseCamera.html#m_resultsSubscriber" class="member-name-link">m_resultsSubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Entry for storing the latest processing results from the camera</div>
 </dd>
