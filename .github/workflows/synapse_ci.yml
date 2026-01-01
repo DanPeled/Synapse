@@ -19,6 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        python: [3.11, 3.12, 3.13, 3.14]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -28,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: ${{ matrix.python }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -75,7 +76,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Install Ruff and isort
         run: pip install ruff isort
@@ -96,7 +97,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -128,7 +129,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
