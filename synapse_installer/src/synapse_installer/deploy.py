@@ -21,6 +21,7 @@ from .setup_service import (SERVICE_NAME, restartService,
                             setupServiceOnConnectedClient)
 from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
                    DeployDeviceConfig, IsValidIP)
+from .venv_setup import ensureVenvAutoPython
 
 BUILD_DIR = "build"
 
@@ -104,6 +105,7 @@ def _connectAndDeploy(
         assert transport is not None
 
         with SCPClient(transport) as scp:
+            ensureVenvAutoPython(client)
             for zip_path in zip_paths:
                 remote_zip = f"/tmp/{zip_path.name}"
                 print(f"Uploading {zip_path.name} to {remote_zip}")
