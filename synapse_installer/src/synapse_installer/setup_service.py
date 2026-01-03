@@ -6,8 +6,9 @@
 from pathlib import Path
 from typing import Tuple
 
-from command_executor import runCommand
 from paramiko import SSHClient
+
+from .command_executor import runCommand
 
 SERVICE_NAME = "synapse-runtime"
 

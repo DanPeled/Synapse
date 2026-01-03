@@ -59,6 +59,7 @@ jobs:
         run: make build
 
       - name: Check wheel contents
+        shell: bash
         run: |
           pip install wheel
           python - <<'EOF'
