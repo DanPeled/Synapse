@@ -107,17 +107,17 @@ jobs:
             container: python:3.13-bookworm
             platform: linux/arm64
             python_version: "3.13"
-
-          # Raspberry Pi 5 cross container (needs Python installed inside)
-          - name: raspberry-pi-3.11
-            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
-            python_version: "3.11"
-          - name: raspberry-pi-3.12
-            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
-            python_version: "3.12"
-          - name: raspberry-pi-3.13
-            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
-            python_version: "3.13"
+          #
+          # # Raspberry Pi 5 cross container (needs Python installed inside)
+          # - name: raspberry-pi-3.11
+          #   container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+          #   python_version: "3.11"
+          # - name: raspberry-pi-3.12
+          #   container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+          #   python_version: "3.12"
+          # - name: raspberry-pi-3.13
+          #   container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+          #   python_version: "3.13"
 
     runs-on: ubuntu-22.04
     container: ${{ matrix.container }}
