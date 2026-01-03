@@ -15,13 +15,13 @@ on:
       - "synapse_installer/**"
 
 jobs:
+  # x86 builds (matrix)
   build:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: [3.11, 3.12, 3.13]
     runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v3
 
@@ -75,6 +75,54 @@ jobs:
                       print(info.filename)
           EOF
 
+  # ARM64 builds for Orange Pi 5, Raspberry Pi 5, Jetson
+  build_arm:
+    strategy:
+      matrix:
+        include:
+          - name: orange-pi-5
+            container: python:3.13-bookworm
+          - name: jetson
+            container: python:3.13-bookworm
+          - name: raspberry-pi-5
+            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04-py313
+    runs-on: ubuntu-22.04
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+          cache: pip
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Install dependencies
+        run: |
+          make install
+          pip install ".[dev]"
+
+      - name: Run build check
+        run: make build
+
+      - name: Check wheel contents
+        run: |
+          python - <<'EOF'
+          import sys, glob, zipfile, re
+          wheel_files = glob.glob('dist/*.whl')
+          if not wheel_files:
+              sys.exit("No wheel file found")
+          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          with zipfile.ZipFile(wheel_files[0]) as zf:
+              for info in zf.infolist():
+                  if pattern.search(info.filename):
+                      print(info.filename)
+          EOF
+
+  # Lint
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +135,7 @@ jobs:
       - run: ruff check .
       - run: isort --check-only --diff .
 
+  # Type-check
   type-check:
     runs-on: ubuntu-latest
     steps:
@@ -119,38 +168,7 @@ jobs:
       - run: pip install pyright
       - run: pyright
 
-  build_aarch64:
-    name: Build Aarch64
-    runs-on: ubuntu-22.04
-    container: wpilib/aarch64-cross-ubuntu
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: 3.12
-          cache: pip
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "20.9.0"
-      - name: Install dependencies
-        run: |
-          make install
-          pip install ".[dev]"
-      - name: Run build check
-        run: make build
-      - name: Check wheel contents
-        run: |
-          python - <<'EOF'
-          import sys, glob, zipfile, re
-          wheel_files = glob.glob('dist/*.whl')
-          if not wheel_files:
-              sys.exit("No wheel file found")
-          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
-          with zipfile.ZipFile(wheel_files[0]) as zf:
-              for info in zf.infolist():
-                  if pattern.search(info.filename):
-                      print(info.filename)
-          EOF
+  # Test
   test:
     runs-on: ubuntu-latest
     steps:
