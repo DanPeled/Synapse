@@ -112,14 +112,14 @@ jobs:
         run: |
           if command -v python3 >/dev/null 2>&1; then
               echo "python3 found, creating 'python' symlink"
-              sudo ln -sf $(command -v python3) /usr/bin/python
+              ln -sf $(command -v python3) /usr/bin/python
           elif command -v python >/dev/null 2>&1; then
               echo "'python' already exists"
           else
-              echo "No python found, installing python3..."
-              sudo apt-get update
-              sudo apt-get install -y python3 python3-pip
-              sudo ln -sf $(command -v python3) /usr/bin/python
+              "No python found, installing python3..."
+              apt-get update
+              apt-get install -y python3 python3-pip
+              ln -sf $(command -v python3) /usr/bin/python
           fi
 
       - name: Install dependencies
