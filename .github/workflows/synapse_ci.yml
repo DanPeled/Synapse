@@ -80,12 +80,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: orange-pi-5
-            container: python:3.13-bookworm
-          - name: jetson
-            container: python:3.13-bookworm
+          - name: bookworm
+            container: python:3.12-bookworm
           - name: raspberry-pi-5
-            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04-py313
+            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04-py312
     runs-on: ubuntu-22.04
     container: ${{ matrix.container }}
     steps:
@@ -105,33 +103,71 @@ jobs:
           key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
           restore-keys: |
             ubuntu-node-20-
+
       - run: npm ci
         working-directory: synapse_ui
 
-      - name: Ensure 'python' command exists
+      # Only install Python 3.12 from source for Raspberry Pi
+      - name: Install Python 3.12 on Raspberry Pi
+        if: matrix.name == 'raspberry-pi-5'
+        shell: bash
         run: |
-          if command -v python3 >/dev/null 2>&1; then
-              echo "python3 found, creating 'python' symlink"
-              ln -sf $(command -v python3) /usr/local/bin/python
-          elif command -v python >/dev/null 2>&1; then
-              echo "'python' already exists"
-          else
-              echo "No python found, installing python3..."
-              apt-get update
-              apt-get install -y python3 python3-pip
-              ln -sf $(command -v python3) /usr/local/bin/python
+          set -e
+          PYTHON_VERSION="3.12.2"
+          PYTHON_CMD=$(command -v python3 || true)
+          if [[ -n "$PYTHON_CMD" ]]; then
+            VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+            if [[ "$VERSION" < "3.12" ]]; then
+              PYTHON_CMD=""
+            fi
           fi
 
-      - name: Install dependencies
+          if [[ -z "$PYTHON_CMD" ]]; then
+            echo "Installing Python $PYTHON_VERSION from source..."
+            apt-get update
+            apt-get install -y wget build-essential libssl-dev zlib1g-dev libncurses5-dev \
+              libncursesw5-dev libreadline-dev libsqlite3-dev libgdbm-dev libdb5.3-dev \
+              libbz2-dev libexpat1-dev liblzma-dev tk-dev libffi-dev
+            wget https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz
+            tar xf Python-$PYTHON_VERSION.tgz
+            cd Python-$PYTHON_VERSION
+            ./configure --enable-optimizations --prefix=/usr/local
+            make -j$(nproc)
+            make install
+            cd ..
+            PYTHON_CMD=/usr/local/bin/python3
+          fi
+
+          echo "Using Python at $PYTHON_CMD"
+          ln -sf $PYTHON_CMD /usr/local/bin/python
+          python --version
+
+      - name: Create Python 3.12 venv
+        shell: bash
         run: |
+          PYTHON_CMD=$(command -v python3 || command -v python)
+          $PYTHON_CMD -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          python --version
+
+      - name: Install dependencies in venv
+        shell: bash
+        run: |
+          source .venv/bin/activate
           make install
-          pip install ".[dev]"
+          python -m pip install ".[dev]"
 
-      - name: Run build check
-        run: make build
-
-      - name: Check wheel contents
+      - name: Run build check in venv
+        shell: bash
         run: |
+          source .venv/bin/activate
+          make build
+
+      - name: Check wheel contents in venv
+        shell: bash
+        run: |
+          source .venv/bin/activate
           python - <<'EOF'
           import sys, glob, zipfile, re
           wheel_files = glob.glob('dist/*.whl')
