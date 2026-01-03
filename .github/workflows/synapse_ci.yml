@@ -142,7 +142,7 @@ jobs:
           ln -sf $PYTHON_CMD /usr/local/bin/python
           python --version
 
-      - name: Create Python 3.12 venv
+      - name: Create Python venv
         shell: bash
         run: |
           PYTHON_CMD=$(command -v python3 || command -v python)
