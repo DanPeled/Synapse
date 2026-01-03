@@ -20,10 +20,84 @@ from synapse_installer.util import (NOT_IN_SYNAPSE_PROJECT_ERR,
 
 from .command_executor import (CommandExecutor, LocalCommandExecutor,
                                SSHCommandExecutor)
+from .venv_setup import runAndGetWithExecutor
 
-PackageManager = str
-CheckInstalledCmd = str
-InstallCmd = str
+SERVICE_NAME = "synapse-runtime"
+
+
+def findOrInstallPython(executor: CommandExecutor, minPython: str = "3.12") -> str:
+    """
+    Finds a Python interpreter >= minPython on the remote system.
+    If not found, attempts to install Python from source.
+    Returns the command to invoke the interpreter (e.g., "python3.12").
+    """
+
+    def runAndGet(cmd: str) -> str:
+        stdout, stderr, exitCode = executor.execCommand(cmd)
+        if exitCode != 0 and "command not found" not in stderr:
+            raise RuntimeError(stderr)
+        return stdout.strip()
+
+    candidates = ["python3.12", "python3.13", "python3"]
+    pythonCmd = None
+
+    # 1) Try to find a suitable Python
+    for cmd in candidates:
+        try:
+            version = runAndGet(f"{cmd} -c 'import sys; print(sys.version_info[:3])'")
+            major, minor, _ = eval(version)
+            minMajor, minMinor = map(int, minPython.split("."))
+            if major > minMajor or (major == minMajor and minor >= minMinor):
+                pythonCmd = cmd
+                break
+        except Exception:
+            continue
+
+    # 2) If not found, install Python
+    if not pythonCmd:
+        fprint(f"[yellow]Python >= {minPython} not found, installing...[/yellow]")
+
+        # Install build dependencies
+        deps = [
+            "build-essential",
+            "libssl-dev",
+            "zlib1g-dev",
+            "libncurses5-dev",
+            "libncursesw5-dev",
+            "libreadline-dev",
+            "libsqlite3-dev",
+            "libgdbm-dev",
+            "libdb5.3-dev",
+            "libbz2-dev",
+            "libexpat1-dev",
+            "liblzma-dev",
+            "libffi-dev",
+            "uuid-dev",
+            "wget",
+            "curl",
+        ]
+        for dep in deps:
+            installSystemPackage(executor, dep)
+
+        # Download and build Python from source
+        cmds = [
+            "cd /tmp",
+            "wget -O Python-3.12.2.tgz https://www.python.org/ftp/python/3.12.2/Python-3.12.2.tgz",
+            "tar xvf Python-3.12.2.tgz",
+            "cd Python-3.12.2",
+            "./configure --enable-optimizations",
+            "make -j$(nproc)",
+            "sudo make altinstall",
+        ]
+        fullCmd = " && ".join(cmds)
+        stdout, stderr, exitCode = executor.execCommand(fullCmd)
+        if exitCode != 0:
+            raise RuntimeError(f"Failed to install Python 3.12:\n{stderr}")
+
+        fprint("[green]Python 3.12 installed successfully[/green]")
+        pythonCmd = "python3.12"
+
+    return pythonCmd
 
 
 def setupSudoers(
@@ -33,9 +107,7 @@ def setupSudoers(
     sudoersLine = f"{username} ALL=(ALL) NOPASSWD:ALL"
     sudoersFile = f"/etc/sudoers.d/{username}-nopasswd"
 
-    # Use sudo -S to provide password automatically
     cmd = f"echo '{password}' | sudo -S bash -c \"echo '{sudoersLine}' > {sudoersFile} && chmod 440 {sudoersFile}\""
-
     stdout, stderr, exitCode = executor.execCommand(cmd)
     if exitCode != 0 or stderr.strip():
         fprint(f"[red]Failed to setup sudoers on {hostname}:\n{stderr}[/red]")
@@ -49,7 +121,7 @@ def installSystemPackage(
     """Install a system package using the appropriate package manager."""
     sudo: str = "sudo " if useSudo else ""
 
-    managers: List[tuple[PackageManager, CheckInstalledCmd, InstallCmd]] = [
+    managers: List[tuple[str, str, str]] = [
         (
             "apt",
             f"dpkg -s {package} >/dev/null 2>&1",
@@ -85,96 +157,80 @@ def installSystemPackage(
     raise RuntimeError("No supported package manager found")
 
 
-def ensurePython310(executor: CommandExecutor) -> str:
-    """Ensure Python 3.10 is installed. Return the python3.10 path."""
-    # Check if python3.10 exists
-    stdout, stderr, exitCode = executor.execCommand("command -v python3.10")
-    if exitCode == 0:
-        return "python3.10"
-
-    fprint("[yellow]Python 3.10 not found, installing...[/yellow]")
-
-    # Install build dependencies
-    deps = [
-        "build-essential",
-        "libssl-dev",
-        "zlib1g-dev",
-        "libncurses5-dev",
-        "libncursesw5-dev",
-        "libreadline-dev",
-        "libsqlite3-dev",
-        "libgdbm-dev",
-        "libdb5.3-dev",
-        "libbz2-dev",
-        "libexpat1-dev",
-        "liblzma-dev",
-        "libffi-dev",
-        "uuid-dev",
-        "wget",
-        "curl",
-    ]
-    for dep in deps:
-        installSystemPackage(executor, dep)
-
-    # Download and compile Python 3.10 from source
-    cmds = [
-        "cd /tmp",
-        "wget -O Python-3.10.12.tgz https://www.python.org/ftp/python/3.10.12/Python-3.10.12.tgz",
-        "tar xvf Python-3.10.12.tgz",
-        "cd Python-3.10.12",
-        "./configure --enable-optimizations",
-        "make -j$(nproc)",
-        "sudo make altinstall",
-    ]
-    fullCmd = " && ".join(cmds)
-    print("running thingamajig")
-    stdout, stderr, exitCode = executor.execCommand(fullCmd)
-    if exitCode != 0:
-        raise RuntimeError(f"Failed to install Python 3.10:\n{stderr}")
-
-    fprint("[green]Python 3.10 installed successfully[/green]")
-    return "python3.10"
-
-
-def installPipRequirements(
+def ensureVenvWithPython(
     executor: CommandExecutor,
-    requirements: List[str],
-    python_cmd: str,
+    workingDir: Path,
+    requirements: Optional[List[str]] = None,
+    minPython: str = "3.12",
     wplibYear: Optional[str] = None,
-) -> None:
-    """Install Python pip requirements using the given python command."""
-    stdout, stderr, exitCode = executor.execCommand(f"{python_cmd} -m pip freeze")
-    installedPackages: dict[str, str] = {}
-    for line in stdout.splitlines():
-        if "==" in line:
-            name, ver = line.strip().split("==", 1)
-            installedPackages[name.lower()] = ver
+) -> str:
+    """
+    Ensure a venv exists at <workingDir>/.venv using Python >= minPython.
+    Installs all pip requirements inside it.
+    Returns the venv python path.
+    """
 
-    for i, requirement in enumerate(requirements, start=1):
-        if "==" in requirement:
-            pkgName, reqVer = requirement.split("==", 1)
-        else:
-            pkgName, reqVer = requirement, None
+    venvDir = workingDir / ".venv"
+    venvPython = venvDir / "bin" / "python"
 
-        pkgName = pkgName.lower()
-        installedVer: Optional[str] = installedPackages.get(pkgName)
-
-        if installedVer is not None and (reqVer is None or installedVer == reqVer):
-            fprint(
-                f"[green][OK][/green] {pkgName} already installed [{i}/{len(requirements)}]"
-            )
-            continue
-
-        fprint(f"Installing {pkgName}... [{i}/{len(requirements)}]")
-
-        cmd: str = f"{python_cmd} -m pip install {requirement} "
-        if wplibYear:
-            cmd += f"--extra-index-url=https://wpilib.jfrog.io/artifactory/api/pypi/wpilib-python-release-{wplibYear}/simple/"
-        cmd += " --break-system-packages --upgrade-strategy only-if-needed"
-
+    def runAndGet(cmd: str) -> str:
         stdout, stderr, exitCode = executor.execCommand(cmd)
-        if stderr.strip():
-            fprint(f"[red]Install for {pkgName} failed!\n{stderr}[/red]")
+        if exitCode != 0 and "command not found" not in stderr:
+            raise RuntimeError(stderr)
+        return stdout.strip()
+
+    # 1) Check if venv already exists
+    try:
+        out = runAndGet(
+            f"""
+            if [ -x "{venvPython}" ]; then
+                "{venvPython}" -c "import sys; print(sys.executable)"
+            fi
+            """
+        )
+        venvPythonPath = out if out else None
+    except RuntimeError:
+        venvPythonPath = None
+
+    # 2) Find or install Python if venv is missing
+    if not venvPythonPath:
+        pythonCmd = findOrInstallPython(executor, minPython)
+
+        # Create the venv
+        print(f"Creating venv with {pythonCmd}...")
+        runAndGet(f"cd {workingDir} && {pythonCmd} -m venv .venv")
+        runAndGet(f"{venvPython} -m pip install --upgrade pip")
+        venvPythonPath = str(venvPython)
+
+    # 3) Install pip requirements inside the venv
+    if requirements:
+        stdout = runAndGet(f"{venvPythonPath} -m pip freeze")
+        installedPackages = {}
+        for line in stdout.splitlines():
+            if "==" in line:
+                name, ver = line.strip().split("==", 1)
+                installedPackages[name.lower()] = ver
+
+        for req in requirements:
+            if "==" in req:
+                pkgName, reqVer = req.split("==", 1)
+            else:
+                pkgName, reqVer = req, None
+            pkgName = pkgName.lower()
+            installedVer = installedPackages.get(pkgName)
+            if installedVer is not None and (reqVer is None or installedVer == reqVer):
+                continue  # already installed
+
+            cmd = f"{venvPythonPath} -m pip install {req}"
+            if wplibYear:
+                cmd += (
+                    f" --extra-index-url="
+                    f"https://wpilib.jfrog.io/artifactory/api/pypi/wpilib-python-release-{wplibYear}/simple/"
+                )
+            cmd += " --upgrade-strategy only-if-needed --break-system-packages"
+            runAndGet(cmd)
+
+    return venvPythonPath
 
 
 def syncRequirements(
@@ -186,23 +242,28 @@ def syncRequirements(
     wplibYear: Optional[str] = None,
 ) -> None:
     """Sync requirements using the provided executor."""
+
     try:
         setupSudoers(executor, hostname, username, password)
+
+        # Install system deps
         installSystemPackage(executor, "libopencv-dev")
         installSystemPackage(executor, "unzip")
         installSystemPackage(executor, "isc-dhcp-client")
-        python_cmd = ensurePython310(executor)
-        # Upgrade pip
-        executor.execCommand(f"{python_cmd} -m ensurepip --upgrade")
-        executor.execCommand(
-            f"{python_cmd} -m pip install --upgrade pip setuptools wheel"
+
+        # Setup venv and pip packages
+        homeDir = runAndGetWithExecutor("echo $HOME", executor)
+        workingDir = Path(homeDir) / "Synapse"
+        ensureVenvWithPython(
+            executor,
+            workingDir,
+            requirements=requirements,
+            wplibYear=wplibYear,
         )
-        requirements = list(
-            filter(lambda requirement: "extra" not in requirement, requirements)
-        )
-        installPipRequirements(executor, requirements, python_cmd, wplibYear)
+
         executor.close()
         fprint(f"[green]Sync completed on {hostname}[/green]")
+
     except Exception as e:
         fprint(f"[red]{e}\n{traceback.format_exc()}[/red]")
 
@@ -268,8 +329,8 @@ def sync(argv: Optional[List[str]] = None) -> int:
 def syncLocal(requirements: List[str], wplibYear: Optional[str] = None) -> None:
     """Sync requirements locally."""
     executor: CommandExecutor = LocalCommandExecutor()
-    python_cmd = sys.executable
-    installPipRequirements(executor, requirements, python_cmd, wplibYear)
+    # python_cmd = sys.executable
+    ensureVenvWithPython(executor, Path.cwd(), requirements, wplibYear=wplibYear)
 
 
 def syncRemote(
@@ -282,4 +343,8 @@ def syncRemote(
     """Sync requirements on a remote machine via SSH."""
     fprint(f"Connecting to {hostname}@{ip}...")
     executor: CommandExecutor = SSHCommandExecutor(ip, "root", password)
-    syncRequirements(executor, hostname, hostname, password, requirements, wplibYear)
+    homeDir = runAndGetWithExecutor("echo $HOME", executor)
+    workingDir = Path(homeDir) / "Synapse"
+    ensureVenvWithPython(
+        executor, workingDir, requirements=requirements, wplibYear=wplibYear
+    )
