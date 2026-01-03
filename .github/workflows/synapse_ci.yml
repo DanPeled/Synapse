@@ -18,28 +18,16 @@ jobs:
   build:
     strategy:
       matrix:
-        build_target:
-          - os: ubuntu-latest
-            python: 3.12
-            container: null
-          - os: ubuntu-latest
-            python: 3.12
-            container: wpilib/aarch64-cross-ubuntu:2025-22.04
-          - os: windows-latest
-            python: 3.12
-            container: null
-          - os: macos-latest
-            python: 3.12
-            container: null
-    runs-on: ${{ matrix.build_target.os }}
-    container: ${{ matrix.build_target.container }}
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: [3.11, 3.12, 3.13]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v3
 
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.build_target.python }}
+          python-version: ${{ matrix.python }}
           cache: pip
 
       - uses: actions/setup-node@v3
@@ -53,9 +41,9 @@ jobs:
             ~/.npm
             synapse_ui/node_modules
             synapse_ui/.next/cache
-          key: ${{ matrix.build_target.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
           restore-keys: |
-            ${{ matrix.build_target.os }}-node-20-
+            ${{ runner.os }}-node-20-
 
       - name: Install Node.js dependencies
         working-directory: synapse_ui
@@ -131,13 +119,44 @@ jobs:
       - run: pip install pyright
       - run: pyright
 
+  build_aarch64:
+    name: Build Aarch64
+    runs-on: ubuntu-22.04
+    container: wpilib/raarch64-cross--ubuntu:2025-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+          cache: pip
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+      - name: Install dependencies
+        run: |
+          make install
+          pip install ".[dev]"
+      - name: Run build check
+        run: make build
+      - name: Check wheel contents
+        run: |
+          python - <<'EOF'
+          import sys, glob, zipfile, re
+          wheel_files = glob.glob('dist/*.whl')
+          if not wheel_files:
+              sys.exit("No wheel file found")
+          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          with zipfile.ZipFile(wheel_files[0]) as zf:
+              for info in zf.infolist():
+                  if pattern.search(info.filename):
+                      print(info.filename)
+          EOF
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          cache: pip
           python-version: "3.12"
       - uses: actions/setup-node@v3
         with:
