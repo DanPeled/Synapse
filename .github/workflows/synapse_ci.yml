@@ -75,15 +75,50 @@ jobs:
                       print(info.filename)
           EOF
 
-  # ARM64 builds for Orange Pi 5, Raspberry Pi 5, Jetson
+  # ARM64 builds for Jetson, Orange Pi 5, Raspberry Pi 5
   build_arm:
     strategy:
       matrix:
         include:
-          - name: bookworm
+          # Jetson (ARM64) using official Python Bookworm containers
+          - name: jetson-3.11
+            container: python:3.11-bookworm
+            platform: linux/arm64
+            python_version: "3.11"
+          - name: jetson-3.12
             container: python:3.12-bookworm
-          - name: raspberry-pi-5
-            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04-py312
+            platform: linux/arm64
+            python_version: "3.12"
+          - name: jetson-3.13
+            container: python:3.13-bookworm
+            platform: linux/arm64
+            python_version: "3.13"
+
+          # Orange Pi 5 (ARM64) using official Python Bookworm containers
+          - name: orange-pi-3.11
+            container: python:3.11-bookworm
+            platform: linux/arm64
+            python_version: "3.11"
+          - name: orange-pi-3.12
+            container: python:3.12-bookworm
+            platform: linux/arm64
+            python_version: "3.12"
+          - name: orange-pi-3.13
+            container: python:3.13-bookworm
+            platform: linux/arm64
+            python_version: "3.13"
+
+          # Raspberry Pi 5 cross container (needs Python installed inside)
+          - name: raspberry-pi-3.11
+            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+            python_version: "3.11"
+          - name: raspberry-pi-3.12
+            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+            python_version: "3.12"
+          - name: raspberry-pi-3.13
+            container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+            python_version: "3.13"
+
     runs-on: ubuntu-22.04
     container: ${{ matrix.container }}
     steps:
@@ -106,41 +141,6 @@ jobs:
 
       - run: npm ci
         working-directory: synapse_ui
-
-      # Only install Python 3.12 from source for Raspberry Pi
-      - name: Install Python 3.12 on Raspberry Pi
-        if: matrix.name == 'raspberry-pi-5'
-        shell: bash
-        run: |
-          set -e
-          PYTHON_VERSION="3.12.2"
-          PYTHON_CMD=$(command -v python3 || true)
-          if [[ -n "$PYTHON_CMD" ]]; then
-            VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-            if [[ "$VERSION" < "3.12" ]]; then
-              PYTHON_CMD=""
-            fi
-          fi
-
-          if [[ -z "$PYTHON_CMD" ]]; then
-            echo "Installing Python $PYTHON_VERSION from source..."
-            apt-get update
-            apt-get install -y wget build-essential libssl-dev zlib1g-dev libncurses5-dev \
-              libncursesw5-dev libreadline-dev libsqlite3-dev libgdbm-dev libdb5.3-dev \
-              libbz2-dev libexpat1-dev liblzma-dev tk-dev libffi-dev
-            wget https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz
-            tar xf Python-$PYTHON_VERSION.tgz
-            cd Python-$PYTHON_VERSION
-            ./configure --enable-optimizations --prefix=/usr/local
-            make -j$(nproc)
-            make install
-            cd ..
-            PYTHON_CMD=/usr/local/bin/python3
-          fi
-
-          echo "Using Python at $PYTHON_CMD"
-          ln -sf $PYTHON_CMD /usr/local/bin/python
-          python --version
 
       - name: Create Python venv
         shell: bash
