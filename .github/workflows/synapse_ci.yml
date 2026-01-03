@@ -8,11 +8,13 @@ on:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - ".github/workflows/synapse_ci.yml"
   pull_request:
     paths:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - ".github/workflows/synapse_ci.yml"
 
 jobs:
   # x86 builds (matrix)
