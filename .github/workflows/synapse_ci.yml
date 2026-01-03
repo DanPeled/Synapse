@@ -153,7 +153,6 @@ jobs:
           key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
           restore-keys: |
             ubuntu-node-20-
-
       - run: npm ci
         working-directory: synapse_ui
 
