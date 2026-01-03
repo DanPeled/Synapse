@@ -95,6 +95,19 @@ jobs:
         with:
           node-version: "20.9.0"
 
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
+      - run: npm ci
+        working-directory: synapse_ui
+
       - name: Install dependencies
         run: |
           make install
@@ -139,6 +152,7 @@ jobs:
         with:
           cache: pip
           python-version: "3.12"
+
       - uses: actions/setup-node@v3
         with:
           node-version: "20.9.0"
