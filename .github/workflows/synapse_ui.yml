@@ -22,12 +22,13 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Cache npm
+      - name: Cache npm + Next.js
         uses: actions/cache@v3
         with:
           path: |
             ~/.npm
             synapse_ui/node_modules
+            synapse_ui/.next/cache
           key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
           restore-keys: |
             ubuntu-node-20-
@@ -36,6 +37,8 @@ jobs:
         run: npm ci
 
       - name: Run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
         run: npm run build
 
   test:
@@ -51,12 +54,13 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Cache npm
+      - name: Cache npm + Next.js
         uses: actions/cache@v3
         with:
           path: |
             ~/.npm
             synapse_ui/node_modules
+            synapse_ui/.next/cache
           key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
 
       - name: Install dependencies
@@ -77,12 +81,13 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Cache npm
+      - name: Cache npm + Next.js
         uses: actions/cache@v3
         with:
           path: |
             ~/.npm
             synapse_ui/node_modules
+            synapse_ui/.next/cache
           key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
 
       - name: Install dependencies

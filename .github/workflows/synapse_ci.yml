@@ -33,12 +33,13 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Cache npm
+      - name: Cache npm + Next.js
         uses: actions/cache@v3
         with:
           path: |
             ~/.npm
             synapse_ui/node_modules
+            synapse_ui/.next/cache
           key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-20-
@@ -53,6 +54,8 @@ jobs:
           pip install ".[dev]"
 
       - name: Run build check
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
         run: make build
 
       - name: Check wheel contents
@@ -92,13 +95,16 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Cache npm
+      - name: Cache npm + Next.js
         uses: actions/cache@v3
         with:
           path: |
             ~/.npm
             synapse_ui/node_modules
-          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
 
       - run: npm ci
         working-directory: synapse_ui
@@ -120,13 +126,16 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Cache npm
+      - name: Cache npm + Next.js
         uses: actions/cache@v3
         with:
           path: |
             ~/.npm
             synapse_ui/node_modules
-          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
 
       - run: npm ci
         working-directory: synapse_ui
