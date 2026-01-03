@@ -18,16 +18,28 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: [3.11, 3.12, 3.13]
-    runs-on: ${{ matrix.os }}
+        build_target:
+          - os: ubuntu-latest
+            python: 3.12
+            container: null
+          - os: ubuntu-latest
+            python: 3.12
+            container: wpilib/aarch64-cross-ubuntu:2025-22.04
+          - os: windows-latest
+            python: 3.12
+            container: null
+          - os: macos-latest
+            python: 3.12
+            container: null
+    runs-on: ${{ matrix.build_target.os }}
+    container: ${{ matrix.build_target.container }}
 
     steps:
       - uses: actions/checkout@v3
 
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ matrix.build_target.python }}
           cache: pip
 
       - uses: actions/setup-node@v3
@@ -41,9 +53,9 @@ jobs:
             ~/.npm
             synapse_ui/node_modules
             synapse_ui/.next/cache
-          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          key: ${{ matrix.build_target.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-node-20-
+            ${{ matrix.build_target.os }}-node-20-
 
       - name: Install Node.js dependencies
         working-directory: synapse_ui
@@ -81,6 +93,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
+          cache: pip
           python-version: "3.12"
       - run: pip install ruff isort
       - run: ruff check .
@@ -92,6 +105,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
+          cache: pip
           python-version: "3.12"
       - uses: actions/setup-node@v3
         with:
@@ -123,6 +137,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
+          cache: pip
           python-version: "3.12"
       - uses: actions/setup-node@v3
         with:
