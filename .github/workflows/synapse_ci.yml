@@ -122,7 +122,7 @@ jobs:
   build_aarch64:
     name: Build Aarch64
     runs-on: ubuntu-22.04
-    container: wpilib/aarch64-cross-ubuntu:2025-22.04
+    container: wpilib/aarch64-cross-ubuntu
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
