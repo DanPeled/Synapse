@@ -78,6 +78,8 @@ class PipelineHandler:
             self.pipelineTypeNames[cameraIndex] = {}
         if cameraIndex not in self.defaultPipelineIndexes:
             self.defaultPipelineIndexes[cameraIndex] = 0
+        if cameraIndex not in self.cameraPipelineSettings:
+            self.cameraPipelineSettings[cameraIndex] = {}
 
     def loadPipelineCameraSettings(self):
         camera_configs = GlobalSettings.getCameraConfigMap()
@@ -197,9 +199,19 @@ class PipelineHandler:
                 )
             currPipeline.name = name
             currPipeline.pipelineIndex = index
-            currPipeline.cameraSettings = (
-                self.cameraPipelineSettings[cameraid].get(index) or CameraSettings()
+            currPipeline.cameraIndex = cameraid
+
+            if cameraid not in self.cameraPipelineSettings:
+                self.cameraPipelineSettings[cameraid] = {index: CameraSettings()}
+            elif index not in self.cameraPipelineSettings[cameraid]:
+                self.cameraPipelineSettings[cameraid][index] = CameraSettings()
+
+            assert (
+                cameraid in self.cameraPipelineSettings
+                and index in self.cameraPipelineSettings[cameraid]
             )
+
+            currPipeline.cameraSettings = self.cameraPipelineSettings[cameraid][index]
 
             # Ensure camera dictionaries exist
             self.pipelineInstanceBindings.setdefault(cameraid, {})
