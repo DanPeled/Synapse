@@ -40,7 +40,7 @@ class PipelineHandler:
 
         self.pipelineTypeNames: CameraPipelineDict[PipelineTypeName] = {}
         self.pipelineSettings: CameraPipelineDict[PipelineSettings] = {}
-        self.cameraPipelineSettings: CameraPipelineDict[CameraSettings] = {}
+        self.cameraPipelineSettings: Dict[PipelineID, CameraSettings] = {}
         self.pipelineInstanceBindings: CameraPipelineDict[Pipeline] = {}
         self.pipelineNames: CameraPipelineDict[PipelineName] = {}
 
@@ -93,14 +93,9 @@ class PipelineHandler:
             with open(path, "r") as f:
                 config = yaml.full_load(f) or {}
 
-            if cameraid not in self.cameraPipelineSettings:
-                self.cameraPipelineSettings[cameraid] = {}
-
-            for pipelineid, camerasettings in (
-                config.get("pipeline_configs") or {}
-            ).items():
-                self.cameraPipelineSettings[cameraid][pipelineid] = CameraSettings(
-                    camerasettings
+            for pipelineid, pipedata in (config.get("pipeline_configs") or {}).items():
+                self.cameraPipelineSettings[pipelineid] = CameraSettings(
+                    pipedata["settings"]
                 )
 
     def loadPipelineInstances(self):
@@ -199,7 +194,9 @@ class PipelineHandler:
                 )
             currPipeline.name = name
             currPipeline.pipelineIndex = index
-            currPipeline.cameraSettings = self.cameraPipelineSettings.get(index) or {}
+            currPipeline.cameraSettings = (
+                self.cameraPipelineSettings.get(index) or CameraSettings()
+            )
 
             # Ensure camera dictionaries exist
             self.pipelineInstanceBindings.setdefault(cameraid, {})
