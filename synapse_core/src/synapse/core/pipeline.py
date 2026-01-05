@@ -14,8 +14,8 @@ from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
                                   PipelineResultProto)
 from synapse_net.socketServer import WebSocketServer
 
-from ..log import createMessage, err
-from ..stypes import CameraID, Frame, PipelineID
+from ..log import createMessage, err, warn
+from ..stypes import CameraID, Frame, PipelineID, Resolution
 from .camera_factory import SynapseCamera
 from .global_settings import GlobalSettings
 from .results_api import (PipelineResult, parsePipelineResult,
@@ -232,15 +232,64 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     def getCameraMatrix(self, cameraIndex: CameraID) -> Optional[List[List[float]]]:
         camConfig = GlobalSettings.getCameraConfig(cameraIndex)
         if not camConfig:
-            err("No camera matrix found, invalid results")
+            err("No camera matrix found, may result in invalid results")
             return None
+
         currRes = self.getCameraSetting(CameraSettings.resolution)
-        if currRes:
-            matrixData = camConfig.calibration.get(currRes)
-            if matrixData:
-                m = matrixData.matrix
-                return [m[i : i + 3] for i in range(0, 9, 3)]
-        return None
+        if not currRes:
+            return None
+
+        def parse_res(res):
+            if isinstance(res, str):
+                w, h = res.lower().split("x")
+                return int(w), int(h)
+            return int(res[0]), int(res[1])
+
+        calib = camConfig.calibration
+
+        # 1) Exact match
+        matrixData = calib.get(currRes)
+        if matrixData:
+            lst = matrixData.matrix
+            return [lst[i : i + 3] for i in range(0, 9, 3)]
+
+        # 2) Fallback: largest available resolution
+        try:
+            currW, currH = parse_res(currRes)
+
+            bestRes = max(calib.keys(), key=lambda r: parse_res(r)[0] * parse_res(r)[1])
+            baseW, baseH = parse_res(bestRes)
+
+            baseMat = calib[bestRes].matrix
+            fx, _, cx, _, fy, cy, _, _, _ = baseMat
+
+            sx = currW / baseW
+            sy = currH / baseH
+
+            scaled = [
+                fx * sx,
+                0.0,
+                cx * sx,
+                0.0,
+                fy * sy,
+                cy * sy,
+                0.0,
+                0.0,
+                1.0,
+            ]
+
+            warn(f"Camera resolution {currRes} not calibrated, scaling from {bestRes}")
+
+            return [scaled[i : i + 3] for i in range(0, 9, 3)]
+
+        except Exception as e:
+            err(f"Failed to scale camera matrix: {e}")
+            return None
+
+    def getResolution(self) -> Resolution:
+        resString = self.getSetting(CameraSettings.resolution)
+        split = resString.split("x")
+        return int(split[0]), int(split[1])
 
     def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
         data = GlobalSettings.getCameraConfig(cameraIndex)
