@@ -6,6 +6,7 @@
 from typing import Dict, Optional, Union, overload
 
 import yaml
+from synapse.log import warn
 
 from ..stypes import CameraID
 from .camera_factory import CameraConfig
@@ -44,15 +45,20 @@ class GlobalSettingsMeta(type):
         if cls.kCamerasListKey in settings:
             cameras = settings[cls.kCamerasListKey]
             for camera in cameras:
-                with open(
+                path = (
                     Config.getInstance().path.parent
                     / f"camera_{camera}"
                     / "camera_configs.yml"
-                ) as f:
-                    camera_settings = yaml.full_load(f)
-                    cls.__cameraConfigs[camera] = CameraConfig.fromDict(
-                        camera_settings.get("camera_configs") or {}
-                    )
+                )
+                if path.exists():
+                    with open(path) as f:
+                        camera_settings = yaml.full_load(f)
+                        cls.__cameraConfigs[camera] = CameraConfig.fromDict(
+                            camera_settings.get("camera_configs") or {}
+                        )
+                else:
+                    warn(f"No camera configs file exists for camra {camera}...")
+
             # for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
             #     camConfig: CameraConfig = CameraConfig.fromDict(camData)
             #     cls.__cameraConfigs[index] = camConfig

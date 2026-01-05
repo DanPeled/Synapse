@@ -81,7 +81,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     @abstractmethod
     def __init__(self, settings: TSettingsType):
         self.settings: TSettingsType = settings
-        self.cameraSettings: Dict[CameraID, CameraSettings] = {}
+        self.cameraSettings: CameraSettings = CameraSettings()
         self.cameraIndex: CameraID = -1
         self.pipelineIndex: PipelineID = -1
         self.name: str = "new pipeline"
@@ -93,9 +93,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         self.invalidateCachedEntries()
         self.cameraIndex = cameraIndex
 
-        if cameraIndex not in self.cameraSettings:
-            self.cameraSettings[cameraIndex] = CameraSettings()
-        self.cameraSettings[cameraIndex].fromCamera(camera)
+        self.cameraSettings.fromCamera(camera)
 
     @abstractmethod
     def processFrame(self, img, timestamp: float) -> PipelineProcessFrameResult:
@@ -220,9 +218,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
     def toDict(self, type_: str, cameraIndex: int) -> dict:
         settingsDict = self.settings.toDict()
-        settingsDict.update(
-            self.cameraSettings.get(cameraIndex, CameraSettings()).toDict()
-        )
+        settingsDict.update(self.cameraSettings.toDict())
         return {
             "name": self.name,
             "type": type_,
@@ -252,6 +248,10 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         if matrixData:
             lst = matrixData.matrix
             return [lst[i : i + 3] for i in range(0, 9, 3)]
+
+        if len(calib.keys()) == 0:
+            warn(f"No calibrations found for camera {self.cameraIndex}")
+            return
 
         # 2) Fallback: largest available resolution
         try:
@@ -287,7 +287,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             return None
 
     def getResolution(self) -> Resolution:
-        resString = self.getSetting(CameraSettings.resolution)
+        resString = self.getCameraSetting(CameraSettings.resolution)
         split = resString.split("x")
         return int(split[0]), int(split[1])
 
@@ -306,9 +306,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     ) -> TSettingValueType: ...
 
     def getCameraSetting(self, setting: Union[str, Setting]) -> Optional[Any]:
-        if self.cameraIndex in self.cameraSettings:
-            return self.cameraSettings[self.cameraIndex].getSetting(setting)
-        return None
+        return self.cameraSettings.getSetting(setting)
 
     def setCameraSetting(
         self, setting: Union[str, Setting], value: SettingsValue
@@ -318,7 +316,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         collection.setSetting(setting, value)
 
     def getCurrentCameraSettingCollection(self) -> Optional[CameraSettings]:
-        return self.cameraSettings.get(self.cameraIndex)
+        return self.cameraSettings
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
         pass
