@@ -8,3 +8,4 @@ dist/
 *.avi
 synapse_lib/vendordep/docs/**
 .venv/
+venv/
