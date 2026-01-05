@@ -96,11 +96,9 @@ class PipelineHandler:
             if cameraid not in self.cameraPipelineSettings:
                 self.cameraPipelineSettings[cameraid] = {}
 
-            for pipelineid, camerasettings in (
-                config.get("pipeline_configs") or {}
-            ).items():
+            for pipelineid, pipedata in (config.get("pipeline_configs") or {}).items():
                 self.cameraPipelineSettings[cameraid][pipelineid] = CameraSettings(
-                    camerasettings
+                    pipedata["settings"]
                 )
 
     def loadPipelineInstances(self):
@@ -199,7 +197,9 @@ class PipelineHandler:
                 )
             currPipeline.name = name
             currPipeline.pipelineIndex = index
-            currPipeline.cameraSettings = self.cameraPipelineSettings.get(index) or {}
+            currPipeline.cameraSettings = (
+                self.cameraPipelineSettings[cameraid].get(index) or CameraSettings()
+            )
 
             # Ensure camera dictionaries exist
             self.pipelineInstanceBindings.setdefault(cameraid, {})
