@@ -75,6 +75,8 @@ setup(
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
         visionProcessingDep("opencv_python==4.8.0.74"),
+        visionProcessingDep("torch==2.1.2"),
+        visionProcessingDep(" ultralytics==8.0.200"),
         visionProcessingDep("opencv_contrib_python==4.8.0.74"),
         deviceAccessDep("PyYAML"),
         deviceAccessDep("pathspec"),

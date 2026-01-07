@@ -89,7 +89,7 @@ class UIHandle:
                     ),
                 ) as httpd:
                     actual_port = httpd.server_address[1]
-                    log(f"UI available at: https://{getIP()}:{actual_port}")
+                    log(f"UI available at: {getIP()}:{actual_port}")
                     httpd.serve_forever()
             except OSError as e:
                 log(f"Failed to start server on port {port}: {e}")

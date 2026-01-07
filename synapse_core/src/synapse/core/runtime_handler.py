@@ -17,7 +17,8 @@ import cv2
 import numpy as np
 import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
-                    NetworkTableInstance, NetworkTableType, ValueEventData)
+                    NetworkTableInstance, NetworkTableType, StringPublisher,
+                    ValueEventData)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
                                   MessageTypeProto)
@@ -48,13 +49,6 @@ class FPSView:
     position = (10, 30)
 
 
-def sendWebUIIP():
-    if NtClient.INSTANCE is not None:
-        NtClient.INSTANCE.nt_inst.getTable(NtClient.INSTANCE.NT_TABLE).getEntry(
-            "web_ui"
-        ).setString(f"https://{getIP()}:3000")
-
-
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
 DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
 
@@ -83,13 +77,16 @@ class RuntimeManager:
         self.pipelineHandler: PipelineHandler = PipelineHandler(directory)
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
-        self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
+        self.cameraFrameEntries: Dict[
+            CameraID, NetworkTableEntry
+        ] = {}  # INFO: not used
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
         self.publishExecutor = ThreadPoolExecutor(max_workers=2)
         self.pipelineExecutors: Dict[CameraID, ThreadPoolExecutor] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.fpsHistory: Dict[CameraID, Deque] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
+        self.webUIPublisher: Optional[StringPublisher] = None
 
         self.running = threading.Event()
         self.running.set()
@@ -139,6 +136,18 @@ class RuntimeManager:
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
 
+    def sendWebUIIP(self):
+        if self.webUIPublisher:
+            self.webUIPublisher.set(f"{getIP()}:3000")
+        else:
+            if NtClient.INSTANCE is not None:
+                self.webUIPublisher = (
+                    NtClient.INSTANCE.nt_inst.getTable(NtClient.INSTANCE.NT_TABLE)
+                    .getStringTopic("web_ui")
+                    .publish()
+                )
+                self.sendWebUIIP()
+
     def setup(self, directory: Path):
         """
         Initializes all components:
@@ -175,7 +184,7 @@ class RuntimeManager:
         self.setupNetworkTables()
 
         self.startMetricsThread()
-        sendWebUIIP()
+        self.sendWebUIIP()
 
         self.isSetup = True
 
@@ -878,7 +887,7 @@ class RuntimeManager:
                     )  # Will result in the camera not processing any pipeline
 
         def onConnect(_: RemoteConnectionIP) -> None:
-            sendWebUIIP()
+            self.sendWebUIIP()
 
         def onSetDefaultPipeline(pipelineindex: PipelineID, cameraid: CameraID):
             self.cameraHandler.cameraConfigBindings[
