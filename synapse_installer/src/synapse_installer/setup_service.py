@@ -37,7 +37,7 @@ def setupServiceOnConnectedClient(client: SSHClient, username: str) -> None:
     homeDir = stdout.read().decode().strip()
 
     workingDir = Path(homeDir) / "Synapse"
-    pythonPath = workingDir / ".venv" / "bin" / "python"
+    pythonPath = workingDir.parent / ".venv" / "bin" / "python"
     mainPath = workingDir / "main.py"
 
     serviceContent = f"""[Unit]
