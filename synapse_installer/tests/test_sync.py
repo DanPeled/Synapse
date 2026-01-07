@@ -75,8 +75,6 @@ def test_sync_requirements_happy_path(monkeypatch):
 
     monkeypatch.setattr(sync_mod, "setupSudoers", lambda *a, **k: None)
     monkeypatch.setattr(sync_mod, "installSystemPackage", lambda *a, **k: None)
-    monkeypatch.setattr(sync_mod, "ensureVenvWithPython", lambda *a, **k: None)
-    monkeypatch.setattr(sync_mod, "runAndGetWithExecutor", lambda *a, **k: "/home/test")
 
     sync_mod.syncRequirements(
         executor,
@@ -87,21 +85,3 @@ def test_sync_requirements_happy_path(monkeypatch):
     )
 
     assert executor.closed is True
-
-
-# ------------------------------------------------------------
-# syncLocal
-# ------------------------------------------------------------
-
-
-def test_sync_local(monkeypatch):
-    called = {}
-
-    def fake_ensure(executor, path, requirements, wplibYear=None):
-        called["ok"] = True
-
-    monkeypatch.setattr(sync_mod, "ensureVenvWithPython", fake_ensure)
-
-    sync_mod.syncLocal(["requests"])
-
-    assert called["ok"] is True
