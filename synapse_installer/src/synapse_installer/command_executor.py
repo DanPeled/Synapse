@@ -8,6 +8,8 @@ import subprocess
 from abc import ABC, abstractmethod
 from typing import Tuple
 
+from paramiko import SSHClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -128,3 +130,15 @@ class SSHCommandExecutor(CommandExecutor):
             logger.debug(f"SSH connection to {self.hostname} closed")
         except Exception as e:
             logger.warning(f"Error closing SSH connection: {e}")
+
+
+def runCommand(
+    client: SSHClient, cmd: str, ignoreErrors: bool = False
+) -> Tuple[str, str]:
+    """Run a command on the remote client and return (stdout, stderr)."""
+    stdin, stdout, stderr = client.exec_command(cmd)
+    out = stdout.read().decode()
+    err = stderr.read().decode()
+    if err and not ignoreErrors and "Created symlink" not in err:
+        print(f"Error: {err.strip()}")
+    return out, err

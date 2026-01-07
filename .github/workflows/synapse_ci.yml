@@ -8,36 +8,48 @@ on:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - ".github/workflows/synapse_ci.yml"
   pull_request:
     paths:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - ".github/workflows/synapse_ci.yml"
 
 jobs:
+  # x86 builds (matrix)
   build:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        python: [3.11, 3.12, 3.13]
     runs-on: ${{ matrix.os }}
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: ${{ matrix.python }}
+          cache: pip
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: "20.9.0"
 
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-20-
+
       - name: Install Node.js dependencies
         working-directory: synapse_ui
-        run: npm install
+        run: npm ci
 
       - name: Install Python dependencies
         run: |
@@ -45,107 +57,190 @@ jobs:
           pip install ".[dev]"
 
       - name: Run build check
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
         run: make build
 
       - name: Check wheel contents
+        shell: bash
         run: |
           pip install wheel
-          python -c "
+          python - <<'EOF'
           import sys, glob, zipfile, re
           wheel_files = glob.glob('dist/*.whl')
           if not wheel_files:
-              print('No wheel file found', file=sys.stderr)
-              sys.exit(1)
-          wheel_file = wheel_files[0]
-          print(f'Wheel file: {wheel_file}')
+              sys.exit("No wheel file found")
           pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
-          with zipfile.ZipFile(wheel_file) as zf:
+          with zipfile.ZipFile(wheel_files[0]) as zf:
               for info in zf.infolist():
                   if pattern.search(info.filename):
                       print(info.filename)
-          "
+          EOF
 
+  # ARM64 builds for Jetson, Orange Pi 5, Raspberry Pi 5
+  build_arm:
+    strategy:
+      matrix:
+        include:
+          - name: bookworm-arm64-3.11
+            container: python:3.11-bookworm
+            platform: linux/arm64
+            python_version: "3.11"
+          - name: bookworm-arm64-3.12
+            container: python:3.12-bookworm
+            platform: linux/arm64
+            python_version: "3.12"
+          - name: bookworm-arm64-3.13
+            container: python:3.13-bookworm
+            platform: linux/arm64
+            python_version: "3.13"
+          #
+          # # Raspberry Pi 5 cross container (needs Python installed inside)
+          # - name: raspberry-pi-3.11
+          #   container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+          #   python_version: "3.11"
+          # - name: raspberry-pi-3.12
+          #   container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+          #   python_version: "3.12"
+          # - name: raspberry-pi-3.13
+          #   container: wpilib/raspbian-cross-ubuntu:2026-bookworm-22.04
+          #   python_version: "3.13"
+
+    runs-on: ubuntu-22.04
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
+
+      - run: npm ci
+        working-directory: synapse_ui
+
+      - name: Create Python venv
+        shell: bash
+        run: |
+          PYTHON_CMD=$(command -v python3 || command -v python)
+          $PYTHON_CMD -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          python --version
+
+      - name: Install dependencies in venv
+        shell: bash
+        run: |
+          source .venv/bin/activate
+          make install
+          python -m pip install ".[dev]"
+
+      - name: Run build check in venv
+        shell: bash
+        run: |
+          source .venv/bin/activate
+          make build
+
+      - name: Check wheel contents in venv
+        shell: bash
+        run: |
+          source .venv/bin/activate
+          python - <<'EOF'
+          import sys, glob, zipfile, re
+          wheel_files = glob.glob('dist/*.whl')
+          if not wheel_files:
+              sys.exit("No wheel file found")
+          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          with zipfile.ZipFile(wheel_files[0]) as zf:
+              for info in zf.infolist():
+                  if pattern.search(info.filename):
+                      print(info.filename)
+          EOF
+
+  # Lint
   lint:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          cache: pip
+          python-version: "3.12"
+      - run: pip install ruff isort
+      - run: ruff check .
+      - run: isort --check-only --diff .
 
-      - name: Install Ruff and isort
-        run: pip install ruff isort
-
-      - name: Run Ruff linting
-        run: ruff check .
-
-      - name: Run isort check
-        run: isort --check-only --diff .
-
+  # Type-check
   type-check:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          cache: pip
+          python-version: "3.12"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: "20.9.0"
 
-      - name: Install Node.js dependencies
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
+      - run: npm ci
         working-directory: synapse_ui
-        run: npm install
 
-      - name: Install Python dependencies
-        run: |
+      - run: |
           make install
           pip install ".[dev]"
+      - run: pip install pyright
+      - run: pyright
 
-      - name: Install Pyright
-        run: pip install pyright
-
-      - name: Run Pyright type checks
-        run: pyright
-
+  # Test
   test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+          python-version: "3.12"
+      - uses: actions/setup-node@v3
         with:
           node-version: "20.9.0"
 
-      - name: Install Node.js dependencies
-        working-directory: synapse_ui
-        run: npm install
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
 
-      - name: Install Python dependencies
-        run: |
+      - run: npm ci
+        working-directory: synapse_ui
+
+      - run: |
           make install
           pip install ".[dev]"
-
-      - name: Install PyTest
-        run: pip install pytest
-
-      - name: Run Tests
-        run: make test
+      - run: pip install pytest
+      - run: make test

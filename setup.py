@@ -63,10 +63,10 @@ setup(
     long_description_content_type="text/markdown",
     packages=allModules,
     package_dir=moduleDirs,
-    python_requires=">=3.9, <3.12",
+    python_requires=">=3.11, <=3.14",
     install_requires=[
         "rich",
-        "numpy==1.24.4",
+        "numpy==1.26.4",
         "msgpack",
         wpilibDep("robotpy_wpimath"),
         wpilibDep("robotpy_apriltag"),

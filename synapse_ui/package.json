@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0",
-    "build": "next build && python3 move_out_to_subdir.py",
+    "build": "next build && python move_out_to_subdir.py",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier 'src/**/*.{js,ts,tsx}' --write",

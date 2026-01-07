@@ -8,6 +8,8 @@ from typing import Tuple
 
 from paramiko import SSHClient
 
+from .command_executor import runCommand
+
 SERVICE_NAME = "synapse-runtime"
 
 
@@ -19,18 +21,6 @@ def isServiceSetup(client: SSHClient, serviceName: str) -> bool:
     return result == "exists"
 
 
-def runCommand(
-    client: SSHClient, cmd: str, ignoreErrors: bool = False
-) -> Tuple[str, str]:
-    """Run a command on the remote client and return (stdout, stderr)."""
-    stdin, stdout, stderr = client.exec_command(cmd)
-    out = stdout.read().decode()
-    err = stderr.read().decode()
-    if err and not ignoreErrors and "Created symlink" not in err:
-        print(f"Error: {err.strip()}")
-    return out, err
-
-
 def restartService(client: SSHClient, serviceName: str) -> Tuple[str, str]:
     """Restart the given systemd service on the remote machine."""
     return runCommand(client, f"sudo systemctl restart {serviceName}")
@@ -39,15 +29,15 @@ def restartService(client: SSHClient, serviceName: str) -> Tuple[str, str]:
 def setupServiceOnConnectedClient(client: SSHClient, username: str) -> None:
     """
     Sets up the systemd service for Synapse Runtime on the remote machine.
-    Uses Python 3.10 explicitly.
+    Uses Python 3.12 venv explicitly.
     """
-    pythonPath = "/usr/local/bin/python3.10"
 
     # Get home directory
     stdin, stdout, stderr = client.exec_command("echo $HOME")
     homeDir = stdout.read().decode().strip()
 
     workingDir = Path(homeDir) / "Synapse"
+    pythonPath = workingDir.parent / ".venv" / "bin" / "python"
     mainPath = workingDir / "main.py"
 
     serviceContent = f"""[Unit]
@@ -57,7 +47,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart={pythonPath} {mainPath.as_posix()}
+ExecStart={pythonPath.as_posix()} {mainPath.as_posix()}
 WorkingDirectory={workingDir.as_posix()}
 Restart=always
 RestartSec=5
