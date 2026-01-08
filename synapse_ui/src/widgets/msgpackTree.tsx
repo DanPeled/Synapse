@@ -116,9 +116,11 @@ export function MsgPackTree({
 
   let decoded: unknown = null; // default to null
   try {
-    decoded = decode(
-      encoded instanceof ArrayBuffer ? new Uint8Array(encoded) : encoded,
-    );
+    if (decoded != null && decoded !== 0) {
+      decoded = decode(
+        encoded instanceof ArrayBuffer ? new Uint8Array(encoded) : encoded,
+      );
+    }
   } catch (e) {
     if (e instanceof TypeError) {
       decoded = null; // silently fallback to null

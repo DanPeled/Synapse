@@ -91,10 +91,12 @@ def logInternal(text: str):
         f.write(str(text) + "\n")
 
 
-def log(text: str):
-    text = addTime(text)
-    logInternal(text)
-    socketLog(text, v1.LogLevelProto.INFO, WebSocketServer.kInstance)
+def log(text: str, shouldAlert=False):
+    modifiedtext = addTime(text)
+    logInternal(modifiedtext)
+    socketLog(modifiedtext, v1.LogLevelProto.INFO, WebSocketServer.kInstance)
+    if shouldAlert:
+        alert(v1.AlertTypeProto.INFO, text)
 
 
 def err(text: str):

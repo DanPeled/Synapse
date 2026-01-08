@@ -798,9 +798,8 @@ class RuntimeManager:
         self.saveCameras()
 
         log.log(
-            MarkupColors.bold(
-                MarkupColors.okblue(f"Saved into {savefile.absolute().__str__()}")
-            )
+            MarkupColors.bold(f"Saved into {savefile.absolute().__str__()}"),
+            shouldAlert=True,
         )
 
     def saveCameras(self):
