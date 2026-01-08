@@ -99,8 +99,6 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     def processFrame(self, img, timestamp: float) -> PipelineProcessFrameResult:
         pass
 
-    def preProcessCleanup(self) -> None: ...
-
     def invalidateCachedEntries(self) -> None:
         for pub in self._ntPublishers.values():
             try:

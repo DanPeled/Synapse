@@ -6,7 +6,7 @@
 import os
 import threading
 import time
-import uuid
+from datetime import datetime
 from functools import cache
 from typing import Any, Dict, Final, List, Optional, Tuple
 
@@ -44,6 +44,7 @@ class CameraHandler:
 
         self.recordFileNames: Dict[CameraID, RecordingFilename] = {}
         self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
+        self.recordingResolutions: Dict[CameraID, Resolution] = {}
         self.recordingStatus: Dict[CameraID, RecordingStatus] = {}
         self.onRecordingStatusChanged: Callback[
             CameraID, RecordingStatus, RecordingFilename
@@ -247,20 +248,25 @@ class CameraHandler:
         Returns:
             cv2.VideoWriter: The associated video writer.
         """
+
+        assert cameraIndex in self.cameras
+
         if cameraIndex in self.recordingOutputs:
             return self.recordingOutputs[cameraIndex]
         fourcc = cv2.VideoWriter.fourcc(*"MJPG")
 
-        height, width = self.streamSizes[cameraIndex]
+        resolution = self.cameras[cameraIndex].getResolution()
 
-        filename = f"records/{NtClient.NT_TABLE}_{uuid.uuid4().hex}.avi"
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"records/{NtClient.NT_TABLE}_camera{cameraIndex}_{timestamp}.avi"
 
         self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
             filename=filename,
             fourcc=fourcc,
-            fps=20.0,
-            frameSize=(height, width),
+            fps=30.0,
+            frameSize=resolution,
         )
+        self.recordingResolutions[cameraIndex] = resolution
 
         log.log(
             f"Started recording camera {self.cameras[cameraIndex].name} to {filename}"
@@ -291,7 +297,7 @@ class CameraHandler:
             if self.recordingStatus[camera.cameraIndex]:
                 videoWriter = self.getRecordOutput(camera.cameraIndex)
                 videoWriter.write(
-                    cv2.resize(frame, self.streamSizes[camera.cameraIndex])
+                    cv2.resize(frame, self.recordingResolutions[camera.cameraIndex])
                 )
             elif camera.cameraIndex in self.recordingOutputs:
                 log.log(

@@ -8,10 +8,9 @@ import threading
 import time
 import traceback
 from asyncio import Queue
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Deque, Dict, Final, List, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
@@ -22,7 +21,6 @@ from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
                                   MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
-from wpilib import Timer
 from wpimath.units import seconds, secondsToMilliseconds
 
 from ..bcolors import MarkupColors
@@ -85,10 +83,8 @@ class RuntimeManager:
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
-        self.publishExecutor = ThreadPoolExecutor(max_workers=2)
-        self.pipelineExecutors: Dict[CameraID, ThreadPoolExecutor] = {}
+        self._lastFrameTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
-        self.fpsHistory: Dict[CameraID, Deque] = {}
         self.cameraManagementThreads: List[threading.Thread] = []
 
         self.running = threading.Event()
@@ -511,9 +507,6 @@ class RuntimeManager:
     def processCamera(self, cameraIndex: CameraID):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
-        self.fpsHistory[cameraIndex] = Deque(maxlen=30)
-        self.pipelineExecutors[cameraIndex] = ThreadPoolExecutor(max_workers=1)
-
         maxFps = float(camera.getMaxFPS())
         minInterval = 1.0 / maxFps if maxFps > 0 else 0.0
 
@@ -528,15 +521,9 @@ class RuntimeManager:
 
             frame = self.fixtureFrame(cameraIndex, frame)
 
-            # Skip if executor is busy
-            executor = self.pipelineExecutors[cameraIndex]
-            if executor._work_queue.qsize() > 0:
-                continue
+            self._processAndPublishFrame(cameraIndex, frame)
 
-            # Submit frame for processing
-            executor.submit(self._processAndPublishFrame, cameraIndex, frame)
-
-            # Maintain camera FPS
+            # Maintain camera FPS cap
             elapsed = time.perf_counter() - loopStart
             remaining = minInterval - elapsed
             if remaining > 0:
@@ -545,7 +532,18 @@ class RuntimeManager:
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
-        processStart = Timer.getFPGATimestamp()
+        now = time.perf_counter()
+
+        # ---- Camera FPS (frame-to-frame) ----
+        lastTime = self._lastFrameTime.get(cameraIndex)
+        if lastTime is not None:
+            cameraFps = 1.0 / (now - lastTime)
+        else:
+            cameraFps = 0.0
+        self._lastFrameTime[cameraIndex] = now
+
+        # ---- Processing latency ----
+        processStart = time.perf_counter()
 
         pipeline = self.pipelineHandler.getPipeline(
             self.pipelineBindings.get(cameraIndex, -1), cameraIndex
@@ -554,30 +552,20 @@ class RuntimeManager:
         processedFrame = frame
         if pipeline is not None:
             try:
-                pipeline.preProcessCleanup()
                 result = pipeline.processFrame(frame, processStart)
-
                 out = self.handleResults(result, cameraIndex)
                 if out is not None:
                     processedFrame = out
-                else:
-                    processedFrame = frame
             except Exception as e:
                 log.err(
                     f"Pipeline error for camera {camera.name}: {e}\n{traceback.format_exc()}"
                 )
 
-        processLatency = Timer.getFPGATimestamp() - processStart
-
-        fps = 1.0 / processLatency if processLatency > 0 else 0
-        self.fpsHistory[cameraIndex].append(fps)
-        smoothedFps = sum(self.fpsHistory[cameraIndex]) / len(
-            self.fpsHistory[cameraIndex]
-        )
+        processLatency = time.perf_counter() - processStart
 
         cv2.putText(
             processedFrame,
-            f"{int(smoothedFps)}",
+            f"FPS: {int(cameraFps)}",
             FPSView.position,
             FPSView.font,
             FPSView.fontScale,
@@ -586,18 +574,14 @@ class RuntimeManager:
             lineType=cv2.LINE_8,
         )
 
-        self.sendLatency(cameraIndex, 0, processLatency, smoothedFps)
-
-        self.publishExecutor.submit(
-            self.cameraHandler.publishFrame, processedFrame, camera
+        self.sendLatency(
+            cameraIndex,
+            0,
+            processLatency,
+            cameraFps,
         )
 
-    def publishFrameAsync(self, frame: Frame, camera: SynapseCamera):
-        if WebSocketServer.kInstance is not None:
-            threading.Thread(
-                target=lambda: self.cameraHandler.publishFrame(frame, camera),
-                daemon=True,
-            ).start()
+        self.cameraHandler.publishFrame(processedFrame, camera)
 
     def run(self):
         """
