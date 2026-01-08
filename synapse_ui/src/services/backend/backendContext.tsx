@@ -29,6 +29,7 @@ import assert from "assert";
 import { toast } from "sonner";
 import { teamColor } from "../style";
 import { AlertTypeProto } from "@/proto/v1/alert";
+import { parseStyledMessage } from "../parseColoredString";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -292,10 +293,7 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
             func(
               <p className={`whitespace-pre-line`} style={{ color: textColor }}>
-                {alert.message.replace(
-                  /\[(\/?)(red|yellow|green|bold|italic)\]/g,
-                  "",
-                )}
+                {parseStyledMessage(alert.message)}
               </p>,
               {
                 duration: 2000,
