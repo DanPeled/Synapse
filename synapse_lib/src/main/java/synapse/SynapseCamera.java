@@ -115,7 +115,7 @@ public class SynapseCamera implements AutoCloseable {
           m_table
               .getRawTopic(NetworkTableTopics.kResultsTopic)
               .subscribe(
-                  "bytes",
+                  "raw",
                   new byte[0],
                   PubSubOption.keepDuplicates(true),
                   PubSubOption.pollStorage(10));
