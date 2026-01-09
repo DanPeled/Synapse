@@ -1,16 +1,16 @@
 {
   "fileName": "SynapseLib.json",
   "name": "SynapseLib",
-  "version": "2026.0.0a1",
+  "version": "dev",
   "frcYear": "2026beta",
   "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
-  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/2026.0.0a1/"],
-  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-2026.0.0a1.json",
+  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/dev/"],
+  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-dev.json",
   "javaDependencies": [
     {
       "groupId": "synapse",
       "artifactId": "Synapse-java",
-      "version": "2026.0.0a1"
+      "version": "dev"
     },
     {
       "groupId": "com.fasterxml.jackson.core",
@@ -53,7 +53,7 @@
     {
       "groupId": "synapse",
       "artifactId": "Synapse-cpp",
-      "version": "2026.0.0a1",
+      "version": "dev",
       "libName": "Vendor",
       "headerClassifier": "headers",
       "sharedLibrary": false,

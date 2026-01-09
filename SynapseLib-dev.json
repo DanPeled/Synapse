@@ -2,7 +2,7 @@
   "fileName": "SynapseLib.json",
   "name": "SynapseLib",
   "version": "dev",
-  "frcYear": "2025",
+  "frcYear": "2026beta",
   "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
   "mavenUrls": ["https://danpeled.github.io/Synapse/maven/dev/"],
   "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-dev.json",
