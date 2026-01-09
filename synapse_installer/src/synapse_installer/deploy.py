@@ -110,7 +110,14 @@ def _connectAndDeploy(
                 scp.put(str(zip_path), remote_zip)
 
                 # Unzip while ignoring warnings about "../" paths
-                unzip_cmd = f"mkdir -p ~/Synapse && unzip -o {remote_zip} -d ~/Synapse 2>/dev/null"
+                unzip_cmd = (
+                    "mkdir -p ~/Synapse/config && "
+                    "find ~/Synapse -mindepth 1 "
+                    "! -path '~/Synapse/config' "
+                    "! -path '~/Synapse/config/*' "
+                    "-exec rm -rf {} + && "
+                    f"unzip -o {remote_zip} -d ~/Synapse 2>/dev/null"
+                )
                 stdin, stdout, stderr = client.exec_command(unzip_cmd)
                 exit_status = stdout.channel.recv_exit_status()
                 out = stdout.read().decode()
