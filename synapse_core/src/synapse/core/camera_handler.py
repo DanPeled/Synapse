@@ -253,12 +253,12 @@ class CameraHandler:
 
         if cameraIndex in self.recordingOutputs:
             return self.recordingOutputs[cameraIndex]
-        fourcc = cv2.VideoWriter.fourcc(*"MJPG")
+        fourcc = cv2.VideoWriter.fourcc(*"mp4v")  # efficient MP4 codec
 
         resolution = self.cameras[cameraIndex].getResolution()
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"records/{NtClient.NT_TABLE}_camera{cameraIndex}_{timestamp}.avi"
+        filename = f"records/{NtClient.NT_TABLE}_camera{cameraIndex}_{timestamp}.mp4"
 
         self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
             filename=filename,
@@ -269,7 +269,8 @@ class CameraHandler:
         self.recordingResolutions[cameraIndex] = resolution
 
         log.log(
-            f"Started recording camera {self.cameras[cameraIndex].name} to {filename}"
+            f"Started recording camera {self.cameras[cameraIndex].name} to {filename}",
+            shouldAlert=True,
         )
         self.recordFileNames[cameraIndex] = filename
 
@@ -301,7 +302,8 @@ class CameraHandler:
                 )
             elif camera.cameraIndex in self.recordingOutputs:
                 log.log(
-                    f"Written Camera {camera.name} recording to {self.recordFileNames[camera.cameraIndex]}"
+                    f"Written Camera {camera.name} recording to {self.recordFileNames[camera.cameraIndex]}",
+                    shouldAlert=True,
                 )
                 videoWriter = self.recordingOutputs.pop(camera.cameraIndex)
                 videoWriter.release()
