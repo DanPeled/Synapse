@@ -73,10 +73,7 @@ function createBaseLogMessageProto(): LogMessageProto {
 }
 
 export const LogMessageProto: MessageFns<LogMessageProto> = {
-  encode(
-    message: LogMessageProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: LogMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.message !== "") {
       writer.uint32(10).string(message.message);
     }
@@ -90,8 +87,7 @@ export const LogMessageProto: MessageFns<LogMessageProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): LogMessageProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseLogMessageProto();
     while (reader.pos < end) {
@@ -134,9 +130,7 @@ export const LogMessageProto: MessageFns<LogMessageProto> = {
     return {
       message: isSet(object.message) ? globalThis.String(object.message) : "",
       level: isSet(object.level) ? logLevelProtoFromJSON(object.level) : 0,
-      timestamp: isSet(object.timestamp)
-        ? globalThis.Number(object.timestamp)
-        : 0,
+      timestamp: isSet(object.timestamp) ? globalThis.Number(object.timestamp) : 0,
     };
   },
 
@@ -154,14 +148,10 @@ export const LogMessageProto: MessageFns<LogMessageProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<LogMessageProto>, I>>(
-    base?: I,
-  ): LogMessageProto {
+  create<I extends Exact<DeepPartial<LogMessageProto>, I>>(base?: I): LogMessageProto {
     return LogMessageProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<LogMessageProto>, I>>(
-    object: I,
-  ): LogMessageProto {
+  fromPartial<I extends Exact<DeepPartial<LogMessageProto>, I>>(object: I): LogMessageProto {
     const message = createBaseLogMessageProto();
     message.message = object.message ?? "";
     message.level = object.level ?? 0;
@@ -170,31 +160,17 @@ export const LogMessageProto: MessageFns<LogMessageProto> = {
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());

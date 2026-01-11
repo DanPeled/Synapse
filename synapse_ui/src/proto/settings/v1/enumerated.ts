@@ -20,104 +20,75 @@ function createBaseEnumeratedConstraintProto(): EnumeratedConstraintProto {
   return { options: [] };
 }
 
-export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
-  {
-    encode(
-      message: EnumeratedConstraintProto,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      for (const v of message.options) {
-        SettingValueProto.encode(v!, writer.uint32(10).fork()).join();
-      }
-      return writer;
-    },
+export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> = {
+  encode(message: EnumeratedConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.options) {
+      SettingValueProto.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): EnumeratedConstraintProto {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseEnumeratedConstraintProto();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.options.push(
-              SettingValueProto.decode(reader, reader.uint32()),
-            );
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): EnumeratedConstraintProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEnumeratedConstraintProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
+
+          message.options.push(SettingValueProto.decode(reader, reader.uint32()));
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): EnumeratedConstraintProto {
-      return {
-        options: globalThis.Array.isArray(object?.options)
-          ? object.options.map((e: any) => SettingValueProto.fromJSON(e))
-          : [],
-      };
-    },
-
-    toJSON(message: EnumeratedConstraintProto): unknown {
-      const obj: any = {};
-      if (message.options?.length) {
-        obj.options = message.options.map((e) => SettingValueProto.toJSON(e));
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(
-      base?: I,
-    ): EnumeratedConstraintProto {
-      return EnumeratedConstraintProto.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(
-      object: I,
-    ): EnumeratedConstraintProto {
-      const message = createBaseEnumeratedConstraintProto();
-      message.options =
-        object.options?.map((e) => SettingValueProto.fromPartial(e)) || [];
-      return message;
-    },
-  };
+  fromJSON(object: any): EnumeratedConstraintProto {
+    return {
+      options: globalThis.Array.isArray(object?.options)
+        ? object.options.map((e: any) => SettingValueProto.fromJSON(e))
+        : [],
+    };
+  },
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+  toJSON(message: EnumeratedConstraintProto): unknown {
+    const obj: any = {};
+    if (message.options?.length) {
+      obj.options = message.options.map((e) => SettingValueProto.toJSON(e));
+    }
+    return obj;
+  },
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+  create<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(base?: I): EnumeratedConstraintProto {
+    return EnumeratedConstraintProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(object: I): EnumeratedConstraintProto {
+    const message = createBaseEnumeratedConstraintProto();
+    message.options = object.options?.map((e) => SettingValueProto.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;

@@ -62,20 +62,11 @@ export interface SetNetworkSettingsProto {
 }
 
 function createBaseDeviceInfoProto(): DeviceInfoProto {
-  return {
-    version: "",
-    hostname: "",
-    ip: "",
-    platform: "",
-    networkInterfaces: [],
-  };
+  return { version: "", hostname: "", ip: "", platform: "", networkInterfaces: [] };
 }
 
 export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
-  encode(
-    message: DeviceInfoProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: DeviceInfoProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.version !== "") {
       writer.uint32(10).string(message.version);
     }
@@ -95,8 +86,7 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): DeviceInfoProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDeviceInfoProto();
     while (reader.pos < end) {
@@ -154,13 +144,9 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
   fromJSON(object: any): DeviceInfoProto {
     return {
       version: isSet(object.version) ? globalThis.String(object.version) : "",
-      hostname: isSet(object.hostname)
-        ? globalThis.String(object.hostname)
-        : "",
+      hostname: isSet(object.hostname) ? globalThis.String(object.hostname) : "",
       ip: isSet(object.ip) ? globalThis.String(object.ip) : "",
-      platform: isSet(object.platform)
-        ? globalThis.String(object.platform)
-        : "",
+      platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
       networkInterfaces: globalThis.Array.isArray(object?.networkInterfaces)
         ? object.networkInterfaces.map((e: any) => globalThis.String(e))
         : [],
@@ -187,14 +173,10 @@ export const DeviceInfoProto: MessageFns<DeviceInfoProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<DeviceInfoProto>, I>>(
-    base?: I,
-  ): DeviceInfoProto {
+  create<I extends Exact<DeepPartial<DeviceInfoProto>, I>>(base?: I): DeviceInfoProto {
     return DeviceInfoProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DeviceInfoProto>, I>>(
-    object: I,
-  ): DeviceInfoProto {
+  fromPartial<I extends Exact<DeepPartial<DeviceInfoProto>, I>>(object: I): DeviceInfoProto {
     const message = createBaseDeviceInfoProto();
     message.version = object.version ?? "";
     message.hostname = object.hostname ?? "";
@@ -210,22 +192,15 @@ function createBaseSetConnectionInfoProto(): SetConnectionInfoProto {
 }
 
 export const SetConnectionInfoProto: MessageFns<SetConnectionInfoProto> = {
-  encode(
-    message: SetConnectionInfoProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: SetConnectionInfoProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.connectedToNetworktables !== false) {
       writer.uint32(8).bool(message.connectedToNetworktables);
     }
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): SetConnectionInfoProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): SetConnectionInfoProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSetConnectionInfoProto();
     while (reader.pos < end) {
@@ -264,14 +239,10 @@ export const SetConnectionInfoProto: MessageFns<SetConnectionInfoProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<SetConnectionInfoProto>, I>>(
-    base?: I,
-  ): SetConnectionInfoProto {
+  create<I extends Exact<DeepPartial<SetConnectionInfoProto>, I>>(base?: I): SetConnectionInfoProto {
     return SetConnectionInfoProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SetConnectionInfoProto>, I>>(
-    object: I,
-  ): SetConnectionInfoProto {
+  fromPartial<I extends Exact<DeepPartial<SetConnectionInfoProto>, I>>(object: I): SetConnectionInfoProto {
     const message = createBaseSetConnectionInfoProto();
     message.connectedToNetworktables = object.connectedToNetworktables ?? false;
     return message;
@@ -279,22 +250,11 @@ export const SetConnectionInfoProto: MessageFns<SetConnectionInfoProto> = {
 };
 
 function createBaseHardwareMetricsProto(): HardwareMetricsProto {
-  return {
-    cpuTemp: 0,
-    cpuUsage: 0,
-    diskUsage: 0,
-    ramUsage: 0,
-    memory: 0,
-    uptime: 0,
-    lastFetched: "",
-  };
+  return { cpuTemp: 0, cpuUsage: 0, diskUsage: 0, ramUsage: 0, memory: 0, uptime: 0, lastFetched: "" };
 }
 
 export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
-  encode(
-    message: HardwareMetricsProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: HardwareMetricsProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.cpuTemp !== 0) {
       writer.uint32(13).float(message.cpuTemp);
     }
@@ -319,12 +279,8 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): HardwareMetricsProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): HardwareMetricsProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseHardwareMetricsProto();
     while (reader.pos < end) {
@@ -399,15 +355,11 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     return {
       cpuTemp: isSet(object.cpuTemp) ? globalThis.Number(object.cpuTemp) : 0,
       cpuUsage: isSet(object.cpuUsage) ? globalThis.Number(object.cpuUsage) : 0,
-      diskUsage: isSet(object.diskUsage)
-        ? globalThis.Number(object.diskUsage)
-        : 0,
+      diskUsage: isSet(object.diskUsage) ? globalThis.Number(object.diskUsage) : 0,
       ramUsage: isSet(object.ramUsage) ? globalThis.Number(object.ramUsage) : 0,
       memory: isSet(object.memory) ? globalThis.Number(object.memory) : 0,
       uptime: isSet(object.uptime) ? globalThis.Number(object.uptime) : 0,
-      lastFetched: isSet(object.lastFetched)
-        ? globalThis.String(object.lastFetched)
-        : "",
+      lastFetched: isSet(object.lastFetched) ? globalThis.String(object.lastFetched) : "",
     };
   },
 
@@ -437,14 +389,10 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<HardwareMetricsProto>, I>>(
-    base?: I,
-  ): HardwareMetricsProto {
+  create<I extends Exact<DeepPartial<HardwareMetricsProto>, I>>(base?: I): HardwareMetricsProto {
     return HardwareMetricsProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<HardwareMetricsProto>, I>>(
-    object: I,
-  ): HardwareMetricsProto {
+  fromPartial<I extends Exact<DeepPartial<HardwareMetricsProto>, I>>(object: I): HardwareMetricsProto {
     const message = createBaseHardwareMetricsProto();
     message.cpuTemp = object.cpuTemp ?? 0;
     message.cpuUsage = object.cpuUsage ?? 0;
@@ -458,20 +406,11 @@ export const HardwareMetricsProto: MessageFns<HardwareMetricsProto> = {
 };
 
 function createBaseSetNetworkSettingsProto(): SetNetworkSettingsProto {
-  return {
-    hostname: "",
-    ip: "",
-    networkInterface: "",
-    networkTable: "",
-    teamNumber: 0,
-  };
+  return { hostname: "", ip: "", networkInterface: "", networkTable: "", teamNumber: 0 };
 }
 
 export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
-  encode(
-    message: SetNetworkSettingsProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: SetNetworkSettingsProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.hostname !== "") {
       writer.uint32(10).string(message.hostname);
     }
@@ -490,12 +429,8 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): SetNetworkSettingsProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): SetNetworkSettingsProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSetNetworkSettingsProto();
     while (reader.pos < end) {
@@ -552,19 +487,11 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
 
   fromJSON(object: any): SetNetworkSettingsProto {
     return {
-      hostname: isSet(object.hostname)
-        ? globalThis.String(object.hostname)
-        : "",
+      hostname: isSet(object.hostname) ? globalThis.String(object.hostname) : "",
       ip: isSet(object.ip) ? globalThis.String(object.ip) : "",
-      networkInterface: isSet(object.networkInterface)
-        ? globalThis.String(object.networkInterface)
-        : "",
-      networkTable: isSet(object.networkTable)
-        ? globalThis.String(object.networkTable)
-        : "",
-      teamNumber: isSet(object.teamNumber)
-        ? globalThis.Number(object.teamNumber)
-        : 0,
+      networkInterface: isSet(object.networkInterface) ? globalThis.String(object.networkInterface) : "",
+      networkTable: isSet(object.networkTable) ? globalThis.String(object.networkTable) : "",
+      teamNumber: isSet(object.teamNumber) ? globalThis.Number(object.teamNumber) : 0,
     };
   },
 
@@ -588,14 +515,10 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<SetNetworkSettingsProto>, I>>(
-    base?: I,
-  ): SetNetworkSettingsProto {
+  create<I extends Exact<DeepPartial<SetNetworkSettingsProto>, I>>(base?: I): SetNetworkSettingsProto {
     return SetNetworkSettingsProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SetNetworkSettingsProto>, I>>(
-    object: I,
-  ): SetNetworkSettingsProto {
+  fromPartial<I extends Exact<DeepPartial<SetNetworkSettingsProto>, I>>(object: I): SetNetworkSettingsProto {
     const message = createBaseSetNetworkSettingsProto();
     message.hostname = object.hostname ?? "";
     message.ip = object.ip ?? "";
@@ -606,31 +529,17 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

@@ -2,44 +2,32 @@
 // versions:
 //   protoc-gen-ts_proto  v2.8.1
 //   protoc               unknown
-// source: proto/settings/v1/boolean.proto
+// source: proto/settings/v1/file.proto
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "proto.settings.v1";
 
-export interface BooleanConstraintProto {
-  renderAsButton: boolean;
+export interface FileConstraintProto {
 }
 
-function createBaseBooleanConstraintProto(): BooleanConstraintProto {
-  return { renderAsButton: false };
+function createBaseFileConstraintProto(): FileConstraintProto {
+  return {};
 }
 
-export const BooleanConstraintProto: MessageFns<BooleanConstraintProto> = {
-  encode(message: BooleanConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.renderAsButton !== false) {
-      writer.uint32(8).bool(message.renderAsButton);
-    }
+export const FileConstraintProto: MessageFns<FileConstraintProto> = {
+  encode(_: FileConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): BooleanConstraintProto {
+  decode(input: BinaryReader | Uint8Array, length?: number): FileConstraintProto {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseBooleanConstraintProto();
+    const message = createBaseFileConstraintProto();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.renderAsButton = reader.bool();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -49,24 +37,20 @@ export const BooleanConstraintProto: MessageFns<BooleanConstraintProto> = {
     return message;
   },
 
-  fromJSON(object: any): BooleanConstraintProto {
-    return { renderAsButton: isSet(object.renderAsButton) ? globalThis.Boolean(object.renderAsButton) : false };
+  fromJSON(_: any): FileConstraintProto {
+    return {};
   },
 
-  toJSON(message: BooleanConstraintProto): unknown {
+  toJSON(_: FileConstraintProto): unknown {
     const obj: any = {};
-    if (message.renderAsButton !== false) {
-      obj.renderAsButton = message.renderAsButton;
-    }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<BooleanConstraintProto>, I>>(base?: I): BooleanConstraintProto {
-    return BooleanConstraintProto.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<FileConstraintProto>, I>>(base?: I): FileConstraintProto {
+    return FileConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<BooleanConstraintProto>, I>>(object: I): BooleanConstraintProto {
-    const message = createBaseBooleanConstraintProto();
-    message.renderAsButton = object.renderAsButton ?? false;
+  fromPartial<I extends Exact<DeepPartial<FileConstraintProto>, I>>(_: I): FileConstraintProto {
+    const message = createBaseFileConstraintProto();
     return message;
   },
 };
@@ -82,10 +66,6 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
-
-function isSet(value: any): boolean {
-  return value !== null && value !== undefined;
-}
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;

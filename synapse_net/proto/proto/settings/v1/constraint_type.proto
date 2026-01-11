@@ -5,6 +5,7 @@ package proto.settings.v1;
 import "proto/settings/v1/boolean.proto";
 import "proto/settings/v1/color.proto";
 import "proto/settings/v1/enumerated.proto";
+import "proto/settings/v1/file.proto";
 import "proto/settings/v1/list.proto";
 import "proto/settings/v1/number.proto";
 import "proto/settings/v1/string.proto";
@@ -30,6 +31,8 @@ message ConstraintConfigProto {
 
     // Boolean constraint
     BooleanConstraintProto boolean = 6;
+
+    FileConstraintProto file = 7;
   }
 }
 
@@ -56,4 +59,6 @@ enum ConstraintTypeProto {
 
   // List options constraint
   CONSTRAINT_TYPE_PROTO_ENUMERATED = 8;
+
+  CONSTRAINT_TYPE_PROTO_FILE = 9;
 }

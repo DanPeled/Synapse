@@ -13,9 +13,13 @@ export const protobufPackage = "proto.settings.v1";
 /** Constraint specifying limitations on string values */
 export interface StringConstraintProto {
   /** Optional minimum length of the string (inclusive) */
-  minLength: number | undefined;
+  minLength:
+    | number
+    | undefined;
   /** Optional maximum length of the string (inclusive) */
-  maxLength: number | undefined;
+  maxLength:
+    | number
+    | undefined;
   /** Optional regex pattern that the string must match */
   pattern: string | undefined;
 }
@@ -25,37 +29,21 @@ function createBaseStringConstraintProto(): StringConstraintProto {
 }
 
 export const StringConstraintProto: MessageFns<StringConstraintProto> = {
-  encode(
-    message: StringConstraintProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: StringConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.minLength !== undefined) {
-      Int32Value.encode(
-        { value: message.minLength! },
-        writer.uint32(10).fork(),
-      ).join();
+      Int32Value.encode({ value: message.minLength! }, writer.uint32(10).fork()).join();
     }
     if (message.maxLength !== undefined) {
-      Int32Value.encode(
-        { value: message.maxLength! },
-        writer.uint32(18).fork(),
-      ).join();
+      Int32Value.encode({ value: message.maxLength! }, writer.uint32(18).fork()).join();
     }
     if (message.pattern !== undefined) {
-      StringValue.encode(
-        { value: message.pattern! },
-        writer.uint32(26).fork(),
-      ).join();
+      StringValue.encode({ value: message.pattern! }, writer.uint32(26).fork()).join();
     }
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): StringConstraintProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): StringConstraintProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseStringConstraintProto();
     while (reader.pos < end) {
@@ -116,14 +104,10 @@ export const StringConstraintProto: MessageFns<StringConstraintProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<StringConstraintProto>, I>>(
-    base?: I,
-  ): StringConstraintProto {
+  create<I extends Exact<DeepPartial<StringConstraintProto>, I>>(base?: I): StringConstraintProto {
     return StringConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<StringConstraintProto>, I>>(
-    object: I,
-  ): StringConstraintProto {
+  fromPartial<I extends Exact<DeepPartial<StringConstraintProto>, I>>(object: I): StringConstraintProto {
     const message = createBaseStringConstraintProto();
     message.minLength = object.minLength ?? undefined;
     message.maxLength = object.maxLength ?? undefined;
@@ -132,31 +116,17 @@ export const StringConstraintProto: MessageFns<StringConstraintProto> = {
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

@@ -16,12 +16,7 @@ import {
   SetCameraRecordingStatusMessageProto,
   SetDefaultPipelineMessageProto,
 } from "./camera";
-import {
-  DeviceInfoProto,
-  HardwareMetricsProto,
-  SetConnectionInfoProto,
-  SetNetworkSettingsProto,
-} from "./device";
+import { DeviceInfoProto, HardwareMetricsProto, SetConnectionInfoProto, SetNetworkSettingsProto } from "./device";
 import { LogMessageProto } from "./log";
 import {
   PipelineProto,
@@ -225,44 +220,82 @@ export interface MessageProto {
   /** Type of the message, indicating what kind of data it contains */
   type: MessageTypeProto;
   /** Information about the device */
-  deviceInfo?: DeviceInfoProto | undefined;
+  deviceInfo?:
+    | DeviceInfoProto
+    | undefined;
   /** Metrics related to hardware performance */
-  hardwareMetrics?: HardwareMetricsProto | undefined;
+  hardwareMetrics?:
+    | HardwareMetricsProto
+    | undefined;
   /** Information about the camera */
-  cameraInfo?: CameraProto | undefined;
+  cameraInfo?:
+    | CameraProto
+    | undefined;
   /** Information about the pipeline */
-  pipelineInfo?: PipelineProto | undefined;
+  pipelineInfo?:
+    | PipelineProto
+    | undefined;
   /** Message to set the type for a pipeline */
-  setPipelineType?: SetPipelineTypeMessageProto | undefined;
+  setPipelineType?:
+    | SetPipelineTypeMessageProto
+    | undefined;
   /** Message to set a setting for a pipeline */
-  setPipelineSetting?: SetPipleineSettingMessageProto | undefined;
+  setPipelineSetting?:
+    | SetPipleineSettingMessageProto
+    | undefined;
   /** Message to set the index of a pipeline */
-  setPipelineIndex?: SetPipelineIndexMessageProto | undefined;
+  setPipelineIndex?:
+    | SetPipelineIndexMessageProto
+    | undefined;
   /** Message to set the name of a pipeline */
-  setPipelineName?: SetPipelineNameMessageProto | undefined;
+  setPipelineName?:
+    | SetPipelineNameMessageProto
+    | undefined;
   /** Message to set the default pipeline */
   setDefaultPipeline?: SetDefaultPipelineMessageProto | undefined;
-  removePipeline?: RemovePipelineMessageProto | undefined;
+  removePipeline?:
+    | RemovePipelineMessageProto
+    | undefined;
   /** Log message containing log data */
-  log?: LogMessageProto | undefined;
+  log?:
+    | LogMessageProto
+    | undefined;
   /** Performance data for a camera */
-  cameraPerformance?: CameraPerformanceProto | undefined;
+  cameraPerformance?:
+    | CameraPerformanceProto
+    | undefined;
   /** Message to set network settings */
-  setNetworkSettings?: SetNetworkSettingsProto | undefined;
+  setNetworkSettings?:
+    | SetNetworkSettingsProto
+    | undefined;
   /** Message to rename a camera */
-  renameCamera?: RenameCameraMessageProto | undefined;
+  renameCamera?:
+    | RenameCameraMessageProto
+    | undefined;
   /** Calibration data for a camera */
-  calibrationData?: CalibrationDataProto | undefined;
+  calibrationData?:
+    | CalibrationDataProto
+    | undefined;
   /** Message to delete calibration data */
-  deleteCalibration?: RemoveCalibrationDataMessageProto | undefined;
+  deleteCalibration?:
+    | RemoveCalibrationDataMessageProto
+    | undefined;
   /** Message to set camera recording status */
-  setCameraRecordingStatus?: SetCameraRecordingStatusMessageProto | undefined;
+  setCameraRecordingStatus?:
+    | SetCameraRecordingStatusMessageProto
+    | undefined;
   /** Message to set connection information for the device */
-  setConnectionInfo?: SetConnectionInfoProto | undefined;
+  setConnectionInfo?:
+    | SetConnectionInfoProto
+    | undefined;
   /** Result of a pipeline operation */
-  pipelineResult?: PipelineResultProto | undefined;
+  pipelineResult?:
+    | PipelineResultProto
+    | undefined;
   /** Alert message containing alert data */
-  alert?: AlertProto | undefined;
+  alert?:
+    | AlertProto
+    | undefined;
   /** List of pipeline types available in the system */
   pipelineTypeInfo: PipelineTypeProto[];
 }
@@ -295,120 +328,66 @@ function createBaseMessageProto(): MessageProto {
 }
 
 export const MessageProto: MessageFns<MessageProto> = {
-  encode(
-    message: MessageProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: MessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
     if (message.deviceInfo !== undefined) {
-      DeviceInfoProto.encode(
-        message.deviceInfo,
-        writer.uint32(18).fork(),
-      ).join();
+      DeviceInfoProto.encode(message.deviceInfo, writer.uint32(18).fork()).join();
     }
     if (message.hardwareMetrics !== undefined) {
-      HardwareMetricsProto.encode(
-        message.hardwareMetrics,
-        writer.uint32(26).fork(),
-      ).join();
+      HardwareMetricsProto.encode(message.hardwareMetrics, writer.uint32(26).fork()).join();
     }
     if (message.cameraInfo !== undefined) {
       CameraProto.encode(message.cameraInfo, writer.uint32(34).fork()).join();
     }
     if (message.pipelineInfo !== undefined) {
-      PipelineProto.encode(
-        message.pipelineInfo,
-        writer.uint32(42).fork(),
-      ).join();
+      PipelineProto.encode(message.pipelineInfo, writer.uint32(42).fork()).join();
     }
     if (message.setPipelineType !== undefined) {
-      SetPipelineTypeMessageProto.encode(
-        message.setPipelineType,
-        writer.uint32(50).fork(),
-      ).join();
+      SetPipelineTypeMessageProto.encode(message.setPipelineType, writer.uint32(50).fork()).join();
     }
     if (message.setPipelineSetting !== undefined) {
-      SetPipleineSettingMessageProto.encode(
-        message.setPipelineSetting,
-        writer.uint32(58).fork(),
-      ).join();
+      SetPipleineSettingMessageProto.encode(message.setPipelineSetting, writer.uint32(58).fork()).join();
     }
     if (message.setPipelineIndex !== undefined) {
-      SetPipelineIndexMessageProto.encode(
-        message.setPipelineIndex,
-        writer.uint32(66).fork(),
-      ).join();
+      SetPipelineIndexMessageProto.encode(message.setPipelineIndex, writer.uint32(66).fork()).join();
     }
     if (message.setPipelineName !== undefined) {
-      SetPipelineNameMessageProto.encode(
-        message.setPipelineName,
-        writer.uint32(74).fork(),
-      ).join();
+      SetPipelineNameMessageProto.encode(message.setPipelineName, writer.uint32(74).fork()).join();
     }
     if (message.setDefaultPipeline !== undefined) {
-      SetDefaultPipelineMessageProto.encode(
-        message.setDefaultPipeline,
-        writer.uint32(82).fork(),
-      ).join();
+      SetDefaultPipelineMessageProto.encode(message.setDefaultPipeline, writer.uint32(82).fork()).join();
     }
     if (message.removePipeline !== undefined) {
-      RemovePipelineMessageProto.encode(
-        message.removePipeline,
-        writer.uint32(90).fork(),
-      ).join();
+      RemovePipelineMessageProto.encode(message.removePipeline, writer.uint32(90).fork()).join();
     }
     if (message.log !== undefined) {
       LogMessageProto.encode(message.log, writer.uint32(98).fork()).join();
     }
     if (message.cameraPerformance !== undefined) {
-      CameraPerformanceProto.encode(
-        message.cameraPerformance,
-        writer.uint32(106).fork(),
-      ).join();
+      CameraPerformanceProto.encode(message.cameraPerformance, writer.uint32(106).fork()).join();
     }
     if (message.setNetworkSettings !== undefined) {
-      SetNetworkSettingsProto.encode(
-        message.setNetworkSettings,
-        writer.uint32(114).fork(),
-      ).join();
+      SetNetworkSettingsProto.encode(message.setNetworkSettings, writer.uint32(114).fork()).join();
     }
     if (message.renameCamera !== undefined) {
-      RenameCameraMessageProto.encode(
-        message.renameCamera,
-        writer.uint32(122).fork(),
-      ).join();
+      RenameCameraMessageProto.encode(message.renameCamera, writer.uint32(122).fork()).join();
     }
     if (message.calibrationData !== undefined) {
-      CalibrationDataProto.encode(
-        message.calibrationData,
-        writer.uint32(130).fork(),
-      ).join();
+      CalibrationDataProto.encode(message.calibrationData, writer.uint32(130).fork()).join();
     }
     if (message.deleteCalibration !== undefined) {
-      RemoveCalibrationDataMessageProto.encode(
-        message.deleteCalibration,
-        writer.uint32(138).fork(),
-      ).join();
+      RemoveCalibrationDataMessageProto.encode(message.deleteCalibration, writer.uint32(138).fork()).join();
     }
     if (message.setCameraRecordingStatus !== undefined) {
-      SetCameraRecordingStatusMessageProto.encode(
-        message.setCameraRecordingStatus,
-        writer.uint32(146).fork(),
-      ).join();
+      SetCameraRecordingStatusMessageProto.encode(message.setCameraRecordingStatus, writer.uint32(146).fork()).join();
     }
     if (message.setConnectionInfo !== undefined) {
-      SetConnectionInfoProto.encode(
-        message.setConnectionInfo,
-        writer.uint32(154).fork(),
-      ).join();
+      SetConnectionInfoProto.encode(message.setConnectionInfo, writer.uint32(154).fork()).join();
     }
     if (message.pipelineResult !== undefined) {
-      PipelineResultProto.encode(
-        message.pipelineResult,
-        writer.uint32(170).fork(),
-      ).join();
+      PipelineResultProto.encode(message.pipelineResult, writer.uint32(170).fork()).join();
     }
     if (message.alert !== undefined) {
       AlertProto.encode(message.alert, writer.uint32(178).fork()).join();
@@ -420,8 +399,7 @@ export const MessageProto: MessageFns<MessageProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MessageProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMessageProto();
     while (reader.pos < end) {
@@ -448,10 +426,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.hardwareMetrics = HardwareMetricsProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.hardwareMetrics = HardwareMetricsProto.decode(reader, reader.uint32());
           continue;
         }
         case 4: {
@@ -475,10 +450,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setPipelineType = SetPipelineTypeMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setPipelineType = SetPipelineTypeMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 7: {
@@ -486,10 +458,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setPipelineSetting = SetPipleineSettingMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setPipelineSetting = SetPipleineSettingMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 8: {
@@ -497,10 +466,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setPipelineIndex = SetPipelineIndexMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setPipelineIndex = SetPipelineIndexMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 9: {
@@ -508,10 +474,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setPipelineName = SetPipelineNameMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setPipelineName = SetPipelineNameMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 10: {
@@ -519,10 +482,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setDefaultPipeline = SetDefaultPipelineMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setDefaultPipeline = SetDefaultPipelineMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 11: {
@@ -530,10 +490,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.removePipeline = RemovePipelineMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.removePipeline = RemovePipelineMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 12: {
@@ -549,10 +506,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.cameraPerformance = CameraPerformanceProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.cameraPerformance = CameraPerformanceProto.decode(reader, reader.uint32());
           continue;
         }
         case 14: {
@@ -560,10 +514,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setNetworkSettings = SetNetworkSettingsProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setNetworkSettings = SetNetworkSettingsProto.decode(reader, reader.uint32());
           continue;
         }
         case 15: {
@@ -571,10 +522,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.renameCamera = RenameCameraMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.renameCamera = RenameCameraMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 16: {
@@ -582,10 +530,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.calibrationData = CalibrationDataProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.calibrationData = CalibrationDataProto.decode(reader, reader.uint32());
           continue;
         }
         case 17: {
@@ -593,10 +538,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.deleteCalibration = RemoveCalibrationDataMessageProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.deleteCalibration = RemoveCalibrationDataMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 18: {
@@ -604,11 +546,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setCameraRecordingStatus =
-            SetCameraRecordingStatusMessageProto.decode(
-              reader,
-              reader.uint32(),
-            );
+          message.setCameraRecordingStatus = SetCameraRecordingStatusMessageProto.decode(reader, reader.uint32());
           continue;
         }
         case 19: {
@@ -616,10 +554,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.setConnectionInfo = SetConnectionInfoProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.setConnectionInfo = SetConnectionInfoProto.decode(reader, reader.uint32());
           continue;
         }
         case 21: {
@@ -627,10 +562,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.pipelineResult = PipelineResultProto.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.pipelineResult = PipelineResultProto.decode(reader, reader.uint32());
           continue;
         }
         case 22: {
@@ -646,9 +578,7 @@ export const MessageProto: MessageFns<MessageProto> = {
             break;
           }
 
-          message.pipelineTypeInfo.push(
-            PipelineTypeProto.decode(reader, reader.uint32()),
-          );
+          message.pipelineTypeInfo.push(PipelineTypeProto.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -663,18 +593,12 @@ export const MessageProto: MessageFns<MessageProto> = {
   fromJSON(object: any): MessageProto {
     return {
       type: isSet(object.type) ? messageTypeProtoFromJSON(object.type) : 0,
-      deviceInfo: isSet(object.deviceInfo)
-        ? DeviceInfoProto.fromJSON(object.deviceInfo)
-        : undefined,
+      deviceInfo: isSet(object.deviceInfo) ? DeviceInfoProto.fromJSON(object.deviceInfo) : undefined,
       hardwareMetrics: isSet(object.hardwareMetrics)
         ? HardwareMetricsProto.fromJSON(object.hardwareMetrics)
         : undefined,
-      cameraInfo: isSet(object.cameraInfo)
-        ? CameraProto.fromJSON(object.cameraInfo)
-        : undefined,
-      pipelineInfo: isSet(object.pipelineInfo)
-        ? PipelineProto.fromJSON(object.pipelineInfo)
-        : undefined,
+      cameraInfo: isSet(object.cameraInfo) ? CameraProto.fromJSON(object.cameraInfo) : undefined,
+      pipelineInfo: isSet(object.pipelineInfo) ? PipelineProto.fromJSON(object.pipelineInfo) : undefined,
       setPipelineType: isSet(object.setPipelineType)
         ? SetPipelineTypeMessageProto.fromJSON(object.setPipelineType)
         : undefined,
@@ -700,9 +624,7 @@ export const MessageProto: MessageFns<MessageProto> = {
       setNetworkSettings: isSet(object.setNetworkSettings)
         ? SetNetworkSettingsProto.fromJSON(object.setNetworkSettings)
         : undefined,
-      renameCamera: isSet(object.renameCamera)
-        ? RenameCameraMessageProto.fromJSON(object.renameCamera)
-        : undefined,
+      renameCamera: isSet(object.renameCamera) ? RenameCameraMessageProto.fromJSON(object.renameCamera) : undefined,
       calibrationData: isSet(object.calibrationData)
         ? CalibrationDataProto.fromJSON(object.calibrationData)
         : undefined,
@@ -710,19 +632,13 @@ export const MessageProto: MessageFns<MessageProto> = {
         ? RemoveCalibrationDataMessageProto.fromJSON(object.deleteCalibration)
         : undefined,
       setCameraRecordingStatus: isSet(object.setCameraRecordingStatus)
-        ? SetCameraRecordingStatusMessageProto.fromJSON(
-            object.setCameraRecordingStatus,
-          )
+        ? SetCameraRecordingStatusMessageProto.fromJSON(object.setCameraRecordingStatus)
         : undefined,
       setConnectionInfo: isSet(object.setConnectionInfo)
         ? SetConnectionInfoProto.fromJSON(object.setConnectionInfo)
         : undefined,
-      pipelineResult: isSet(object.pipelineResult)
-        ? PipelineResultProto.fromJSON(object.pipelineResult)
-        : undefined,
-      alert: isSet(object.alert)
-        ? AlertProto.fromJSON(object.alert)
-        : undefined,
+      pipelineResult: isSet(object.pipelineResult) ? PipelineResultProto.fromJSON(object.pipelineResult) : undefined,
+      alert: isSet(object.alert) ? AlertProto.fromJSON(object.alert) : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
         : [],
@@ -738,9 +654,7 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.deviceInfo = DeviceInfoProto.toJSON(message.deviceInfo);
     }
     if (message.hardwareMetrics !== undefined) {
-      obj.hardwareMetrics = HardwareMetricsProto.toJSON(
-        message.hardwareMetrics,
-      );
+      obj.hardwareMetrics = HardwareMetricsProto.toJSON(message.hardwareMetrics);
     }
     if (message.cameraInfo !== undefined) {
       obj.cameraInfo = CameraProto.toJSON(message.cameraInfo);
@@ -749,71 +663,46 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.pipelineInfo = PipelineProto.toJSON(message.pipelineInfo);
     }
     if (message.setPipelineType !== undefined) {
-      obj.setPipelineType = SetPipelineTypeMessageProto.toJSON(
-        message.setPipelineType,
-      );
+      obj.setPipelineType = SetPipelineTypeMessageProto.toJSON(message.setPipelineType);
     }
     if (message.setPipelineSetting !== undefined) {
-      obj.setPipelineSetting = SetPipleineSettingMessageProto.toJSON(
-        message.setPipelineSetting,
-      );
+      obj.setPipelineSetting = SetPipleineSettingMessageProto.toJSON(message.setPipelineSetting);
     }
     if (message.setPipelineIndex !== undefined) {
-      obj.setPipelineIndex = SetPipelineIndexMessageProto.toJSON(
-        message.setPipelineIndex,
-      );
+      obj.setPipelineIndex = SetPipelineIndexMessageProto.toJSON(message.setPipelineIndex);
     }
     if (message.setPipelineName !== undefined) {
-      obj.setPipelineName = SetPipelineNameMessageProto.toJSON(
-        message.setPipelineName,
-      );
+      obj.setPipelineName = SetPipelineNameMessageProto.toJSON(message.setPipelineName);
     }
     if (message.setDefaultPipeline !== undefined) {
-      obj.setDefaultPipeline = SetDefaultPipelineMessageProto.toJSON(
-        message.setDefaultPipeline,
-      );
+      obj.setDefaultPipeline = SetDefaultPipelineMessageProto.toJSON(message.setDefaultPipeline);
     }
     if (message.removePipeline !== undefined) {
-      obj.removePipeline = RemovePipelineMessageProto.toJSON(
-        message.removePipeline,
-      );
+      obj.removePipeline = RemovePipelineMessageProto.toJSON(message.removePipeline);
     }
     if (message.log !== undefined) {
       obj.log = LogMessageProto.toJSON(message.log);
     }
     if (message.cameraPerformance !== undefined) {
-      obj.cameraPerformance = CameraPerformanceProto.toJSON(
-        message.cameraPerformance,
-      );
+      obj.cameraPerformance = CameraPerformanceProto.toJSON(message.cameraPerformance);
     }
     if (message.setNetworkSettings !== undefined) {
-      obj.setNetworkSettings = SetNetworkSettingsProto.toJSON(
-        message.setNetworkSettings,
-      );
+      obj.setNetworkSettings = SetNetworkSettingsProto.toJSON(message.setNetworkSettings);
     }
     if (message.renameCamera !== undefined) {
       obj.renameCamera = RenameCameraMessageProto.toJSON(message.renameCamera);
     }
     if (message.calibrationData !== undefined) {
-      obj.calibrationData = CalibrationDataProto.toJSON(
-        message.calibrationData,
-      );
+      obj.calibrationData = CalibrationDataProto.toJSON(message.calibrationData);
     }
     if (message.deleteCalibration !== undefined) {
-      obj.deleteCalibration = RemoveCalibrationDataMessageProto.toJSON(
-        message.deleteCalibration,
-      );
+      obj.deleteCalibration = RemoveCalibrationDataMessageProto.toJSON(message.deleteCalibration);
     }
     if (message.setCameraRecordingStatus !== undefined) {
-      obj.setCameraRecordingStatus =
-        SetCameraRecordingStatusMessageProto.toJSON(
-          message.setCameraRecordingStatus,
-        );
+      obj.setCameraRecordingStatus = SetCameraRecordingStatusMessageProto.toJSON(message.setCameraRecordingStatus);
     }
     if (message.setConnectionInfo !== undefined) {
-      obj.setConnectionInfo = SetConnectionInfoProto.toJSON(
-        message.setConnectionInfo,
-      );
+      obj.setConnectionInfo = SetConnectionInfoProto.toJSON(message.setConnectionInfo);
     }
     if (message.pipelineResult !== undefined) {
       obj.pipelineResult = PipelineResultProto.toJSON(message.pipelineResult);
@@ -822,146 +711,94 @@ export const MessageProto: MessageFns<MessageProto> = {
       obj.alert = AlertProto.toJSON(message.alert);
     }
     if (message.pipelineTypeInfo?.length) {
-      obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
-        PipelineTypeProto.toJSON(e),
-      );
+      obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) => PipelineTypeProto.toJSON(e));
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<MessageProto>, I>>(
-    base?: I,
-  ): MessageProto {
+  create<I extends Exact<DeepPartial<MessageProto>, I>>(base?: I): MessageProto {
     return MessageProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(
-    object: I,
-  ): MessageProto {
+  fromPartial<I extends Exact<DeepPartial<MessageProto>, I>>(object: I): MessageProto {
     const message = createBaseMessageProto();
     message.type = object.type ?? 0;
-    message.deviceInfo =
-      object.deviceInfo !== undefined && object.deviceInfo !== null
-        ? DeviceInfoProto.fromPartial(object.deviceInfo)
-        : undefined;
-    message.hardwareMetrics =
-      object.hardwareMetrics !== undefined && object.hardwareMetrics !== null
-        ? HardwareMetricsProto.fromPartial(object.hardwareMetrics)
-        : undefined;
-    message.cameraInfo =
-      object.cameraInfo !== undefined && object.cameraInfo !== null
-        ? CameraProto.fromPartial(object.cameraInfo)
-        : undefined;
-    message.pipelineInfo =
-      object.pipelineInfo !== undefined && object.pipelineInfo !== null
-        ? PipelineProto.fromPartial(object.pipelineInfo)
-        : undefined;
-    message.setPipelineType =
-      object.setPipelineType !== undefined && object.setPipelineType !== null
-        ? SetPipelineTypeMessageProto.fromPartial(object.setPipelineType)
-        : undefined;
-    message.setPipelineSetting =
-      object.setPipelineSetting !== undefined &&
-      object.setPipelineSetting !== null
-        ? SetPipleineSettingMessageProto.fromPartial(object.setPipelineSetting)
-        : undefined;
-    message.setPipelineIndex =
-      object.setPipelineIndex !== undefined && object.setPipelineIndex !== null
-        ? SetPipelineIndexMessageProto.fromPartial(object.setPipelineIndex)
-        : undefined;
-    message.setPipelineName =
-      object.setPipelineName !== undefined && object.setPipelineName !== null
-        ? SetPipelineNameMessageProto.fromPartial(object.setPipelineName)
-        : undefined;
-    message.setDefaultPipeline =
-      object.setDefaultPipeline !== undefined &&
-      object.setDefaultPipeline !== null
-        ? SetDefaultPipelineMessageProto.fromPartial(object.setDefaultPipeline)
-        : undefined;
-    message.removePipeline =
-      object.removePipeline !== undefined && object.removePipeline !== null
-        ? RemovePipelineMessageProto.fromPartial(object.removePipeline)
-        : undefined;
-    message.log =
-      object.log !== undefined && object.log !== null
-        ? LogMessageProto.fromPartial(object.log)
-        : undefined;
-    message.cameraPerformance =
-      object.cameraPerformance !== undefined &&
-      object.cameraPerformance !== null
-        ? CameraPerformanceProto.fromPartial(object.cameraPerformance)
-        : undefined;
-    message.setNetworkSettings =
-      object.setNetworkSettings !== undefined &&
-      object.setNetworkSettings !== null
-        ? SetNetworkSettingsProto.fromPartial(object.setNetworkSettings)
-        : undefined;
-    message.renameCamera =
-      object.renameCamera !== undefined && object.renameCamera !== null
-        ? RenameCameraMessageProto.fromPartial(object.renameCamera)
-        : undefined;
-    message.calibrationData =
-      object.calibrationData !== undefined && object.calibrationData !== null
-        ? CalibrationDataProto.fromPartial(object.calibrationData)
-        : undefined;
-    message.deleteCalibration =
-      object.deleteCalibration !== undefined &&
-      object.deleteCalibration !== null
-        ? RemoveCalibrationDataMessageProto.fromPartial(
-            object.deleteCalibration,
-          )
-        : undefined;
+    message.deviceInfo = (object.deviceInfo !== undefined && object.deviceInfo !== null)
+      ? DeviceInfoProto.fromPartial(object.deviceInfo)
+      : undefined;
+    message.hardwareMetrics = (object.hardwareMetrics !== undefined && object.hardwareMetrics !== null)
+      ? HardwareMetricsProto.fromPartial(object.hardwareMetrics)
+      : undefined;
+    message.cameraInfo = (object.cameraInfo !== undefined && object.cameraInfo !== null)
+      ? CameraProto.fromPartial(object.cameraInfo)
+      : undefined;
+    message.pipelineInfo = (object.pipelineInfo !== undefined && object.pipelineInfo !== null)
+      ? PipelineProto.fromPartial(object.pipelineInfo)
+      : undefined;
+    message.setPipelineType = (object.setPipelineType !== undefined && object.setPipelineType !== null)
+      ? SetPipelineTypeMessageProto.fromPartial(object.setPipelineType)
+      : undefined;
+    message.setPipelineSetting = (object.setPipelineSetting !== undefined && object.setPipelineSetting !== null)
+      ? SetPipleineSettingMessageProto.fromPartial(object.setPipelineSetting)
+      : undefined;
+    message.setPipelineIndex = (object.setPipelineIndex !== undefined && object.setPipelineIndex !== null)
+      ? SetPipelineIndexMessageProto.fromPartial(object.setPipelineIndex)
+      : undefined;
+    message.setPipelineName = (object.setPipelineName !== undefined && object.setPipelineName !== null)
+      ? SetPipelineNameMessageProto.fromPartial(object.setPipelineName)
+      : undefined;
+    message.setDefaultPipeline = (object.setDefaultPipeline !== undefined && object.setDefaultPipeline !== null)
+      ? SetDefaultPipelineMessageProto.fromPartial(object.setDefaultPipeline)
+      : undefined;
+    message.removePipeline = (object.removePipeline !== undefined && object.removePipeline !== null)
+      ? RemovePipelineMessageProto.fromPartial(object.removePipeline)
+      : undefined;
+    message.log = (object.log !== undefined && object.log !== null)
+      ? LogMessageProto.fromPartial(object.log)
+      : undefined;
+    message.cameraPerformance = (object.cameraPerformance !== undefined && object.cameraPerformance !== null)
+      ? CameraPerformanceProto.fromPartial(object.cameraPerformance)
+      : undefined;
+    message.setNetworkSettings = (object.setNetworkSettings !== undefined && object.setNetworkSettings !== null)
+      ? SetNetworkSettingsProto.fromPartial(object.setNetworkSettings)
+      : undefined;
+    message.renameCamera = (object.renameCamera !== undefined && object.renameCamera !== null)
+      ? RenameCameraMessageProto.fromPartial(object.renameCamera)
+      : undefined;
+    message.calibrationData = (object.calibrationData !== undefined && object.calibrationData !== null)
+      ? CalibrationDataProto.fromPartial(object.calibrationData)
+      : undefined;
+    message.deleteCalibration = (object.deleteCalibration !== undefined && object.deleteCalibration !== null)
+      ? RemoveCalibrationDataMessageProto.fromPartial(object.deleteCalibration)
+      : undefined;
     message.setCameraRecordingStatus =
-      object.setCameraRecordingStatus !== undefined &&
-      object.setCameraRecordingStatus !== null
-        ? SetCameraRecordingStatusMessageProto.fromPartial(
-            object.setCameraRecordingStatus,
-          )
+      (object.setCameraRecordingStatus !== undefined && object.setCameraRecordingStatus !== null)
+        ? SetCameraRecordingStatusMessageProto.fromPartial(object.setCameraRecordingStatus)
         : undefined;
-    message.setConnectionInfo =
-      object.setConnectionInfo !== undefined &&
-      object.setConnectionInfo !== null
-        ? SetConnectionInfoProto.fromPartial(object.setConnectionInfo)
-        : undefined;
-    message.pipelineResult =
-      object.pipelineResult !== undefined && object.pipelineResult !== null
-        ? PipelineResultProto.fromPartial(object.pipelineResult)
-        : undefined;
-    message.alert =
-      object.alert !== undefined && object.alert !== null
-        ? AlertProto.fromPartial(object.alert)
-        : undefined;
-    message.pipelineTypeInfo =
-      object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||
-      [];
+    message.setConnectionInfo = (object.setConnectionInfo !== undefined && object.setConnectionInfo !== null)
+      ? SetConnectionInfoProto.fromPartial(object.setConnectionInfo)
+      : undefined;
+    message.pipelineResult = (object.pipelineResult !== undefined && object.pipelineResult !== null)
+      ? PipelineResultProto.fromPartial(object.pipelineResult)
+      : undefined;
+    message.alert = (object.alert !== undefined && object.alert !== null)
+      ? AlertProto.fromPartial(object.alert)
+      : undefined;
+    message.pipelineTypeInfo = object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) || [];
     return message;
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
