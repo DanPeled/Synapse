@@ -158,7 +158,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
         self.setConfig(self.cameraIndex)
 
-        ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
+        ApriltagPipeline.fmap = ApriltagFieldJson.loadField("deploy/fmap.json")
 
     def setConfig(self, cameraIndex: CameraID) -> None:
         self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()

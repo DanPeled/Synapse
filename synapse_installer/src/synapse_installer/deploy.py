@@ -111,12 +111,19 @@ def _connectAndDeploy(
 
                 # Unzip while ignoring warnings about "../" paths
                 unzip_cmd = (
-                    "mkdir -p ~/Synapse/config && "
-                    "find ~/Synapse -mindepth 1 "
-                    "! -path '~/Synapse/config' "
-                    "! -path '~/Synapse/config/*' "
-                    "-exec rm -rf {} + && "
-                    f"unzip -o {remote_zip} -d ~/Synapse 2>/dev/null"
+                    "bash -lc '"
+                    "set -e; "
+                    'mkdir -p "$HOME/Synapse"; '
+                    'if [ -d "$HOME/Synapse/config" ]; then '
+                    '  mv "$HOME/Synapse/config" /tmp/synapse_config; '
+                    "fi; "
+                    'rm -rf "$HOME/Synapse"; '
+                    'mkdir -p "$HOME/Synapse"; '
+                    "if [ -d /tmp/synapse_config ]; then "
+                    '  mv /tmp/synapse_config "$HOME/Synapse/config"; '
+                    "fi; "
+                    f'unzip -o "{remote_zip}" -d "$HOME/Synapse" >/dev/null'
+                    "'"
                 )
                 stdin, stdout, stderr = client.exec_command(unzip_cmd)
                 exit_status = stdout.channel.recv_exit_status()
