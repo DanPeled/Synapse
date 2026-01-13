@@ -34,6 +34,7 @@ from synapse_net.ui_handle import UIHandle
 from synapse_net import devicenetworking
 
 from ..bcolors import MarkupColors
+from ..hardware.deploy_dir import DeployDirectory
 from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
 from ..log import err, log, logs, missingFeature, warn
@@ -83,6 +84,10 @@ class Synapse:
             bool: True if initialization was successful, False otherwise.
         """
         Synapse.kInstance = self
+
+        DeployDirectory.setup(
+            configPath.parent.parent / "deploy"
+        )  # config is at project/config/settings.yml, go to ... which is project/
 
         platform = Platform.getCurrentPlatform()
 
