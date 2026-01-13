@@ -15,6 +15,7 @@ from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
                                    pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
+from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
@@ -158,7 +159,9 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
         self.setConfig(self.cameraIndex)
 
-        ApriltagPipeline.fmap = ApriltagFieldJson.loadField("config/fmap.json")
+        ApriltagPipeline.fmap = ApriltagFieldJson.loadField(
+            DeployDirectory.getDir() / "fmap.json"
+        )
 
     def setConfig(self, cameraIndex: CameraID) -> None:
         self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()

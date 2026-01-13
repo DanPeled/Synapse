@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+from pathlib import Path
 from typing import Dict, Optional
 
 from wpimath.geometry import Pose3d, Quaternion, Rotation3d, Translation3d
@@ -18,7 +19,7 @@ class ApriltagFieldJson:
         self.width = width
 
     @staticmethod
-    def loadField(filePath: str) -> "ApriltagFieldJson":
+    def loadField(filePath: str | Path) -> "ApriltagFieldJson":
         with open(filePath, "r") as file:
             jsonDict: dict = json.load(file)
             tagsDict: Dict[ApriltagFieldJson.TagId, Pose3d] = {}
