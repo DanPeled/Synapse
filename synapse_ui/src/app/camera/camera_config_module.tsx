@@ -5,8 +5,14 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import { CameraProto, RenameCameraMessageProto } from "@/proto/v1/camera";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import {
+  CameraProto,
+  RenameCameraMessageProto,
+} from "@/generated/messages/v1/camera";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { CameraID } from "@/services/backend/dataStractures";
 import {
   baseCardColor,

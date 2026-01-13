@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package messages.v1;
+
+import "messages/v1/alert.proto";
+import "messages/v1/camera.proto";
+import "messages/v1/device.proto";
+import "messages/v1/log.proto";
+import "messages/v1/pipeline.proto";
+
+message MessageProto {
+  // Main message structure for communication
+
+  MessageTypeProto type = 1; // Type of the message, indicating what kind of data it contains
+  oneof payload {
+    messages.v1.DeviceInfoProto device_info = 2; // Information about the device
+    messages.v1.HardwareMetricsProto hardware_metrics = 3; // Metrics related to hardware performance
+    messages.v1.CameraProto camera_info = 4; // Information about the camera
+    messages.v1.PipelineProto pipeline_info = 5; // Information about the pipeline
+    messages.v1.SetPipelineTypeMessageProto set_pipeline_type = 6; // Message to set the type for a pipeline
+    messages.v1.SetPipleineSettingMessageProto set_pipeline_setting = 7; // Message to set a setting for a pipeline
+    messages.v1.SetPipelineIndexMessageProto set_pipeline_index = 8; // Message to set the index of a pipeline
+    messages.v1.SetPipelineNameMessageProto set_pipeline_name = 9; // Message to set the name of a pipeline
+    messages.v1.SetDefaultPipelineMessageProto set_default_pipeline = 10; // Message to set the default pipeline
+    messages.v1.RemovePipelineMessageProto remove_pipeline = 11;
+    messages.v1.LogMessageProto log = 12; // Log message containing log data
+    messages.v1.CameraPerformanceProto camera_performance = 13; // Performance data for a camera
+    messages.v1.SetNetworkSettingsProto set_network_settings = 14; // Message to set network settings
+    messages.v1.RenameCameraMessageProto rename_camera = 15; // Message to rename a camera
+    messages.v1.CalibrationDataProto calibration_data = 16; // Calibration data for a camera
+    messages.v1.RemoveCalibrationDataMessageProto delete_calibration = 17; // Message to delete calibration data
+    messages.v1.SetCameraRecordingStatusMessageProto set_camera_recording_status = 18; // Message to set camera recording status
+    messages.v1.SetConnectionInfoProto set_connection_info = 19; // Message to set connection information for the device
+    messages.v1.PipelineResultProto pipeline_result = 21; // Result of a pipeline operation
+    messages.v1.AlertProto alert = 22; // Alert message containing alert data
+  }
+
+  repeated PipelineTypeProto pipeline_type_info = 20; // List of pipeline types available in the system
+}
+
+// Enum for different message types in the protocol
+enum MessageTypeProto {
+  MESSAGE_TYPE_PROTO_UNSPECIFIED = 0;
+  MESSAGE_TYPE_PROTO_SEND_DEVICE_INFO = 1;
+  MESSAGE_TYPE_PROTO_SEND_METRICS = 2;
+  MESSAGE_TYPE_PROTO_ADD_PIPELINE = 3;
+  MESSAGE_TYPE_PROTO_SEND_PIPELINE_TYPES = 4;
+  MESSAGE_TYPE_PROTO_ADD_CAMERA = 5;
+  MESSAGE_TYPE_PROTO_SET_TYPE_FOR_PIPELINE = 6;
+  MESSAGE_TYPE_PROTO_SET_SETTING = 7;
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_INDEX = 8;
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_NAME = 9;
+  MESSAGE_TYPE_PROTO_SET_DEFAULT_PIPELINE = 10;
+  MESSAGE_TYPE_PROTO_DELETE_PIPELINE = 11;
+  MESSAGE_TYPE_PROTO_LOG = 12;
+  MESSAGE_TYPE_PROTO_SAVE = 13;
+  MESSAGE_TYPE_PROTO_REPORT_CAMERA_PERFORMANCE = 14;
+  MESSAGE_TYPE_PROTO_SET_NETWORK_SETTINGS = 15;
+  MESSAGE_TYPE_PROTO_REBOOT = 16;
+  MESSAGE_TYPE_PROTO_FORMAT = 17;
+  MESSAGE_TYPE_PROTO_RESTART_SYNAPSE = 18;
+  MESSAGE_TYPE_PROTO_RENAME_CAMERA = 19;
+  MESSAGE_TYPE_PROTO_CALIBRATING = 20;
+  MESSAGE_TYPE_PROTO_CALIBRATION_DATA = 21;
+  MESSAGE_TYPE_PROTO_DELETE_CALIBRATION = 22;
+  MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS = 23;
+  MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24;
+  MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT = 25;
+  MESSAGE_TYPE_PROTO_ALERT = 26;
+}

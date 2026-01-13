@@ -34,13 +34,16 @@ import {
 import { useEffect, useState } from "react";
 import { ProgramLogsDialog } from "./programLogsDialog";
 import { NetworkSettings } from "./network_settings";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { WebSocketWrapper } from "@/services/websocket";
 import {
   downloadHttpDirectoryAsZip,
   FILE_SERVER_URL,
 } from "@/services/backend/fileServer";
-import { DeviceInfoProto } from "@/proto/v1/device";
+import { DeviceInfoProto } from "@/generated/messages/v1/device";
 import ImportSettingsButton from "./import_settings_button";
 
 async function downloadSettings(deviceInfo: DeviceInfoProto) {

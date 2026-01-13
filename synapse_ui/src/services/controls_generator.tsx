@@ -1,6 +1,6 @@
-import { ConstraintTypeProto } from "@/proto/settings/v1/constraint_type";
-import { SettingMetaProto } from "@/proto/settings/v1/settings";
-import { SettingValueProto } from "@/proto/settings/v1/value";
+import { ConstraintTypeProto } from "@/generated/settings/v1/constraint_type";
+import { SettingMetaProto } from "@/generated/settings/v1/settings";
+import { SettingValueProto } from "@/generated/settings/v1/value";
 import { Dropdown, DropdownOption } from "@/widgets/dropdown";
 import { Slider } from "@/widgets/slider";
 import TextInput from "@/widgets/textInput";
@@ -13,7 +13,7 @@ import { teamColor } from "./style";
 import { RefreshCcw } from "lucide-react";
 import assert from "assert";
 import { hasSettingValue } from "./backend/backendContext";
-import { PipelineProto } from "@/proto/v1/pipeline";
+import { PipelineProto } from "@/generated/messages/v1/pipeline";
 import { PipelineID } from "./backend/dataStractures";
 
 export function generateControlFromSettingMeta({

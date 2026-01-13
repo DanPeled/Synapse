@@ -1,6 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
-import { PipelineProto, RemovePipelineMessageProto } from "@/proto/v1/pipeline";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
+import {
+  PipelineProto,
+  RemovePipelineMessageProto,
+} from "@/generated/messages/v1/pipeline";
 import { CameraID } from "@/services/backend/dataStractures";
 import { teamColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";

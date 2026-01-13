@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
-from synapse_net.proto.v1 import SetNetworkSettingsProto
+from synapse_net.generated.messages.v1 import SetNetworkSettingsProto
 
 
 @dataclass

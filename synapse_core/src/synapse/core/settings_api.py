@@ -11,21 +11,19 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
 
 from betterproto import which_one_of
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse_net.proto.settings.v1 import (
-    BooleanConstraintProto,
-    ColorConstraintProto,
-    ColorFormatProto,
-    ConstraintConfigProto,
-    ConstraintProto,
-    ConstraintTypeProto,
-    EnumeratedConstraintProto,
-    ListConstraintProto,
-    NumberConstraintProto,
-    SettingMetaProto,
-    SettingValueProto,
-    StringConstraintProto,
-)
-from synapse_net.proto.v1 import CameraProto
+from synapse_net.generated.messages.v1 import CameraProto
+from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
+                                               ColorConstraintProto,
+                                               ColorFormatProto,
+                                               ConstraintConfigProto,
+                                               ConstraintProto,
+                                               ConstraintTypeProto,
+                                               EnumeratedConstraintProto,
+                                               ListConstraintProto,
+                                               NumberConstraintProto,
+                                               SettingMetaProto,
+                                               SettingValueProto,
+                                               StringConstraintProto)
 
 from ..bcolors import MarkupColors
 from ..log import err

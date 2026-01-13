@@ -6,7 +6,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from synapse_net.proto.v1 import MessageProto
+from synapse_net.generated.messages.v1 import MessageProto
 from synapse_net.socketServer import (SocketEvent, WebSocketServer,
                                       getMessageDataFieldName)
 

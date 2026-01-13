@@ -10,8 +10,8 @@ from typing import (Any, Callable, Dict, Generic, Iterable, List, Optional,
                     Type, TypeVar, Union, overload)
 
 from ntcore import GenericPublisher, NetworkTable, Value
-from synapse_net.proto.v1 import (MessageTypeProto, PipelineProto,
-                                  PipelineResultProto)
+from synapse_net.generated.messages.v1 import (MessageTypeProto, PipelineProto,
+                                               PipelineResultProto)
 from synapse_net.socketServer import WebSocketServer
 
 from ..log import createMessage, err, warn

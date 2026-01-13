@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package settings.v1;
+
+import "settings/v1/value.proto";
+
+// Constraint that limits a setting to a predefined list of possible values
+message EnumeratedConstraintProto {
+  // List of allowed option values for the setting
+  repeated SettingValueProto options = 1;
+}

@@ -18,8 +18,8 @@ import numpy as np
 from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
                     VideoSource)
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
+from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
-from synapse_net.proto.v1 import CalibrationDataProto
 from wpimath import geometry
 
 from ..log import err, warn

@@ -15,18 +15,14 @@ import psutil
 from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.file_server import FileServer
+from synapse_net.generated.messages.v1 import (
+    DeviceInfoProto, MessageProto, MessageTypeProto, PipelineProto,
+    PipelineTypeProto, RemovePipelineMessageProto,
+    SetCameraRecordingStatusMessageProto, SetConnectionInfoProto,
+    SetDefaultPipelineMessageProto, SetNetworkSettingsProto,
+    SetPipelineIndexMessageProto, SetPipelineNameMessageProto,
+    SetPipleineSettingMessageProto)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
-                                  MessageTypeProto, PipelineProto,
-                                  PipelineTypeProto,
-                                  RemovePipelineMessageProto,
-                                  SetCameraRecordingStatusMessageProto,
-                                  SetConnectionInfoProto,
-                                  SetDefaultPipelineMessageProto,
-                                  SetNetworkSettingsProto,
-                                  SetPipelineIndexMessageProto,
-                                  SetPipelineNameMessageProto,
-                                  SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
 from synapse_net.ui_handle import UIHandle

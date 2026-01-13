@@ -1,14 +1,20 @@
 import { Button } from "@/components/ui/button";
-import { SettingValueProto } from "@/proto/settings/v1/value";
-import { CalibrationDataProto, CameraProto } from "@/proto/v1/camera";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import { SettingValueProto } from "@/generated/settings/v1/value";
+import {
+  CalibrationDataProto,
+  CameraProto,
+} from "@/generated/messages/v1/camera";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import {
   PipelineProto,
   PipelineTypeProto,
   RemovePipelineMessageProto,
   SetPipelineIndexMessageProto,
   SetPipleineSettingMessageProto,
-} from "@/proto/v1/pipeline";
+} from "@/generated/messages/v1/pipeline";
 import {
   hasSettingValue,
   useBackendContext,

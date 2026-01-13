@@ -1,7 +1,10 @@
 import { Card, CardHeader } from "@/components/ui/card";
-import { SettingValueProto } from "@/proto/settings/v1/value";
-import { CameraProto } from "@/proto/v1/camera";
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
+import { SettingValueProto } from "@/generated/settings/v1/value";
+import { CameraProto } from "@/generated/messages/v1/camera";
+import {
+  PipelineProto,
+  PipelineTypeProto,
+} from "@/generated/messages/v1/pipeline";
 import { PipelineID } from "@/services/backend/dataStractures";
 import { generateControlFromSettingMeta } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";

@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package settings.v1;
+
+import "settings/v1/boolean.proto";
+import "settings/v1/color.proto";
+import "settings/v1/enumerated.proto";
+import "settings/v1/file.proto";
+import "settings/v1/list.proto";
+import "settings/v1/number.proto";
+import "settings/v1/string.proto";
+
+// Configuration for different types of constraints on settings values.
+// Uses a oneof to specify exactly one type of constraint configuration.
+message ConstraintConfigProto {
+  oneof config {
+    // Constraint based on a numeric value
+    NumberConstraintProto numeric = 1;
+
+    // Constraint based on selectable list options with extra options
+    EnumeratedConstraintProto enumerated = 2;
+
+    // Constraint based on color formats and modes
+    ColorConstraintProto color = 3;
+
+    // Constraint based on string properties (e.g., regex, length)
+    StringConstraintProto string = 4;
+
+    // Constraint for a value list
+    ListConstraintProto list = 5;
+
+    // Boolean constraint
+    BooleanConstraintProto boolean = 6;
+
+    FileConstraintProto file = 7;
+  }
+}
+
+// Enumeration of constraint types that can be applied to settings.
+// Some constraints may not have corresponding config messages.
+enum ConstraintTypeProto {
+  // Default unspecified constraint type
+  CONSTRAINT_TYPE_PROTO_UNSPECIFIED = 0;
+
+  // Numeric range constraint
+  CONSTRAINT_TYPE_PROTO_NUMBER = 1;
+
+  // Constraint requiring value to be one of a predefined list
+  CONSTRAINT_TYPE_PROTO_LIST = 2;
+
+  // String-based constraint
+  CONSTRAINT_TYPE_PROTO_STRING = 3;
+
+  // Color-related constraint
+  CONSTRAINT_TYPE_PROTO_COLOR = 4;
+
+  // Boolean constraint (true/false), no separate config message needed
+  CONSTRAINT_TYPE_PROTO_BOOLEAN = 5;
+
+  // List options constraint
+  CONSTRAINT_TYPE_PROTO_ENUMERATED = 8;
+
+  CONSTRAINT_TYPE_PROTO_FILE = 9;
+}

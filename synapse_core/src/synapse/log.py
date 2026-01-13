@@ -9,10 +9,9 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+import synapse_net.generated.messages.v1 as v1
 from rich import print
 from synapse_net.socketServer import WebSocketServer, createMessage
-
-from synapse_net.proto import v1
 
 from .alert import alert
 from .bcolors import MarkupColors, TextTarget, parseTextStyle
