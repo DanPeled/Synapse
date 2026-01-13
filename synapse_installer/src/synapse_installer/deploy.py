@@ -104,13 +104,24 @@ def _connectAndDeploy(
         assert transport is not None
 
         with SCPClient(transport) as scp:
+            success = True
+
+            client.exec_command("""
+            mkdir -p "$HOME/Synapse/config" && \
+            find "$HOME/Synapse" -mindepth 1 -maxdepth 1 ! -name config -exec rm -rf {{}}
+            """)
+
             for zip_path in zip_paths:
                 remote_zip = f"/tmp/{zip_path.name}"
+                client.exec_command("mkdir -p $HOME/tmp")
                 print(f"Uploading {zip_path.name} to {remote_zip}")
                 scp.put(str(zip_path), remote_zip)
 
                 # Unzip while ignoring warnings about "../" paths
-                unzip_cmd = f"mkdir -p ~/Synapse && unzip -o {remote_zip} -d ~/Synapse 2>/dev/null"
+                unzip_cmd = f"""
+                    unzip -o "{remote_zip}" -d "$HOME/Synapse"
+                    """
+
                 stdin, stdout, stderr = client.exec_command(unzip_cmd)
                 exit_status = stdout.channel.recv_exit_status()
                 out = stdout.read().decode()
@@ -125,14 +136,16 @@ def _connectAndDeploy(
                     if out.strip():
                         print("STDOUT:", out.strip())
                     if err.strip():
+                        success = False
                         print("STDERR:", err.strip())
                     break
-            # Only run if all zip files were successfully unzipped
-            setupServiceOnConnectedClient(client, hostname)
-            restartService(client, SERVICE_NAME)
+            if success:
+                # Only run if all zip files were successfully unzipped
+                setupServiceOnConnectedClient(client, hostname)
+                restartService(client, SERVICE_NAME)
+                print(f"Deployment completed on {hostname}")
 
         client.close()
-        print(f"Deployment completed on {hostname}")
 
     except Exception as error:
         errString = "".join(
