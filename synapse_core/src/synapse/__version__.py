@@ -5,6 +5,6 @@
 
 from typing import Final
 
-WPILIB_VERSION: Final[str] = "2026.1.1b1"
+WPILIB_VERSION: Final[str] = "2026.1.1"
 WPILIB_YEAR: Final[str] = "2026"
-SYNAPSE_VERSION: Final[str] = "2026.0.0a1"
+SYNAPSE_VERSION: Final[str] = "2026.0.1"
