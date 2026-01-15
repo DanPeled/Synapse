@@ -15,6 +15,7 @@ import yaml
 from rich import print as fprint
 from scp import SCPClient
 from synapse.bcolors import MarkupColors
+from synapse_net.stdout_streamer import SystemdServiceLogStreamer
 
 from .lockfile import createDirectoryZIP, createPackageZIP
 from .setup_service import (SERVICE_NAME, restartService,
@@ -144,6 +145,14 @@ def _connectAndDeploy(
                 setupServiceOnConnectedClient(client, hostname)
                 restartService(client, SERVICE_NAME)
                 print(f"Deployment completed on {hostname}")
+
+                print("Starting Connection to console...")
+                streamer = SystemdServiceLogStreamer(
+                    sshClient=client, service="synapse-runtime.service"
+                )
+                streamer.connect()
+                for line in streamer.stream():
+                    print(line)
 
         client.close()
 
