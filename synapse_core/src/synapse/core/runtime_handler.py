@@ -14,9 +14,11 @@ from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
+import synapse.__version__ as versionFile
 import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
-                    NetworkTableInstance, NetworkTableType, ValueEventData)
+                    NetworkTableInstance, NetworkTableType, StringPublisher,
+                    ValueEventData)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
                                   MessageTypeProto)
@@ -50,7 +52,7 @@ def sendWebUIIP():
     if NtClient.INSTANCE is not None:
         NtClient.INSTANCE.nt_inst.getTable(NtClient.INSTANCE.NT_TABLE).getEntry(
             "web_ui"
-        ).setString(f"https://{getIP()}:3000")
+        ).setString(f"{getIP()}:3000")
 
 
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
@@ -92,6 +94,7 @@ class RuntimeManager:
 
         self.isSetup: bool = False
         self.lastLatencyReportTime: float = time.time()
+        self.versionPublisher: Optional[StringPublisher] = None
 
         self.DEFAULT_STEP = "step_0"
 
@@ -170,6 +173,14 @@ class RuntimeManager:
 
         self.setupNetworkTables()
 
+        self.versionPublisher = (
+            NetworkTableInstance.getDefault()
+            .getStringTopic(f"{NtClient.NT_TABLE}/version")
+            .publish()
+        )
+
+        self.versionPublisher.set(versionFile.SYNAPSE_VERSION)
+
         self.startMetricsThread()
         sendWebUIIP()
 
@@ -200,30 +211,32 @@ class RuntimeManager:
 
             metricsManager: Final[MetricsManager] = MetricsManager()
 
-            # entry = NetworkTableInstance.getDefault().getEntry(
-            #     f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}"
-            # )
+            entry = (
+                NetworkTableInstance.getDefault()
+                .getDoubleArrayTopic(f"{NtClient.NT_TABLE}/{NTKeys.kMetrics.value}")
+                .publish()
+            )
 
             while self.running.is_set():
                 cpuTemp = metricsManager.getCpuTemp()
                 cpuUsage = metricsManager.getCpuUtilization()
                 memory = metricsManager.getMemory()
                 uptime = metricsManager.getUptime()
-                # gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                gpuMemorySplit = metricsManager.getGPUMemorySplit()
                 usedRam = metricsManager.getUsedRam()
                 usedDiskPct = metricsManager.getUsedDiskPct()
-                # npuUsage = metricsManager.getNpuUsage()
+                npuUsage = metricsManager.getNpuUsage()
 
-                # metrics = [
-                #     cpuTemp,
-                #     cpuUsage,
-                #     memory,
-                #     uptime,
-                #     gpuMemorySplit,
-                #     usedRam,
-                #     usedDiskPct,
-                #     npuUsage,
-                # ]
+                metrics = [
+                    cpuTemp,
+                    cpuUsage,
+                    memory,
+                    uptime,
+                    gpuMemorySplit,
+                    usedRam,
+                    usedDiskPct,
+                    npuUsage,
+                ]
 
                 if WebSocketServer.kInstance is not None:
                     metricsMessage = HardwareMetricsProto()
@@ -241,7 +254,7 @@ class RuntimeManager:
                         )
                     )
 
-                # entry.setDoubleArray(metrics)
+                entry.set(metrics)
 
                 try:
                     time.sleep(1.4)
