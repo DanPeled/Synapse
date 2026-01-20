@@ -115,19 +115,11 @@ export function MsgPackTree({
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
   let decoded: unknown = null; // default to null
-  try {
-    if (decoded != null && decoded !== 0) {
-      decoded = decode(
-        encoded instanceof ArrayBuffer ? new Uint8Array(encoded) : encoded,
-      );
-    }
-  } catch (e) {
-    if (e instanceof TypeError) {
-      decoded = null; // silently fallback to null
-    } else {
-      // re-throw other errors
-      throw e;
-    }
+
+  if (encoded !== null && encoded.byteLength !== 0) {
+    decoded = decode(
+      encoded instanceof ArrayBuffer ? new Uint8Array(encoded) : encoded,
+    );
   }
 
   return (
