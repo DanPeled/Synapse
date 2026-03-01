@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import queue
-import socket
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -160,6 +159,75 @@ class SynapseCamera(ABC):
         self.stream: str = ""
         self.cameraIndex: CameraID = -1
 
+    def generateNoSignalFrame(self, size: Resolution = (640, 480)) -> Frame:
+        width, height = size
+
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+
+        colors = [
+            (255, 255, 255),  # white
+            (0, 255, 255),  # yellow
+            (255, 255, 0),  # cyan
+            (0, 255, 0),  # green
+            (255, 0, 255),  # magenta
+            (0, 0, 255),  # red
+            (255, 0, 0),  # blue
+        ]
+
+        bar_width = width // len(colors)
+        for i, color in enumerate(colors):
+            frame[:, i * bar_width : (i + 1) * bar_width] = color
+
+        noise_intensity = np.random.randint(10, 40)
+        noise = np.random.randint(0, noise_intensity, frame.shape, dtype=np.uint8)
+        frame = cv2.add(frame, noise)
+
+        for y in range(0, height, 2):
+            frame[y : y + 1, :] = (frame[y : y + 1, :] * 0.6).astype(np.uint8)
+
+        if np.random.rand() > 0.7:
+            glitch_y = np.random.randint(0, height)
+            glitch_height = np.random.randint(5, 20)
+            shift = np.random.randint(-30, 30)
+            frame[glitch_y : glitch_y + glitch_height] = np.roll(
+                frame[glitch_y : glitch_y + glitch_height], shift, axis=1
+            )
+
+        text = f"NO SIGNAL ? {self.name} (#{self.cameraIndex})"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = min(width, height) / 600
+        thickness = max(2, int(font_scale * 2))
+
+        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+        text_x = (width - text_size[0]) // 2
+        text_y = (height + text_size[1]) // 2
+
+        # Black outline
+        cv2.putText(
+            frame,
+            text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (0, 0, 0),
+            thickness + 3,
+            cv2.LINE_AA,
+        )
+
+        # White foreground
+        cv2.putText(
+            frame,
+            text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (255, 255, 255),
+            thickness,
+            cv2.LINE_AA,
+        )
+
+        return frame
+
     @classmethod
     @abstractmethod
     def create(
@@ -172,12 +240,7 @@ class SynapseCamera(ABC):
 
     def setIndex(self, cameraIndex: CameraID) -> None:
         self.cameraIndex: CameraID = cameraIndex
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        self.stream = f"http://{ip}:{1181 + cameraIndex}/?action=stream/stream.mjpeg"
+        self.stream = ""
 
     @abstractmethod
     def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
@@ -449,6 +512,10 @@ class CsCoreCamera(SynapseCamera):
                 time.sleep(1.0 / mode.fps / 2.0)
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
+        # If no frame available or disconnected → NO SIGNAL
+        if not self.isConnected():
+            return True, self.generateNoSignalFrame(self.getResolution())
+
         with self._lock:
             try:
                 hasFrame, index = self._frameQueue.get_nowait()
@@ -456,7 +523,8 @@ class CsCoreCamera(SynapseCamera):
                     return True, self._bufferPool[index]
             except queue.Empty:
                 pass
-        return False, None
+
+        return True, self.generateNoSignalFrame(self.getResolution())
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()

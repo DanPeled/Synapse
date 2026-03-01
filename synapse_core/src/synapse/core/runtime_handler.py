@@ -528,13 +528,16 @@ class RuntimeManager:
         while self.running.is_set():
             loopStart = time.perf_counter()
 
-            ret, frame = camera.grabFrame()
-            if not ret or frame is None:
-                continue
+            if camera.isConnected():
+                ret, frame = camera.grabFrame()
+                if not ret or frame is None:
+                    continue
 
-            frame = self.fixtureFrame(cameraIndex, frame)
+                frame = self.fixtureFrame(cameraIndex, frame)
 
-            self._processAndPublishFrame(cameraIndex, frame)
+                self._processAndPublishFrame(cameraIndex, frame)
+            else:
+                self.cameraHandler.publishFrame(camera.generateNoSignalFrame(), camera)
 
             # Maintain camera FPS cap
             elapsed = time.perf_counter() - loopStart
