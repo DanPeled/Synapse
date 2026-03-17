@@ -158,6 +158,7 @@ class SynapseCamera(ABC):
         self.name: str = name
         self.stream: str = ""
         self.cameraIndex: CameraID = -1
+        self.isRunning: bool = True
 
     def generateNoSignalFrame(self, size: Resolution = (640, 480)) -> Frame:
         width, height = size
@@ -512,10 +513,6 @@ class CsCoreCamera(SynapseCamera):
                 time.sleep(1.0 / mode.fps / 2.0)
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        # If no frame available or disconnected → NO SIGNAL
-        if not self.isConnected():
-            return True, self.generateNoSignalFrame(self.getResolution())
-
         with self._lock:
             try:
                 hasFrame, index = self._frameQueue.get_nowait()
@@ -524,7 +521,7 @@ class CsCoreCamera(SynapseCamera):
             except queue.Empty:
                 pass
 
-        return True, self.generateNoSignalFrame(self.getResolution())
+        return False, None
 
     def isConnected(self) -> bool:
         return self.camera.isConnected()
@@ -708,6 +705,56 @@ def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
                 rotationList[0], rotationList[1], rotationList[2]
             ),
         )
+
+
+class NoSignalCamera(SynapseCamera):
+    def __init__(self, name: str) -> None:
+        super().__init__(name=name)
+        self.resolution: Resolution = (640, 480)
+
+    @classmethod
+    def create(
+        cls, *_, path: Union[str, int] = 0, name: str = "", index: CameraID = -1
+    ) -> "NoSignalCamera":
+        inst = NoSignalCamera(name)
+        inst.setIndex(index)
+        return inst
+
+    def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
+        # Always return a no-signal frame
+        return True, self.generateNoSignalFrame(self.resolution)
+
+    def isConnected(self) -> bool:
+        # Pretend the camera is never connected
+        return False
+
+    def close(self) -> None:
+        pass
+
+    def setProperty(self, prop: str, value: Union[int, float]) -> None:
+        # Ignore all property changes
+        pass
+
+    def getProperty(self, prop: str) -> Union[int, float, None]:
+        # No properties exist
+        return None
+
+    def setVideoMode(self, fps: int, width: int, height: int) -> None:
+        # Only store resolution for frame generation
+        self.resolution = (width, height)
+
+    def getResolution(self) -> Size:
+        return self.resolution
+
+    def getSupportedResolutions(self) -> List[Size]:
+        # Only support the current resolution
+        return [self.resolution]
+
+    def getPropertyMeta(self) -> Optional[PropertyMetaDict]:
+        return None
+
+    def getMaxFPS(self) -> float:
+        return 0.0
 
 
 def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:

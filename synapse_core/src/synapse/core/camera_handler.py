@@ -19,8 +19,8 @@ from synapse_net.nt_client import NtClient
 from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, Frame,
                       RecordingFilename, RecordingStatus, Resolution)
-from .camera_factory import (CameraConfig, CameraFactory, SynapseCamera,
-                             getCameraTableName)
+from .camera_factory import (CameraConfig, CameraFactory, NoSignalCamera,
+                             SynapseCamera, getCameraTableName)
 from .global_settings import GlobalSettings
 
 
@@ -55,7 +55,7 @@ class CameraHandler:
         self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
         self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
         self.cameraUIDs: List[CameraUID] = []
-        self.requestedCameraUIDs: Dict[CameraID, CameraUID] = {}
+        self.requestedCameraUIDs: Dict[CameraUID, CameraID] = {}
 
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
@@ -115,7 +115,11 @@ class CameraHandler:
                     else:
                         self.cameraUIDs.append(cameraConfig.id)
                 else:
-                    self.requestedCameraUIDs[cameraIndex] = cameraConfig.id
+                    self.requestedCameraUIDs[cameraConfig.id] = cameraIndex
+
+                    self.addCameraData(
+                        cameraIndex, cameraConfig, NoSignalCamera(cameraConfig.name)
+                    )
 
                     log.warn(
                         f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped and added later"
@@ -148,9 +152,15 @@ class CameraHandler:
             if info.productId not in found and id not in self.cameraUIDs:
                 found.append(info.productId)
                 newIndex = 0
+
+                print(self.requestedCameraUIDs)
                 if len(self.requestedCameraUIDs.keys()) > 0:
-                    m = max(self.requestedCameraUIDs.keys())
-                    newIndex = m + 1
+                    if id in self.requestedCameraUIDs.keys():
+                        newIndex = self.requestedCameraUIDs.pop(id)
+                    else:
+                        m = max(self.requestedCameraUIDs.values())
+                        newIndex = m + 1
+
                 cameraIndex = newIndex
                 cameraConfig = CameraConfig(
                     name=info.name,
@@ -336,17 +346,45 @@ class CameraHandler:
             log.err(f"Failed to start camera capture: {e}")
             return False
 
+        self.addCameraData(cameraIndex, cameraConfig, camera)
+
+        return True
+
+    def addCameraData(
+        self,
+        cameraIndex: CameraID,
+        cameraConfig: CameraConfig,
+        camera: SynapseCamera,
+    ):
+        if cameraIndex in self.cameras.keys():
+            prevCam = self.cameras.pop(cameraIndex)
+            prevCam.isRunning = False
         self.cameras[cameraIndex] = camera
+
+        camera.cameraIndex = cameraIndex
+
         self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
 
-        camera.stream = (
+        ret, frame = camera.grabFrame()
+
+        if frame is not None:
+            self.streamOutputs[cameraIndex].putFrame(
+                frame
+            )  # NOTE: stream only appears after a frame has been posted, probably
+
+        stream = (
             NetworkTableInstance.getDefault()
             .getTable("CameraPublisher")
             .getSubTable(NtClient.NT_TABLE)
-            .getSubTable(getCameraTableName(camera))
-            .getStringArray("streams", ["", ""])[1]
+            .getSubTable(cameraConfig.name)
+            .getStringArray("streams", [])[1]
             .replace("mjpg:", "")
         )
+
+        print(cameraConfig.name)
+        print(stream)
+
+        camera.stream = stream
 
         self.setRecordingStatus(cameraIndex, False)
 
@@ -355,7 +393,6 @@ class CameraHandler:
         log.log(
             f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
         )
-        return True
 
     def setCameraProps(
         self, settings: Dict[str, Any], camera: SynapseCamera

@@ -10,7 +10,7 @@ import traceback
 from asyncio import Queue
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
@@ -87,7 +87,7 @@ class RuntimeManager:
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
-        self.cameraManagementThreads: List[threading.Thread] = []
+        self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
 
         self.running = threading.Event()
         self.running.set()
@@ -130,10 +130,11 @@ class RuntimeManager:
                     {},
                 )
                 self.setPipelineByIndex(cameraID, self.pipelineBindings[cameraID])
+
             thread = threading.Thread(target=self.processCamera, args=(cameraID,))
             thread.daemon = True
             thread.start()
-            self.cameraManagementThreads.append(thread)
+            self.cameraManagementThreads[cameraID] = thread
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
@@ -525,7 +526,7 @@ class RuntimeManager:
 
         log.log(f"Started {camera.name} loop (maxFPS={maxFps})")
 
-        while self.running.is_set():
+        while self.running.is_set() and camera.isRunning:
             loopStart = time.perf_counter()
 
             if camera.isConnected():
@@ -843,7 +844,7 @@ class RuntimeManager:
 
         self.cameraHandler.cleanup()
         self.running.clear()
-        for thread in self.cameraManagementThreads:
+        for thread in self.cameraManagementThreads.values():
             thread.join()
         if self.metricsThread:
             self.metricsThread.join()
