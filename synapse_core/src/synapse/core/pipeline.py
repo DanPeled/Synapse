@@ -208,7 +208,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             self.settings.setSetting(settingObj, value)
             self.onSettingChanged(settingObj, self.getSetting(setting))
         elif setting in CameraSettings():
-            collection = self.getCurrentCameraSettingCollection()
+            collection = self.getCameraSettings()
             assert collection is not None
             collection.setSetting(setting, value)
         else:
@@ -309,11 +309,11 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     def setCameraSetting(
         self, setting: Union[str, Setting], value: SettingsValue
     ) -> None:
-        collection = self.getCurrentCameraSettingCollection()
+        collection = self.getCameraSettings()
         assert collection is not None
         collection.setSetting(setting, value)
 
-    def getCurrentCameraSettingCollection(self) -> Optional[CameraSettings]:
+    def getCameraSettings(self) -> CameraSettings:
         return self.cameraSettings
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
@@ -332,7 +332,7 @@ def pipelineToProto(inst: Pipeline, index: int, cameraId: CameraID) -> PipelineP
         for key in api.getSettingsSchema().keys()
     }
 
-    cameraSettings = inst.getCurrentCameraSettingCollection()
+    cameraSettings = inst.getCameraSettings()
     if cameraSettings:
         cameraAPI = cameraSettings.getAPI()
         settingsValues.update(

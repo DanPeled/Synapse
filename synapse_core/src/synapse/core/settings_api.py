@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
 
 from betterproto import which_one_of
+from cscore import VideoProperty
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
                                            ColorConstraintProto,
@@ -18,6 +19,7 @@ from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
                                            ConstraintProto,
                                            ConstraintTypeProto,
                                            EnumeratedConstraintProto,
+                                           EnumeratedOptionProto,
                                            ListConstraintProto,
                                            NumberConstraintProto,
                                            SettingMetaProto, SettingValueProto,
@@ -134,10 +136,16 @@ class NumberConstraint(Constraint[Union[float, int]]):
 TEnumeratedType = TypeVar("TEnumeratedType")
 
 
+@dataclass
+class EnumeratedOption(Generic[TEnumeratedType]):
+    key: str
+    value: TEnumeratedType
+
+
 class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]):
     """Constraint for selecting from predefined options"""
 
-    def __init__(self, options: List[TEnumeratedType]):
+    def __init__(self, options: Union[List[EnumeratedOption], List[TEnumeratedType]]):
         """
         Initialize a ListOptionsConstraint instance.
 
@@ -147,16 +155,19 @@ class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]
                 Defaults to False.
 
         """
+        assert options
+        if options and not isinstance(options[0], EnumeratedOption):
+            options = [EnumeratedOption(str(o), o) for o in options]
         super().__init__(ConstraintTypeProto.ENUMERATED)
-        self.options = options
+        self.options: List[EnumeratedOption] = options  # pyright: ignore
 
     def validate(self, value: SettingsValue) -> ValidationResult:
-        expectedType = type(self.options[0])
+        expectedType = type(self.options[0].value)
         if not isinstance(value, expectedType):
             return ValidationResult(
                 False, f"Expected type {expectedType}, got {type(value)}"
             )
-        if value not in self.options:
+        if value not in map(lambda o: o.value, self.options):
             return ValidationResult(
                 False, f"Value {value} not in allowed options: {self.options}"
             )
@@ -165,13 +176,20 @@ class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
-            "options": self.options,
+            "options": {o.key: o.value for o in self.options},
         }
 
     def configToProto(self) -> ConstraintConfigProto:
         return ConstraintConfigProto(
             enumerated=EnumeratedConstraintProto(
-                options=list(map(lambda op: settingValueToProto(op), self.options)),
+                options=list(
+                    map(
+                        lambda op: EnumeratedOptionProto(
+                            key=op.key, value=settingValueToProto(op.value)
+                        ),
+                        self.options,
+                    )
+                ),
             )
         )
 
@@ -676,10 +694,78 @@ class SettingsCollection:
         """
         self._settingsApi = SettingsAPI()
         self._fieldNames = []
-        self._initializeSettings()
 
+        self._initializeSettings()
         if settings:
             self.generateSettingsFromMap(settings)
+
+    def generateSetting(self, field: str, value: Any) -> None:
+        constraint: Optional[Constraint] = None
+        if isinstance(value, bool):
+            constraint = BooleanConstraint()
+        elif isinstance(value, float | int):
+            constraint = NumberConstraint(
+                minValue=None,
+                maxValue=None,
+                step=None if isinstance(value, float) else 1,
+            )
+        elif isinstance(value, str):
+            constraint = StringConstraint()
+        elif isinstance(value, list):
+
+            def getListDepth(value) -> int:
+                if not isinstance(value, list):
+                    return 0
+                if not value:
+                    return 1
+                return 1 + max(getListDepth(item) for item in value)
+
+            constraint = ListConstraint(depth=getListDepth(value))
+        if constraint is not None:
+            self._settingsApi.addSetting(
+                Setting(key=field, constraint=constraint, defaultValue=value)
+            )
+        else:
+            setting = self._settingsApi.settings[field]
+            validation = setting.validate(value)
+            if validation.errorMessage is None:
+                self._settingsApi.setValue(field, value)
+            else:
+                err(
+                    f"Error validating {MarkupColors.bold(field)}"
+                    + f"\n\t\t{validation.errorMessage}"
+                    + f"\n\tSetting {field} as default: {setting.defaultValue}"
+                )
+
+    def generateSettingFromProp(self, prop: VideoProperty) -> None:
+        constraint: Optional[Constraint] = None
+        if prop.getKind().value == VideoProperty.Kind.kBoolean.value:
+            constraint = BooleanConstraint()
+        elif prop.getKind().value == VideoProperty.Kind.kInteger.value:
+            constraint = NumberConstraint(
+                minValue=prop.getMin(),
+                maxValue=prop.getMax(),
+                step=1,
+            )
+        elif prop.getKind().value == VideoProperty.Kind.kString.value:
+            constraint = StringConstraint()
+        elif prop.getKind().value == VideoProperty.Kind.kEnum.value:
+            options = []
+            for i in range(len(prop.getChoices())):
+                if prop.getChoices()[i]:
+                    options.append(EnumeratedOption(prop.getChoices()[i], i))
+            constraint = EnumeratedConstraint(options)
+        else:
+            return
+        if constraint is not None:
+            self.addSetting(
+                Setting(
+                    key=prop.getName(),
+                    constraint=constraint,
+                    defaultValue=prop.getDefault(),
+                ),
+                prop.getName(),
+            )
 
     def generateSettingsFromMap(self, settingsMap: SettingsMap) -> None:
         """
@@ -691,42 +777,7 @@ class SettingsCollection:
         prexistingKeys = self.getSchema().keys()
         for field, value in settingsMap.items():
             if field not in prexistingKeys:
-                constraint: Optional[Constraint] = None
-                if isinstance(value, bool):
-                    constraint = BooleanConstraint()
-                elif isinstance(value, float | int):
-                    constraint = NumberConstraint(
-                        minValue=None,
-                        maxValue=None,
-                        step=None if isinstance(value, float) else 1,
-                    )
-                elif isinstance(value, str):
-                    constraint = StringConstraint()
-                elif isinstance(value, list):
-
-                    def getListDepth(value) -> int:
-                        if not isinstance(value, list):
-                            return 0
-                        if not value:
-                            return 1
-                        return 1 + max(getListDepth(item) for item in value)
-
-                    constraint = ListConstraint(depth=getListDepth(value))
-                if constraint is not None:
-                    self._settingsApi.addSetting(
-                        Setting(key=field, constraint=constraint, defaultValue=value)
-                    )
-            else:
-                setting = self._settingsApi.settings[field]
-                validation = setting.validate(value)
-                if validation.errorMessage is None:
-                    self._settingsApi.setValue(field, value)
-                else:
-                    err(
-                        f"Error validating {MarkupColors.bold(field)}"
-                        + f"\n\t\t{validation.errorMessage}"
-                        + f"\n\tSetting {field} as default: {setting.defaultValue}"
-                    )
+                self.generateSetting(field, value)
 
     def sendSettings(self, nt_table: NetworkTable):
         """
@@ -768,8 +819,11 @@ class SettingsCollection:
                 if isinstance(attrValue, Setting):
                     if attrValue.key != attrName:
                         attrValue.key = attrName
-                    self._settingsApi.addSetting(attrValue)
-                    self._fieldNames.append(attrName)
+                    self.addSetting(attrValue, attrName)
+
+    def addSetting(self, setting: Setting, name: str):
+        self._settingsApi.addSetting(setting)
+        self._fieldNames.append(name)
 
     @overload
     def getSetting(self, setting: str) -> Optional[Any]: ...
@@ -949,12 +1003,6 @@ class CameraSettings(SettingsCollection):
         category=kCameraPropsCategory,
         description="Adjusts the brightness level of the image.",
     )
-    exposure = settingField(
-        NumberConstraint(0, 100),
-        default=50,
-        category=kCameraPropsCategory,
-        description="Controls the exposure level.",
-    )
     saturation = settingField(
         NumberConstraint(0, 100),
         default=50,
@@ -1017,9 +1065,6 @@ class CameraSettings(SettingsCollection):
             self.brightness.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
-            self.exposure.constraint = getPropNumberConstraint(
-                propMeta, CameraPropKeys.kBrightness.value
-            )
             self.saturation.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
@@ -1029,6 +1074,18 @@ class CameraSettings(SettingsCollection):
             self.gain.constraint = getPropNumberConstraint(
                 propMeta, CameraPropKeys.kBrightness.value
             )
+            for prop in camera.getProperties():
+                if (
+                    "raw" in prop.getName()
+                    or "backlight" in prop.getName()
+                    or "connect_verbose" in prop.getName()
+                    or "privacy" in prop.getName()
+                    or "gamma" in prop.getName()
+                    or "exposure_dynamic_framerate" in prop.getName()
+                ):
+                    continue
+                self.generateSettingFromProp(prop)
+
         self.resolution.constraint = EnumeratedConstraint(
             options=list(
                 set(map(lambda s: f"{s[0]}x{s[1]}", camera.getSupportedResolutions()))
