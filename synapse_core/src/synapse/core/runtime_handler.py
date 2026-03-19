@@ -298,7 +298,7 @@ class RuntimeManager:
 
         currPipeline.bind(cameraIndex, camera)
 
-        cameraSettings = currPipeline.getCurrentCameraSettingCollection()
+        cameraSettings = currPipeline.getCameraSettings()
 
         assert cameraSettings is not None
 
@@ -348,24 +348,26 @@ class RuntimeManager:
         )
         assert pipeline is not None
 
-        settings = self.pipelineHandler.getPipelineSettings(
-            self.pipelineBindings[cameraIndex], cameraIndex
-        )
-        setting = settings.getAPI().getSetting(prop)
         camera = self.cameraHandler.getCamera(cameraIndex)
+        camSettings = pipeline.getCameraSettings().getAPI().settings.keys()
 
-        if prop in CameraSettings().getAPI().settings.keys():
+        if prop in camSettings:
             assert camera is not None
             camera.setProperty(prop=prop, value=value)
             pipeline.setCameraSetting(prop, value)
-        elif setting is not None:
-            settings.setSetting(prop, value)
-            pipeline.onSettingChanged(setting, settings.getSetting(prop))
         else:
-            log.warn(
-                f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
+            settings = self.pipelineHandler.getPipelineSettings(
+                self.pipelineBindings[cameraIndex], cameraIndex
             )
-            return
+            setting = settings.getAPI().getSetting(prop)
+            if setting is not None:
+                pipeline.setSetting(prop, value)
+                pipeline.onSettingChanged(setting, settings.getSetting(prop))
+            else:
+                log.warn(
+                    f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
+                )
+                return
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 
@@ -726,20 +728,18 @@ class RuntimeManager:
 
     def fixBlackLevelOffset(self, settings: PipelineSettings, frame: Frame) -> Frame:
         blackLevelOffset = settings.getSetting("black_level_offset")
+        if blackLevelOffset is None or blackLevelOffset == 0:
+            return frame
 
-        if blackLevelOffset == 0 or blackLevelOffset is None:
-            return frame  # No adjustment needed
+        # Normalize to [0,1] and convert to float32
+        image = frame.astype(np.float32) / 255.0
 
-        blackLevelOffset = -blackLevelOffset / 100
+        # Apply black level offset (scaled)
+        offset = blackLevelOffset / 100.0
+        image = np.clip(image + offset, 0, 1)
 
-        # Convert to float32 for better precision
-        image = frame.astype(np.float32) / 255.0  # Normalize to range [0,1]
-
-        # Apply black level offset: lift only the darkest values
-        image = np.power(image + blackLevelOffset, 1.0)  # Apply a soft offset
-
-        # Clip to valid range and convert back to uint8
-        return np.clip(image * 255, 0, 255).astype(np.uint8)
+        # Convert back to uint8
+        return (image * 255).astype(np.uint8)
 
     def fixtureFrame(self, cameraIndex: CameraID, frame: Frame) -> Frame:
         if (
@@ -752,9 +752,7 @@ class RuntimeManager:
             )
             if pipeline is None:
                 return frame
-            settings: Optional[CameraSettings] = (
-                pipeline.getCurrentCameraSettingCollection()
-            )
+            settings: Optional[CameraSettings] = pipeline.getCameraSettings()
             if settings is not None:
                 frame = self.rotateCameraBySettings(settings, frame)
 

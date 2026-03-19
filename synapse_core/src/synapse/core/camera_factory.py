@@ -15,7 +15,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 import cv2
 import numpy as np
 from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoSource)
+                    VideoProperty, VideoSource)
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.nt_client import NtClient
 from synapse_net.proto.v1 import CalibrationDataProto
@@ -168,8 +168,7 @@ class SynapseCamera(ABC):
         colors = [
             (255, 255, 255),  # white
             (0, 255, 255),  # yellow
-            (255, 255, 0),  # cyan
-            (0, 255, 0),  # green
+            (255, 255, 0),  # cyan (0, 255, 0),  # green
             (255, 0, 255),  # magenta
             (0, 0, 255),  # red
             (255, 0, 0),  # blue
@@ -257,6 +256,9 @@ class SynapseCamera(ABC):
 
     @abstractmethod
     def getProperty(self, prop: str) -> Union[int, float, None]: ...
+
+    def getProperties(self) -> List[VideoProperty]:
+        return []
 
     @abstractmethod
     def setVideoMode(self, fps: int, width: int, height: int) -> None: ...
@@ -376,8 +378,8 @@ class CsCoreCamera(SynapseCamera):
         self.camera: VideoCamera
         self.sink: CvSink
         self.propertyMeta: PropertyMetaDict = {}
-        self._properties: Dict[str, Any] = {}
-        self._videoModes: List[Any] = []
+        self._properties: Dict[str, VideoProperty] = {}
+        self._videoModes: List[VideoMode] = []
         self._validVideoModes: List[VideoMode] = []
 
         # --- FIX: Memory Recycling Implementation ---
@@ -396,6 +398,9 @@ class CsCoreCamera(SynapseCamera):
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
 
+    def getProperties(self) -> List:
+        return list(self._properties.values())
+
     @classmethod
     def create(
         cls,
@@ -412,7 +417,6 @@ class CsCoreCamera(SynapseCamera):
             inst.camera = UsbCamera(f"USB Camera {index}", path)
 
         inst.sink = CameraServer.getVideo(inst.camera)
-        inst.sink.getProperty("auto_exposure").set(0)
 
         # Cache properties and metadata
         props = inst.camera.enumerateProperties()
@@ -428,6 +432,7 @@ class CsCoreCamera(SynapseCamera):
 
         # Cache video modes and valid resolutions
         inst._videoModes = inst.camera.enumerateVideoModes()
+        inst.camera.setExposureManual(1)
         inst._validVideoModes = [mode for mode in inst._videoModes]
 
         # This will call setVideoMode, which now initializes the buffer pool.
@@ -536,6 +541,8 @@ class CsCoreCamera(SynapseCamera):
         )
 
     def setProperty(self, prop: str, value: Union[int, float, str]) -> None:
+        if prop == "orientation":
+            return
         if prop == "resolution" and isinstance(value, str):
             resolution = value.split("x")
             width = int(resolution[0])

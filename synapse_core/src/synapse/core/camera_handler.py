@@ -153,7 +153,6 @@ class CameraHandler:
                 found.append(info.productId)
                 newIndex = 0
 
-                print(self.requestedCameraUIDs)
                 if len(self.requestedCameraUIDs.keys()) > 0:
                     if id in self.requestedCameraUIDs.keys():
                         newIndex = self.requestedCameraUIDs.pop(id)
@@ -365,7 +364,7 @@ class CameraHandler:
 
         self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
 
-        ret, frame = camera.grabFrame()
+        frame = camera.generateNoSignalFrame()
 
         if frame is not None:
             self.streamOutputs[cameraIndex].putFrame(
@@ -380,9 +379,6 @@ class CameraHandler:
             .getStringArray("streams", [])[1]
             .replace("mjpg:", "")
         )
-
-        print(cameraConfig.name)
-        print(stream)
 
         camera.stream = stream
 

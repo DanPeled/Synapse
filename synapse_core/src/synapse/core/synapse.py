@@ -73,6 +73,7 @@ class Synapse:
         runtimeHandler: RuntimeManager,
         configPath: Path,
     ) -> bool:
+        self.__init_cmd_args()
         """
         Initializes the Synapse pipeline by loading configuration settings and setting up NetworkTables and global settings.
 
@@ -96,7 +97,8 @@ class Synapse:
         else:
             os.system("clear")
 
-        UIHandle.startUI()
+        if not self.__isHeadless:
+            UIHandle.startUI()
 
         log(
             MarkupColors.bold(
@@ -145,7 +147,6 @@ class Synapse:
                 raise Exception("Global settings setup failed")
 
             # Initialize NetworkTables
-            self.__init_cmd_args()
 
             log(
                 f"Network Config:\n  Team Number: {config.network.teamNumber}\n  Name: {config.network.name}\n  Is Server: {self.__isServer}\n  Is Sim: {self.__isSim}"
@@ -194,6 +195,9 @@ class Synapse:
         parser = argparse.ArgumentParser()
         parser.add_argument("--server", action="store_true", help="Run in server mode")
         parser.add_argument("--sim", action="store_true", help="Run in sim mode")
+        parser.add_argument(
+            "--headless", action="store_true", help="Run in headless mode"
+        )
         args = parser.parse_args()
 
         if args.server:
@@ -204,6 +208,10 @@ class Synapse:
             self.__isSim = True
         else:
             self.__isSim = False
+        if args.headless:
+            self.__isHeadless = True
+        else:
+            self.__isHeadless = False
 
     def run(self) -> None:
         """
@@ -543,7 +551,6 @@ class Synapse:
 
             if pipeline is not None:
                 val = protoToSettingValue(setSettingMSG.value)
-                pipeline.setSetting(setSettingMSG.setting, val)
                 self.runtimeHandler.updateSetting(
                     setSettingMSG.setting, setSettingMSG.cameraid, val
                 )
