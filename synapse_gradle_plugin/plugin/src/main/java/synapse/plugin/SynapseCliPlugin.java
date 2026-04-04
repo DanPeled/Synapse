@@ -9,10 +9,11 @@ import org.gradle.api.Project;
 /**
  * A simple 'hello world' plugin.
  */
-public class Synapse_cli_pluginPlugin implements Plugin<Project> {
+public class SynapseCliPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
         StartupSettingsExtension ext = project.getExtensions().create("synapse", StartupSettingsExtension.class);
+
         var deploy = project.getTasks().register("synapseDeploy", DeployTask.class, task -> {
             task.doFirst(t -> {
                 if (ext.getProjectName() == null) {
