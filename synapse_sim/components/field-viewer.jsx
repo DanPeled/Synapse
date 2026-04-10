@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { Suspense, useState, useEffect, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Html } from '@react-three/drei';
-import AprilTag from './apriltag';
-import { fieldLengthMeters, RobotModel, fieldWidthMeters } from './glbModel';
+import { Suspense, useState, useEffect, useRef } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, useGLTF, Html } from "@react-three/drei";
+import AprilTag from "./apriltag";
+import { fieldLengthMeters, RobotModel, fieldWidthMeters } from "./glbModel";
 
 // Tag size: 6.5 inches in meters
 const TAG_SIZE_METERS = 10.5 * 0.0254;
@@ -33,12 +33,12 @@ function LoadingScreen() {
     <Html center>
       <div
         style={{
-          color: 'white',
-          fontSize: '18px',
-          fontFamily: 'system-ui',
-          background: 'rgba(0,0,0,0.8)',
-          padding: '20px 40px',
-          borderRadius: '8px',
+          color: "white",
+          fontSize: "18px",
+          fontFamily: "system-ui",
+          background: "rgba(0,0,0,0.8)",
+          padding: "20px 40px",
+          borderRadius: "8px",
         }}
       >
         Loading field...
@@ -53,29 +53,33 @@ function Kitbot() {
       modelUrl="/kitbot2026.glb"
       pose={{
         position: [fieldWidthMeters / 2, fieldLengthMeters / 2, 0.05],
-        rotations: [{ axis: 'z', degrees: 0 }],
+        rotations: [{ axis: "z", degrees: 0 }],
       }}
-      cameraOffsetWpi={
-        {
-          position: [0, 0, 0.2],
-          rotations: [{
-            "axis": "x", "degrees": 90
-          }, {
-            "axis": "y", "degrees": 0
-          }, {
-            "axis": "z", "degrees": 0
+      cameraOffsetWpi={{
+        position: [0, 0, 0.2],
+        rotations: [
+          {
+            axis: "x",
+            degrees: 90,
           },
-          ]
-        }
-      }
+          {
+            axis: "y",
+            degrees: 0,
+          },
+          {
+            axis: "z",
+            degrees: 0,
+          },
+        ],
+      }}
     />
   );
 }
 
 /** Main viewer */
 export default function FieldViewer({
-  fieldModelUrl = '/field.glb',
-  aprilTagConfigUrl = '/apriltag-config.json',
+  fieldModelUrl = "/field.glb",
+  aprilTagConfigUrl = "/apriltag-config.json",
 }) {
   const [aprilTagConfig, setAprilTagConfig] = useState(null);
   const controlsRef = useRef();
@@ -84,7 +88,7 @@ export default function FieldViewer({
     fetch(aprilTagConfigUrl)
       .then((res) => res.json())
       .then(setAprilTagConfig)
-      .catch((err) => console.error('Failed to load AprilTag config:', err));
+      .catch((err) => console.error("Failed to load AprilTag config:", err));
   }, [aprilTagConfigUrl]);
 
   return (
@@ -107,7 +111,14 @@ export default function FieldViewer({
         <directionalLight position={[0, 100, 5]} intensity={50} />
 
         {/* OrbitControls with ref */}
-        <OrbitControls ref={controlsRef} enablePan enableZoom enableRotate maxDistance={100} minDistance={0.5} />
+        <OrbitControls
+          ref={controlsRef}
+          enablePan
+          enableZoom
+          enableRotate
+          maxDistance={100}
+          minDistance={0.5}
+        />
       </Canvas>
     </div>
   );
