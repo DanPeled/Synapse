@@ -51,7 +51,9 @@ export interface SetPipleineSettingMessageProto {
   /** The key/name of the setting to update */
   setting: string;
   /** The new value to assign to the setting */
-  value: SettingValueProto | undefined;
+  value:
+    | SettingValueProto
+    | undefined;
   /** The index of the pipeline instance to update */
   pipelineIndex: number;
   cameraid: number;
@@ -92,10 +94,7 @@ function createBasePipelineTypeProto(): PipelineTypeProto {
 }
 
 export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
-  encode(
-    message: PipelineTypeProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: PipelineTypeProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.type !== "") {
       writer.uint32(10).string(message.type);
     }
@@ -106,8 +105,7 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): PipelineTypeProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePipelineTypeProto();
     while (reader.pos < end) {
@@ -126,9 +124,7 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
             break;
           }
 
-          message.settings.push(
-            SettingMetaProto.decode(reader, reader.uint32()),
-          );
+          message.settings.push(SettingMetaProto.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -160,18 +156,13 @@ export const PipelineTypeProto: MessageFns<PipelineTypeProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(
-    base?: I,
-  ): PipelineTypeProto {
+  create<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(base?: I): PipelineTypeProto {
     return PipelineTypeProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(
-    object: I,
-  ): PipelineTypeProto {
+  fromPartial<I extends Exact<DeepPartial<PipelineTypeProto>, I>>(object: I): PipelineTypeProto {
     const message = createBasePipelineTypeProto();
     message.type = object.type ?? "";
-    message.settings =
-      object.settings?.map((e) => SettingMetaProto.fromPartial(e)) || [];
+    message.settings = object.settings?.map((e) => SettingMetaProto.fromPartial(e)) || [];
     return message;
   },
 };
@@ -181,10 +172,7 @@ function createBasePipelineProto(): PipelineProto {
 }
 
 export const PipelineProto: MessageFns<PipelineProto> = {
-  encode(
-    message: PipelineProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: PipelineProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
@@ -195,10 +183,7 @@ export const PipelineProto: MessageFns<PipelineProto> = {
       writer.uint32(26).string(message.type);
     }
     Object.entries(message.settingsValues).forEach(([key, value]) => {
-      PipelineProto_SettingsValuesEntry.encode(
-        { key: key as any, value },
-        writer.uint32(34).fork(),
-      ).join();
+      PipelineProto_SettingsValuesEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
     });
     if (message.cameraid !== 0) {
       writer.uint32(40).uint32(message.cameraid);
@@ -207,8 +192,7 @@ export const PipelineProto: MessageFns<PipelineProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): PipelineProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePipelineProto();
     while (reader.pos < end) {
@@ -243,10 +227,7 @@ export const PipelineProto: MessageFns<PipelineProto> = {
             break;
           }
 
-          const entry4 = PipelineProto_SettingsValuesEntry.decode(
-            reader,
-            reader.uint32(),
-          );
+          const entry4 = PipelineProto_SettingsValuesEntry.decode(reader, reader.uint32());
           if (entry4.value !== undefined) {
             message.settingsValues[entry4.key] = entry4.value;
           }
@@ -275,12 +256,10 @@ export const PipelineProto: MessageFns<PipelineProto> = {
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
       type: isSet(object.type) ? globalThis.String(object.type) : "",
       settingsValues: isObject(object.settingsValues)
-        ? Object.entries(object.settingsValues).reduce<{
-            [key: string]: SettingValueProto;
-          }>((acc, [key, value]) => {
-            acc[key] = SettingValueProto.fromJSON(value);
-            return acc;
-          }, {})
+        ? Object.entries(object.settingsValues).reduce<{ [key: string]: SettingValueProto }>((acc, [key, value]) => {
+          acc[key] = SettingValueProto.fromJSON(value);
+          return acc;
+        }, {})
         : {},
       cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
     };
@@ -312,26 +291,23 @@ export const PipelineProto: MessageFns<PipelineProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<PipelineProto>, I>>(
-    base?: I,
-  ): PipelineProto {
+  create<I extends Exact<DeepPartial<PipelineProto>, I>>(base?: I): PipelineProto {
     return PipelineProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<PipelineProto>, I>>(
-    object: I,
-  ): PipelineProto {
+  fromPartial<I extends Exact<DeepPartial<PipelineProto>, I>>(object: I): PipelineProto {
     const message = createBasePipelineProto();
     message.name = object.name ?? "";
     message.index = object.index ?? 0;
     message.type = object.type ?? "";
-    message.settingsValues = Object.entries(
-      object.settingsValues ?? {},
-    ).reduce<{ [key: string]: SettingValueProto }>((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = SettingValueProto.fromPartial(value);
-      }
-      return acc;
-    }, {});
+    message.settingsValues = Object.entries(object.settingsValues ?? {}).reduce<{ [key: string]: SettingValueProto }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = SettingValueProto.fromPartial(value);
+        }
+        return acc;
+      },
+      {},
+    );
     message.cameraid = object.cameraid ?? 0;
     return message;
   },
@@ -341,553 +317,462 @@ function createBasePipelineProto_SettingsValuesEntry(): PipelineProto_SettingsVa
   return { key: "", value: undefined };
 }
 
-export const PipelineProto_SettingsValuesEntry: MessageFns<PipelineProto_SettingsValuesEntry> =
-  {
-    encode(
-      message: PipelineProto_SettingsValuesEntry,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.key !== "") {
-        writer.uint32(10).string(message.key);
-      }
-      if (message.value !== undefined) {
-        SettingValueProto.encode(
-          message.value,
-          writer.uint32(18).fork(),
-        ).join();
-      }
-      return writer;
-    },
+export const PipelineProto_SettingsValuesEntry: MessageFns<PipelineProto_SettingsValuesEntry> = {
+  encode(message: PipelineProto_SettingsValuesEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      SettingValueProto.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): PipelineProto_SettingsValuesEntry {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBasePipelineProto_SettingsValuesEntry();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.key = reader.string();
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): PipelineProto_SettingsValuesEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePipelineProto_SettingsValuesEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
-          case 2: {
-            if (tag !== 18) {
-              break;
-            }
 
-            message.value = SettingValueProto.decode(reader, reader.uint32());
-            continue;
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
           }
+
+          message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): PipelineProto_SettingsValuesEntry {
-      return {
-        key: isSet(object.key) ? globalThis.String(object.key) : "",
-        value: isSet(object.value)
-          ? SettingValueProto.fromJSON(object.value)
-          : undefined,
-      };
-    },
-
-    toJSON(message: PipelineProto_SettingsValuesEntry): unknown {
-      const obj: any = {};
-      if (message.key !== "") {
-        obj.key = message.key;
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      if (message.value !== undefined) {
-        obj.value = SettingValueProto.toJSON(message.value);
-      }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create<I extends Exact<DeepPartial<PipelineProto_SettingsValuesEntry>, I>>(
-      base?: I,
-    ): PipelineProto_SettingsValuesEntry {
-      return PipelineProto_SettingsValuesEntry.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<
-      I extends Exact<DeepPartial<PipelineProto_SettingsValuesEntry>, I>,
-    >(object: I): PipelineProto_SettingsValuesEntry {
-      const message = createBasePipelineProto_SettingsValuesEntry();
-      message.key = object.key ?? "";
-      message.value =
-        object.value !== undefined && object.value !== null
-          ? SettingValueProto.fromPartial(object.value)
-          : undefined;
-      return message;
-    },
-  };
+  fromJSON(object: any): PipelineProto_SettingsValuesEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? SettingValueProto.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: PipelineProto_SettingsValuesEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = SettingValueProto.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PipelineProto_SettingsValuesEntry>, I>>(
+    base?: I,
+  ): PipelineProto_SettingsValuesEntry {
+    return PipelineProto_SettingsValuesEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PipelineProto_SettingsValuesEntry>, I>>(
+    object: I,
+  ): PipelineProto_SettingsValuesEntry {
+    const message = createBasePipelineProto_SettingsValuesEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? SettingValueProto.fromPartial(object.value)
+      : undefined;
+    return message;
+  },
+};
 
 function createBaseSetPipelineTypeMessageProto(): SetPipelineTypeMessageProto {
   return { newType: "", pipelineIndex: 0, cameraid: 0 };
 }
 
-export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto> =
-  {
-    encode(
-      message: SetPipelineTypeMessageProto,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.newType !== "") {
-        writer.uint32(10).string(message.newType);
-      }
-      if (message.pipelineIndex !== 0) {
-        writer.uint32(16).uint32(message.pipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        writer.uint32(24).uint32(message.cameraid);
-      }
-      return writer;
-    },
+export const SetPipelineTypeMessageProto: MessageFns<SetPipelineTypeMessageProto> = {
+  encode(message: SetPipelineTypeMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.newType !== "") {
+      writer.uint32(10).string(message.newType);
+    }
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(16).uint32(message.pipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      writer.uint32(24).uint32(message.cameraid);
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): SetPipelineTypeMessageProto {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseSetPipelineTypeMessageProto();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.newType = reader.string();
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPipelineTypeMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPipelineTypeMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
 
-            message.pipelineIndex = reader.uint32();
-            continue;
-          }
-          case 3: {
-            if (tag !== 24) {
-              break;
-            }
-
-            message.cameraid = reader.uint32();
-            continue;
-          }
+          message.newType = reader.string();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pipelineIndex = reader.uint32();
+          continue;
         }
-        reader.skip(tag & 7);
-      }
-      return message;
-    },
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
 
-    fromJSON(object: any): SetPipelineTypeMessageProto {
-      return {
-        newType: isSet(object.newType) ? globalThis.String(object.newType) : "",
-        pipelineIndex: isSet(object.pipelineIndex)
-          ? globalThis.Number(object.pipelineIndex)
-          : 0,
-        cameraid: isSet(object.cameraid)
-          ? globalThis.Number(object.cameraid)
-          : 0,
-      };
-    },
+          message.cameraid = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    toJSON(message: SetPipelineTypeMessageProto): unknown {
-      const obj: any = {};
-      if (message.newType !== "") {
-        obj.newType = message.newType;
-      }
-      if (message.pipelineIndex !== 0) {
-        obj.pipelineIndex = Math.round(message.pipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        obj.cameraid = Math.round(message.cameraid);
-      }
-      return obj;
-    },
+  fromJSON(object: any): SetPipelineTypeMessageProto {
+    return {
+      newType: isSet(object.newType) ? globalThis.String(object.newType) : "",
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+      cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
+    };
+  },
 
-    create<I extends Exact<DeepPartial<SetPipelineTypeMessageProto>, I>>(
-      base?: I,
-    ): SetPipelineTypeMessageProto {
-      return SetPipelineTypeMessageProto.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<I extends Exact<DeepPartial<SetPipelineTypeMessageProto>, I>>(
-      object: I,
-    ): SetPipelineTypeMessageProto {
-      const message = createBaseSetPipelineTypeMessageProto();
-      message.newType = object.newType ?? "";
-      message.pipelineIndex = object.pipelineIndex ?? 0;
-      message.cameraid = object.cameraid ?? 0;
-      return message;
-    },
-  };
+  toJSON(message: SetPipelineTypeMessageProto): unknown {
+    const obj: any = {};
+    if (message.newType !== "") {
+      obj.newType = message.newType;
+    }
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      obj.cameraid = Math.round(message.cameraid);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPipelineTypeMessageProto>, I>>(base?: I): SetPipelineTypeMessageProto {
+    return SetPipelineTypeMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPipelineTypeMessageProto>, I>>(object: I): SetPipelineTypeMessageProto {
+    const message = createBaseSetPipelineTypeMessageProto();
+    message.newType = object.newType ?? "";
+    message.pipelineIndex = object.pipelineIndex ?? 0;
+    message.cameraid = object.cameraid ?? 0;
+    return message;
+  },
+};
 
 function createBaseSetPipleineSettingMessageProto(): SetPipleineSettingMessageProto {
   return { setting: "", value: undefined, pipelineIndex: 0, cameraid: 0 };
 }
 
-export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessageProto> =
-  {
-    encode(
-      message: SetPipleineSettingMessageProto,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.setting !== "") {
-        writer.uint32(10).string(message.setting);
-      }
-      if (message.value !== undefined) {
-        SettingValueProto.encode(
-          message.value,
-          writer.uint32(18).fork(),
-        ).join();
-      }
-      if (message.pipelineIndex !== 0) {
-        writer.uint32(24).uint32(message.pipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        writer.uint32(32).uint32(message.cameraid);
-      }
-      return writer;
-    },
+export const SetPipleineSettingMessageProto: MessageFns<SetPipleineSettingMessageProto> = {
+  encode(message: SetPipleineSettingMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.setting !== "") {
+      writer.uint32(10).string(message.setting);
+    }
+    if (message.value !== undefined) {
+      SettingValueProto.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(24).uint32(message.pipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      writer.uint32(32).uint32(message.cameraid);
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): SetPipleineSettingMessageProto {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseSetPipleineSettingMessageProto();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.setting = reader.string();
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPipleineSettingMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPipleineSettingMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
-          case 2: {
-            if (tag !== 18) {
-              break;
-            }
 
-            message.value = SettingValueProto.decode(reader, reader.uint32());
-            continue;
-          }
-          case 3: {
-            if (tag !== 24) {
-              break;
-            }
-
-            message.pipelineIndex = reader.uint32();
-            continue;
-          }
-          case 4: {
-            if (tag !== 32) {
-              break;
-            }
-
-            message.cameraid = reader.uint32();
-            continue;
-          }
+          message.setting = reader.string();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
         }
-        reader.skip(tag & 7);
-      }
-      return message;
-    },
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
 
-    fromJSON(object: any): SetPipleineSettingMessageProto {
-      return {
-        setting: isSet(object.setting) ? globalThis.String(object.setting) : "",
-        value: isSet(object.value)
-          ? SettingValueProto.fromJSON(object.value)
-          : undefined,
-        pipelineIndex: isSet(object.pipelineIndex)
-          ? globalThis.Number(object.pipelineIndex)
-          : 0,
-        cameraid: isSet(object.cameraid)
-          ? globalThis.Number(object.cameraid)
-          : 0,
-      };
-    },
+          message.pipelineIndex = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
 
-    toJSON(message: SetPipleineSettingMessageProto): unknown {
-      const obj: any = {};
-      if (message.setting !== "") {
-        obj.setting = message.setting;
+          message.cameraid = reader.uint32();
+          continue;
+        }
       }
-      if (message.value !== undefined) {
-        obj.value = SettingValueProto.toJSON(message.value);
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      if (message.pipelineIndex !== 0) {
-        obj.pipelineIndex = Math.round(message.pipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        obj.cameraid = Math.round(message.cameraid);
-      }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create<I extends Exact<DeepPartial<SetPipleineSettingMessageProto>, I>>(
-      base?: I,
-    ): SetPipleineSettingMessageProto {
-      return SetPipleineSettingMessageProto.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<
-      I extends Exact<DeepPartial<SetPipleineSettingMessageProto>, I>,
-    >(object: I): SetPipleineSettingMessageProto {
-      const message = createBaseSetPipleineSettingMessageProto();
-      message.setting = object.setting ?? "";
-      message.value =
-        object.value !== undefined && object.value !== null
-          ? SettingValueProto.fromPartial(object.value)
-          : undefined;
-      message.pipelineIndex = object.pipelineIndex ?? 0;
-      message.cameraid = object.cameraid ?? 0;
-      return message;
-    },
-  };
+  fromJSON(object: any): SetPipleineSettingMessageProto {
+    return {
+      setting: isSet(object.setting) ? globalThis.String(object.setting) : "",
+      value: isSet(object.value) ? SettingValueProto.fromJSON(object.value) : undefined,
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+      cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
+    };
+  },
+
+  toJSON(message: SetPipleineSettingMessageProto): unknown {
+    const obj: any = {};
+    if (message.setting !== "") {
+      obj.setting = message.setting;
+    }
+    if (message.value !== undefined) {
+      obj.value = SettingValueProto.toJSON(message.value);
+    }
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      obj.cameraid = Math.round(message.cameraid);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPipleineSettingMessageProto>, I>>(base?: I): SetPipleineSettingMessageProto {
+    return SetPipleineSettingMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPipleineSettingMessageProto>, I>>(
+    object: I,
+  ): SetPipleineSettingMessageProto {
+    const message = createBaseSetPipleineSettingMessageProto();
+    message.setting = object.setting ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? SettingValueProto.fromPartial(object.value)
+      : undefined;
+    message.pipelineIndex = object.pipelineIndex ?? 0;
+    message.cameraid = object.cameraid ?? 0;
+    return message;
+  },
+};
 
 function createBaseSetPipelineIndexMessageProto(): SetPipelineIndexMessageProto {
   return { pipelineIndex: 0, cameraIndex: 0 };
 }
 
-export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessageProto> =
-  {
-    encode(
-      message: SetPipelineIndexMessageProto,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.pipelineIndex !== 0) {
-        writer.uint32(8).uint32(message.pipelineIndex);
-      }
-      if (message.cameraIndex !== 0) {
-        writer.uint32(16).uint32(message.cameraIndex);
-      }
-      return writer;
-    },
+export const SetPipelineIndexMessageProto: MessageFns<SetPipelineIndexMessageProto> = {
+  encode(message: SetPipelineIndexMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(8).uint32(message.pipelineIndex);
+    }
+    if (message.cameraIndex !== 0) {
+      writer.uint32(16).uint32(message.cameraIndex);
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): SetPipelineIndexMessageProto {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseSetPipelineIndexMessageProto();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 8) {
-              break;
-            }
-
-            message.pipelineIndex = reader.uint32();
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPipelineIndexMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPipelineIndexMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
           }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
 
-            message.cameraIndex = reader.uint32();
-            continue;
+          message.pipelineIndex = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
           }
+
+          message.cameraIndex = reader.uint32();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): SetPipelineIndexMessageProto {
-      return {
-        pipelineIndex: isSet(object.pipelineIndex)
-          ? globalThis.Number(object.pipelineIndex)
-          : 0,
-        cameraIndex: isSet(object.cameraIndex)
-          ? globalThis.Number(object.cameraIndex)
-          : 0,
-      };
-    },
-
-    toJSON(message: SetPipelineIndexMessageProto): unknown {
-      const obj: any = {};
-      if (message.pipelineIndex !== 0) {
-        obj.pipelineIndex = Math.round(message.pipelineIndex);
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      if (message.cameraIndex !== 0) {
-        obj.cameraIndex = Math.round(message.cameraIndex);
-      }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create<I extends Exact<DeepPartial<SetPipelineIndexMessageProto>, I>>(
-      base?: I,
-    ): SetPipelineIndexMessageProto {
-      return SetPipelineIndexMessageProto.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<I extends Exact<DeepPartial<SetPipelineIndexMessageProto>, I>>(
-      object: I,
-    ): SetPipelineIndexMessageProto {
-      const message = createBaseSetPipelineIndexMessageProto();
-      message.pipelineIndex = object.pipelineIndex ?? 0;
-      message.cameraIndex = object.cameraIndex ?? 0;
-      return message;
-    },
-  };
+  fromJSON(object: any): SetPipelineIndexMessageProto {
+    return {
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
+    };
+  },
+
+  toJSON(message: SetPipelineIndexMessageProto): unknown {
+    const obj: any = {};
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    if (message.cameraIndex !== 0) {
+      obj.cameraIndex = Math.round(message.cameraIndex);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPipelineIndexMessageProto>, I>>(base?: I): SetPipelineIndexMessageProto {
+    return SetPipelineIndexMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPipelineIndexMessageProto>, I>>(object: I): SetPipelineIndexMessageProto {
+    const message = createBaseSetPipelineIndexMessageProto();
+    message.pipelineIndex = object.pipelineIndex ?? 0;
+    message.cameraIndex = object.cameraIndex ?? 0;
+    return message;
+  },
+};
 
 function createBaseSetPipelineNameMessageProto(): SetPipelineNameMessageProto {
   return { pipelineIndex: 0, cameraid: 0, name: "" };
 }
 
-export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto> =
-  {
-    encode(
-      message: SetPipelineNameMessageProto,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.pipelineIndex !== 0) {
-        writer.uint32(8).uint32(message.pipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        writer.uint32(16).uint32(message.cameraid);
-      }
-      if (message.name !== "") {
-        writer.uint32(26).string(message.name);
-      }
-      return writer;
-    },
+export const SetPipelineNameMessageProto: MessageFns<SetPipelineNameMessageProto> = {
+  encode(message: SetPipelineNameMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.pipelineIndex !== 0) {
+      writer.uint32(8).uint32(message.pipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      writer.uint32(16).uint32(message.cameraid);
+    }
+    if (message.name !== "") {
+      writer.uint32(26).string(message.name);
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): SetPipelineNameMessageProto {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseSetPipelineNameMessageProto();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 8) {
-              break;
-            }
-
-            message.pipelineIndex = reader.uint32();
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPipelineNameMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPipelineNameMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
           }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
 
-            message.cameraid = reader.uint32();
-            continue;
-          }
-          case 3: {
-            if (tag !== 26) {
-              break;
-            }
-
-            message.name = reader.string();
-            continue;
-          }
+          message.pipelineIndex = reader.uint32();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.cameraid = reader.uint32();
+          continue;
         }
-        reader.skip(tag & 7);
-      }
-      return message;
-    },
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
 
-    fromJSON(object: any): SetPipelineNameMessageProto {
-      return {
-        pipelineIndex: isSet(object.pipelineIndex)
-          ? globalThis.Number(object.pipelineIndex)
-          : 0,
-        cameraid: isSet(object.cameraid)
-          ? globalThis.Number(object.cameraid)
-          : 0,
-        name: isSet(object.name) ? globalThis.String(object.name) : "",
-      };
-    },
+          message.name = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    toJSON(message: SetPipelineNameMessageProto): unknown {
-      const obj: any = {};
-      if (message.pipelineIndex !== 0) {
-        obj.pipelineIndex = Math.round(message.pipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        obj.cameraid = Math.round(message.cameraid);
-      }
-      if (message.name !== "") {
-        obj.name = message.name;
-      }
-      return obj;
-    },
+  fromJSON(object: any): SetPipelineNameMessageProto {
+    return {
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+      cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+    };
+  },
 
-    create<I extends Exact<DeepPartial<SetPipelineNameMessageProto>, I>>(
-      base?: I,
-    ): SetPipelineNameMessageProto {
-      return SetPipelineNameMessageProto.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<I extends Exact<DeepPartial<SetPipelineNameMessageProto>, I>>(
-      object: I,
-    ): SetPipelineNameMessageProto {
-      const message = createBaseSetPipelineNameMessageProto();
-      message.pipelineIndex = object.pipelineIndex ?? 0;
-      message.cameraid = object.cameraid ?? 0;
-      message.name = object.name ?? "";
-      return message;
-    },
-  };
+  toJSON(message: SetPipelineNameMessageProto): unknown {
+    const obj: any = {};
+    if (message.pipelineIndex !== 0) {
+      obj.pipelineIndex = Math.round(message.pipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      obj.cameraid = Math.round(message.cameraid);
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPipelineNameMessageProto>, I>>(base?: I): SetPipelineNameMessageProto {
+    return SetPipelineNameMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPipelineNameMessageProto>, I>>(object: I): SetPipelineNameMessageProto {
+    const message = createBaseSetPipelineNameMessageProto();
+    message.pipelineIndex = object.pipelineIndex ?? 0;
+    message.cameraid = object.cameraid ?? 0;
+    message.name = object.name ?? "";
+    return message;
+  },
+};
 
 function createBasePipelineResultProto(): PipelineResultProto {
-  return {
-    isMsgpack: false,
-    key: "",
-    pipelineIndex: 0,
-    value: undefined,
-    cameraid: 0,
-  };
+  return { isMsgpack: false, key: "", pipelineIndex: 0, value: undefined, cameraid: 0 };
 }
 
 export const PipelineResultProto: MessageFns<PipelineResultProto> = {
-  encode(
-    message: PipelineResultProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: PipelineResultProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.isMsgpack !== false) {
       writer.uint32(8).bool(message.isMsgpack);
     }
@@ -906,12 +791,8 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): PipelineResultProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): PipelineResultProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePipelineResultProto();
     while (reader.pos < end) {
@@ -968,16 +849,10 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
 
   fromJSON(object: any): PipelineResultProto {
     return {
-      isMsgpack: isSet(object.isMsgpack)
-        ? globalThis.Boolean(object.isMsgpack)
-        : false,
+      isMsgpack: isSet(object.isMsgpack) ? globalThis.Boolean(object.isMsgpack) : false,
       key: isSet(object.key) ? globalThis.String(object.key) : "",
-      pipelineIndex: isSet(object.pipelineIndex)
-        ? globalThis.Number(object.pipelineIndex)
-        : 0,
-      value: isSet(object.value)
-        ? SettingValueProto.fromJSON(object.value)
-        : undefined,
+      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
+      value: isSet(object.value) ? SettingValueProto.fromJSON(object.value) : undefined,
       cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
     };
   },
@@ -1002,22 +877,17 @@ export const PipelineResultProto: MessageFns<PipelineResultProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<PipelineResultProto>, I>>(
-    base?: I,
-  ): PipelineResultProto {
+  create<I extends Exact<DeepPartial<PipelineResultProto>, I>>(base?: I): PipelineResultProto {
     return PipelineResultProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<PipelineResultProto>, I>>(
-    object: I,
-  ): PipelineResultProto {
+  fromPartial<I extends Exact<DeepPartial<PipelineResultProto>, I>>(object: I): PipelineResultProto {
     const message = createBasePipelineResultProto();
     message.isMsgpack = object.isMsgpack ?? false;
     message.key = object.key ?? "";
     message.pipelineIndex = object.pipelineIndex ?? 0;
-    message.value =
-      object.value !== undefined && object.value !== null
-        ? SettingValueProto.fromPartial(object.value)
-        : undefined;
+    message.value = (object.value !== undefined && object.value !== null)
+      ? SettingValueProto.fromPartial(object.value)
+      : undefined;
     message.cameraid = object.cameraid ?? 0;
     return message;
   },
@@ -1027,119 +897,89 @@ function createBaseRemovePipelineMessageProto(): RemovePipelineMessageProto {
   return { removePipelineIndex: 0, cameraid: 0 };
 }
 
-export const RemovePipelineMessageProto: MessageFns<RemovePipelineMessageProto> =
-  {
-    encode(
-      message: RemovePipelineMessageProto,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.removePipelineIndex !== 0) {
-        writer.uint32(8).uint32(message.removePipelineIndex);
-      }
-      if (message.cameraid !== 0) {
-        writer.uint32(16).uint32(message.cameraid);
-      }
-      return writer;
-    },
+export const RemovePipelineMessageProto: MessageFns<RemovePipelineMessageProto> = {
+  encode(message: RemovePipelineMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.removePipelineIndex !== 0) {
+      writer.uint32(8).uint32(message.removePipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      writer.uint32(16).uint32(message.cameraid);
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): RemovePipelineMessageProto {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseRemovePipelineMessageProto();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 8) {
-              break;
-            }
-
-            message.removePipelineIndex = reader.uint32();
-            continue;
+  decode(input: BinaryReader | Uint8Array, length?: number): RemovePipelineMessageProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemovePipelineMessageProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
           }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
 
-            message.cameraid = reader.uint32();
-            continue;
+          message.removePipelineIndex = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
           }
+
+          message.cameraid = reader.uint32();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): RemovePipelineMessageProto {
-      return {
-        removePipelineIndex: isSet(object.removePipelineIndex)
-          ? globalThis.Number(object.removePipelineIndex)
-          : 0,
-        cameraid: isSet(object.cameraid)
-          ? globalThis.Number(object.cameraid)
-          : 0,
-      };
-    },
-
-    toJSON(message: RemovePipelineMessageProto): unknown {
-      const obj: any = {};
-      if (message.removePipelineIndex !== 0) {
-        obj.removePipelineIndex = Math.round(message.removePipelineIndex);
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      if (message.cameraid !== 0) {
-        obj.cameraid = Math.round(message.cameraid);
-      }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create<I extends Exact<DeepPartial<RemovePipelineMessageProto>, I>>(
-      base?: I,
-    ): RemovePipelineMessageProto {
-      return RemovePipelineMessageProto.fromPartial(base ?? ({} as any));
-    },
-    fromPartial<I extends Exact<DeepPartial<RemovePipelineMessageProto>, I>>(
-      object: I,
-    ): RemovePipelineMessageProto {
-      const message = createBaseRemovePipelineMessageProto();
-      message.removePipelineIndex = object.removePipelineIndex ?? 0;
-      message.cameraid = object.cameraid ?? 0;
-      return message;
-    },
-  };
+  fromJSON(object: any): RemovePipelineMessageProto {
+    return {
+      removePipelineIndex: isSet(object.removePipelineIndex) ? globalThis.Number(object.removePipelineIndex) : 0,
+      cameraid: isSet(object.cameraid) ? globalThis.Number(object.cameraid) : 0,
+    };
+  },
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+  toJSON(message: RemovePipelineMessageProto): unknown {
+    const obj: any = {};
+    if (message.removePipelineIndex !== 0) {
+      obj.removePipelineIndex = Math.round(message.removePipelineIndex);
+    }
+    if (message.cameraid !== 0) {
+      obj.cameraid = Math.round(message.cameraid);
+    }
+    return obj;
+  },
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+  create<I extends Exact<DeepPartial<RemovePipelineMessageProto>, I>>(base?: I): RemovePipelineMessageProto {
+    return RemovePipelineMessageProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RemovePipelineMessageProto>, I>>(object: I): RemovePipelineMessageProto {
+    const message = createBaseRemovePipelineMessageProto();
+    message.removePipelineIndex = object.removePipelineIndex ?? 0;
+    message.cameraid = object.cameraid ?? 0;
+    return message;
+  },
+};
+
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

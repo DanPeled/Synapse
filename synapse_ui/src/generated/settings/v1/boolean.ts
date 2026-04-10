@@ -18,22 +18,15 @@ function createBaseBooleanConstraintProto(): BooleanConstraintProto {
 }
 
 export const BooleanConstraintProto: MessageFns<BooleanConstraintProto> = {
-  encode(
-    message: BooleanConstraintProto,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: BooleanConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.renderAsButton !== false) {
       writer.uint32(8).bool(message.renderAsButton);
     }
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): BooleanConstraintProto {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): BooleanConstraintProto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseBooleanConstraintProto();
     while (reader.pos < end) {
@@ -57,11 +50,7 @@ export const BooleanConstraintProto: MessageFns<BooleanConstraintProto> = {
   },
 
   fromJSON(object: any): BooleanConstraintProto {
-    return {
-      renderAsButton: isSet(object.renderAsButton)
-        ? globalThis.Boolean(object.renderAsButton)
-        : false,
-    };
+    return { renderAsButton: isSet(object.renderAsButton) ? globalThis.Boolean(object.renderAsButton) : false };
   },
 
   toJSON(message: BooleanConstraintProto): unknown {
@@ -72,45 +61,27 @@ export const BooleanConstraintProto: MessageFns<BooleanConstraintProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<BooleanConstraintProto>, I>>(
-    base?: I,
-  ): BooleanConstraintProto {
+  create<I extends Exact<DeepPartial<BooleanConstraintProto>, I>>(base?: I): BooleanConstraintProto {
     return BooleanConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<BooleanConstraintProto>, I>>(
-    object: I,
-  ): BooleanConstraintProto {
+  fromPartial<I extends Exact<DeepPartial<BooleanConstraintProto>, I>>(object: I): BooleanConstraintProto {
     const message = createBaseBooleanConstraintProto();
     message.renderAsButton = object.renderAsButton ?? false;
     return message;
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends {}
-        ? { [K in keyof T]?: DeepPartial<T[K]> }
-        : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin
-  ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-    };
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
