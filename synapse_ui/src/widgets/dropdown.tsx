@@ -22,6 +22,7 @@ interface DropdownProps<T> {
   options: DropdownOption<T>[];
   disabled?: boolean;
   textSize?: string;
+  className?: string;
 }
 
 export function Dropdown<T>({
@@ -31,6 +32,7 @@ export function Dropdown<T>({
   options,
   disabled = false,
   textSize = "text-base",
+  className = "",
 }: DropdownProps<T>) {
   const stringToValue = new Map<string, T>();
   const valueToString = new Map<T, string>();
@@ -45,7 +47,10 @@ export function Dropdown<T>({
 
   return (
     <div
-      className="flex items-center gap-3 relative transition-colors w-full"
+      className={cn(
+        "flex items-center gap-3 relative transition-colors w-full",
+        className,
+      )}
       style={{
         color: teamColor,
         fontWeight: 500,
@@ -61,7 +66,7 @@ export function Dropdown<T>({
       >
         {label}
       </label>
-      <div className="flex-1 relative">
+      <div className="flex-1 relative w-full h-full">
         <Select
           value={selectedKey ?? ""}
           onValueChange={(strVal) => {

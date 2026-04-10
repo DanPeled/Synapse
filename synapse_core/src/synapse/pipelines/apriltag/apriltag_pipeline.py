@@ -292,19 +292,16 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                     )
 
         self.setDataValue("hasResults", True)
-        self.setResults(
-            ApriltagsJson.toJsonString(
-                ApriltagResult(
-                    self.combinedApriltagPoseEstimator.estimate(
-                        map(
-                            lambda estimate: estimate.cameraPoseEstimate,
-                            tagEstimates,
-                        )
-                    ),
+        result = ApriltagResult(
+            self.combinedApriltagPoseEstimator.estimate(
+                map(
+                    lambda estimate: estimate.cameraPoseEstimate,
                     tagEstimates,
-                ),
+                )
             ),
+            tagEstimates,
         )
+        self.setResults(ApriltagsJson.toJsonString(result))
 
         return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 

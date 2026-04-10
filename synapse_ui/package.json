@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "next dev --turbopack -H 0.0.0.0",
+    "dev": "next dev --turbopack -H 0.0.0.0 -p 8000",
     "build": "next build && python move_out_to_subdir.py",
     "start": "next start",
     "lint": "next lint",

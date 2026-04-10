@@ -22,27 +22,31 @@ class ApriltagFieldJson:
     def loadField(filePath: str | Path) -> "ApriltagFieldJson":
         with open(filePath, "r") as file:
             jsonDict: dict = json.load(file)
-            tagsDict: Dict[ApriltagFieldJson.TagId, Pose3d] = {}
-            for tag in jsonDict.get("tags", {}):
-                poseDict = tag["pose"]
-                rotation = poseDict["rotation"]["quaternion"]
-                translation = poseDict["translation"]
-                tagsDict[tag["ID"]] = Pose3d(
-                    translation=Translation3d(
-                        translation["x"], translation["y"], translation["z"]
-                    ),
-                    rotation=Rotation3d(
-                        Quaternion(
-                            w=rotation["W"],
-                            x=rotation["X"],
-                            y=rotation["Y"],
-                            z=rotation["Z"],
-                        )
-                    ),
-                )
-            length = jsonDict["field"]["length"]
-            width = jsonDict["field"]["width"]
-            return ApriltagFieldJson(tagsDict, length, width)
+            return ApriltagFieldJson.loadFieldJson(jsonDict)
+
+    @staticmethod
+    def loadFieldJson(data: dict) -> "ApriltagFieldJson":
+        tagsDict: Dict[ApriltagFieldJson.TagId, Pose3d] = {}
+        for tag in data.get("tags", {}):
+            poseDict = tag["pose"]
+            rotation = poseDict["rotation"]["quaternion"]
+            translation = poseDict["translation"]
+            tagsDict[tag["ID"]] = Pose3d(
+                translation=Translation3d(
+                    translation["x"], translation["y"], translation["z"]
+                ),
+                rotation=Rotation3d(
+                    Quaternion(
+                        w=rotation["W"],
+                        x=rotation["X"],
+                        y=rotation["Y"],
+                        z=rotation["Z"],
+                    )
+                ),
+            )
+        length = data["field"]["length"]
+        width = data["field"]["width"]
+        return ApriltagFieldJson(tagsDict, length, width)
 
     def getTagPose(self, id: TagId) -> Optional[Pose3d]:
         if id in self.fieldMap.keys():

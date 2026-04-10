@@ -24,7 +24,6 @@ function RenderPrimitiveResult({
   copyToClipboard: (key: string, text: string) => void;
   textSize?: string;
 }) {
-  // Render `null` if value.value is undefined
   const val =
     value.value === undefined ? null : String(protoToSettingValue(value.value));
 

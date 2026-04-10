@@ -115,12 +115,18 @@ class SettingValueProto(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class EnumeratedOptionProto(betterproto.Message):
+    key: str = betterproto.string_field(1)
+    value: "SettingValueProto" = betterproto.message_field(2)
+
+
+@dataclass(eq=False, repr=False)
 class EnumeratedConstraintProto(betterproto.Message):
     """
     Constraint that limits a setting to a predefined list of possible values
     """
 
-    options: List["SettingValueProto"] = betterproto.message_field(1)
+    options: List["EnumeratedOptionProto"] = betterproto.message_field(1)
     """List of allowed option values for the setting"""
 
 

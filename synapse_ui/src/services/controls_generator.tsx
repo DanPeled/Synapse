@@ -272,10 +272,12 @@ export function GenerateControl({
         );
       }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED: {
+      console.log(setting.constraint.constraint?.enumerated?.options);
       const options =
         setting.constraint.constraint?.enumerated?.options.map((op) => {
-          const val = protoToSettingValue(op);
-          return { label: String(val), value: val };
+          // Extract the actual value from the proto
+          const val = op.value?.intValue ?? op.value?.stringValue ?? 0;
+          return { label: op.key, value: val };
         }) ?? [];
 
       // Patterns for "1920x1080" and single numbers like "60"
@@ -310,7 +312,7 @@ export function GenerateControl({
         <LabeledControl label={settingName}>
           <Dropdown
             label=""
-            options={sortedOptions as DropdownOption<SettingValueProto>[]}
+            options={sortedOptions as DropdownOption<string>[]}
             value={val}
             onValueChange={(val) => setValue(settingValueToProto(val))}
             disabled={locked}

@@ -13,13 +13,14 @@ from typing import Any, Dict, Final, List, Optional, Tuple
 import cscore as cs
 import cv2
 import synapse.log as log
+from ntcore import NetworkTableInstance
 from synapse_net.nt_client import NtClient
 
 from ..callback import Callback
 from ..stypes import (CameraID, CameraName, CameraUID, Frame,
                       RecordingFilename, RecordingStatus, Resolution)
-from .camera_factory import (CameraConfig, CameraFactory, SynapseCamera,
-                             getCameraTableName)
+from .camera_factory import (CameraConfig, CameraFactory, NoSignalCamera,
+                             SynapseCamera, getCameraTableName)
 from .global_settings import GlobalSettings
 
 
@@ -54,6 +55,7 @@ class CameraHandler:
         self.onAddCamera: Callback[CameraID, CameraName, SynapseCamera] = Callback()
         self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
         self.cameraUIDs: List[CameraUID] = []
+        self.requestedCameraUIDs: Dict[CameraUID, CameraID] = {}
 
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
@@ -102,22 +104,25 @@ class CameraHandler:
             for info in cs.UsbCamera.enumerateUsbCameras()
         }
 
-        found: List[int] = []
-
         for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
             if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraUIDs:
                 info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
                     cameraConfig.id, None
                 )
                 if info is not None:
-                    found.append(info.productId)
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:
                         self.cameraUIDs.append(cameraConfig.id)
                 else:
+                    self.requestedCameraUIDs[cameraConfig.id] = cameraIndex
+
+                    self.addCameraData(
+                        cameraIndex, cameraConfig, NoSignalCamera(cameraConfig.name)
+                    )
+
                     log.warn(
-                        f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped"
+                        f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped and added later"
                     )
                     continue
 
@@ -143,15 +148,22 @@ class CameraHandler:
         found: List[int] = []
 
         for info in self.usbCameraInfos.values():
-            if info.productId not in found:
+            id = f"{info.name}_{info.productId}"
+            if info.productId not in found and id not in self.cameraUIDs:
                 found.append(info.productId)
                 newIndex = 0
-                if len(self.cameras.keys()) > 0:
-                    newIndex = max(self.cameras.keys()) + 1
+
+                if len(self.requestedCameraUIDs.keys()) > 0:
+                    if id in self.requestedCameraUIDs.keys():
+                        newIndex = self.requestedCameraUIDs.pop(id)
+                    else:
+                        m = max(self.requestedCameraUIDs.values())
+                        newIndex = m + 1
+
                 cameraIndex = newIndex
                 cameraConfig = CameraConfig(
                     name=info.name,
-                    id=f"{info.name}_{info.productId}",
+                    id=id,
                     defaultPipeline=0,
                     calibration={},
                     streamRes=self.DEFAULT_STREAM_SIZE,
@@ -159,7 +171,7 @@ class CameraHandler:
 
                 if cameraConfig.id not in self.cameraUIDs:
                     log.log(
-                        f"Found non-registered camera: {info.name} (i={info.dev}), adding automatically"
+                        f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
                     )
                     GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
@@ -333,31 +345,50 @@ class CameraHandler:
             log.err(f"Failed to start camera capture: {e}")
             return False
 
-        MAX_RETRIES = 30
-        for attempt in range(MAX_RETRIES):
-            if camera.isConnected():
-                break
-            log.log(
-                f"Trying to open camera {camera.name} ({cameraConfig.id}), attempt {attempt + 1}"
-            )
-            time.sleep(1)
+        self.addCameraData(cameraIndex, cameraConfig, camera)
 
-        if camera.isConnected():
-            self.cameras[cameraIndex] = camera
-            self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
-            self.setRecordingStatus(cameraIndex, False)
+        return True
 
-            self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
+    def addCameraData(
+        self,
+        cameraIndex: CameraID,
+        cameraConfig: CameraConfig,
+        camera: SynapseCamera,
+    ):
+        if cameraIndex in self.cameras.keys():
+            prevCam = self.cameras.pop(cameraIndex)
+            prevCam.isRunning = False
+        self.cameras[cameraIndex] = camera
 
-            log.log(
-                f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
-            )
-            return True
+        camera.cameraIndex = cameraIndex
 
-        log.err(
-            f"Failed to open camera {camera.name} ({cameraConfig.id}) after {MAX_RETRIES} retries."
+        self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
+
+        frame = camera.generateNoSignalFrame()
+
+        if frame is not None:
+            self.streamOutputs[cameraIndex].putFrame(
+                frame
+            )  # NOTE: stream only appears after a frame has been posted, probably
+
+        stream = (
+            NetworkTableInstance.getDefault()
+            .getTable("CameraPublisher")
+            .getSubTable(NtClient.NT_TABLE)
+            .getSubTable(cameraConfig.name)
+            .getStringArray("streams", [])[1]
+            .replace("mjpg:", "")
         )
-        return False
+
+        camera.stream = stream
+
+        self.setRecordingStatus(cameraIndex, False)
+
+        self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
+
+        log.log(
+            f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
+        )
 
     def setCameraProps(
         self, settings: Dict[str, Any], camera: SynapseCamera

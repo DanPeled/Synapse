@@ -10,11 +10,108 @@ import { SettingValueProto } from "./value";
 
 export const protobufPackage = "settings.v1";
 
+export interface EnumeratedOptionProto {
+  key: string;
+  value: SettingValueProto | undefined;
+}
+
 /** Constraint that limits a setting to a predefined list of possible values */
 export interface EnumeratedConstraintProto {
   /** List of allowed option values for the setting */
-  options: SettingValueProto[];
+  options: EnumeratedOptionProto[];
 }
+
+function createBaseEnumeratedOptionProto(): EnumeratedOptionProto {
+  return { key: "", value: undefined };
+}
+
+export const EnumeratedOptionProto: MessageFns<EnumeratedOptionProto> = {
+  encode(
+    message: EnumeratedOptionProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      SettingValueProto.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): EnumeratedOptionProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEnumeratedOptionProto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = SettingValueProto.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EnumeratedOptionProto {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value)
+        ? SettingValueProto.fromJSON(object.value)
+        : undefined,
+    };
+  },
+
+  toJSON(message: EnumeratedOptionProto): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = SettingValueProto.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EnumeratedOptionProto>, I>>(
+    base?: I,
+  ): EnumeratedOptionProto {
+    return EnumeratedOptionProto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EnumeratedOptionProto>, I>>(
+    object: I,
+  ): EnumeratedOptionProto {
+    const message = createBaseEnumeratedOptionProto();
+    message.key = object.key ?? "";
+    message.value =
+      object.value !== undefined && object.value !== null
+        ? SettingValueProto.fromPartial(object.value)
+        : undefined;
+    return message;
+  },
+};
 
 function createBaseEnumeratedConstraintProto(): EnumeratedConstraintProto {
   return { options: [] };
@@ -27,7 +124,7 @@ export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
       writer: BinaryWriter = new BinaryWriter(),
     ): BinaryWriter {
       for (const v of message.options) {
-        SettingValueProto.encode(v!, writer.uint32(10).fork()).join();
+        EnumeratedOptionProto.encode(v!, writer.uint32(10).fork()).join();
       }
       return writer;
     },
@@ -49,7 +146,7 @@ export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
             }
 
             message.options.push(
-              SettingValueProto.decode(reader, reader.uint32()),
+              EnumeratedOptionProto.decode(reader, reader.uint32()),
             );
             continue;
           }
@@ -65,7 +162,7 @@ export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
     fromJSON(object: any): EnumeratedConstraintProto {
       return {
         options: globalThis.Array.isArray(object?.options)
-          ? object.options.map((e: any) => SettingValueProto.fromJSON(e))
+          ? object.options.map((e: any) => EnumeratedOptionProto.fromJSON(e))
           : [],
       };
     },
@@ -73,7 +170,9 @@ export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
     toJSON(message: EnumeratedConstraintProto): unknown {
       const obj: any = {};
       if (message.options?.length) {
-        obj.options = message.options.map((e) => SettingValueProto.toJSON(e));
+        obj.options = message.options.map((e) =>
+          EnumeratedOptionProto.toJSON(e),
+        );
       }
       return obj;
     },
@@ -88,7 +187,7 @@ export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
     ): EnumeratedConstraintProto {
       const message = createBaseEnumeratedConstraintProto();
       message.options =
-        object.options?.map((e) => SettingValueProto.fromPartial(e)) || [];
+        object.options?.map((e) => EnumeratedOptionProto.fromPartial(e)) || [];
       return message;
     },
   };
@@ -118,6 +217,10 @@ export type Exact<P, I extends P> = P extends Builtin
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
       [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
     };
+
+function isSet(value: any): boolean {
+  return value !== null && value !== undefined;
+}
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;

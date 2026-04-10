@@ -1,6 +1,6 @@
 plugins {
     id "java"
-    id "edu.wpi.first.GradleRIO" version "2026.1.1-beta-1"
+    id "edu.wpi.first.GradleRIO" version "2026.1.1"
     id 'com.diffplug.spotless' version '6.20.0'
 }
 
@@ -70,7 +70,7 @@ dependencies {
     annotationProcessor wpi.java.deps.wpilibAnnotations()
     implementation wpi.java.deps.wpilib()
     implementation wpi.java.vendor.java()
-    implementation("synapse.vision:synapse_lib:2026.0.0a1")
+    implementation("synapse.vision:synapse_lib:2026.0.1")
 
 
 
