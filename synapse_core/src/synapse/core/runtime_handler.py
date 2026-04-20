@@ -16,21 +16,12 @@ import cv2
 import numpy as np
 import synapse.__version__ as versionFile
 import synapse.log as log
-from ntcore import (
-    Event,
-    EventFlags,
-    NetworkTable,
-    NetworkTableEntry,
-    NetworkTableInstance,
-    NetworkTableType,
-    StringPublisher,
-    ValueEventData,
-)
-from synapse_net.generated.messages.v1 import (
-    CameraPerformanceProto,
-    HardwareMetricsProto,
-    MessageTypeProto,
-)
+from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
+                    NetworkTableInstance, NetworkTableType, StringPublisher,
+                    ValueEventData)
+from synapse_net.generated.messages.v1 import (CameraPerformanceProto,
+                                               HardwareMetricsProto,
+                                               MessageTypeProto)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpimath.units import seconds, secondsToMilliseconds
@@ -43,13 +34,8 @@ from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .nt_keys import NTKeys
-from .pipeline import (
-    FrameResult,
-    Pipeline,
-    PipelineProcessFrameResult,
-    PipelineSettings,
-    getPipelineTypename,
-)
+from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
+                       PipelineSettings, getPipelineTypename)
 from .pipeline_handler import PipelineHandler
 from .settings_api import CameraSettings
 

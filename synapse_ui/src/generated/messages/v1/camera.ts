@@ -74,7 +74,10 @@ function createBaseCameraProto(): CameraProto {
 }
 
 export const CameraProto: MessageFns<CameraProto> = {
-  encode(message: CameraProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CameraProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
@@ -103,7 +106,8 @@ export const CameraProto: MessageFns<CameraProto> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CameraProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCameraProto();
     while (reader.pos < end) {
@@ -170,7 +174,9 @@ export const CameraProto: MessageFns<CameraProto> = {
             break;
           }
 
-          message.settings.push(SettingMetaProto.decode(reader, reader.uint32()));
+          message.settings.push(
+            SettingMetaProto.decode(reader, reader.uint32()),
+          );
           continue;
         }
       }
@@ -185,11 +191,17 @@ export const CameraProto: MessageFns<CameraProto> = {
   fromJSON(object: any): CameraProto {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      streamPath: isSet(object.streamPath) ? globalThis.String(object.streamPath) : "",
+      streamPath: isSet(object.streamPath)
+        ? globalThis.String(object.streamPath)
+        : "",
       kind: isSet(object.kind) ? globalThis.String(object.kind) : "",
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
-      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
-      defaultPipeline: isSet(object.defaultPipeline) ? globalThis.Number(object.defaultPipeline) : 0,
+      pipelineIndex: isSet(object.pipelineIndex)
+        ? globalThis.Number(object.pipelineIndex)
+        : 0,
+      defaultPipeline: isSet(object.defaultPipeline)
+        ? globalThis.Number(object.defaultPipeline)
+        : 0,
       maxFps: isSet(object.maxFps) ? globalThis.Number(object.maxFps) : 0,
       settings: globalThis.Array.isArray(object?.settings)
         ? object.settings.map((e: any) => SettingMetaProto.fromJSON(e))
@@ -229,7 +241,9 @@ export const CameraProto: MessageFns<CameraProto> = {
   create<I extends Exact<DeepPartial<CameraProto>, I>>(base?: I): CameraProto {
     return CameraProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CameraProto>, I>>(object: I): CameraProto {
+  fromPartial<I extends Exact<DeepPartial<CameraProto>, I>>(
+    object: I,
+  ): CameraProto {
     const message = createBaseCameraProto();
     message.name = object.name ?? "";
     message.streamPath = object.streamPath ?? "";
@@ -238,7 +252,8 @@ export const CameraProto: MessageFns<CameraProto> = {
     message.pipelineIndex = object.pipelineIndex ?? 0;
     message.defaultPipeline = object.defaultPipeline ?? 0;
     message.maxFps = object.maxFps ?? 0;
-    message.settings = object.settings?.map((e) => SettingMetaProto.fromPartial(e)) || [];
+    message.settings =
+      object.settings?.map((e) => SettingMetaProto.fromPartial(e)) || [];
     return message;
   },
 };
@@ -248,7 +263,10 @@ function createBaseCameraPerformanceProto(): CameraPerformanceProto {
 }
 
 export const CameraPerformanceProto: MessageFns<CameraPerformanceProto> = {
-  encode(message: CameraPerformanceProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CameraPerformanceProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.latencyCapture !== 0) {
       writer.uint32(13).float(message.latencyCapture);
     }
@@ -264,8 +282,12 @@ export const CameraPerformanceProto: MessageFns<CameraPerformanceProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CameraPerformanceProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CameraPerformanceProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCameraPerformanceProto();
     while (reader.pos < end) {
@@ -314,10 +336,16 @@ export const CameraPerformanceProto: MessageFns<CameraPerformanceProto> = {
 
   fromJSON(object: any): CameraPerformanceProto {
     return {
-      latencyCapture: isSet(object.latencyCapture) ? globalThis.Number(object.latencyCapture) : 0,
-      latencyProcess: isSet(object.latencyProcess) ? globalThis.Number(object.latencyProcess) : 0,
+      latencyCapture: isSet(object.latencyCapture)
+        ? globalThis.Number(object.latencyCapture)
+        : 0,
+      latencyProcess: isSet(object.latencyProcess)
+        ? globalThis.Number(object.latencyProcess)
+        : 0,
       fps: isSet(object.fps) ? globalThis.Number(object.fps) : 0,
-      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
     };
   },
 
@@ -338,10 +366,14 @@ export const CameraPerformanceProto: MessageFns<CameraPerformanceProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(base?: I): CameraPerformanceProto {
+  create<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(
+    base?: I,
+  ): CameraPerformanceProto {
     return CameraPerformanceProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(object: I): CameraPerformanceProto {
+  fromPartial<I extends Exact<DeepPartial<CameraPerformanceProto>, I>>(
+    object: I,
+  ): CameraPerformanceProto {
     const message = createBaseCameraPerformanceProto();
     message.latencyCapture = object.latencyCapture ?? 0;
     message.latencyProcess = object.latencyProcess ?? 0;
@@ -355,86 +387,103 @@ function createBaseSetDefaultPipelineMessageProto(): SetDefaultPipelineMessagePr
   return { cameraIndex: 0, pipelineIndex: 0 };
 }
 
-export const SetDefaultPipelineMessageProto: MessageFns<SetDefaultPipelineMessageProto> = {
-  encode(message: SetDefaultPipelineMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.cameraIndex !== 0) {
-      writer.uint32(8).int32(message.cameraIndex);
-    }
-    if (message.pipelineIndex !== 0) {
-      writer.uint32(16).int32(message.pipelineIndex);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SetDefaultPipelineMessageProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSetDefaultPipelineMessageProto();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.cameraIndex = reader.int32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.pipelineIndex = reader.int32();
-          continue;
-        }
+export const SetDefaultPipelineMessageProto: MessageFns<SetDefaultPipelineMessageProto> =
+  {
+    encode(
+      message: SetDefaultPipelineMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.cameraIndex !== 0) {
+        writer.uint32(8).int32(message.cameraIndex);
       }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
+      if (message.pipelineIndex !== 0) {
+        writer.uint32(16).int32(message.pipelineIndex);
       }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+      return writer;
+    },
 
-  fromJSON(object: any): SetDefaultPipelineMessageProto {
-    return {
-      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
-      pipelineIndex: isSet(object.pipelineIndex) ? globalThis.Number(object.pipelineIndex) : 0,
-    };
-  },
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): SetDefaultPipelineMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetDefaultPipelineMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
 
-  toJSON(message: SetDefaultPipelineMessageProto): unknown {
-    const obj: any = {};
-    if (message.cameraIndex !== 0) {
-      obj.cameraIndex = Math.round(message.cameraIndex);
-    }
-    if (message.pipelineIndex !== 0) {
-      obj.pipelineIndex = Math.round(message.pipelineIndex);
-    }
-    return obj;
-  },
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
 
-  create<I extends Exact<DeepPartial<SetDefaultPipelineMessageProto>, I>>(base?: I): SetDefaultPipelineMessageProto {
-    return SetDefaultPipelineMessageProto.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SetDefaultPipelineMessageProto>, I>>(
-    object: I,
-  ): SetDefaultPipelineMessageProto {
-    const message = createBaseSetDefaultPipelineMessageProto();
-    message.cameraIndex = object.cameraIndex ?? 0;
-    message.pipelineIndex = object.pipelineIndex ?? 0;
-    return message;
-  },
-};
+            message.pipelineIndex = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): SetDefaultPipelineMessageProto {
+      return {
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+        pipelineIndex: isSet(object.pipelineIndex)
+          ? globalThis.Number(object.pipelineIndex)
+          : 0,
+      };
+    },
+
+    toJSON(message: SetDefaultPipelineMessageProto): unknown {
+      const obj: any = {};
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      if (message.pipelineIndex !== 0) {
+        obj.pipelineIndex = Math.round(message.pipelineIndex);
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<SetDefaultPipelineMessageProto>, I>>(
+      base?: I,
+    ): SetDefaultPipelineMessageProto {
+      return SetDefaultPipelineMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<
+      I extends Exact<DeepPartial<SetDefaultPipelineMessageProto>, I>,
+    >(object: I): SetDefaultPipelineMessageProto {
+      const message = createBaseSetDefaultPipelineMessageProto();
+      message.cameraIndex = object.cameraIndex ?? 0;
+      message.pipelineIndex = object.pipelineIndex ?? 0;
+      return message;
+    },
+  };
 
 function createBaseRenameCameraMessageProto(): RenameCameraMessageProto {
   return { cameraIndex: 0, newName: "" };
 }
 
 export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
-  encode(message: RenameCameraMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: RenameCameraMessageProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.cameraIndex !== 0) {
       writer.uint32(8).int32(message.cameraIndex);
     }
@@ -444,8 +493,12 @@ export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RenameCameraMessageProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): RenameCameraMessageProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseRenameCameraMessageProto();
     while (reader.pos < end) {
@@ -478,7 +531,9 @@ export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
 
   fromJSON(object: any): RenameCameraMessageProto {
     return {
-      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
       newName: isSet(object.newName) ? globalThis.String(object.newName) : "",
     };
   },
@@ -494,10 +549,14 @@ export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(base?: I): RenameCameraMessageProto {
+  create<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(
+    base?: I,
+  ): RenameCameraMessageProto {
     return RenameCameraMessageProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(object: I): RenameCameraMessageProto {
+  fromPartial<I extends Exact<DeepPartial<RenameCameraMessageProto>, I>>(
+    object: I,
+  ): RenameCameraMessageProto {
     const message = createBaseRenameCameraMessageProto();
     message.cameraIndex = object.cameraIndex ?? 0;
     message.newName = object.newName ?? "";
@@ -506,11 +565,20 @@ export const RenameCameraMessageProto: MessageFns<RenameCameraMessageProto> = {
 };
 
 function createBaseCalibrationDataProto(): CalibrationDataProto {
-  return { cameraIndex: 0, meanError: 0, resolution: "", cameraMatrix: [], distCoeffs: [] };
+  return {
+    cameraIndex: 0,
+    meanError: 0,
+    resolution: "",
+    cameraMatrix: [],
+    distCoeffs: [],
+  };
 }
 
 export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
-  encode(message: CalibrationDataProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CalibrationDataProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.cameraIndex !== 0) {
       writer.uint32(8).int32(message.cameraIndex);
     }
@@ -533,8 +601,12 @@ export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CalibrationDataProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CalibrationDataProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCalibrationDataProto();
     while (reader.pos < end) {
@@ -611,9 +683,15 @@ export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
 
   fromJSON(object: any): CalibrationDataProto {
     return {
-      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
-      meanError: isSet(object.meanError) ? globalThis.Number(object.meanError) : 0,
-      resolution: isSet(object.resolution) ? globalThis.String(object.resolution) : "",
+      cameraIndex: isSet(object.cameraIndex)
+        ? globalThis.Number(object.cameraIndex)
+        : 0,
+      meanError: isSet(object.meanError)
+        ? globalThis.Number(object.meanError)
+        : 0,
+      resolution: isSet(object.resolution)
+        ? globalThis.String(object.resolution)
+        : "",
       cameraMatrix: globalThis.Array.isArray(object?.cameraMatrix)
         ? object.cameraMatrix.map((e: any) => globalThis.Number(e))
         : [],
@@ -643,10 +721,14 @@ export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(base?: I): CalibrationDataProto {
+  create<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(
+    base?: I,
+  ): CalibrationDataProto {
     return CalibrationDataProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(object: I): CalibrationDataProto {
+  fromPartial<I extends Exact<DeepPartial<CalibrationDataProto>, I>>(
+    object: I,
+  ): CalibrationDataProto {
     const message = createBaseCalibrationDataProto();
     message.cameraIndex = object.cameraIndex ?? 0;
     message.meanError = object.meanError ?? 0;
@@ -661,173 +743,213 @@ function createBaseRemoveCalibrationDataMessageProto(): RemoveCalibrationDataMes
   return { cameraIndex: 0, resolution: "" };
 }
 
-export const RemoveCalibrationDataMessageProto: MessageFns<RemoveCalibrationDataMessageProto> = {
-  encode(message: RemoveCalibrationDataMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.cameraIndex !== 0) {
-      writer.uint32(8).int32(message.cameraIndex);
-    }
-    if (message.resolution !== "") {
-      writer.uint32(18).string(message.resolution);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RemoveCalibrationDataMessageProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRemoveCalibrationDataMessageProto();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.cameraIndex = reader.int32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.resolution = reader.string();
-          continue;
-        }
+export const RemoveCalibrationDataMessageProto: MessageFns<RemoveCalibrationDataMessageProto> =
+  {
+    encode(
+      message: RemoveCalibrationDataMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.cameraIndex !== 0) {
+        writer.uint32(8).int32(message.cameraIndex);
       }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
+      if (message.resolution !== "") {
+        writer.uint32(18).string(message.resolution);
       }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+      return writer;
+    },
 
-  fromJSON(object: any): RemoveCalibrationDataMessageProto {
-    return {
-      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
-      resolution: isSet(object.resolution) ? globalThis.String(object.resolution) : "",
-    };
-  },
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): RemoveCalibrationDataMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRemoveCalibrationDataMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
 
-  toJSON(message: RemoveCalibrationDataMessageProto): unknown {
-    const obj: any = {};
-    if (message.cameraIndex !== 0) {
-      obj.cameraIndex = Math.round(message.cameraIndex);
-    }
-    if (message.resolution !== "") {
-      obj.resolution = message.resolution;
-    }
-    return obj;
-  },
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
 
-  create<I extends Exact<DeepPartial<RemoveCalibrationDataMessageProto>, I>>(
-    base?: I,
-  ): RemoveCalibrationDataMessageProto {
-    return RemoveCalibrationDataMessageProto.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RemoveCalibrationDataMessageProto>, I>>(
-    object: I,
-  ): RemoveCalibrationDataMessageProto {
-    const message = createBaseRemoveCalibrationDataMessageProto();
-    message.cameraIndex = object.cameraIndex ?? 0;
-    message.resolution = object.resolution ?? "";
-    return message;
-  },
-};
+            message.resolution = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): RemoveCalibrationDataMessageProto {
+      return {
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+        resolution: isSet(object.resolution)
+          ? globalThis.String(object.resolution)
+          : "",
+      };
+    },
+
+    toJSON(message: RemoveCalibrationDataMessageProto): unknown {
+      const obj: any = {};
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      if (message.resolution !== "") {
+        obj.resolution = message.resolution;
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<RemoveCalibrationDataMessageProto>, I>>(
+      base?: I,
+    ): RemoveCalibrationDataMessageProto {
+      return RemoveCalibrationDataMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<
+      I extends Exact<DeepPartial<RemoveCalibrationDataMessageProto>, I>,
+    >(object: I): RemoveCalibrationDataMessageProto {
+      const message = createBaseRemoveCalibrationDataMessageProto();
+      message.cameraIndex = object.cameraIndex ?? 0;
+      message.resolution = object.resolution ?? "";
+      return message;
+    },
+  };
 
 function createBaseSetCameraRecordingStatusMessageProto(): SetCameraRecordingStatusMessageProto {
   return { record: false, cameraIndex: 0 };
 }
 
-export const SetCameraRecordingStatusMessageProto: MessageFns<SetCameraRecordingStatusMessageProto> = {
-  encode(message: SetCameraRecordingStatusMessageProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.record !== false) {
-      writer.uint32(8).bool(message.record);
-    }
-    if (message.cameraIndex !== 0) {
-      writer.uint32(16).int32(message.cameraIndex);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SetCameraRecordingStatusMessageProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSetCameraRecordingStatusMessageProto();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.record = reader.bool();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.cameraIndex = reader.int32();
-          continue;
-        }
+export const SetCameraRecordingStatusMessageProto: MessageFns<SetCameraRecordingStatusMessageProto> =
+  {
+    encode(
+      message: SetCameraRecordingStatusMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.record !== false) {
+        writer.uint32(8).bool(message.record);
       }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
+      if (message.cameraIndex !== 0) {
+        writer.uint32(16).int32(message.cameraIndex);
       }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+      return writer;
+    },
 
-  fromJSON(object: any): SetCameraRecordingStatusMessageProto {
-    return {
-      record: isSet(object.record) ? globalThis.Boolean(object.record) : false,
-      cameraIndex: isSet(object.cameraIndex) ? globalThis.Number(object.cameraIndex) : 0,
-    };
-  },
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): SetCameraRecordingStatusMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetCameraRecordingStatusMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
 
-  toJSON(message: SetCameraRecordingStatusMessageProto): unknown {
-    const obj: any = {};
-    if (message.record !== false) {
-      obj.record = message.record;
-    }
-    if (message.cameraIndex !== 0) {
-      obj.cameraIndex = Math.round(message.cameraIndex);
-    }
-    return obj;
-  },
+            message.record = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
 
-  create<I extends Exact<DeepPartial<SetCameraRecordingStatusMessageProto>, I>>(
-    base?: I,
-  ): SetCameraRecordingStatusMessageProto {
-    return SetCameraRecordingStatusMessageProto.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SetCameraRecordingStatusMessageProto>, I>>(
-    object: I,
-  ): SetCameraRecordingStatusMessageProto {
-    const message = createBaseSetCameraRecordingStatusMessageProto();
-    message.record = object.record ?? false;
-    message.cameraIndex = object.cameraIndex ?? 0;
-    return message;
-  },
-};
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+    fromJSON(object: any): SetCameraRecordingStatusMessageProto {
+      return {
+        record: isSet(object.record)
+          ? globalThis.Boolean(object.record)
+          : false,
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+      };
+    },
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+    toJSON(message: SetCameraRecordingStatusMessageProto): unknown {
+      const obj: any = {};
+      if (message.record !== false) {
+        obj.record = message.record;
+      }
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      return obj;
+    },
+
+    create<
+      I extends Exact<DeepPartial<SetCameraRecordingStatusMessageProto>, I>,
+    >(base?: I): SetCameraRecordingStatusMessageProto {
+      return SetCameraRecordingStatusMessageProto.fromPartial(
+        base ?? ({} as any),
+      );
+    },
+    fromPartial<
+      I extends Exact<DeepPartial<SetCameraRecordingStatusMessageProto>, I>,
+    >(object: I): SetCameraRecordingStatusMessageProto {
+      const message = createBaseSetCameraRecordingStatusMessageProto();
+      message.record = object.record ?? false;
+      message.cameraIndex = object.cameraIndex ?? 0;
+      return message;
+    },
+  };
+
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
+
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());

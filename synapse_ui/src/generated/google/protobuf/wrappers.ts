@@ -104,7 +104,10 @@ function createBaseDoubleValue(): DoubleValue {
 }
 
 export const DoubleValue: MessageFns<DoubleValue> = {
-  encode(message: DoubleValue, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DoubleValue,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== 0) {
       writer.uint32(9).double(message.value);
     }
@@ -112,7 +115,8 @@ export const DoubleValue: MessageFns<DoubleValue> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): DoubleValue {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDoubleValue();
     while (reader.pos < end) {
@@ -150,7 +154,9 @@ export const DoubleValue: MessageFns<DoubleValue> = {
   create<I extends Exact<DeepPartial<DoubleValue>, I>>(base?: I): DoubleValue {
     return DoubleValue.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DoubleValue>, I>>(object: I): DoubleValue {
+  fromPartial<I extends Exact<DeepPartial<DoubleValue>, I>>(
+    object: I,
+  ): DoubleValue {
     const message = createBaseDoubleValue();
     message.value = object.value ?? 0;
     return message;
@@ -162,7 +168,10 @@ function createBaseFloatValue(): FloatValue {
 }
 
 export const FloatValue: MessageFns<FloatValue> = {
-  encode(message: FloatValue, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: FloatValue,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== 0) {
       writer.uint32(13).float(message.value);
     }
@@ -170,7 +179,8 @@ export const FloatValue: MessageFns<FloatValue> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): FloatValue {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseFloatValue();
     while (reader.pos < end) {
@@ -208,7 +218,9 @@ export const FloatValue: MessageFns<FloatValue> = {
   create<I extends Exact<DeepPartial<FloatValue>, I>>(base?: I): FloatValue {
     return FloatValue.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<FloatValue>, I>>(object: I): FloatValue {
+  fromPartial<I extends Exact<DeepPartial<FloatValue>, I>>(
+    object: I,
+  ): FloatValue {
     const message = createBaseFloatValue();
     message.value = object.value ?? 0;
     return message;
@@ -220,7 +232,10 @@ function createBaseInt64Value(): Int64Value {
 }
 
 export const Int64Value: MessageFns<Int64Value> = {
-  encode(message: Int64Value, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Int64Value,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== 0) {
       writer.uint32(8).int64(message.value);
     }
@@ -228,7 +243,8 @@ export const Int64Value: MessageFns<Int64Value> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Int64Value {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseInt64Value();
     while (reader.pos < end) {
@@ -266,7 +282,9 @@ export const Int64Value: MessageFns<Int64Value> = {
   create<I extends Exact<DeepPartial<Int64Value>, I>>(base?: I): Int64Value {
     return Int64Value.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<Int64Value>, I>>(object: I): Int64Value {
+  fromPartial<I extends Exact<DeepPartial<Int64Value>, I>>(
+    object: I,
+  ): Int64Value {
     const message = createBaseInt64Value();
     message.value = object.value ?? 0;
     return message;
@@ -278,7 +296,10 @@ function createBaseUInt64Value(): UInt64Value {
 }
 
 export const UInt64Value: MessageFns<UInt64Value> = {
-  encode(message: UInt64Value, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UInt64Value,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== 0) {
       writer.uint32(8).uint64(message.value);
     }
@@ -286,7 +307,8 @@ export const UInt64Value: MessageFns<UInt64Value> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): UInt64Value {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUInt64Value();
     while (reader.pos < end) {
@@ -324,7 +346,9 @@ export const UInt64Value: MessageFns<UInt64Value> = {
   create<I extends Exact<DeepPartial<UInt64Value>, I>>(base?: I): UInt64Value {
     return UInt64Value.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<UInt64Value>, I>>(object: I): UInt64Value {
+  fromPartial<I extends Exact<DeepPartial<UInt64Value>, I>>(
+    object: I,
+  ): UInt64Value {
     const message = createBaseUInt64Value();
     message.value = object.value ?? 0;
     return message;
@@ -336,7 +360,10 @@ function createBaseInt32Value(): Int32Value {
 }
 
 export const Int32Value: MessageFns<Int32Value> = {
-  encode(message: Int32Value, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Int32Value,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== 0) {
       writer.uint32(8).int32(message.value);
     }
@@ -344,7 +371,8 @@ export const Int32Value: MessageFns<Int32Value> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Int32Value {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseInt32Value();
     while (reader.pos < end) {
@@ -382,7 +410,9 @@ export const Int32Value: MessageFns<Int32Value> = {
   create<I extends Exact<DeepPartial<Int32Value>, I>>(base?: I): Int32Value {
     return Int32Value.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<Int32Value>, I>>(object: I): Int32Value {
+  fromPartial<I extends Exact<DeepPartial<Int32Value>, I>>(
+    object: I,
+  ): Int32Value {
     const message = createBaseInt32Value();
     message.value = object.value ?? 0;
     return message;
@@ -394,7 +424,10 @@ function createBaseUInt32Value(): UInt32Value {
 }
 
 export const UInt32Value: MessageFns<UInt32Value> = {
-  encode(message: UInt32Value, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UInt32Value,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== 0) {
       writer.uint32(8).uint32(message.value);
     }
@@ -402,7 +435,8 @@ export const UInt32Value: MessageFns<UInt32Value> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): UInt32Value {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUInt32Value();
     while (reader.pos < end) {
@@ -440,7 +474,9 @@ export const UInt32Value: MessageFns<UInt32Value> = {
   create<I extends Exact<DeepPartial<UInt32Value>, I>>(base?: I): UInt32Value {
     return UInt32Value.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<UInt32Value>, I>>(object: I): UInt32Value {
+  fromPartial<I extends Exact<DeepPartial<UInt32Value>, I>>(
+    object: I,
+  ): UInt32Value {
     const message = createBaseUInt32Value();
     message.value = object.value ?? 0;
     return message;
@@ -452,7 +488,10 @@ function createBaseBoolValue(): BoolValue {
 }
 
 export const BoolValue: MessageFns<BoolValue> = {
-  encode(message: BoolValue, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: BoolValue,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== false) {
       writer.uint32(8).bool(message.value);
     }
@@ -460,7 +499,8 @@ export const BoolValue: MessageFns<BoolValue> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): BoolValue {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseBoolValue();
     while (reader.pos < end) {
@@ -484,7 +524,9 @@ export const BoolValue: MessageFns<BoolValue> = {
   },
 
   fromJSON(object: any): BoolValue {
-    return { value: isSet(object.value) ? globalThis.Boolean(object.value) : false };
+    return {
+      value: isSet(object.value) ? globalThis.Boolean(object.value) : false,
+    };
   },
 
   toJSON(message: BoolValue): unknown {
@@ -498,7 +540,9 @@ export const BoolValue: MessageFns<BoolValue> = {
   create<I extends Exact<DeepPartial<BoolValue>, I>>(base?: I): BoolValue {
     return BoolValue.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<BoolValue>, I>>(object: I): BoolValue {
+  fromPartial<I extends Exact<DeepPartial<BoolValue>, I>>(
+    object: I,
+  ): BoolValue {
     const message = createBaseBoolValue();
     message.value = object.value ?? false;
     return message;
@@ -510,7 +554,10 @@ function createBaseStringValue(): StringValue {
 }
 
 export const StringValue: MessageFns<StringValue> = {
-  encode(message: StringValue, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: StringValue,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value !== "") {
       writer.uint32(10).string(message.value);
     }
@@ -518,7 +565,8 @@ export const StringValue: MessageFns<StringValue> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): StringValue {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseStringValue();
     while (reader.pos < end) {
@@ -542,7 +590,9 @@ export const StringValue: MessageFns<StringValue> = {
   },
 
   fromJSON(object: any): StringValue {
-    return { value: isSet(object.value) ? globalThis.String(object.value) : "" };
+    return {
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
   },
 
   toJSON(message: StringValue): unknown {
@@ -556,7 +606,9 @@ export const StringValue: MessageFns<StringValue> = {
   create<I extends Exact<DeepPartial<StringValue>, I>>(base?: I): StringValue {
     return StringValue.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<StringValue>, I>>(object: I): StringValue {
+  fromPartial<I extends Exact<DeepPartial<StringValue>, I>>(
+    object: I,
+  ): StringValue {
     const message = createBaseStringValue();
     message.value = object.value ?? "";
     return message;
@@ -568,7 +620,10 @@ function createBaseBytesValue(): BytesValue {
 }
 
 export const BytesValue: MessageFns<BytesValue> = {
-  encode(message: BytesValue, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: BytesValue,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.value.length !== 0) {
       writer.uint32(10).bytes(message.value);
     }
@@ -576,7 +631,8 @@ export const BytesValue: MessageFns<BytesValue> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): BytesValue {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseBytesValue();
     while (reader.pos < end) {
@@ -600,7 +656,11 @@ export const BytesValue: MessageFns<BytesValue> = {
   },
 
   fromJSON(object: any): BytesValue {
-    return { value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0) };
+    return {
+      value: isSet(object.value)
+        ? bytesFromBase64(object.value)
+        : new Uint8Array(0),
+    };
   },
 
   toJSON(message: BytesValue): unknown {
@@ -614,7 +674,9 @@ export const BytesValue: MessageFns<BytesValue> = {
   create<I extends Exact<DeepPartial<BytesValue>, I>>(base?: I): BytesValue {
     return BytesValue.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<BytesValue>, I>>(object: I): BytesValue {
+  fromPartial<I extends Exact<DeepPartial<BytesValue>, I>>(
+    object: I,
+  ): BytesValue {
     const message = createBaseBytesValue();
     message.value = object.value ?? new Uint8Array(0);
     return message;
@@ -646,17 +708,31 @@ function base64FromBytes(arr: Uint8Array): string {
   }
 }
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());

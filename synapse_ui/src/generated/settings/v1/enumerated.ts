@@ -26,7 +26,10 @@ function createBaseEnumeratedOptionProto(): EnumeratedOptionProto {
 }
 
 export const EnumeratedOptionProto: MessageFns<EnumeratedOptionProto> = {
-  encode(message: EnumeratedOptionProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: EnumeratedOptionProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.key !== "") {
       writer.uint32(10).string(message.key);
     }
@@ -36,8 +39,12 @@ export const EnumeratedOptionProto: MessageFns<EnumeratedOptionProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): EnumeratedOptionProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): EnumeratedOptionProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEnumeratedOptionProto();
     while (reader.pos < end) {
@@ -71,7 +78,9 @@ export const EnumeratedOptionProto: MessageFns<EnumeratedOptionProto> = {
   fromJSON(object: any): EnumeratedOptionProto {
     return {
       key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? SettingValueProto.fromJSON(object.value) : undefined,
+      value: isSet(object.value)
+        ? SettingValueProto.fromJSON(object.value)
+        : undefined,
     };
   },
 
@@ -86,15 +95,20 @@ export const EnumeratedOptionProto: MessageFns<EnumeratedOptionProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<EnumeratedOptionProto>, I>>(base?: I): EnumeratedOptionProto {
+  create<I extends Exact<DeepPartial<EnumeratedOptionProto>, I>>(
+    base?: I,
+  ): EnumeratedOptionProto {
     return EnumeratedOptionProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<EnumeratedOptionProto>, I>>(object: I): EnumeratedOptionProto {
+  fromPartial<I extends Exact<DeepPartial<EnumeratedOptionProto>, I>>(
+    object: I,
+  ): EnumeratedOptionProto {
     const message = createBaseEnumeratedOptionProto();
     message.key = object.key ?? "";
-    message.value = (object.value !== undefined && object.value !== null)
-      ? SettingValueProto.fromPartial(object.value)
-      : undefined;
+    message.value =
+      object.value !== undefined && object.value !== null
+        ? SettingValueProto.fromPartial(object.value)
+        : undefined;
     return message;
   },
 };
@@ -103,75 +117,106 @@ function createBaseEnumeratedConstraintProto(): EnumeratedConstraintProto {
   return { options: [] };
 }
 
-export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> = {
-  encode(message: EnumeratedConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.options) {
-      EnumeratedOptionProto.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
+export const EnumeratedConstraintProto: MessageFns<EnumeratedConstraintProto> =
+  {
+    encode(
+      message: EnumeratedConstraintProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      for (const v of message.options) {
+        EnumeratedOptionProto.encode(v!, writer.uint32(10).fork()).join();
+      }
+      return writer;
+    },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): EnumeratedConstraintProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEnumeratedConstraintProto();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): EnumeratedConstraintProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseEnumeratedConstraintProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.options.push(
+              EnumeratedOptionProto.decode(reader, reader.uint32()),
+            );
+            continue;
           }
-
-          message.options.push(EnumeratedOptionProto.decode(reader, reader.uint32()));
-          continue;
         }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
       }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
+      return message;
+    },
+
+    fromJSON(object: any): EnumeratedConstraintProto {
+      return {
+        options: globalThis.Array.isArray(object?.options)
+          ? object.options.map((e: any) => EnumeratedOptionProto.fromJSON(e))
+          : [],
+      };
+    },
+
+    toJSON(message: EnumeratedConstraintProto): unknown {
+      const obj: any = {};
+      if (message.options?.length) {
+        obj.options = message.options.map((e) =>
+          EnumeratedOptionProto.toJSON(e),
+        );
       }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+      return obj;
+    },
 
-  fromJSON(object: any): EnumeratedConstraintProto {
-    return {
-      options: globalThis.Array.isArray(object?.options)
-        ? object.options.map((e: any) => EnumeratedOptionProto.fromJSON(e))
-        : [],
-    };
-  },
+    create<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(
+      base?: I,
+    ): EnumeratedConstraintProto {
+      return EnumeratedConstraintProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(
+      object: I,
+    ): EnumeratedConstraintProto {
+      const message = createBaseEnumeratedConstraintProto();
+      message.options =
+        object.options?.map((e) => EnumeratedOptionProto.fromPartial(e)) || [];
+      return message;
+    },
+  };
 
-  toJSON(message: EnumeratedConstraintProto): unknown {
-    const obj: any = {};
-    if (message.options?.length) {
-      obj.options = message.options.map((e) => EnumeratedOptionProto.toJSON(e));
-    }
-    return obj;
-  },
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-  create<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(base?: I): EnumeratedConstraintProto {
-    return EnumeratedConstraintProto.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EnumeratedConstraintProto>, I>>(object: I): EnumeratedConstraintProto {
-    const message = createBaseEnumeratedConstraintProto();
-    message.options = object.options?.map((e) => EnumeratedOptionProto.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
-
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

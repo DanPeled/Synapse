@@ -102,25 +102,15 @@ export function constraintTypeProtoToJSON(object: ConstraintTypeProto): string {
  */
 export interface ConstraintConfigProto {
   /** Constraint based on a numeric value */
-  numeric?:
-    | NumberConstraintProto
-    | undefined;
+  numeric?: NumberConstraintProto | undefined;
   /** Constraint based on selectable list options with extra options */
-  enumerated?:
-    | EnumeratedConstraintProto
-    | undefined;
+  enumerated?: EnumeratedConstraintProto | undefined;
   /** Constraint based on color formats and modes */
-  color?:
-    | ColorConstraintProto
-    | undefined;
+  color?: ColorConstraintProto | undefined;
   /** Constraint based on string properties (e.g., regex, length) */
-  string?:
-    | StringConstraintProto
-    | undefined;
+  string?: StringConstraintProto | undefined;
   /** Constraint for a value list */
-  list?:
-    | ListConstraintProto
-    | undefined;
+  list?: ListConstraintProto | undefined;
   /** Boolean constraint */
   boolean?: BooleanConstraintProto | undefined;
   file?: FileConstraintProto | undefined;
@@ -139,24 +129,42 @@ function createBaseConstraintConfigProto(): ConstraintConfigProto {
 }
 
 export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
-  encode(message: ConstraintConfigProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: ConstraintConfigProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.numeric !== undefined) {
-      NumberConstraintProto.encode(message.numeric, writer.uint32(10).fork()).join();
+      NumberConstraintProto.encode(
+        message.numeric,
+        writer.uint32(10).fork(),
+      ).join();
     }
     if (message.enumerated !== undefined) {
-      EnumeratedConstraintProto.encode(message.enumerated, writer.uint32(18).fork()).join();
+      EnumeratedConstraintProto.encode(
+        message.enumerated,
+        writer.uint32(18).fork(),
+      ).join();
     }
     if (message.color !== undefined) {
-      ColorConstraintProto.encode(message.color, writer.uint32(26).fork()).join();
+      ColorConstraintProto.encode(
+        message.color,
+        writer.uint32(26).fork(),
+      ).join();
     }
     if (message.string !== undefined) {
-      StringConstraintProto.encode(message.string, writer.uint32(34).fork()).join();
+      StringConstraintProto.encode(
+        message.string,
+        writer.uint32(34).fork(),
+      ).join();
     }
     if (message.list !== undefined) {
       ListConstraintProto.encode(message.list, writer.uint32(42).fork()).join();
     }
     if (message.boolean !== undefined) {
-      BooleanConstraintProto.encode(message.boolean, writer.uint32(50).fork()).join();
+      BooleanConstraintProto.encode(
+        message.boolean,
+        writer.uint32(50).fork(),
+      ).join();
     }
     if (message.file !== undefined) {
       FileConstraintProto.encode(message.file, writer.uint32(58).fork()).join();
@@ -164,8 +172,12 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ConstraintConfigProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): ConstraintConfigProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseConstraintConfigProto();
     while (reader.pos < end) {
@@ -176,7 +188,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.numeric = NumberConstraintProto.decode(reader, reader.uint32());
+          message.numeric = NumberConstraintProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 2: {
@@ -184,7 +199,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.enumerated = EnumeratedConstraintProto.decode(reader, reader.uint32());
+          message.enumerated = EnumeratedConstraintProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 3: {
@@ -200,7 +218,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.string = StringConstraintProto.decode(reader, reader.uint32());
+          message.string = StringConstraintProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 5: {
@@ -216,7 +237,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
             break;
           }
 
-          message.boolean = BooleanConstraintProto.decode(reader, reader.uint32());
+          message.boolean = BooleanConstraintProto.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
         case 7: {
@@ -238,13 +262,27 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
 
   fromJSON(object: any): ConstraintConfigProto {
     return {
-      numeric: isSet(object.numeric) ? NumberConstraintProto.fromJSON(object.numeric) : undefined,
-      enumerated: isSet(object.enumerated) ? EnumeratedConstraintProto.fromJSON(object.enumerated) : undefined,
-      color: isSet(object.color) ? ColorConstraintProto.fromJSON(object.color) : undefined,
-      string: isSet(object.string) ? StringConstraintProto.fromJSON(object.string) : undefined,
-      list: isSet(object.list) ? ListConstraintProto.fromJSON(object.list) : undefined,
-      boolean: isSet(object.boolean) ? BooleanConstraintProto.fromJSON(object.boolean) : undefined,
-      file: isSet(object.file) ? FileConstraintProto.fromJSON(object.file) : undefined,
+      numeric: isSet(object.numeric)
+        ? NumberConstraintProto.fromJSON(object.numeric)
+        : undefined,
+      enumerated: isSet(object.enumerated)
+        ? EnumeratedConstraintProto.fromJSON(object.enumerated)
+        : undefined,
+      color: isSet(object.color)
+        ? ColorConstraintProto.fromJSON(object.color)
+        : undefined,
+      string: isSet(object.string)
+        ? StringConstraintProto.fromJSON(object.string)
+        : undefined,
+      list: isSet(object.list)
+        ? ListConstraintProto.fromJSON(object.list)
+        : undefined,
+      boolean: isSet(object.boolean)
+        ? BooleanConstraintProto.fromJSON(object.boolean)
+        : undefined,
+      file: isSet(object.file)
+        ? FileConstraintProto.fromJSON(object.file)
+        : undefined,
     };
   },
 
@@ -274,47 +312,72 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(base?: I): ConstraintConfigProto {
+  create<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(
+    base?: I,
+  ): ConstraintConfigProto {
     return ConstraintConfigProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(object: I): ConstraintConfigProto {
+  fromPartial<I extends Exact<DeepPartial<ConstraintConfigProto>, I>>(
+    object: I,
+  ): ConstraintConfigProto {
     const message = createBaseConstraintConfigProto();
-    message.numeric = (object.numeric !== undefined && object.numeric !== null)
-      ? NumberConstraintProto.fromPartial(object.numeric)
-      : undefined;
-    message.enumerated = (object.enumerated !== undefined && object.enumerated !== null)
-      ? EnumeratedConstraintProto.fromPartial(object.enumerated)
-      : undefined;
-    message.color = (object.color !== undefined && object.color !== null)
-      ? ColorConstraintProto.fromPartial(object.color)
-      : undefined;
-    message.string = (object.string !== undefined && object.string !== null)
-      ? StringConstraintProto.fromPartial(object.string)
-      : undefined;
-    message.list = (object.list !== undefined && object.list !== null)
-      ? ListConstraintProto.fromPartial(object.list)
-      : undefined;
-    message.boolean = (object.boolean !== undefined && object.boolean !== null)
-      ? BooleanConstraintProto.fromPartial(object.boolean)
-      : undefined;
-    message.file = (object.file !== undefined && object.file !== null)
-      ? FileConstraintProto.fromPartial(object.file)
-      : undefined;
+    message.numeric =
+      object.numeric !== undefined && object.numeric !== null
+        ? NumberConstraintProto.fromPartial(object.numeric)
+        : undefined;
+    message.enumerated =
+      object.enumerated !== undefined && object.enumerated !== null
+        ? EnumeratedConstraintProto.fromPartial(object.enumerated)
+        : undefined;
+    message.color =
+      object.color !== undefined && object.color !== null
+        ? ColorConstraintProto.fromPartial(object.color)
+        : undefined;
+    message.string =
+      object.string !== undefined && object.string !== null
+        ? StringConstraintProto.fromPartial(object.string)
+        : undefined;
+    message.list =
+      object.list !== undefined && object.list !== null
+        ? ListConstraintProto.fromPartial(object.list)
+        : undefined;
+    message.boolean =
+      object.boolean !== undefined && object.boolean !== null
+        ? BooleanConstraintProto.fromPartial(object.boolean)
+        : undefined;
+    message.file =
+      object.file !== undefined && object.file !== null
+        ? FileConstraintProto.fromPartial(object.file)
+        : undefined;
     return message;
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

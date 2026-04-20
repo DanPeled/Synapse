@@ -22,7 +22,10 @@ function createBaseListConstraintProto(): ListConstraintProto {
 }
 
 export const ListConstraintProto: MessageFns<ListConstraintProto> = {
-  encode(message: ListConstraintProto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: ListConstraintProto,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.minLength !== 0) {
       writer.uint32(16).int32(message.minLength);
     }
@@ -32,8 +35,12 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ListConstraintProto {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): ListConstraintProto {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseListConstraintProto();
     while (reader.pos < end) {
@@ -66,8 +73,12 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
 
   fromJSON(object: any): ListConstraintProto {
     return {
-      minLength: isSet(object.minLength) ? globalThis.Number(object.minLength) : 0,
-      maxLength: isSet(object.maxLength) ? globalThis.Number(object.maxLength) : 0,
+      minLength: isSet(object.minLength)
+        ? globalThis.Number(object.minLength)
+        : 0,
+      maxLength: isSet(object.maxLength)
+        ? globalThis.Number(object.maxLength)
+        : 0,
     };
   },
 
@@ -82,10 +93,14 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ListConstraintProto>, I>>(base?: I): ListConstraintProto {
+  create<I extends Exact<DeepPartial<ListConstraintProto>, I>>(
+    base?: I,
+  ): ListConstraintProto {
     return ListConstraintProto.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ListConstraintProto>, I>>(object: I): ListConstraintProto {
+  fromPartial<I extends Exact<DeepPartial<ListConstraintProto>, I>>(
+    object: I,
+  ): ListConstraintProto {
     const message = createBaseListConstraintProto();
     message.minLength = object.minLength ?? 0;
     message.maxLength = object.maxLength ?? 0;
@@ -93,17 +108,31 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends {}
+        ? { [K in keyof T]?: DeepPartial<T[K]> }
+        : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
