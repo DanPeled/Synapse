@@ -450,7 +450,7 @@ class StringConstraint(Constraint[str]):
         self.maxLength = maxLength
         self.pattern = pattern
 
-    def validate(self, value: SettingsValue) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult[str]:
         if not isinstance(value, str):
             return ValidationResult(False, "Value must be a string")
 
@@ -494,17 +494,17 @@ class StringConstraint(Constraint[str]):
         )
 
 
-class FileConstraint(Constraint[str]):
+class FileConstraint(Constraint[Optional[Path]]):
     def __init__(self, fileTypes: Optional[Set[str]] = None):
         super().__init__(ConstraintTypeProto.FILE)
         self.fileTypes: Optional[Set[str]] = fileTypes
 
-    def validate(self, value: SettingsValue) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult[Optional[Path]]:
         if isinstance(value, Path):
             return ValidationResult(True, None, value.absolute())
         elif isinstance(value, str):
             if Path(value).exists():
-                return ValidationResult(True, None, value)
+                return ValidationResult(True, None, Path(value))
             return ValidationResult(False, "Path must exist")
         return ValidationResult(False, "Path must be either Path or str")
 

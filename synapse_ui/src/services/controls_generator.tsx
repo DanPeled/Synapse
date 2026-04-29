@@ -15,6 +15,7 @@ import assert from "assert";
 import { hasSettingValue } from "./backend/backendContext";
 import { PipelineProto } from "@/generated/messages/v1/pipeline";
 import { PipelineID } from "./backend/dataStractures";
+import { FileDropzone } from "@/widgets/file_upload";
 
 export function generateControlFromSettingMeta({
   setting,
@@ -271,8 +272,20 @@ export function GenerateControl({
           </LabeledControl>
         );
       }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_FILE: {
+      // TODO: Future feature
+      // return (
+      //   <LabeledControl label={settingName}>
+      //     <FileDropzone
+      //       onChangeAction={(f) => {}}
+      //       value={[File(val)]}
+      //       className="pl-10"
+      //       maxFiles={1}
+      //     />
+      //   </LabeledControl>
+      // );
+    }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED: {
-      console.log(setting.constraint.constraint?.enumerated?.options);
       const options =
         setting.constraint.constraint?.enumerated?.options.map((op) => {
           // Extract the actual value from the proto
