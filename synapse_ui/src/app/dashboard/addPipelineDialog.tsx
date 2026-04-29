@@ -10,8 +10,14 @@ import TextInput from "@/widgets/textInput";
 import { teamColor, borderColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";
 
-import { PipelineProto, PipelineTypeProto } from "@/proto/v1/pipeline";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import {
+  PipelineProto,
+  PipelineTypeProto,
+} from "@/generated/messages/v1/pipeline";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 
 export function AddPipelineDialog({
   visible,

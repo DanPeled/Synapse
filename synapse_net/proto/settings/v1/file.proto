@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package settings.v1;
+
+message FileConstraintProto {
+  string path = 1;
+  repeated string file_types = 2;
+}

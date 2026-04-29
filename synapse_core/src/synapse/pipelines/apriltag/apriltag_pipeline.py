@@ -14,7 +14,8 @@ from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
                                    Setting, SettingsValue, SynapseCamera,
                                    pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, settingField)
+                                       FileConstraint, NumberConstraint,
+                                       settingField)
 from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
@@ -72,6 +73,7 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
 
 
 class ApriltagPipelineSettings(PipelineSettings):
+    example_test = settingField(FileConstraint({"jpg", "mjpeg"}), default=None)
     tag_size = settingField(
         NumberConstraint(minValue=0, maxValue=None),
         default=units.meters(0.1651),

@@ -18,15 +18,18 @@ import {
   CameraPerformanceProto,
   CameraProto,
   SetCameraRecordingStatusMessageProto,
-} from "@/proto/v1/camera";
+} from "@/generated/messages/v1/camera";
 import {
   PipelineProto,
   PipelineTypeProto,
   SetPipelineIndexMessageProto,
   SetPipelineTypeMessageProto,
   SetPipleineSettingMessageProto,
-} from "@/proto/v1/pipeline";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+} from "@/generated/messages/v1/pipeline";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { SaveActionsDialog } from "./save_actions";
 import {
   PipelineID,

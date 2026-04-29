@@ -110,7 +110,7 @@ def generateTestFunction(messageCls: Type[Message]) -> Callable[[], None]:
     return testSerialization
 
 
-modules = importSubmodules("synapse_net.proto")
+modules = importSubmodules("synapse_net.generated")
 for mod_name, module in modules.items():
     for name, cls in inspect.getmembers(module, inspect.isclass):
         if issubclass(cls, Message) and cls is not Message:

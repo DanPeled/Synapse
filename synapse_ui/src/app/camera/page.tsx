@@ -7,7 +7,7 @@ import { CameraStream } from "@/widgets/cameraStream";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { useBackendContext } from "@/services/backend/backendContext";
-import { CameraProto } from "@/proto/v1/camera";
+import { CameraProto } from "@/generated/messages/v1/camera";
 import { CameraConfigModule } from "./camera_config_module";
 
 export default function CameraConfigPage() {

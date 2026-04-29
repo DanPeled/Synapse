@@ -8,7 +8,7 @@ import { Activity, Copy, Check } from "lucide-react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { PipelineResultProto } from "@/proto/v1/pipeline";
+import { PipelineResultProto } from "@/generated/messages/v1/pipeline";
 import { MsgPackTree } from "@/widgets/msgpackTree";
 
 function RenderPrimitiveResult({

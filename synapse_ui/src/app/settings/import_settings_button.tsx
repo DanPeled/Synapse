@@ -6,8 +6,11 @@ import {
   uploadFileReplace,
   uploadZipReplaceFolder,
 } from "@/services/backend/fileServer";
-import { DeviceInfoProto } from "@/proto/v1/device";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import { DeviceInfoProto } from "@/generated/messages/v1/device";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { WebSocketWrapper } from "@/services/websocket";
 import { useEffect, useRef } from "react";
 

@@ -1,4 +1,4 @@
-import { DeviceInfoProto } from "@/proto/v1/device";
+import { DeviceInfoProto } from "@/generated/messages/v1/device";
 import JSZip from "jszip";
 
 export const FILE_SERVER_PORT = 8080;
