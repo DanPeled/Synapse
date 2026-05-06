@@ -19,7 +19,8 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
-from wpimath import geometry
+from wpimath import Rotation3d, Transform3d, Translation3d
+from wpiutil import PixelFormat
 
 from ..log import err, warn
 from ..stypes import CameraID, Frame, Resolution
@@ -563,7 +564,7 @@ class CsCoreCamera(SynapseCamera):
         width: int,
         height: int,
         fps: int,
-        pixelFormat: VideoMode.PixelFormat,
+        pixelFormat: PixelFormat,
     ) -> Optional[VideoMode]:
         # 1. Exact match
         if self._videoModes is None or len(self._videoModes) == 0:
@@ -599,7 +600,7 @@ class CsCoreCamera(SynapseCamera):
         if self._videoModes is None or len(self._videoModes) == 0:
             warn(f"No video modes on camera: {self.cameraIndex}")
             return
-        pixelFormat = VideoMode.PixelFormat.kMJPEG
+        pixelFormat = VideoMode.pixelFormat.MJPEG
 
         # Always select a valid mode
         mode = self._selectBestVideoMode(width, height, fps, pixelFormat)
@@ -684,7 +685,7 @@ def getCameraTableName(camera: SynapseCamera) -> str:
     return camera.name
 
 
-def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
+def listToTransform3d(dataList: List[List[float]]) -> Transform3d:
     """
     Converts a 2D list containing position and rotation data into a Transform3d object.
 
@@ -696,19 +697,19 @@ def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
         dataList (List[List[float]]): A list with two elements, each being a list of three floats.
 
     Returns:
-        geometry.Transform3d: The resulting Transform3d object. Returns an identity transform
+        Transform3d: The resulting Transform3d object. Returns an identity transform
         if the input list does not contain exactly two elements.
     """
     if len(dataList) != 2:
         err("Invalid transform length")
-        return geometry.Transform3d()
+        return Transform3d()
     else:
         poseList = dataList[0]
         rotationList = dataList[1]
 
-        return geometry.Transform3d(
-            translation=geometry.Translation3d(poseList[0], poseList[1], poseList[2]),
-            rotation=geometry.Rotation3d.fromDegrees(
+        return Transform3d(
+            translation=Translation3d(poseList[0], poseList[1], poseList[2]),
+            rotation=Rotation3d.fromDegrees(
                 rotationList[0], rotationList[1], rotationList[2]
             ),
         )
@@ -764,7 +765,7 @@ class NoSignalCamera(SynapseCamera):
         return 0.0
 
 
-def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:
+def transform3dToList(transform: Transform3d) -> List[List[float]]:
     """
     Converts a Transform3d object into a 2D list containing position and rotation data.
 
@@ -773,7 +774,7 @@ def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:
     - The second sublist represents the rotation (roll, pitch, yaw) in degrees.
 
     Args:
-        transform (geometry.Transform3d): The Transform3d object to convert.
+        transform (Transform3d): The Transform3d object to convert.
 
     Returns:
         List[List[float]]: A 2D list with translation and rotation values.

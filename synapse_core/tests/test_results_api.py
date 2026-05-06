@@ -8,7 +8,9 @@ from math import radians
 
 import msgpack
 from synapse.core import results_api as api
-from wpimath import geometry
+from wpimath import (Pose2d, Pose3d, Rotation2d, Rotation3d, Transform2d,
+                     Transform3d, Translation2d, Translation3d, Twist2d,
+                     Twist3d)
 
 # -------------------
 # Dummy PipelineResult subclasses for testing
@@ -37,61 +39,57 @@ class PRBool(api.PipelineResult):
 
 class PRTranslation2d(api.PipelineResult):
     def __init__(self, x, y):
-        self.translation = geometry.Translation2d(x, y)
+        self.translation = Translation2d(x, y)
 
 
 class PRTranslation3d(api.PipelineResult):
     def __init__(self, x, y, z):
-        self.translation = geometry.Translation3d(x, y, z)
+        self.translation = Translation3d(x, y, z)
 
 
 class PRRotation2d(api.PipelineResult):
     def __init__(self, deg):
-        self.rotation = geometry.Rotation2d(radians(deg))
+        self.rotation = Rotation2d(radians(deg))
 
 
 class PRRotation3d(api.PipelineResult):
     def __init__(self, x_deg, y_deg, z_deg):
-        self.rotation = geometry.Rotation3d(
-            radians(x_deg), radians(y_deg), radians(z_deg)
-        )
+        self.rotation = Rotation3d(radians(x_deg), radians(y_deg), radians(z_deg))
 
 
 class PRPose2d(api.PipelineResult):
     def __init__(self, x, y, deg):
-        self.pose = geometry.Pose2d(x, y, geometry.Rotation2d(radians(deg)))
+        self.pose = Pose2d(x, y, Rotation2d(radians(deg)))
 
 
 class PRPose3d(api.PipelineResult):
     def __init__(self, x, y, z, x_deg, y_deg, z_deg):
-        self.pose = geometry.Pose3d(
-            x, y, z, geometry.Rotation3d(radians(x_deg), radians(y_deg), radians(z_deg))
+        self.pose = Pose3d(
+            x, y, z, Rotation3d(radians(x_deg), radians(y_deg), radians(z_deg))
         )
 
 
 class PRTransform2d(api.PipelineResult):
     def __init__(self, x, y, deg):
-        self.transform = geometry.Transform2d(
-            geometry.Translation2d(x, y), geometry.Rotation2d(radians(deg))
-        )
+        self.transform = Transform2d(Translation2d(x, y), Rotation2d(radians(deg)))
 
 
 class PRTransform3d(api.PipelineResult):
     def __init__(self, x, y, z, x_deg, y_deg, z_deg):
-        self.transform = geometry.Transform3d(
-            geometry.Translation3d(x, y, z),
-            geometry.Rotation3d(radians(x_deg), radians(y_deg), radians(z_deg)),
+        self.transform = Transform3d(
+            Translation3d(x, y, z),
+            Rotation3d(radians(x_deg), radians(y_deg), radians(z_deg)),
         )
 
 
 class PRTwist2d(api.PipelineResult):
     def __init__(self, dx, dy, dtheta):
-        self.twist = geometry.Twist2d(dx, dy, dtheta)
+        self.twist = Twist2d(dx, dy, dtheta)
 
 
 class PRTwist3d(api.PipelineResult):
     def __init__(self, dx, dy, dz, rx, ry, rz):
-        self.twist = geometry.Twist3d(dx, dy, dz, radians(rx), radians(ry), radians(rz))
+        self.twist = Twist3d(dx, dy, dz, radians(rx), radians(ry), radians(rz))
 
 
 @dataclass
@@ -129,23 +127,21 @@ def test_parse_geometry():
     assert api.parsePipelineResult(PRTranslation3d(1, 2, 3))["translation"] == [1, 2, 3]
 
     # Rotation
-    r2d_obj = geometry.Rotation2d(radians(45))
+    r2d_obj = Rotation2d(radians(45))
     parsed2d = api.parsePipelineResult(PRRotation2d(45))["rotation"]
     assert parsed2d == r2d_obj.degrees()
 
-    r3d_obj = geometry.Rotation3d(radians(10), radians(20), radians(30))
+    r3d_obj = Rotation3d(radians(10), radians(20), radians(30))
     parsed3d = api.parsePipelineResult(PRRotation3d(10, 20, 30))["rotation"]
     expected3d = [r3d_obj.x_degrees, r3d_obj.y_degrees, r3d_obj.z_degrees]
     assert parsed3d == expected3d
 
     # Pose
-    p2d_obj = geometry.Pose2d(5, 7, geometry.Rotation2d(radians(90)))
+    p2d_obj = Pose2d(5, 7, Rotation2d(radians(90)))
     parsed_p2d = api.parsePipelineResult(PRPose2d(5, 7, 90))["pose"]
     assert parsed_p2d == [p2d_obj.X(), p2d_obj.Y(), p2d_obj.rotation().degrees()]
 
-    p3d_obj = geometry.Pose3d(
-        1, 2, 3, geometry.Rotation3d(radians(10), radians(20), radians(30))
-    )
+    p3d_obj = Pose3d(1, 2, 3, Rotation3d(radians(10), radians(20), radians(30)))
     parsed_p3d = api.parsePipelineResult(PRPose3d(1, 2, 3, 10, 20, 30))["pose"]
     expected_p3d = [
         p3d_obj.X(),
@@ -158,9 +154,7 @@ def test_parse_geometry():
     assert parsed_p3d == expected_p3d
 
     # Transform
-    t2d_obj = geometry.Transform2d(
-        geometry.Translation2d(1, 2), geometry.Rotation2d(radians(90))
-    )
+    t2d_obj = Transform2d(Translation2d(1, 2), Rotation2d(radians(90)))
     parsed_t2d = api.parsePipelineResult(PRTransform2d(1, 2, 90))["transform"]
     assert parsed_t2d == [
         t2d_obj.translation().X(),
@@ -168,9 +162,9 @@ def test_parse_geometry():
         t2d_obj.rotation().degrees(),
     ]
 
-    t3d_obj = geometry.Transform3d(
-        geometry.Translation3d(1, 2, 3),
-        geometry.Rotation3d(radians(10), radians(20), radians(30)),
+    t3d_obj = Transform3d(
+        Translation3d(1, 2, 3),
+        Rotation3d(radians(10), radians(20), radians(30)),
     )
     parsed_t3d = api.parsePipelineResult(PRTransform3d(1, 2, 3, 10, 20, 30))[
         "transform"
@@ -187,7 +181,7 @@ def test_parse_geometry():
 
     # Twist
     assert api.parsePipelineResult(PRTwist2d(1, 2, 3))["twist"] == [1, 2, 3]
-    twist3d_obj = geometry.Twist3d(1, 2, 3, radians(4), radians(5), radians(6))
+    twist3d_obj = Twist3d(1, 2, 3, radians(4), radians(5), radians(6))
     parsed_twist3d = api.parsePipelineResult(PRTwist3d(1, 2, 3, 4, 5, 6))["twist"]
     expected_twist3d = [
         twist3d_obj.dx,

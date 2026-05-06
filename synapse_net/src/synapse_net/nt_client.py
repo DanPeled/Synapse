@@ -61,7 +61,7 @@ class NtClient:
                 self.nt_inst.setServerTeam(teamNumber)
 
         # Start client
-        self.nt_inst.startClient4(name)
+        self.nt_inst.startClient(name)
 
         timeout = 10
         start_time = time.time()
@@ -70,10 +70,10 @@ class NtClient:
         def connectionListener(event: Event):
             if isinstance(event.data, ConnectionInfo):
                 ip = event.data.remote_ip
-                if event.is_(EventFlags.kConnected):
+                if event.is_(EventFlags.CONNECTED):
                     log(f"Connected to NetworkTables server ({ip})")
                     NtClient.onConnect.call(ip)
-                elif event.is_(EventFlags.kDisconnected):
+                elif event.is_(EventFlags.DISCONNECTED):
                     log(f"Disconnected from NetworkTables server ({ip})")
                     NtClient.onDisconnect.call(ip)
 

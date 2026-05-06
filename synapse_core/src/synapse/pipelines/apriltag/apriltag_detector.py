@@ -11,8 +11,7 @@ import cv2
 import numpy as np
 from synapse.stypes import Frame
 from typing_extensions import Buffer
-from wpimath import units
-from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
+from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d, units
 
 Homography = Tuple[float, float, float, float, float, float, float, float, float]
 Corners = Tuple[float, float, float, float, float, float, float, float]

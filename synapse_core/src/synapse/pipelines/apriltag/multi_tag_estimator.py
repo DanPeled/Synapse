@@ -6,7 +6,7 @@
 import math
 from typing import Iterable
 
-from wpimath.geometry import Pose3d, Quaternion, Rotation3d
+from wpimath import Pose3d, Quaternion, Rotation3d
 
 from .apriltag_detector import (CameraPoseEstimate,
                                 ICombinedApriltagCameraPoseEstimator)
