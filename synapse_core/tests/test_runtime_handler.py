@@ -61,13 +61,13 @@ class TestRuntimeManager(unittest.TestCase):
 
     def test_get_event_data_value_bool(self):
         mock_event = MagicMock()
-        type_prop = PropertyMock(return_value="Boolean")
+        type_prop = PropertyMock(return_value="BOOLEAN")
         value = MagicMock(getBoolean=MagicMock(return_value=True))
         mock_event.data.__class__ = ValueEventData
         mock_event.data.topic.getType = type_prop
         mock_event.data.value = value
 
-        with patch("synapse.core.runtime_handler.NetworkTableType.kBoolean", "Boolean"):
+        with patch("synapse.core.runtime_handler.NetworkTableType.BOOLEAN", "BOOLEAN"):
             result = self.handler.getEventDataValue(mock_event)
             self.assertTrue(result)
 
