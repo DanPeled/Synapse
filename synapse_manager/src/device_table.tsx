@@ -80,6 +80,7 @@ export default function DeviceTable() {
                     <Upload />
                   </button>
                   <button
+                    title="Open Dashboard"
                     onClick={() => {
                       openWindow({
                         label: `SynapseDashboard${device.hostname}`,
