@@ -6,7 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from "./components/ui/table";
-import { Info, Upload } from "lucide-react";
+import { Info, LayoutDashboard, Upload } from "lucide-react";
+import { openWindow } from "./lib/utils";
 
 type Device = {
   hostname: string;
@@ -15,12 +16,12 @@ type Device = {
 
 const devices: Device[] = [
   {
-    hostname: "limelight.local",
+    hostname: "limelight",
     address: "10.44.81.11",
   },
   {
-    hostname: "coprocessor.local",
-    address: "10.44.81.20",
+    hostname: "coprocessor",
+    address: "localhost",
   },
 ];
 
@@ -68,8 +69,26 @@ export default function DeviceTable() {
               >
                 <div className="row gap-5">
                   {" "}
-                  <Info />
-                  <Upload />
+                  <button
+                    onClick={() => {
+                      openWindow({ label: "processor" });
+                    }}
+                  >
+                    <Info />
+                  </button>
+                  <button>
+                    <Upload />
+                  </button>
+                  <button
+                    onClick={() => {
+                      openWindow({
+                        label: `SynapseDashboard${device.hostname}`,
+                        url: `http://${device.address}:3000`,
+                      });
+                    }}
+                  >
+                    <LayoutDashboard />
+                  </button>
                 </div>
               </TableCell>
             </TableRow>

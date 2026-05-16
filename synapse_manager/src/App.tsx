@@ -9,7 +9,7 @@ function App() {
           Find Devices
         </button>
 
-        <p className="text-sm m-0 text-[#bd3a8a]">
+        <p className="text-sm m-0 text-gray-200">
           Click on any hostname or IP address to navigate to the web interface
           of the corresponding device
         </p>
