@@ -10,6 +10,14 @@ SynapseLib:
   - changed-files:
       - any-glob-to-any-file: ["synapse_lib/**"]
 
+SynapseManager:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_manager/**"]
+
+SynapseGradlePlugin:
+  - changed-files:
+      - any-glob-to-any-file: ["synapse_gradle_plugin/**"]
+
 SynapseNet:
   - changed-files:
       - any-glob-to-any-file: ["synapse_net/**"]
