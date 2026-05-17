@@ -6,26 +6,16 @@ import {
   TableHeader,
   TableRow,
 } from "./components/ui/table";
+
 import { Info, LayoutDashboard, Upload } from "lucide-react";
 import { openWindow } from "./lib/utils";
+import { DiscoveryResponse } from "./udp";
 
-type Device = {
-  hostname: string;
-  address: string;
-};
-
-const devices: Device[] = [
-  {
-    hostname: "limelight",
-    address: "10.44.81.11",
-  },
-  {
-    hostname: "coprocessor",
-    address: "localhost",
-  },
-];
-
-export default function DeviceTable() {
+export default function DeviceTable({
+  devices,
+}: {
+  devices: DiscoveryResponse[];
+}) {
   return (
     <div className="ml-5 mt-5 overflow-hidden rounded-2xl bg-[#1f1f1f] shadow-sm">
       <Table className="overflow-hidden rounded-2xl">
@@ -35,23 +25,17 @@ export default function DeviceTable() {
               Hostname
             </TableHead>
 
-            <TableHead className="text-[#ff66c4] last:rounded-tr-2xl">
-              Address
-            </TableHead>
-            <TableHead className="text-[#ff66c4] last:rounded-tr-2xl"></TableHead>
+            <TableHead className="text-[#ff66c4]">Address</TableHead>
+
+            <TableHead className="text-[#ff66c4]" />
           </TableRow>
         </TableHeader>
 
         <TableBody>
           {devices.map((device, index) => (
             <TableRow
-              key={device.address}
-              className="
-                text-xl text-[#ff66c4]
-                transition-colors
-                hover:bg-[#2b2a2a]
-                border-none
-              "
+              key={device.ip}
+              className="text-xl text-[#ff66c4] hover:bg-[#2b2a2a]"
             >
               <TableCell
                 className={index === devices.length - 1 ? "rounded-bl-2xl" : ""}
@@ -59,32 +43,26 @@ export default function DeviceTable() {
                 {device.hostname}
               </TableCell>
 
+              <TableCell>{device.ip}</TableCell>
+
               <TableCell
                 className={index === devices.length - 1 ? "rounded-br-2xl" : ""}
               >
-                {device.address}
-              </TableCell>
-              <TableCell
-                className={index === devices.length - 1 ? "rounded-br-2xl" : ""}
-              >
-                <div className="row gap-5">
-                  {" "}
-                  <button
-                    onClick={() => {
-                      openWindow({ label: "processor" });
-                    }}
-                  >
+                <div className="flex gap-5">
+                  <button onClick={() => openWindow({ label: "processor" })}>
                     <Info />
                   </button>
+
                   <button>
                     <Upload />
                   </button>
+
                   <button
                     title="Open Dashboard"
                     onClick={() => {
                       openWindow({
                         label: `SynapseDashboard${device.hostname}`,
-                        url: `http://${device.address}:3000`,
+                        url: `http://${device.ip}:3000`,
                       });
                     }}
                   >
