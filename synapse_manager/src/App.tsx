@@ -3,6 +3,7 @@ import DeviceTable from "./device_table";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DiscoveryResponse } from "./udp";
+import { LoaderCircle, Search } from "lucide-react";
 
 function App() {
   const [devices, setDevices] = useState<DiscoveryResponse[]>([]);
@@ -24,7 +25,7 @@ function App() {
   }
 
   useEffect(() => {
-    scanDevices(); // initial run
+    scanDevices();
 
     const id = setInterval(() => {
       scanDevices();
@@ -38,15 +39,20 @@ function App() {
       <div className="row flex items-center gap-4">
         <button
           onClick={scanDevices}
-          className="text-xm text-[#ff66c4] font-bold w-40 ml-2"
+          className="text-xm text-[#ff66c4] font-bold w-45 ml-2 flex items-center justify-center gap-2"
         >
-          {loading ? "Scanning..." : "Find Devices"}
+          {loading ? (
+            <>
+              <LoaderCircle className="w-4 h-4 animate-spin" />
+              Scanning...
+            </>
+          ) : (
+            <>
+              <Search className="w-4 h-4" />
+              Find Devices
+            </>
+          )}
         </button>
-
-        <p className="text-sm m-0 text-gray-200">
-          Click on any hostname or IP address to navigate to the web interface
-          of the corresponding device
-        </p>
       </div>
 
       <DeviceTable devices={devices} />
