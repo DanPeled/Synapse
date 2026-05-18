@@ -58,6 +58,19 @@ button {
   outline: none;
 }
 
+button:disabled {
+  background-color: #1a1a1a;
+  color: #6b6b6b;
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  border-color: #2a2a2a;
+}
+
+button:disabled:hover {
+  background-color: #1a1a1a;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     background-color: #2f2f2f;
