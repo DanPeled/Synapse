@@ -1,0 +1,97 @@
+name: Synapse Manager Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux
+          - os: windows-latest
+            label: windows
+          - os: macos-latest
+            label: macos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: synapse_manager/src-tauri
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: synapse_manager/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: synapse_manager
+        run: npm ci
+
+      - name: Build Tauri app
+        working-directory: synapse_manager/src-tauri
+        run: npm run tauri build
+
+      # Rename output artifacts
+      - name: Rename artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+
+          mkdir -p out
+
+          find synapse_manager/src-tauri/target/release/bundle -type f \( -name "*.AppImage" -o -name "*.dmg" -o -name "*.deb" \) | while read file; do
+            ext="${file##*.}"
+            cp "$file" "out/synapse_manager_${{ matrix.label }}_${VERSION}.${ext}"
+          done
+
+      - name: Rename artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME
+
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+
+          Get-ChildItem synapse_manager/src-tauri/target/release/bundle -Recurse -Include *.msi | ForEach-Object {
+            Copy-Item $_.FullName "out/synapse_manager_windows_$version.msi"
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: synapse-${{ matrix.label }}
+          path: out/*
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

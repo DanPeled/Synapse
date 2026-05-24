@@ -1,9 +1,8 @@
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::UdpSocket;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DiscoveryResponse {
     pub ip: String,
     pub hostname: String,
@@ -20,43 +19,41 @@ pub struct ScanResult {
     pub devices: Vec<DiscoveryResponse>,
 }
 
-fn discover_devices() -> Vec<DiscoveryResponse> {
-    // ephemeral socket for receiving replies
-    let socket = UdpSocket::bind("0.0.0.0:0").expect("failed to bind socket");
-
+fn discover_devices_with_socket(socket: &UdpSocket) -> Vec<DiscoveryResponse> {
     socket.set_broadcast(true).ok();
     socket
-        .set_read_timeout(Some(Duration::from_millis(500)))
+        .set_read_timeout(Some(Duration::from_millis(100)))
         .ok();
 
-    // send ping
     let target = format!("255.255.255.255:{PORT}");
-    socket
-        .send_to(PING.as_bytes(), &target)
-        .expect("failed to send ping");
+
+    socket.send_to(PING.as_bytes(), &target).ok();
 
     let mut buf = [0u8; 2048];
     let mut results = Vec::new();
 
     let start = Instant::now();
 
-    // collect replies for ~2 seconds
-    while start.elapsed() < Duration::from_secs(2) {
+    while start.elapsed() < Duration::from_millis(500) {
         match socket.recv_from(&mut buf) {
-            Ok((size, _addr)) => {
+            Ok((size, _)) => {
                 let msg = String::from_utf8_lossy(&buf[..size]);
 
                 if let Ok(device) = serde_json::from_str::<DiscoveryResponse>(&msg) {
                     results.push(device);
                 }
             }
-            Err(_) => {
-                // timeout -> just continue until window ends
-            }
+            Err(_) => {}
         }
     }
 
     results
+}
+
+fn discover_devices() -> Vec<DiscoveryResponse> {
+    let socket = UdpSocket::bind("0.0.0.0:0").expect("failed to bind socket");
+
+    discover_devices_with_socket(&socket)
 }
 
 #[tauri::command]

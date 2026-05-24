@@ -22,11 +22,11 @@ import {
   Info,
   Laptop,
   LayoutDashboard,
-  Link,
+  // Link,
   ShieldCheck,
   Tag,
-  Terminal,
-  Upload,
+  // Terminal,
+  // Upload,
 } from "lucide-react";
 import { openWindow } from "./lib/utils";
 import { DiscoveryResponse } from "./udp";
@@ -85,13 +85,17 @@ export default function DeviceTable({
                   }
                 >
                   <div className="flex gap-5">
-                    <button onClick={() => setSelectedDevice(device)}>
+                    <button
+                      onClick={() => setSelectedDevice(device)}
+                      title="Info"
+                    >
                       <Info />
                     </button>
 
-                    <button>
-                      <Upload />
-                    </button>
+                    {/** TODO
+                    <button title="Deploy" disabled>
+                     <Upload />
+                      </button>  **/}
 
                     <button
                       title="Open Dashboard"
@@ -164,9 +168,9 @@ function DeviceDialog({ device }: { device: DiscoveryResponse }) {
         <strong>Version:</strong>
         <span>{device.version}</span>
       </p>
-
+      {/** TODO
       <div className="row space-x-2 mt-15">
-        <button title="Link To Project">
+        <button title="Link To Project" disabled>
           <Link />
         </button>
 
@@ -174,6 +178,7 @@ function DeviceDialog({ device }: { device: DiscoveryResponse }) {
           <Terminal />
         </button>
       </div>
+      **/}
     </div>
   );
 }
