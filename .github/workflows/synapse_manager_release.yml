@@ -24,6 +24,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Linux dependencies (Tauri)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            pkg-config \
+            build-essential
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -44,10 +56,9 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        working-directory: synapse_manager/src-tauri
+        working-directory: synapse_manager
         run: npm run tauri build
 
-      # Rename output artifacts
       - name: Rename artifacts (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
