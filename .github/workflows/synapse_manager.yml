@@ -3,7 +3,11 @@ name: Synapse Manager
 on:
   push:
     branches: [main]
+    paths:
+      - "synapse_manager/**"
   pull_request:
+    paths:
+      - "synapse_manager/**"
 
 jobs:
   format:
