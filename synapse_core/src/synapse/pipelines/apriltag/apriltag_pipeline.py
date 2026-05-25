@@ -28,8 +28,7 @@ from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
 from synapse.pipelines.apriltag.multi_tag_estimator import \
     WeightedAverageMultiTagEstimator
 from synapse.stypes import CameraID
-from wpimath import units
-from wpimath.geometry import Pose3d, Transform3d
+from wpimath import Pose3d, Transform3d, units
 
 
 class ApriltagVerbosity(Enum):

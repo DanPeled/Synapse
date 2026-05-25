@@ -335,7 +335,7 @@ class RuntimeManager:
 
                 if NtClient.INSTANCE is not None:
                     NetworkTableInstance.getDefault().addListener(
-                        entry, EventFlags.kValueRemote, updateSettingListener
+                        entry, EventFlags.VALUE_REMOTE, updateSettingListener
                     )
 
         for key in pipeline_config.getMap().keys():
@@ -406,25 +406,25 @@ class RuntimeManager:
         topic_type = topic.getType()
         value = event.data.value
 
-        if topic_type == NetworkTableType.kBoolean:
+        if topic_type == NetworkTableType.BOOLEAN:
             return value.getBoolean()
-        elif topic_type == NetworkTableType.kFloat:
+        elif topic_type == NetworkTableType.FLOAT:
             return value.getFloat()
-        elif topic_type == NetworkTableType.kDouble:
+        elif topic_type == NetworkTableType.DOUBLE:
             return value.getDouble()
-        elif topic_type == NetworkTableType.kInteger:
+        elif topic_type == NetworkTableType.INTEGER:
             return value.getInteger()
-        elif topic_type == NetworkTableType.kString:
+        elif topic_type == NetworkTableType.STRING:
             return value.getString()
-        elif topic_type == NetworkTableType.kBooleanArray:
+        elif topic_type == NetworkTableType.BOOLEAN_ARRAY:
             return value.getBooleanArray()
-        elif topic_type == NetworkTableType.kFloatArray:
+        elif topic_type == NetworkTableType.FLOAT_ARRAY:
             return value.getFloatArray()
-        elif topic_type == NetworkTableType.kDoubleArray:
+        elif topic_type == NetworkTableType.DOUBLE_ARRAY:
             return value.getDoubleArray()
-        elif topic_type == NetworkTableType.kIntegerArray:
+        elif topic_type == NetworkTableType.INTEGER_ARRAY:
             return value.getIntegerArray()
-        elif topic_type == NetworkTableType.kStringArray:
+        elif topic_type == NetworkTableType.STRING_ARRAY:
             return value.getStringArray()
         else:
             raise ValueError(f"Unsupported topic type: {topic_type}")
@@ -699,7 +699,7 @@ class RuntimeManager:
                 )
 
             NetworkTableInstance.getDefault().addListener(
-                entry, EventFlags.kValueRemote, updateNTPipelineListener
+                entry, EventFlags.VALUE_REMOTE, updateNTPipelineListener
             )
 
             entry.setInteger(self.pipelineHandler.defaultPipelineIndexes[cameraIndex])
@@ -897,7 +897,7 @@ class RuntimeManager:
             assert recordEntry is not None
 
             NetworkTableInstance.getDefault().addListener(
-                recordEntry, EventFlags.kValueRemote, listener
+                recordEntry, EventFlags.VALUE_REMOTE, listener
             )
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
