@@ -4,3 +4,6 @@
 # Ignore Gradle build output directory
 build
 plugin/bin/*
+.vscode/*
+.settings/*
+plugin/.settings/*
