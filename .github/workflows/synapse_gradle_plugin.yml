@@ -35,7 +35,7 @@ jobs:
       - name: Build Project
         run: |
           cd synapse_gradle_plugin
-          ./gradlew build
+          ./gradlew build --no-configuration-cache
 
   test:
     needs: build
@@ -57,7 +57,7 @@ jobs:
       - name: Run Tests
         run: |
           cd synapse_gradle_plugin
-          ./gradlew test
+          ./gradlew test --no-configuration-cache
 
   spotless-check:
     runs-on: ubuntu-latest
@@ -75,4 +75,4 @@ jobs:
       - name: Run Spotless Check
         run: |
           cd synapse_gradle_plugin
-          ./gradlew spotlessCheck
+          ./gradlew spotlessCheck --no-configuration-cache
