@@ -3,7 +3,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from synapse_net.proto.v1 import AlertProto, AlertTypeProto, MessageTypeProto
+from synapse_net.generated.messages.v1 import (AlertProto, AlertTypeProto,
+                                               MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
 
 

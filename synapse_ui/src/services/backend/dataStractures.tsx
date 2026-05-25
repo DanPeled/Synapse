@@ -2,20 +2,20 @@ import {
   DeviceInfoProto,
   HardwareMetricsProto,
   SetNetworkSettingsProto,
-} from "@/proto/v1/device";
+} from "@/generated/messages/v1/device";
 import { WebSocketWrapper } from "../websocket";
+import { RefObject } from "react";
 import {
   CalibrationDataProto,
   CameraPerformanceProto,
   CameraProto,
-} from "@/proto/v1/camera";
+} from "@/generated/messages/v1/camera";
 import {
   PipelineProto,
   PipelineResultProto,
   PipelineTypeProto,
-} from "@/proto/v1/pipeline";
-import { LogMessageProto } from "@/proto/v1/log";
-import { RefObject } from "react";
+} from "@/generated/messages/v1/pipeline";
+import { LogMessageProto } from "@/generated/messages/v1/log";
 
 export type CameraID = number;
 export type PipelineID = number;

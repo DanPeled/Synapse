@@ -18,7 +18,10 @@ import {
 import { Row } from "@/widgets/containers";
 import { baseCardColor, teamColor } from "@/services/style";
 import { CalibrationDialog } from "./calibration_dialog";
-import { CalibrationDataProto, CameraProto } from "@/proto/v1/camera";
+import {
+  CalibrationDataProto,
+  CameraProto,
+} from "@/generated/messages/v1/camera";
 import { WebSocketWrapper } from "@/services/websocket";
 import { useBackendContext } from "@/services/backend/backendContext";
 

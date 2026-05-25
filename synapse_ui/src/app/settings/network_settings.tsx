@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SetNetworkSettingsProto } from "@/proto/v1/device";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+import { SetNetworkSettingsProto } from "@/generated/messages/v1/device";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { useBackendContext } from "@/services/backend/backendContext";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Button } from "@/widgets/button";

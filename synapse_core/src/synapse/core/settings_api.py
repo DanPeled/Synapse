@@ -7,24 +7,28 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
+from pathlib import Path
+from typing import (Any, Dict, Generic, List, Optional, Set, TypeVar, Union,
+                    overload)
 
 from betterproto import which_one_of
 from cscore import VideoProperty
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
-                                           ColorConstraintProto,
-                                           ColorFormatProto,
-                                           ConstraintConfigProto,
-                                           ConstraintProto,
-                                           ConstraintTypeProto,
-                                           EnumeratedConstraintProto,
-                                           EnumeratedOptionProto,
-                                           ListConstraintProto,
-                                           NumberConstraintProto,
-                                           SettingMetaProto, SettingValueProto,
-                                           StringConstraintProto)
-from synapse_net.proto.v1 import CameraProto
+from synapse_net.generated.messages.v1 import CameraProto
+from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
+                                               ColorConstraintProto,
+                                               ColorFormatProto,
+                                               ConstraintConfigProto,
+                                               ConstraintProto,
+                                               ConstraintTypeProto,
+                                               EnumeratedConstraintProto,
+                                               EnumeratedOptionProto,
+                                               FileConstraintProto,
+                                               ListConstraintProto,
+                                               NumberConstraintProto,
+                                               SettingMetaProto,
+                                               SettingValueProto,
+                                               StringConstraintProto)
 
 from ..bcolors import MarkupColors
 from ..log import err
@@ -446,7 +450,7 @@ class StringConstraint(Constraint[str]):
         self.maxLength = maxLength
         self.pattern = pattern
 
-    def validate(self, value: SettingsValue) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult[str]:
         if not isinstance(value, str):
             return ValidationResult(False, "Value must be a string")
 
@@ -487,6 +491,33 @@ class StringConstraint(Constraint[str]):
                 max_length=self.maxLength,
                 pattern=self.pattern,
             )
+        )
+
+
+class FileConstraint(Constraint[Optional[Path]]):
+    def __init__(self, fileTypes: Optional[Set[str]] = None):
+        super().__init__(ConstraintTypeProto.FILE)
+        self.fileTypes: Optional[Set[str]] = fileTypes
+
+    def validate(self, value: SettingsValue) -> ValidationResult[Optional[Path]]:
+        if isinstance(value, Path):
+            return ValidationResult(True, None, value.absolute())
+        elif isinstance(value, str):
+            if Path(value).exists():
+                return ValidationResult(True, None, Path(value))
+            return ValidationResult(False, "Path must exist")
+        return ValidationResult(False, "Path must be either Path or str")
+
+    def toDict(self) -> Dict[str, Any]:
+        return {"type": self.constraintType.value, "file_types": self.fileTypes or None}
+
+    @classmethod
+    def fromDict(cls, data: Dict[str, Any]) -> "FileConstraint":
+        return FileConstraint(data.get("file_types", None))
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            file=FileConstraintProto(file_types=list(self.fileTypes or []))
         )
 
 
@@ -729,7 +760,7 @@ class SettingsCollection:
             setting = self._settingsApi.settings[field]
             validation = setting.validate(value)
             if validation.errorMessage is None:
-                self._settingsApi.setValue(field, value)
+                self._settingsApi.setValue(field, validation.normalizedValue)
             else:
                 err(
                     f"Error validating {MarkupColors.bold(field)}"

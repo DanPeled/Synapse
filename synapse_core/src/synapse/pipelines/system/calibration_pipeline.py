@@ -14,9 +14,10 @@ from synapse.core.pipeline import (CameraSettings, FrameResult, PipelineResult,
                                    systemPipeline)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
-from synapse.core.synapse import RemovePipelineMessageProto, Synapse
-from synapse_net.proto.v1 import (CalibrationDataProto, MessageProto,
-                                  MessageTypeProto)
+from synapse.core.synapse import Synapse
+from synapse_net.generated.messages.v1 import (CalibrationDataProto,
+                                               MessageProto, MessageTypeProto,
+                                               RemovePipelineMessageProto)
 
 
 class CalibrationResult(NamedTuple):

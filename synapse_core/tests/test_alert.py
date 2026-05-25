@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from synapse.alert import alert
-from synapse_net.proto.v1 import AlertTypeProto
+from synapse_net.generated.messages.v1 import AlertTypeProto
 
 
 class TestAlertFunction(unittest.TestCase):

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package settings.v1;
+
+// Represents a flexible value for a setting, supporting multiple scalar types and arrays.
+message SettingValueProto {
+  // One scalar value (only one can be set at a time)
+  oneof scalar_value {
+    // Integer scalar value
+    int32 int_value = 1;
+
+    // String scalar value
+    string string_value = 2;
+
+    // Boolean scalar value
+    bool bool_value = 3;
+
+    // Float scalar value
+    float float_value = 4;
+
+    // Bytes scalar value
+    bytes bytes_value = 5;
+  }
+
+  // Repeated integer values (array)
+  repeated int32 int_array_value = 6;
+
+  // Repeated string values (array)
+  repeated string string_array_value = 7;
+
+  // Repeated boolean values (array)
+  repeated bool bool_array_value = 8;
+
+  // Repeated float values (array)
+  repeated float float_array_value = 9;
+
+  // Repeated bytes values (array)
+  repeated bytes bytes_array_value = 10;
+}

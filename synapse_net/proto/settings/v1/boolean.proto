@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package settings.v1;
+
+message BooleanConstraintProto {
+  bool render_as_button = 1;
+}

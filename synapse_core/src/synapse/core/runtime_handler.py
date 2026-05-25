@@ -19,9 +19,10 @@ import synapse.log as log
 from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
                     NetworkTableInstance, NetworkTableType, StringPublisher,
                     ValueEventData)
+from synapse_net.generated.messages.v1 import (CameraPerformanceProto,
+                                               HardwareMetricsProto,
+                                               MessageTypeProto)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.proto.v1 import (CameraPerformanceProto, HardwareMetricsProto,
-                                  MessageTypeProto)
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpimath.units import seconds, secondsToMilliseconds
 

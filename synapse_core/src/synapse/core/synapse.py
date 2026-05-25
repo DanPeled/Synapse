@@ -2,31 +2,29 @@
 # SPDX-FileCopyrightText: 2026 Dan Peled
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 import asyncio
 import os
 import threading
 import time
 import traceback
+from multiprocessing import Process
 from pathlib import Path
 from typing import Any, List, Optional
 
 import psutil
+from synapse.__version__ import SYNAPSE_VERSION
 from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.file_server import FileServer
+from synapse_net.generated.messages.v1 import (
+    DeviceInfoProto, MessageProto, MessageTypeProto, PipelineProto,
+    PipelineTypeProto, RemovePipelineMessageProto,
+    SetCameraRecordingStatusMessageProto, SetConnectionInfoProto,
+    SetDefaultPipelineMessageProto, SetNetworkSettingsProto,
+    SetPipelineIndexMessageProto, SetPipelineNameMessageProto,
+    SetPipleineSettingMessageProto)
+from synapse_net.manager_discover import UDPDeviceResponder
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
-                                  MessageTypeProto, PipelineProto,
-                                  PipelineTypeProto,
-                                  RemovePipelineMessageProto,
-                                  SetCameraRecordingStatusMessageProto,
-                                  SetConnectionInfoProto,
-                                  SetDefaultPipelineMessageProto,
-                                  SetNetworkSettingsProto,
-                                  SetPipelineIndexMessageProto,
-                                  SetPipelineNameMessageProto,
-                                  SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
 from synapse_net.ui_handle import UIHandle
@@ -67,6 +65,8 @@ class Synapse:
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
         self.fileServer: Optional[FileServer] = None
+        self.managerResponder: Optional[UDPDeviceResponder] = None
+        self.managerResponderProcess: Optional[Process] = None
 
     def init(
         self,
@@ -151,6 +151,19 @@ class Synapse:
             log(
                 f"Network Config:\n  Team Number: {config.network.teamNumber}\n  Name: {config.network.name}\n  Is Server: {self.__isServer}\n  Is Sim: {self.__isSim}"
             )
+
+            self.managerResponder = UDPDeviceResponder(
+                config.network.name,
+                config.network.teamNumber,
+                SYNAPSE_VERSION,
+            )
+
+            self.managerResponderProcess = Process(
+                target=self.managerResponder.run,
+                daemon=True,  # auto-kill when main process exits
+            )
+
+            self.managerResponderProcess.start()
 
             nt_good = self.__init_networktables(config.network)
             if nt_good:
@@ -374,6 +387,11 @@ class Synapse:
         log("WebSocket server started on ws://localhost:8765")
 
     def cleanup(self):
+        if self.managerResponderProcess is not None:
+            if self.managerResponderProcess.is_alive():
+                self.managerResponderProcess.terminate()
+                self.managerResponderProcess.join(timeout=5)
+
         if NtClient.INSTANCE is not None:
             NtClient.INSTANCE.cleanup()
 

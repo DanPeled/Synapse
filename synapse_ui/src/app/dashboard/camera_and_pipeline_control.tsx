@@ -26,9 +26,15 @@ import {
   PipelineProto,
   PipelineTypeProto,
   SetPipelineNameMessageProto,
-} from "@/proto/v1/pipeline";
-import { CameraProto, SetDefaultPipelineMessageProto } from "@/proto/v1/camera";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+} from "@/generated/messages/v1/pipeline";
+import {
+  CameraProto,
+  SetDefaultPipelineMessageProto,
+} from "@/generated/messages/v1/camera";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { AddPipelineDialog } from "./addPipelineDialog";
 import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
 import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
