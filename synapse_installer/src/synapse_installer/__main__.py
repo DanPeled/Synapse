@@ -106,6 +106,7 @@ def main() -> None:
     if not handler or handler is None:
         print(f"Unknown command: `{cmd}`\n{HELP_TEXT}")
         sys.exit(1)
+        return
 
     sys.exit(handler(args))
 
