@@ -13,7 +13,7 @@ from synapse.core.synapse import Synapse
 def test_synapse_run_called_when_init_succeeds():
     root = Path(__file__).parent
     handler = RuntimeManager(root)
-    s = Synapse()
+    s = Synapse(sendSettingsInNT=False)
 
     s.init = MagicMock(return_value=True)
     s.run = MagicMock()
