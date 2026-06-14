@@ -79,7 +79,7 @@ class TestRuntimeManager(unittest.TestCase):
             patch.object(self.handler, "setupNetworkTables") as setup_nt,
             patch.object(self.handler, "startMetricsThread") as start_metrics,
         ):
-            self.handler.setup(directory=Path("."))
+            self.handler.setup(directory=Path("."), sendSettingsInNT=False)
 
             setup_loader.assert_called_once()
             setup_cameras.assert_called_once()

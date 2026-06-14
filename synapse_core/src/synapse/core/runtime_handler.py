@@ -140,7 +140,7 @@ class RuntimeManager:
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
 
-    def setup(self, directory: Path):
+    def setup(self, directory: Path, sendSettingsInNT: bool):
         """
         Initializes all components:
         - Loads pipelines from the directory.
@@ -154,6 +154,7 @@ class RuntimeManager:
         """
 
         self.setupCallbacks()
+        self.__sendSettingsInNT = sendSettingsInNT
 
         log.log(
             MarkupColors.header(
@@ -314,9 +315,11 @@ class RuntimeManager:
         )
 
         currPipeline.ntTable = cameraTable
+
+        if not self.__sendSettingsInNT:
+            return
         settingsSubtable = cameraTable.getSubTable(NTKeys.kSettings.value)
         pipeline_config.sendSettings(settingsSubtable)
-
         cameraSettings.sendSettings(settingsSubtable)
 
         def updateSettingListener(event: Event, cameraIndex=cameraIndex):
@@ -371,6 +374,9 @@ class RuntimeManager:
                 return
 
         self.onSettingChanged.call(prop, value, cameraIndex)
+
+        if not self.__sendSettingsInNT:
+            return
 
         nt_table = getCameraTable(camera)
         key = (cameraIndex, prop)
