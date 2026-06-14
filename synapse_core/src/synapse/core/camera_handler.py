@@ -231,7 +231,7 @@ class CameraHandler:
             to their corresponding video output objects.
         """
         return cs.CameraServer.putVideo(
-            f"{NtClient.NT_TABLE}/{getCameraTableName(self.cameras[cameraIndex])}",
+            name=f"{NtClient.NT_TABLE}/{getCameraTableName(self.cameras[cameraIndex])}",
             width=self.getStreamRes(cameraIndex)[0],
             height=self.getStreamRes(cameraIndex)[1],
         )
