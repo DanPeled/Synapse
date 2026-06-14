@@ -9,7 +9,7 @@ import time
 import traceback
 from multiprocessing import Process
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Final, List, Optional
 
 import psutil
 from synapse.__version__ import SYNAPSE_VERSION
@@ -60,13 +60,14 @@ class Synapse:
 
     kInstance: "Synapse"
 
-    def __init__(self) -> None:
+    def __init__(self, sendSettingsInNT: bool) -> None:
         self.runtimeHandler: RuntimeManager
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
         self.fileServer: Optional[FileServer] = None
         self.managerResponder: Optional[UDPDeviceResponder] = None
         self.managerResponderProcess: Optional[Process] = None
+        self.__sendSettingsInNT: Final[bool] = sendSettingsInNT
 
     def init(
         self,
@@ -167,7 +168,7 @@ class Synapse:
 
             nt_good = self.__init_networktables(config.network)
             if nt_good:
-                self.runtimeHandler.setup(Path(os.getcwd()))
+                self.runtimeHandler.setup(Path(os.getcwd()), self.__sendSettingsInNT)
             else:
                 err(
                     f"Something went wrong while setting up networktables with params: {config.network}"
@@ -753,9 +754,9 @@ class Synapse:
         self.cleanup()
 
     @staticmethod
-    def createAndRunRuntime(root: Path) -> None:
+    def createAndRunRuntime(root: Path, sendSettingsInNT: bool = False) -> None:
         handler = RuntimeManager(root)
-        s = Synapse()
+        s = Synapse(sendSettingsInNT)
         if s.init(handler, root / "config" / "settings.yml"):
             s.run()
         s.close()
