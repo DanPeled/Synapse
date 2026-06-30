@@ -14,15 +14,8 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import (
-    CameraServer,
-    CvSink,
-    UsbCamera,
-    VideoCamera,
-    VideoMode,
-    VideoProperty,
-    VideoSource,
-)
+from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
+                    VideoProperty, VideoSource)
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
