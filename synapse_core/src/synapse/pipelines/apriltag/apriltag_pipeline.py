@@ -108,8 +108,8 @@ class ApriltagPipelineSettings(PipelineSettings):
         description="If True, perform edge refinement to improve detection accuracy.",
     )
     quad_decimate = settingField(
-        NumberConstraint(minValue=0.0, maxValue=None),
-        default=2.0,
+        NumberConstraint(minValue=1.0, maxValue=None),
+        default=1.0,
         description="Decimation factor for the input image to speed up detection.",
     )
     quad_sigma = settingField(

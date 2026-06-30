@@ -2,10 +2,10 @@
 # SPDX-FileCopyrightText: 2026 Dan Peled
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 import os
 import threading
 import time
+import traceback
 from datetime import datetime
 from functools import cache
 from typing import Any, Dict, Final, List, Optional, Tuple
@@ -156,9 +156,9 @@ class CameraHandler:
                 if len(self.requestedCameraUIDs.keys()) > 0:
                     if id in self.requestedCameraUIDs.keys():
                         newIndex = self.requestedCameraUIDs.pop(id)
-                    else:
-                        m = max(self.requestedCameraUIDs.values())
-                        newIndex = m + 1
+                else:
+                    m = max(self.cameras.keys())
+                    newIndex = m + 1
 
                 cameraIndex = newIndex
                 cameraConfig = CameraConfig(
@@ -342,7 +342,10 @@ class CameraHandler:
             )
             camera.setIndex(cameraIndex)
         except Exception as e:
-            log.err(f"Failed to start camera capture: {e}")
+            log.err(
+                f"Failed to start camera capture ({type(e).__name__}): {e}\n"
+                f"{traceback.format_exc()}"
+            )
             return False
 
         self.addCameraData(cameraIndex, cameraConfig, camera)
@@ -360,7 +363,7 @@ class CameraHandler:
             prevCam.isRunning = False
         self.cameras[cameraIndex] = camera
 
-        camera.cameraIndex = cameraIndex
+        camera.setIndex(cameraIndex)
 
         self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
 

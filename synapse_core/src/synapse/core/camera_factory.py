@@ -435,8 +435,8 @@ class CsCoreCamera(SynapseCamera):
         inst.camera.setExposureManual(1)
         inst._validVideoModes = [mode for mode in inst._videoModes]
 
-        # This will call setVideoMode, which now initializes the buffer pool.
-        inst.setVideoMode(1000, 1920, 1080)
+        # # This will call setVideoMode, which now initializes the buffer pool.
+        inst.setVideoMode(100, 1920, 1080)
 
         # Start background frame grabbing thread
         inst._startFrameThread()
@@ -551,35 +551,24 @@ class CsCoreCamera(SynapseCamera):
         fps: int,
         pixelFormat: VideoMode.PixelFormat,
     ) -> Optional[VideoMode]:
-        # 1. Exact match
-        if self._videoModes is None or len(self._videoModes) == 0:
+        if not self._videoModes:
             return None
 
-        for mode in self._validVideoModes:
-            if (
-                mode.width == width
-                and mode.height == height
-                and mode.pixelFormat == pixelFormat
-            ):
-                return mode
+        def score(mode: VideoMode):
+            area_diff = abs(mode.width * mode.height - width * height)
+            fps_diff = abs(mode.fps - fps)
+            exact_res = mode.width == width and mode.height == height
+            exact_fmt = mode.pixelFormat == pixelFormat
 
-        # 2. Same resolution, closest FPS
-        same_res = [
-            m
-            for m in self._validVideoModes
-            if m.width == width and m.height == height and m.pixelFormat == pixelFormat
-        ]
-        if same_res:
-            return max(same_res, key=lambda m: m.fps)
+            # Lower is better
+            return (
+                0 if exact_fmt else 1,
+                0 if exact_res else 1,
+                area_diff,
+                fps_diff,
+            )
 
-        # 3. Closest resolution by area
-        def area(m):
-            return m.width * m.height
-
-        return max(
-            (m for m in self._validVideoModes if m.pixelFormat == pixelFormat),
-            key=area,
-        )
+        return min(self._videoModes, key=score)
 
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
         if self._videoModes is None or len(self._videoModes) == 0:
