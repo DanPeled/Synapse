@@ -122,6 +122,18 @@ class ApriltagPipelineSettings(PipelineSettings):
         default=4,
         description="Number of iterations for pose estimation refinement.",
     )
+    crop_x1 = settingField(
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=-1
+    )
+    crop_x2 = settingField(
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=1
+    )
+    crop_y1 = settingField(
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=-1
+    )
+    crop_y2 = settingField(
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=1
+    )
 
 
 @dataclass
@@ -200,6 +212,29 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
         if setting.key in [
+            self.settings.crop_x1,
+            self.settings.crop_x2,
+            self.settings.crop_y1,
+            self.settings.crop_y2,
+        ]:
+            self.cameraMatrix = (
+                self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
+            )
+            cx = self.cameraMatrix[0][2]
+            cy = self.cameraMatrix[1][2]
+            config = self.poseEstimator.getConfig()
+            h, w = self.getResolution()
+
+            crop_x1 = self.getSetting(self.settings.crop_x1)
+            crop_y1 = self.getSetting(self.settings.crop_y1)
+
+            offset_x = int((crop_x1 + 1) * 0.5 * w)
+            offset_y = int((crop_y1 + 1) * 0.5 * h)
+
+            config.cx = cx - offset_x
+            config.cy = cy - offset_y
+            self.poseEstimator.setConfig(config)
+        if setting.key in [
             self.settings.num_threads.key,
             self.settings.quad_decimate.key,
             self.settings.quad_sigma.key,
@@ -227,11 +262,47 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     ) -> ApriltagPoseEstimate:
         return self.poseEstimator.estimate(tag, nIters=iterationCount)
 
+    def cropImageToFit(self, img, drawOn):
+        h, w = img.shape[:2]
+
+        nx1 = self.getSetting(self.settings.crop_x1)
+        nx2 = self.getSetting(self.settings.crop_x2)
+        ny1 = self.getSetting(self.settings.crop_y1)
+        ny2 = self.getSetting(self.settings.crop_y2)
+
+        x1 = int((nx1 + 1) * 0.5 * w)
+        x2 = int((nx2 + 1) * 0.5 * w)
+        y1 = int((ny1 + 1) * 0.5 * h)
+        y2 = int((ny2 + 1) * 0.5 * h)
+
+        # Clamp
+        x1 = max(0, min(x1, w))
+        x2 = max(0, min(x2, w))
+        y1 = max(0, min(y1, h))
+        y2 = max(0, min(y2, h))
+
+        # Fix corner ordering
+        left = min(x1, x2)
+        right = max(x1, x2)
+        top = min(y1, y2)
+        bottom = max(y1, y2)
+
+        cv2.rectangle(
+            drawOn,
+            (left, top),
+            (right - 1, bottom - 1),
+            (0, 255, 0),
+            2,
+        )
+
+        return img[top:bottom, left:right]
+
     def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        cropped = self.cropImageToFit(gray, img)
 
-        tags = self.apriltagDetector.detect(gray)
+        tags = self.apriltagDetector.detect(cropped)
         tagEstimates: List[ApriltagDetectionResult] = []
 
         if not tags:
