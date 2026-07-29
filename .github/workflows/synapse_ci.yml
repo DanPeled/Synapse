@@ -176,7 +176,7 @@ jobs:
         with:
           cache: pip
           python-version: "3.12"
-      - run: pip install ruff isort
+      - run: pip install ".[dev]"
       - run: ruff check .
       - run: isort --check-only --diff .
 

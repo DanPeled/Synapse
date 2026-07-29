@@ -95,7 +95,7 @@ setup(
             "pytest",
             "pytest-asyncio",
             "pytest-mock",
-            "ruff",
+            "ruff==0.15.20",
             "isort",
             "pyright",
             "build",
