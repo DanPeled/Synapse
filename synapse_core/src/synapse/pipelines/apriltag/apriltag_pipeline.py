@@ -10,10 +10,9 @@ from typing import Any, Dict, Final, List, Optional, Set
 
 import cv2
 import numpy as np
-from synapse import log
-from synapse.core.pipeline import (CameraSettings, FrameResult, Pipeline,
-                                   PipelineSettings, Setting, SettingsValue,
-                                   SynapseCamera, pipelineResult)
+from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
+                                   Setting, SettingsValue, SynapseCamera,
+                                   pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse.hardware.deploy_dir import DeployDirectory
