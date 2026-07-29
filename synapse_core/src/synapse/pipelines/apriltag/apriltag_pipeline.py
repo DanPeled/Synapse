@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from functools import cache, lru_cache
+from functools import cache
 from typing import Any, Dict, Final, List, Optional, Set
 
 import cv2
@@ -20,7 +20,7 @@ from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
     ApriltagPoseEstimator, CameraPoseEstimate,
-    ICombinedApriltagCameraPoseEstimator, drawTagDetectionMarker, opencvToWPI,
+    ICombinedApriltagCameraPoseEstimator, drawTagDetectionMarker,
     tagToCameraPose)
 from synapse.pipelines.apriltag.apriltag_robotpy import (
     RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
@@ -222,12 +222,10 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             config.tagSize = value
             self.poseEstimator.setConfig(config)
 
-    @lru_cache(maxsize=100)
-    def estimateTagPose(self, tag: AprilTagDetection) -> ApriltagPoseEstimate:
-        return self.poseEstimator.estimate(
-            tag,
-            nIters=int(self.getSetting(self.settings.iteration_count)),
-        )
+    def estimateTagPose(
+        self, tag: AprilTagDetection, iterationCount: int = 1
+    ) -> ApriltagPoseEstimate:
+        return self.poseEstimator.estimate(tag, nIters=iterationCount)
 
     def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
@@ -239,13 +237,18 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         if not tags:
             self.setDataValue("hasResults", False)
             self.setResults(None)
-            return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+            return img
+
+        fieldposeEnabled = self.getSetting(ApriltagPipelineSettings.fieldpose)
+        iterationCount = int(self.getSetting(self.settings.iteration_count))
 
         for tag in tags:
-            if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap.keys():
+            if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap:
                 warn(f"Invalid tagID: {tag.tagID}")
-                return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-            tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(tag)
+                return img
+            tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(
+                tag, iterationCount
+            )
 
             self.setDataValue(self.kTagIDKey, tag.tagID)
 
@@ -255,17 +258,15 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
             drawTagDetectionMarker(
                 tag=tag,
-                img=gray,
+                img=img,
             )
-
-            tagRelativePose = opencvToWPI(tagRelativePose)
 
             self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
             self.setDataValue(
                 self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
             )
 
-            if self.getSetting(ApriltagPipelineSettings.fieldpose):
+            if fieldposeEnabled:
                 tagFieldPose = self.fmap.getTagPose(tag.tagID)
 
                 if tagFieldPose:
@@ -294,21 +295,18 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.setDataValue("hasResults", True)
         result = ApriltagResult(
             self.combinedApriltagPoseEstimator.estimate(
-                map(
-                    lambda estimate: estimate.cameraPoseEstimate,
-                    tagEstimates,
-                )
+                [estimate.cameraPoseEstimate for estimate in tagEstimates]
             ),
             tagEstimates,
         )
-        self.setResults(ApriltagsJson.toJsonString(result))
+        self.setResults(ApriltagsJson.toDict(result))
 
-        return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        return img
 
 
 class ApriltagsJson:
     @classmethod
-    def toJsonString(cls, result: ApriltagResult) -> Dict[str, Any]:
+    def toDict(cls, result: ApriltagResult) -> Dict[str, Any]:
         tags: List[dict] = []
 
         for tag in result.tagDetections:
