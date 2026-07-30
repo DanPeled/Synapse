@@ -76,63 +76,81 @@ class ApriltagPipelineSettings(PipelineSettings):
         NumberConstraint(minValue=0, maxValue=None),
         default=units.meters(0.1651),
         description="Physical size of the AprilTag in meters.",
+        category="<Toolbox/> Engine Config",
     )
     tag_family = settingField(
         EnumeratedConstraint(["tag36h11", "tag16h5"]),
         default="tag36h11",
         description="AprilTag family to detect.",
+        category="<Toolbox/> Engine Config",
     )
     stick_to_ground = settingField(
         BooleanConstraint(),
         default=False,
         description="If True, the detected pose will be constrained to the ground plane.",
+        category="<Activity/> Results",
     )
     fieldpose = settingField(
         BooleanConstraint(),
         default=True,
         description="If True, estimate the tag's pose relative to the field coordinate frame.",
+        category="<Activity/> Results",
     )
     verbosity = settingField(
         EnumeratedConstraint(options=[ver.value for ver in ApriltagVerbosity]),
         default=ApriltagVerbosity.kPoseOnly.value,
         description="Level of logging and debug output.",
+        category="<Activity/> Results",
     )
     num_threads = settingField(
         NumberConstraint(minValue=1, maxValue=6, step=1),
         default=1,
         description="Number of CPU threads used for AprilTag detection.",
+        category="<Toolbox/> Engine Config",
     )
     refine_edges = settingField(
         BooleanConstraint(renderAsButton=False),
         default=True,
         description="If True, perform edge refinement to improve detection accuracy.",
+        category="<Toolbox/> Engine Config",
     )
     quad_decimate = settingField(
         NumberConstraint(minValue=1.0, maxValue=None),
         default=1.0,
         description="Decimation factor for the input image to speed up detection.",
+        category="<Toolbox/> Engine Config",
     )
     quad_sigma = settingField(
         NumberConstraint(minValue=0.0, maxValue=None),
         default=0.0,
         description="Gaussian blur sigma applied to the input image before detection.",
+        category="<Toolbox/> Engine Config",
     )
     iteration_count = settingField(
         NumberConstraint(minValue=1, maxValue=None, step=1),
         default=4,
         description="Number of iterations for pose estimation refinement.",
+        category="<Toolbox/> Engine Config",
     )
     crop_x1 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=-1
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=-1,
+        category="<Funnel/> Filtering",
     )
     crop_x2 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=1
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=1,
+        category="<Funnel/> Filtering",
     )
     crop_y1 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=-1
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=-1,
+        category="<Funnel/> Filtering",
     )
     crop_y2 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01), default=1
+        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=1,
+        category="<Funnel/> Filtering",
     )
 
 

@@ -1026,7 +1026,7 @@ def setEntryValue(entry: NetworkTableEntry, value):
 
 
 class CameraSettings(SettingsCollection):
-    kCameraPropsCategory = "Camera Properties"
+    kCameraPropsCategory = "<Camera/> Camera Properties"
 
     brightness = settingField(
         NumberConstraint(0, 100),
@@ -1230,6 +1230,7 @@ def cameraToProto(
         default_pipeline=defaultPipeline,
         max_fps=int(camera.getMaxFPS()),
         settings=settingsToProto(
-            typename="Camera Props", settings=cameraSettingsMetaValue
+            typename=CameraSettings.kCameraPropsCategory,
+            settings=cameraSettingsMetaValue,
         ),
     )
