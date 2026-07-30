@@ -2,16 +2,17 @@
 # SPDX-FileCopyrightText: 2026 Dan Peled
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 import asyncio
 import os
 import threading
 import time
 import traceback
+from multiprocessing import Process
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Final, List, Optional
 
 import psutil
+from synapse.__version__ import SYNAPSE_VERSION
 from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.file_server import FileServer
@@ -22,6 +23,7 @@ from synapse_net.generated.messages.v1 import (
     SetDefaultPipelineMessageProto, SetNetworkSettingsProto,
     SetPipelineIndexMessageProto, SetPipelineNameMessageProto,
     SetPipleineSettingMessageProto)
+from synapse_net.manager_discover import UDPDeviceResponder
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
@@ -58,11 +60,14 @@ class Synapse:
 
     kInstance: "Synapse"
 
-    def __init__(self) -> None:
+    def __init__(self, sendSettingsInNT: bool) -> None:
         self.runtimeHandler: RuntimeManager
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
         self.fileServer: Optional[FileServer] = None
+        self.managerResponder: Optional[UDPDeviceResponder] = None
+        self.managerResponderProcess: Optional[Process] = None
+        self.__sendSettingsInNT: Final[bool] = sendSettingsInNT
 
     def init(
         self,
@@ -148,9 +153,22 @@ class Synapse:
                 f"Network Config:\n  Team Number: {config.network.teamNumber}\n  Name: {config.network.name}\n  Is Server: {self.__isServer}\n  Is Sim: {self.__isSim}"
             )
 
+            self.managerResponder = UDPDeviceResponder(
+                config.network.name,
+                config.network.teamNumber,
+                SYNAPSE_VERSION,
+            )
+
+            self.managerResponderProcess = Process(
+                target=self.managerResponder.run,
+                daemon=True,  # auto-kill when main process exits
+            )
+
+            self.managerResponderProcess.start()
+
             nt_good = self.__init_networktables(config.network)
             if nt_good:
-                self.runtimeHandler.setup(Path(os.getcwd()))
+                self.runtimeHandler.setup(Path(os.getcwd()), self.__sendSettingsInNT)
             else:
                 err(
                     f"Something went wrong while setting up networktables with params: {config.network}"
@@ -370,6 +388,11 @@ class Synapse:
         log("WebSocket server started on ws://localhost:8765")
 
     def cleanup(self):
+        if self.managerResponderProcess is not None:
+            if self.managerResponderProcess.is_alive():
+                self.managerResponderProcess.terminate()
+                self.managerResponderProcess.join(timeout=5)
+
         if NtClient.INSTANCE is not None:
             NtClient.INSTANCE.cleanup()
 
@@ -731,9 +754,9 @@ class Synapse:
         self.cleanup()
 
     @staticmethod
-    def createAndRunRuntime(root: Path) -> None:
+    def createAndRunRuntime(root: Path, sendSettingsInNT: bool = False) -> None:
         handler = RuntimeManager(root)
-        s = Synapse()
+        s = Synapse(sendSettingsInNT)
         if s.init(handler, root / "config" / "settings.yml"):
             s.run()
         s.close()

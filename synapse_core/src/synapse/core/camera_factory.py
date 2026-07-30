@@ -436,8 +436,8 @@ class CsCoreCamera(SynapseCamera):
         inst.camera.setExposureManual(1)
         inst._validVideoModes = [mode for mode in inst._videoModes]
 
-        # This will call setVideoMode, which now initializes the buffer pool.
-        inst.setVideoMode(1000, 1920, 1080)
+        # # This will call setVideoMode, which now initializes the buffer pool.
+        inst.setVideoMode(100, 1920, 1080)
 
         # Start background frame grabbing thread
         inst._startFrameThread()
@@ -464,53 +464,39 @@ class CsCoreCamera(SynapseCamera):
         self._thread.start()
 
     def _frameGrabberLoop(self) -> None:
-        # Wait until the camera reports connected
+        # Wait until camera connects
         while self._running and not self.isConnected():
-            time.sleep(0.1)
+            time.sleep(0.05)
 
         buffer_index = 0
+        pool_size = len(self._bufferPool)
 
         while self._running:
-            # ---- HARD SAFETY GUARD ----
             if not self._bufferPool:
-                time.sleep(0.1)
+                time.sleep(0.05)
                 continue
 
-            # Get current video mode (used for pacing)
-            mode = self.camera.getVideoMode()
-            fps = mode.fps if mode and mode.fps > 0 else 30
+            buffer = self._bufferPool[buffer_index]
 
-            # Select buffer (safe: bufferPool is non-empty)
-            try:
-                buffer = self._bufferPool[buffer_index]
-            except IndexError:
-                # Pool changed while running (video mode switch)
-                buffer_index = 0
-                time.sleep(0.01)
-                continue
+            # IMPORTANT: no lock, grabFrame is thread-safe in CSCore
+            (timestamp, frame) = self.sink.grabFrame(buffer)
 
-            # Grab frame into pre-allocated buffer
-            with self._lock:
-                timestamp = self.sink.grabFrame(buffer)
-
-            if timestamp != 0:
-                # Push buffer index (drop oldest if queue full)
-                try:
-                    self._frameQueue.put_nowait((True, buffer_index))
-                except queue.Full:
+            if timestamp > 0:
+                # If queue is full, drop oldest frame
+                if self._frameQueue.full():
                     try:
                         self._frameQueue.get_nowait()
                     except queue.Empty:
                         pass
-                    self._frameQueue.put_nowait((True, buffer_index))
 
-                # Advance buffer index circularly
-                buffer_index = (buffer_index + 1) % len(self._bufferPool)
+                self._frameQueue.put_nowait((True, buffer_index))
 
-            # ---- FRAME PACING (NO SPINNING) ----
-            # Sleep for half-frame period to reduce latency
-            sleep_time = max(0.002, 1.0 / fps / 2.0)
-            time.sleep(sleep_time)
+                # advance buffer only on successful frame
+                buffer_index = (buffer_index + 1) % pool_size
+
+            else:
+                # small yield only on failure (prevents CPU spin)
+                time.sleep(0.001)
 
     def _waitForNextFrame(self):
         if self.isConnected():
@@ -566,41 +552,31 @@ class CsCoreCamera(SynapseCamera):
         fps: int,
         pixelFormat: PixelFormat,
     ) -> Optional[VideoMode]:
-        # 1. Exact match
-        if self._videoModes is None or len(self._videoModes) == 0:
+        if not self._videoModes:
             return None
 
-        for mode in self._validVideoModes:
-            if (
-                mode.width == width
-                and mode.height == height
-                and mode.pixelFormat == pixelFormat
-            ):
-                return mode
+        def score(mode: VideoMode):
+            area_diff = abs(mode.width * mode.height - width * height)
+            fps_diff = abs(mode.fps - fps)
+            exact_res = mode.width == width and mode.height == height
+            exact_fmt = mode.pixelFormat == pixelFormat
 
-        # 2. Same resolution, closest FPS
-        same_res = [
-            m
-            for m in self._validVideoModes
-            if m.width == width and m.height == height and m.pixelFormat == pixelFormat
-        ]
-        if same_res:
-            return max(same_res, key=lambda m: m.fps)
+            # Lower is better
+            return (
+                0 if exact_fmt else 1,
+                0 if exact_res else 1,
+                area_diff,
+                fps_diff,
+            )
 
-        # 3. Closest resolution by area
-        def area(m):
-            return m.width * m.height
-
-        return max(
-            (m for m in self._validVideoModes if m.pixelFormat == pixelFormat),
-            key=area,
-        )
+        return min(self._videoModes, key=score)
 
     def setVideoMode(self, fps: int, width: int, height: int) -> None:
         if self._videoModes is None or len(self._videoModes) == 0:
             warn(f"No video modes on camera: {self.cameraIndex}")
             return
-        pixelFormat = VideoMode.pixelFormat.MJPEG
+
+        pixelFormat = PixelFormat.MJPEG
 
         # Always select a valid mode
         mode = self._selectBestVideoMode(width, height, fps, pixelFormat)

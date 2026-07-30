@@ -184,8 +184,10 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
             frame_center = (frame_shape[1] / 2, frame_shape[0] / 2)
             return min(
                 detections,
-                key=lambda d: (d.center[0] - frame_center[0]) ** 2
-                + (d.center[1] - frame_center[1]) ** 2,
+                key=lambda d: (
+                    (d.center[0] - frame_center[0]) ** 2
+                    + (d.center[1] - frame_center[1]) ** 2
+                ),
             )
         elif strategy == "first_detected":
             return detections[0]

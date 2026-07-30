@@ -18,18 +18,20 @@ class RobotpyApriltagDetector(AprilTagDetector):
         self.detector: rpy_apriltag.AprilTagDetector = rpy_apriltag.AprilTagDetector()
 
     def detect(self, frame: Buffer) -> List[AprilTagDetection]:
-        return list(
-            map(
-                lambda detection: AprilTagDetection(
+        corners_template = makeCorners()
+        detections = []
+        for detection in self.detector.detect(frame):
+            center = detection.getCenter()
+            detections.append(
+                AprilTagDetection(
                     tagID=detection.getId(),
                     homography=detection.getHomography(),
-                    corners=detection.getCorners(makeCorners()),
-                    center=(int(detection.getCenter().x), int(detection.getCenter().y)),
+                    corners=detection.getCorners(corners_template),
+                    center=(int(center.x), int(center.y)),
                     hamming=detection.getHamming(),
-                ),
-                self.detector.detect(frame),
+                )
             )
-        )
+        return detections
 
     def setFamily(self, fam: str) -> None:
         self.detector.clearFamilies()

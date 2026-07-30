@@ -59,7 +59,7 @@ def makeCorners(
     return (x0, y0, x1, y1, x2, y2, x3, y3)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AprilTagDetection:
     """Represents the result of an AprilTag detection.
 
@@ -78,7 +78,7 @@ class AprilTagDetection:
     center: Tuple[int, int]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApriltagPoseEstimate:
     """Represents an estimated 3D pose of an AprilTag.
 
