@@ -169,8 +169,9 @@ export function CameraAndPipelineControls({
                   label="Pipeline"
                   value={selectedPipelineIndex}
                   onValueChange={(val) => setSelectedPipelineIndex(val)}
-                  options={Array.from(pipelines.entries()).map(
-                    ([index, pipeline]) => ({
+                  options={Array.from(pipelines.entries())
+                    .filter(([index]) => index !== 9999)
+                    .map(([index, pipeline]) => ({
                       label: (
                         <span className="inline-flex items-center gap-2">
                           {pipeline.name} (#{index}){" "}
@@ -185,8 +186,7 @@ export function CameraAndPipelineControls({
                       ),
                       value: index,
                       key: index.toString(),
-                    }),
-                  )}
+                    }))}
                 />
 
                 {/* Pipeline actions */}

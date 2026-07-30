@@ -9,8 +9,31 @@ import { PipelineID } from "@/services/backend/dataStractures";
 import { generateControlFromSettingMeta } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
-import { Camera, Settings } from "lucide-react";
 import { JSX, useEffect, useState } from "react";
+import * as Icons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+function CategoryName({ text }: { text: string }) {
+  const parts = text.split(/(<\w+\s*\/>)/g);
+
+  return (
+    <span className="inline-flex items-center gap-2 text-lg">
+      {parts.map((part, index) => {
+        const match = part.match(/^<(\w+)\s*\/>$/);
+
+        if (match) {
+          const Icon = Icons[match[1] as keyof typeof Icons] as LucideIcon;
+
+          return Icon ? (
+            <Icon key={index} className="w-5 h-5 relative -top-[1px]" />
+          ) : null;
+        }
+
+        return <span key={index}>{part}</span>;
+      })}
+    </span>
+  );
+}
 
 export function PipelineConfigControl({
   selectedPipeline,
@@ -35,38 +58,38 @@ export function PipelineConfigControl({
   pipelines: Map<PipelineID, PipelineProto>;
   locked: boolean;
 }) {
-  const [cameraControls, setCameraControls] = useState<
-    (JSX.Element | undefined)[]
-  >([]);
-  const [pipelineControls, setPipelineControls] = useState<
-    (JSX.Element | undefined)[]
-  >([]);
+  const [controls, setControls] = useState<
+    Map<string, (JSX.Element | undefined)[]>
+  >(new Map());
 
   function generateControls() {
     if (!selectedPipelineType || !backendConnected) {
-      setCameraControls([]);
-      setPipelineControls([]);
+      setControls(
+        new Map([
+          ["<Camera/> Camera Properties", []],
+          ["Pipeline Config", []],
+        ]),
+      );
       return;
     }
 
-    const cameraItems: (JSX.Element | undefined)[] = [];
-    const pipelineItems: (JSX.Element | undefined)[] = [];
+    const newControls = new Map<string, (JSX.Element | undefined)[]>();
 
     selectedPipelineType.settings.forEach((setting) => {
       const control = generateControlFromSettingMeta({
-        setting: setting,
-        selectedPipeline: selectedPipeline,
-        setPipelines: setPipelines,
-        setSetting: setSetting,
-        locked: locked,
-        pipelines: pipelines,
+        setting,
+        selectedPipeline,
+        setPipelines,
+        setSetting,
+        locked,
+        pipelines,
       });
 
-      if (setting.category === "Camera Properties") {
-        cameraItems.push(control);
-      } else {
-        pipelineItems.push(control);
+      if (!newControls.has(setting.category)) {
+        newControls.set(setting.category, []);
       }
+
+      newControls.get(setting.category)!.push(control);
     });
 
     cameraInfo?.settings.forEach((setting) => {
@@ -78,11 +101,13 @@ export function PipelineConfigControl({
         locked: locked,
         pipelines: pipelines,
       });
-      cameraItems.push(control);
+      if (!newControls.has(setting.category)) {
+        newControls.set(setting.category, []);
+      }
+      newControls.get(setting.category)!.push(control);
     });
 
-    setCameraControls(cameraItems);
-    setPipelineControls(pipelineItems);
+    setControls(newControls);
   }
 
   useEffect(() => {
@@ -102,74 +127,62 @@ export function PipelineConfigControl({
     >
       <CardHeader>
         <Tabs
-          defaultValue="input"
+          defaultValue="<Camera/> Camera Properties"
           className="w-full"
           style={{ color: teamColor }}
         >
           <TabsList
-            className="grid w-full grid-cols-2 border-gray-600 rounded-xl gap-2"
-            style={{ backgroundColor: baseCardColor }}
+            className="grid w-full border-gray-600 rounded-xl gap-2"
+            style={{
+              backgroundColor: baseCardColor,
+              gridTemplateColumns: `repeat(${controls.size}, minmax(0, 1fr))`,
+            }}
           >
-            <TabsTrigger
-              value="input"
-              className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer h-8"
-            >
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                <span>Camera Properties</span>
-                <Camera />
-              </div>
-            </TabsTrigger>
-            <TabsTrigger
-              value="pipeline"
-              className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer"
-            >
-              {selectedPipelineType?.type ?? "Pipeline"}
-            </TabsTrigger>
-            {/* <TabsTrigger */}
-            {/*   value="output" */}
-            {/*   className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer" */}
-            {/* > */}
-            {/*   Output */}
-            {/* </TabsTrigger> */}
+            {Array.from(controls.entries())
+              .sort(([a], [b]) => {
+                if (a.includes("Camera Properties")) return -1;
+                if (b.includes("Camera Properties")) return 1;
+                return 0;
+              })
+              .map(([category]) => (
+                <TabsTrigger
+                  key={category}
+                  value={category}
+                  className="bg-zinc-800 rounded-md data-[state=active]:bg-pink-800 hover:bg-zinc-700 transition-colors duration-200 cursor-pointer h-9"
+                >
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <CategoryName text={category} />{" "}
+                  </div>
+                </TabsTrigger>
+              ))}
           </TabsList>
 
-          <TabsContent value="input" className="p-6 space-y-6">
-            <div style={{ color: teamColor }}>
-              {cameraControls.length > 0 ? (
-                <div className="space-y-2">{cameraControls}</div>
-              ) : (
-                <div className="text-center" style={{ color: teamColor }}>
-                  <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
-                  <p className="select-none">Camera Settings</p>
-                  <p className="text-sm select-none">
-                    Configure camera parameters
-                  </p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="pipeline" className="p-6 space-y-6">
-            <div style={{ color: teamColor }}>
-              {pipelineControls.length > 0 ? (
-                <div className="space-y-2">{pipelineControls}</div>
-              ) : (
-                <div className="text-center" style={{ color: teamColor }}>
-                  <Settings className="w-16 h-16 mx-auto mb-2 opacity-50" />
-                  <p className="select-none">Pipeline Settings</p>
-                  <p className="text-sm select-none">
-                    Configure pipeline-specific parameters
-                  </p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
+          {Array.from(controls.entries()).map(([category, items]) => (
+            <TabsContent
+              key={category}
+              value={category}
+              className="p-6 space-y-6 pt-1"
+            >
+              <div style={{ color: teamColor }}>
+                {items.length > 0 ? (
+                  <div className="space-y-2">{items}</div>
+                ) : (
+                  <div className="text-center" style={{ color: teamColor }}>
+                    <CategoryName text={category} />
+                    <p className="text-sm select-none">
+                      Configure {category.toLowerCase()} parameters
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          ))}
 
           {/* <TabsContent value="output" className="p-6"> */}
           {/*   <div className="text-center" style={{ color: teamColor }}> */}
