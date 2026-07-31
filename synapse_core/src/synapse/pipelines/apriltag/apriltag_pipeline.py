@@ -10,23 +10,41 @@ from typing import Any, Dict, Final, List, Optional, Set
 
 import cv2
 import numpy as np
-from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
-                                   Setting, SettingsValue, SynapseCamera,
-                                   pipelineResult)
-from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, settingField)
+from synapse.core.pipeline import (
+    FrameResult,
+    Pipeline,
+    PipelineSettings,
+    Setting,
+    SettingsValue,
+    SynapseCamera,
+    pipelineResult,
+)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    EnumeratedConstraint,
+    NumberConstraint,
+    settingField,
+)
 from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
-    AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
-    ApriltagPoseEstimator, CameraPoseEstimate,
-    ICombinedApriltagCameraPoseEstimator, drawTagDetectionMarker,
-    tagToCameraPose)
+    AprilTagDetection,
+    AprilTagDetector,
+    ApriltagPoseEstimate,
+    ApriltagPoseEstimator,
+    CameraPoseEstimate,
+    ICombinedApriltagCameraPoseEstimator,
+    drawTagDetectionMarker,
+    tagToCameraPose,
+)
 from synapse.pipelines.apriltag.apriltag_robotpy import (
-    RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
+    RobotpyApriltagDetector,
+    RobotpyApriltagPoseEstimator,
+)
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
-from synapse.pipelines.apriltag.multi_tag_estimator import \
-    WeightedAverageMultiTagEstimator
+from synapse.pipelines.apriltag.multi_tag_estimator import (
+    WeightedAverageMultiTagEstimator,
+)
 from synapse.stypes import CameraID
 from wpimath import units
 from wpimath.geometry import Pose3d, Transform3d
@@ -175,6 +193,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kCameraPoseFieldSpaceKey: Final[str] = "cameraPose_fieldSpace"
     kCameraPoseTagSpaceKey: Final[str] = "cameraPose_tagSpace"
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
+    kTagAmbiguityKey: Final[str] = "ambiguity"
     kTagPoseEstimateErrorKey: Final[str] = "tag_error"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
@@ -388,7 +407,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             ),
             tagEstimates,
         )
-        self.setResults(ApriltagsJson.toDict(result))
+
+        self.setResults(ApriltagsJson.toDict(result))  # TODO: Rate Limit NT
 
         return img
 
@@ -400,18 +420,18 @@ class ApriltagsJson:
 
         for tag in result.tagDetections:
             tag: ApriltagDetectionResult = tag
-            tags.append(
+            tags.append(  # TODO: Expose settings to choose what values to send
                 {
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
-                    ApriltagPipeline.kCameraPoseFieldSpaceKey: tag.cameraPoseEstimate.cameraPose_fieldSpace,
-                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
+                    ApriltagPipeline.kTagAmbiguityKey: tag.tagPoseEstimate.ambiguity,
+                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate.acceptedPose,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
                 }
             )
 
         return {
-            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,  # Maybe switch to combining pose on the robot instead?
             ApriltagPipeline.kTagDetectionsKey: tags,
         }
 
