@@ -7,9 +7,7 @@ from dataclasses import fields, is_dataclass
 from typing import Any
 
 import msgpack
-from wpimath import (Pose2d, Pose3d, Rotation2d, Rotation3d, Transform2d,
-                     Transform3d, Translation2d, Translation3d, Twist2d,
-                     Twist3d)
+from wpimath import geometry
 
 
 class PipelineResult: ...
@@ -20,29 +18,29 @@ class PipelineResult: ...
 # -------------------
 
 
-def serializeTranslation2d(obj: Translation2d):
+def serializeTranslation2d(obj: geometry.Translation2d):
     return [obj.X(), obj.Y()]
 
 
-def serializeTranslation3d(obj: Translation3d):
+def serializeTranslation3d(obj: geometry.Translation3d):
     return [obj.X(), obj.Y(), obj.Z()]
 
 
-def serializeRotation2d(obj: Rotation2d):
+def serializeRotation2d(obj: geometry.Rotation2d):
     return obj.degrees()
 
 
-def serializeRotation3d(obj: Rotation3d):
+def serializeRotation3d(obj: geometry.Rotation3d):
     return [obj.x_degrees, obj.y_degrees, obj.z_degrees]
 
 
-def serializePose2d(obj: Pose2d):
+def serializePose2d(obj: geometry.Pose2d):
     t = obj.translation()
     r = obj.rotation()
     return [t.X(), t.Y(), r.degrees()]
 
 
-def serializePose3d(obj: Pose3d):
+def serializePose3d(obj: geometry.Pose3d):
     return [
         obj.X(),
         obj.Y(),
@@ -53,23 +51,23 @@ def serializePose3d(obj: Pose3d):
     ]
 
 
-def serializeTransform2d(obj: Transform2d):
+def serializeTransform2d(obj: geometry.Transform2d):
     t = obj.translation()
     r = obj.rotation()
     return [t.X(), t.Y(), r.degrees()]
 
 
-def serializeTransform3d(obj: Transform3d):
+def serializeTransform3d(obj: geometry.Transform3d):
     t = obj.translation()
     r = obj.rotation()
     return [t.X(), t.Y(), t.Z(), r.x_degrees, r.y_degrees, r.z_degrees]
 
 
-def serializeTwist2d(obj: Twist2d):
+def serializeTwist2d(obj: geometry.Twist2d):
     return [obj.dx, obj.dy, obj.dtheta]
 
 
-def serializeTwist3d(obj: Twist3d):
+def serializeTwist3d(obj: geometry.Twist3d):
     return [obj.dx, obj.dy, obj.dz, obj.rx, obj.ry, obj.rz]
 
 
@@ -86,25 +84,27 @@ def parsePipelineResult(result: Any, _cache: dict[int, Any] | None = None) -> An
         return result
 
     # --- Geometry types ---
-    if isinstance(result, Translation2d):
+    import wpimath.geometry as geom
+
+    if isinstance(result, geom.Translation2d):
         out = serializeTranslation2d(result)
-    elif isinstance(result, Translation3d):
+    elif isinstance(result, geom.Translation3d):
         out = serializeTranslation3d(result)
-    elif isinstance(result, Rotation2d):
+    elif isinstance(result, geom.Rotation2d):
         out = serializeRotation2d(result)
-    elif isinstance(result, Rotation3d):
+    elif isinstance(result, geom.Rotation3d):
         out = serializeRotation3d(result)
-    elif isinstance(result, Pose2d):
+    elif isinstance(result, geom.Pose2d):
         out = serializePose2d(result)
-    elif isinstance(result, Pose3d):
+    elif isinstance(result, geom.Pose3d):
         out = serializePose3d(result)
-    elif isinstance(result, Transform2d):
+    elif isinstance(result, geom.Transform2d):
         out = serializeTransform2d(result)
-    elif isinstance(result, Transform3d):
+    elif isinstance(result, geom.Transform3d):
         out = serializeTransform3d(result)
-    elif isinstance(result, Twist2d):
+    elif isinstance(result, geom.Twist2d):
         out = serializeTwist2d(result)
-    elif isinstance(result, Twist3d):
+    elif isinstance(result, geom.Twist3d):
         out = serializeTwist3d(result)
 
     # --- Containers ---
