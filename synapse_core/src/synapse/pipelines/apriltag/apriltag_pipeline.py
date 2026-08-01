@@ -6,8 +6,8 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Final, List, Optional, Set
-
+from typing import Any, Dict, Final, List, Optional, Set, cast
+from typing_extensions import Buffer
 import cv2
 import numpy as np
 from synapse.core.pipeline import (
@@ -110,7 +110,7 @@ class ApriltagPipelineSettings(PipelineSettings):
     )
     refine_edges = settingField(
         BooleanConstraint(renderAsButton=False),
-        default=True,
+        default=False,
         description="If True, perform edge refinement to improve detection accuracy.",
         category="<Toolbox/> Engine Config",
     )
@@ -218,6 +218,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
 
         self.__hadResults: bool = False
+        self.tagEstimates: List[ApriltagDetectionResult] = []
 
     def setConfig(self, cameraIndex: CameraID) -> None:
         self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
@@ -314,6 +315,14 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         ny1 = self.getSetting(self.settings.crop_y1)
         ny2 = self.getSetting(self.settings.crop_y2)
 
+        if (
+            nx1 == self.settings.crop_x1.defaultValue
+            and nx2 == self.settings.crop_x2.defaultValue
+            and ny1 == self.settings.crop_y1.defaultValue
+            and ny2 == self.settings.crop_y2.defaultValue
+        ):  # No Crop needed, return original image
+            return img
+
         x1 = int((nx1 + 1) * 0.5 * w)
         x2 = int((nx2 + 1) * 0.5 * w)
         y1 = int((ny1 + 1) * 0.5 * h)
@@ -343,71 +352,38 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
     def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        cropped = self.cropImageToFit(gray, img)
+        #
+        # TODO: Check equalizing histogram (white and black levels)
+        cropped_color = self.cropImageToFit(img, img)
+        cropped = cv2.cvtColor(cropped_color, cv2.COLOR_BGR2GRAY)
 
-        tags = self.apriltagDetector.detect(cropped)
-        tagEstimates: List[ApriltagDetectionResult] = []
+        if not cropped.flags["C_CONTIGUOUS"]:
+            cropped = np.ascontiguousarray(cropped)
+
+        tags = self.apriltagDetector.detect(cast(Buffer, cropped))  # pyright: ignore
 
         if not tags:
             if self.__hadResults:
+                self.__hadResults = False
                 self.setDataValue("hasResults", False)
                 self.setResults(None)
             return img
 
         self.__hadResults = tags is not None
+        self.tagEstimates.clear()
 
         fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
         iterationCount = int(self.getSetting(self.settings.iteration_count))
         estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
 
         for tag in tags:
-            if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap:
-                warn(f"Invalid tagID: {tag.tagID}")
-                return img
-
-            self.setDataValue(self.kTagIDKey, tag.tagID)
-
-            if estimateTag3DPose or fieldposeEnabled:
-                tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(
-                    tag, iterationCount
-                )
-
-                tagRelativePose: Transform3d = (
-                    tagPoseEstimate.acceptedPose
-                )  # TODO: check if needs to switch with pose2 sometimes
-
-                if estimateTag3DPose:
-                    self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
-                    self.setDataValue(
-                        self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
-                    )
-
-                if fieldposeEnabled:
-                    tagFieldPose = self.fmap.getTagPose(tag.tagID)
-
-                    if tagFieldPose:
-                        cameraPoseEstimate = tagToCameraPose(
-                            tagFieldPose=tagFieldPose,
-                            cameraToTagTransform=Transform3d(
-                                translation=tagRelativePose.translation(),
-                                rotation=tagRelativePose.rotation(),
-                            ),
-                        )
-
-                        self.setDataValue(
-                            self.kCameraPoseFieldSpaceKey,
-                            cameraPoseEstimate.cameraPose_fieldSpace,
-                        )
-
-                        tagEstimates.append(
-                            ApriltagDetectionResult(
-                                detection=tag,
-                                timestamp=timestamp,
-                                cameraPoseEstimate=cameraPoseEstimate,
-                                tagPoseEstimate=tagPoseEstimate,
-                            )
-                        )
+            self.processTag(
+                tag,
+                timestamp,
+                estimateTag3DPose,
+                fieldposeEnabled,
+                iterationCount,
+            )
 
             drawTagDetectionMarker(
                 tag=tag,
@@ -417,14 +393,73 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.setDataValue("hasResults", True)
         result = ApriltagResult(
             self.combinedApriltagPoseEstimator.estimate(
-                [estimate.cameraPoseEstimate for estimate in tagEstimates]
+                [estimate.cameraPoseEstimate for estimate in self.tagEstimates]
             ),
-            tagEstimates,
+            self.tagEstimates,
         )
 
         self.setResults(ApriltagsJson.toDict(result))  # TODO: Rate Limit NT
 
         return img
+
+    def processTag(
+        self,
+        tag: AprilTagDetection,
+        timestamp: float,
+        estimateTag3DPose: bool,
+        fieldposeEnabled: bool,
+        poseEstimationIterationCount: int,
+    ) -> None:
+        if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap:
+            warn(f"Invalid tagID: {tag.tagID}")
+            return
+
+        self.setDataValue(self.kTagIDKey, tag.tagID)
+
+        if estimateTag3DPose or fieldposeEnabled:
+            tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(
+                tag, poseEstimationIterationCount
+            )
+
+            tagRelativePose: Transform3d = (
+                tagPoseEstimate.acceptedPose
+            )  # TODO: check if needs to switch with pose2 sometimes
+
+            if estimateTag3DPose:
+                self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
+                self.setDataValue(
+                    self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
+                )
+
+            if fieldposeEnabled:
+                tagFieldPose = self.fmap.getTagPose(tag.tagID)
+
+                if tagFieldPose:
+                    cameraPoseEstimate = estimateCameraPose(
+                        tagFieldPose, tagRelativePose
+                    )
+                    self.setDataValue(
+                        self.kCameraPoseFieldSpaceKey,
+                        cameraPoseEstimate.cameraPose_fieldSpace,
+                    )
+
+                    self.tagEstimates.append(
+                        ApriltagDetectionResult(
+                            detection=tag,
+                            timestamp=timestamp,
+                            cameraPoseEstimate=cameraPoseEstimate,
+                            tagPoseEstimate=tagPoseEstimate,
+                        )
+                    )
+
+
+def estimateCameraPose(
+    tagFieldPose: Pose3d, tagRelativePose: Transform3d
+) -> CameraPoseEstimate:
+    return tagToCameraPose(
+        tagFieldPose=tagFieldPose,
+        cameraToTagTransform=tagRelativePose,
+    )
 
 
 class ApriltagsJson:

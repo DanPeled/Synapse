@@ -14,8 +14,15 @@ from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cv2
 import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoProperty, VideoSource)
+from cscore import (
+    CameraServer,
+    CvSink,
+    UsbCamera,
+    VideoCamera,
+    VideoMode,
+    VideoProperty,
+    VideoSource,
+)
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
@@ -382,15 +389,13 @@ class CsCoreCamera(SynapseCamera):
         self._videoModes: List[VideoMode] = []
         self._validVideoModes: List[VideoMode] = []
 
-        # --- FIX: Memory Recycling Implementation ---
-        # Pool of pre-allocated frame buffers
-        self._poolSize: Final[int] = 5
+        self._poolSize: Final[int] = 2
         self._bufferPool: List[np.ndarray] = []
 
         # Queue now holds the INDEX of the filled buffer, not a copy of the frame data
         # Tuple[bool, Optional[int]]: (hasFrame, buffer_index)
         self._frameQueue: queue.Queue[Tuple[bool, Optional[int]]] = queue.Queue(
-            maxsize=self._poolSize
+            maxsize=1
         )
         # --- END FIX ---
 
@@ -506,7 +511,7 @@ class CsCoreCamera(SynapseCamera):
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
         with self._lock:
             try:
-                hasFrame, index = self._frameQueue.get_nowait()
+                hasFrame, index = self._frameQueue.get(timeout=0.1)
                 if hasFrame and index is not None and index < len(self._bufferPool):
                     return True, self._bufferPool[index]
             except queue.Empty:
