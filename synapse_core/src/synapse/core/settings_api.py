@@ -8,27 +8,39 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import (Any, Dict, Generic, List, Optional, Set, TypeVar, Union,
-                    overload)
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Set,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from betterproto import which_one_of
 from cscore import VideoProperty
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse_net.generated.messages.v1 import CameraProto
-from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
-                                               ColorConstraintProto,
-                                               ColorFormatProto,
-                                               ConstraintConfigProto,
-                                               ConstraintProto,
-                                               ConstraintTypeProto,
-                                               EnumeratedConstraintProto,
-                                               EnumeratedOptionProto,
-                                               FileConstraintProto,
-                                               ListConstraintProto,
-                                               NumberConstraintProto,
-                                               SettingMetaProto,
-                                               SettingValueProto,
-                                               StringConstraintProto)
+from synapse_net.generated.settings.v1 import (
+    BooleanConstraintProto,
+    ColorConstraintProto,
+    ColorFormatProto,
+    ConstraintConfigProto,
+    ConstraintProto,
+    ConstraintTypeProto,
+    EnumeratedConstraintProto,
+    EnumeratedOptionProto,
+    FileConstraintProto,
+    ListConstraintProto,
+    NumberConstraintProto,
+    SettingMetaProto,
+    SettingValueProto,
+    StringConstraintProto,
+)
 
 from ..bcolors import MarkupColors
 from ..log import err
@@ -146,10 +158,33 @@ class EnumeratedOption(Generic[TEnumeratedType]):
     value: TEnumeratedType
 
 
+TEnum = TypeVar("TEnum", bound=Enum)
+
+
 class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]):
     """Constraint for selecting from predefined options"""
 
-    def __init__(self, options: Union[List[EnumeratedOption], List[TEnumeratedType]]):
+    @overload
+    def __init__(self, options: List[EnumeratedOption[TEnumeratedType]]) -> None: ...
+
+    @overload
+    def __init__(self, options: List[TEnumeratedType]) -> None: ...
+
+    @staticmethod
+    def fromEnum(
+        enum_type: type[TEnum],
+    ) -> "EnumeratedConstraint[TEnumeratedType]":
+        return EnumeratedConstraint(
+            [
+                EnumeratedOption(member.name, cast(TEnumeratedType, member.value))
+                for member in enum_type
+            ]
+        )
+
+    def __init__(
+        self,
+        options: Union[List[EnumeratedOption[TEnumeratedType]], List[TEnumeratedType]],
+    ):
         """
         Initialize a ListOptionsConstraint instance.
 
@@ -161,9 +196,12 @@ class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]
         """
         assert options
         if options and not isinstance(options[0], EnumeratedOption):
-            options = [EnumeratedOption(str(o), o) for o in options]
+            raw_options = cast(List[TEnumeratedType], options)
+            options = [EnumeratedOption(str(o), o) for o in raw_options]
         super().__init__(ConstraintTypeProto.ENUMERATED)
-        self.options: List[EnumeratedOption] = options  # pyright: ignore
+        self.options: List[EnumeratedOption[TEnumeratedType]] = cast(
+            List[EnumeratedOption[TEnumeratedType]], options
+        )
 
     def validate(self, value: SettingsValue) -> ValidationResult:
         expectedType = type(self.options[0].value)
@@ -781,7 +819,7 @@ class SettingsCollection:
         elif prop.getKind().value == VideoProperty.Kind.kString.value:
             constraint = StringConstraint()
         elif prop.getKind().value == VideoProperty.Kind.kEnum.value:
-            options = []
+            options: List[EnumeratedOption] = []
             for i in range(len(prop.getChoices())):
                 if prop.getChoices()[i]:
                     options.append(EnumeratedOption(prop.getChoices()[i], i))

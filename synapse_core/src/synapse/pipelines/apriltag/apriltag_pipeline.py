@@ -102,24 +102,6 @@ class ApriltagPipelineSettings(PipelineSettings):
         description="AprilTag family to detect.",
         category="<Toolbox/> Engine Config",
     )
-    stick_to_ground = settingField(
-        BooleanConstraint(),
-        default=False,
-        description="If True, the detected pose will be constrained to the ground plane.",
-        category="<Activity/> Results",
-    )
-    fieldpose = settingField(
-        BooleanConstraint(),
-        default=True,
-        description="If True, estimate the tag's pose relative to the field coordinate frame.",
-        category="<Activity/> Results",
-    )
-    verbosity = settingField(
-        EnumeratedConstraint(options=[ver.value for ver in ApriltagVerbosity]),
-        default=ApriltagVerbosity.kPoseOnly.value,
-        description="Level of logging and debug output.",
-        category="<Activity/> Results",
-    )
     num_threads = settingField(
         NumberConstraint(minValue=1, maxValue=6, step=1),
         default=1,
@@ -170,6 +152,29 @@ class ApriltagPipelineSettings(PipelineSettings):
         default=1,
         category="<Funnel/> Filtering",
     )
+    stick_to_ground = settingField(
+        BooleanConstraint(),
+        default=False,
+        description="If True, the detected pose will be constrained to the ground plane.",
+        category="<Activity/> Results",
+    )
+    publish_camera_field_pose = settingField(
+        BooleanConstraint(),
+        default=True,
+        description="If True, estimate the cameras's pose relative to the field coordinate frame.",
+        category="<Activity/> Results",
+    )
+    verbosity = settingField(
+        EnumeratedConstraint.fromEnum(ApriltagVerbosity),
+        default=ApriltagVerbosity.kPoseOnly.value,
+        description="Level of logging and debug output.",
+        category="<Activity/> Results",
+    )
+    publish_tag_pose_3d = settingField(
+        BooleanConstraint(),
+        default=False,
+        category="<Activity/> Results",
+    )
 
 
 @dataclass
@@ -211,6 +216,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField(
             DeployDirectory.getDir() / "fmap.json"
         )
+
+        self.__hadResults: bool = False
 
     def setConfig(self, cameraIndex: CameraID) -> None:
         self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
@@ -343,62 +350,69 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         tagEstimates: List[ApriltagDetectionResult] = []
 
         if not tags:
-            self.setDataValue("hasResults", False)
-            self.setResults(None)
+            if self.__hadResults:
+                self.setDataValue("hasResults", False)
+                self.setResults(None)
             return img
 
-        fieldposeEnabled = self.getSetting(ApriltagPipelineSettings.fieldpose)
+        self.__hadResults = tags is not None
+
+        fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
         iterationCount = int(self.getSetting(self.settings.iteration_count))
+        estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
 
         for tag in tags:
             if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap:
                 warn(f"Invalid tagID: {tag.tagID}")
                 return img
-            tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(
-                tag, iterationCount
-            )
 
             self.setDataValue(self.kTagIDKey, tag.tagID)
 
-            tagRelativePose: Transform3d = (
-                tagPoseEstimate.acceptedPose
-            )  # TODO: check if needs to switch with pose2 sometimes
+            if estimateTag3DPose or fieldposeEnabled:
+                tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(
+                    tag, iterationCount
+                )
+
+                tagRelativePose: Transform3d = (
+                    tagPoseEstimate.acceptedPose
+                )  # TODO: check if needs to switch with pose2 sometimes
+
+                if estimateTag3DPose:
+                    self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
+                    self.setDataValue(
+                        self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
+                    )
+
+                if fieldposeEnabled:
+                    tagFieldPose = self.fmap.getTagPose(tag.tagID)
+
+                    if tagFieldPose:
+                        cameraPoseEstimate = tagToCameraPose(
+                            tagFieldPose=tagFieldPose,
+                            cameraToTagTransform=Transform3d(
+                                translation=tagRelativePose.translation(),
+                                rotation=tagRelativePose.rotation(),
+                            ),
+                        )
+
+                        self.setDataValue(
+                            self.kCameraPoseFieldSpaceKey,
+                            cameraPoseEstimate.cameraPose_fieldSpace,
+                        )
+
+                        tagEstimates.append(
+                            ApriltagDetectionResult(
+                                detection=tag,
+                                timestamp=timestamp,
+                                cameraPoseEstimate=cameraPoseEstimate,
+                                tagPoseEstimate=tagPoseEstimate,
+                            )
+                        )
 
             drawTagDetectionMarker(
                 tag=tag,
                 img=img,
             )
-
-            self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
-            self.setDataValue(
-                self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
-            )
-
-            if fieldposeEnabled:
-                tagFieldPose = self.fmap.getTagPose(tag.tagID)
-
-                if tagFieldPose:
-                    cameraPoseEstimate = tagToCameraPose(
-                        tagFieldPose=tagFieldPose,
-                        cameraToTagTransform=Transform3d(
-                            translation=tagRelativePose.translation(),
-                            rotation=tagRelativePose.rotation(),
-                        ),
-                    )
-
-                    self.setDataValue(
-                        self.kCameraPoseFieldSpaceKey,
-                        cameraPoseEstimate.cameraPose_fieldSpace,
-                    )
-
-                    tagEstimates.append(
-                        ApriltagDetectionResult(
-                            detection=tag,
-                            timestamp=timestamp,
-                            cameraPoseEstimate=cameraPoseEstimate,
-                            tagPoseEstimate=tagPoseEstimate,
-                        )
-                    )
 
         self.setDataValue("hasResults", True)
         result = ApriltagResult(
