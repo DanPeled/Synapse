@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 from typing import List
 
 import robotpy_apriltag as rpy_apriltag
@@ -16,62 +17,83 @@ from .apriltag_detector import (AprilTagDetection, AprilTagDetector,
 class RobotpyApriltagDetector(AprilTagDetector):
     def __init__(self) -> None:
         self.detector: rpy_apriltag.AprilTagDetector = rpy_apriltag.AprilTagDetector()
+        self.lock = threading.Lock()
+        self.cornersTemplate = makeCorners()
 
     def detect(self, frame: Buffer) -> List[AprilTagDetection]:
-        corners_template = makeCorners()
-        detections = []
-        for detection in self.detector.detect(frame):
-            center = detection.getCenter()
-            detections.append(
-                AprilTagDetection(
-                    tagID=detection.getId(),
-                    homography=detection.getHomography(),
-                    corners=detection.getCorners(corners_template),
-                    center=(int(center.x), int(center.y)),
-                    hamming=detection.getHamming(),
+        with self.lock:
+            detections_raw = self.detector.detect(frame)
+
+            detections = []
+            for detection in detections_raw:
+                center = detection.getCenter()
+
+                detections.append(
+                    AprilTagDetection(
+                        tagID=detection.getId(),
+                        homography=detection.getHomography(),
+                        corners=detection.getCorners(self.cornersTemplate),
+                        center=(int(center.x), int(center.y)),
+                        hamming=detection.getHamming(),
+                    )
                 )
-            )
+
         return detections
 
     def setFamily(self, fam: str) -> None:
-        self.detector.clearFamilies()
-        self.detector.addFamily(fam)
+        with self.lock:
+            self.detector.clearFamilies()
+            self.detector.addFamily(fam)
 
     def setConfig(self, config: AprilTagDetector.Config) -> None:
-        rpy_config = rpy_apriltag.AprilTagDetector.Config()
+        with self.lock:
+            rpy_config = rpy_apriltag.AprilTagDetector.Config()
 
-        rpy_config.quadDecimate = config.quadDecimate
-        rpy_config.quadSigma = config.quadSigma
-        rpy_config.refineEdges = config.refineEdges
-        rpy_config.numThreads = config.numThreads
+            rpy_config.quadDecimate = float(config.quadDecimate)
+            rpy_config.quadSigma = config.quadSigma
+            rpy_config.refineEdges = config.refineEdges
+            rpy_config.numThreads = config.numThreads
 
-        self.detector.setConfig(rpy_config)
+            self.detector.setConfig(rpy_config)
 
     def getConfig(self) -> AprilTagDetector.Config:
-        config = self.detector.getConfig()
-        return self.Config(
-            config.numThreads, config.refineEdges, config.quadDecimate, config.quadSigma
-        )
+        with self.lock:
+            config = self.detector.getConfig()
+
+            return self.Config(
+                config.numThreads,
+                config.refineEdges,
+                config.quadDecimate,
+                config.quadSigma,
+            )
 
 
 class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
     def __init__(self, config: ApriltagPoseEstimator.Config) -> None:
-        self.estimator: rpy_apriltag.AprilTagPoseEstimator = (
-            rpy_apriltag.AprilTagPoseEstimator(
-                rpy_apriltag.AprilTagPoseEstimator.Config(
-                    config.tagSize, config.fx, config.fy, config.cx, config.cy
-                )
+        self.estimator = rpy_apriltag.AprilTagPoseEstimator(
+            rpy_apriltag.AprilTagPoseEstimator.Config(
+                config.tagSize,
+                config.fx,
+                config.fy,
+                config.cx,
+                config.cy,
             )
         )
+        self.lock = threading.Lock()
 
     def estimate(
         self, tagDetection: AprilTagDetection, nIters: int
     ) -> ApriltagPoseEstimate:
-        estimate = self.estimator.estimateOrthogonalIteration(
-            tagDetection.homography, tagDetection.corners, nIters
-        )
+        with self.lock:
+            estimate = self.estimator.estimateOrthogonalIteration(
+                tagDetection.homography,
+                tagDetection.corners,
+                nIters,
+            )
+
         rejected, rejectedErr = estimate.pose1, estimate.error1
         accepted, acceptedErr = estimate.pose2, estimate.error2
+
         if estimate.error1 < estimate.error2:
             rejected, rejectedErr = estimate.pose2, estimate.error2
             accepted, acceptedErr = estimate.pose1, estimate.error1
@@ -85,15 +107,23 @@ class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
         )
 
     def setConfig(self, config: ApriltagPoseEstimator.Config) -> None:
-        estimatorConfig = self.estimator.getConfig()
-        estimatorConfig.tagSize = config.tagSize
-        estimatorConfig.fx = config.fx
-        estimatorConfig.fy = config.fy
-        estimatorConfig.cx = config.cx
-        estimatorConfig.cy = config.cy
+        with self.lock:
+            estimatorConfig = self.estimator.getConfig()
+            estimatorConfig.tagSize = config.tagSize
+            estimatorConfig.fx = config.fx
+            estimatorConfig.fy = config.fy
+            estimatorConfig.cx = config.cx
+            estimatorConfig.cy = config.cy
+            self.estimator.setConfig(estimatorConfig)
 
     def getConfig(self) -> ApriltagPoseEstimator.Config:
-        config = self.estimator.getConfig()
-        return ApriltagPoseEstimator.Config(
-            config.cx, config.cy, config.fx, config.fy, config.tagSize
-        )
+        with self.lock:
+            config = self.estimator.getConfig()
+
+            return ApriltagPoseEstimator.Config(
+                config.cx,
+                config.cy,
+                config.fx,
+                config.fy,
+                config.tagSize,
+            )

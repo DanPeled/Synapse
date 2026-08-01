@@ -112,6 +112,10 @@ class Platform(Enum):
         )
 
     @classmethod
+    def getThreadCount(cls) -> int:
+        return psutil.cpu_count(logical=True) or 1
+
+    @classmethod
     def getNativeLibraryFolderName(cls) -> str:
         return Platform.getCurrentPlatform().__nativeLibraryFolderName
 
