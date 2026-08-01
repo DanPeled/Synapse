@@ -32,7 +32,7 @@ def test_setup_client_success(mock_sleep, mock_nt_instance) -> None:
 
     assert result is True
     mock_instance.setServer.assert_called_with("127.0.0.1")
-    mock_instance.startClient4.assert_called_with("testClient")
+    mock_instance.startClient.assert_called_with("testClient")
 
 
 @patch("synapse_net.nt_client.NetworkTableInstance")
@@ -48,4 +48,4 @@ def test_setup_server(mock_nt_instance) -> None:
     assert result is True
     mock_server_instance.startServer.assert_called_with("127.0.0.1")
     mock_server_instance.setServer.assert_called_with("127.0.0.1")
-    mock_server_instance.startClient4.assert_called_with("serverNode")
+    mock_server_instance.startClient.assert_called_with("serverNode")

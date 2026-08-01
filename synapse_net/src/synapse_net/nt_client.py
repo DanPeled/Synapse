@@ -61,7 +61,7 @@ class NtClient:
                 self.nt_inst.setServerTeam(teamNumber)
 
         # Start client
-        self.nt_inst.startClient4(name)
+        self.nt_inst.startClient(name)
 
         timeout = 10
         start_time = time.time()
