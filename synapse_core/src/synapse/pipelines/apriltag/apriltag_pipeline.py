@@ -16,6 +16,7 @@ from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
                                        NumberConstraint, settingField)
 from synapse.hardware.deploy_dir import DeployDirectory
+from synapse.hardware.metrics import Platform
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
@@ -86,7 +87,7 @@ class ApriltagPipelineSettings(PipelineSettings):
         category="<Toolbox/> Engine Config",
     )
     num_threads = settingField(
-        NumberConstraint(minValue=1, maxValue=6, step=1),
+        NumberConstraint(minValue=1, maxValue=Platform.getThreadCount(), step=1),
         default=1,
         description="Number of CPU threads used for AprilTag detection.",
         category="<Toolbox/> Engine Config",

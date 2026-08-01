@@ -7,6 +7,7 @@ import os
 import subprocess
 import time
 from abc import abstractmethod
+from concurrent.futures import thread
 from enum import Enum
 from pathlib import Path
 from typing import Any, Final, Optional
@@ -110,6 +111,10 @@ class Platform(Enum):
             if current != Platform.UNKNOWN
             else Platform.getUnknownPlatformString()
         )
+
+    @classmethod
+    def getThreadCount(cls) -> int:
+        return psutil.cpu_count(logical=True) or 1
 
     @classmethod
     def getNativeLibraryFolderName(cls) -> str:
