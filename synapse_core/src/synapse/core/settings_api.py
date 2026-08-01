@@ -8,39 +8,27 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import (
-    Any,
-    Dict,
-    Generic,
-    List,
-    Optional,
-    Set,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import (Any, Dict, Generic, List, Optional, Set, TypeVar, Union,
+                    cast, overload)
 
 from betterproto import which_one_of
 from cscore import VideoProperty
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse_net.generated.messages.v1 import CameraProto
-from synapse_net.generated.settings.v1 import (
-    BooleanConstraintProto,
-    ColorConstraintProto,
-    ColorFormatProto,
-    ConstraintConfigProto,
-    ConstraintProto,
-    ConstraintTypeProto,
-    EnumeratedConstraintProto,
-    EnumeratedOptionProto,
-    FileConstraintProto,
-    ListConstraintProto,
-    NumberConstraintProto,
-    SettingMetaProto,
-    SettingValueProto,
-    StringConstraintProto,
-)
+from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
+                                               ColorConstraintProto,
+                                               ColorFormatProto,
+                                               ConstraintConfigProto,
+                                               ConstraintProto,
+                                               ConstraintTypeProto,
+                                               EnumeratedConstraintProto,
+                                               EnumeratedOptionProto,
+                                               FileConstraintProto,
+                                               ListConstraintProto,
+                                               NumberConstraintProto,
+                                               SettingMetaProto,
+                                               SettingValueProto,
+                                               StringConstraintProto)
 
 from ..bcolors import MarkupColors
 from ..log import err
