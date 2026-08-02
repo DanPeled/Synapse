@@ -156,7 +156,7 @@ class RuntimeManager:
         self.setupCallbacks()
         self.__sendSettingsInNT = sendSettingsInNT
 
-        log.log(
+        log.info(
             MarkupColors.header(
                 "\n" + "=" * 20 + " Loading Pipeline Types & Instances... " + "=" * 20
             )
@@ -164,7 +164,7 @@ class RuntimeManager:
 
         self.pipelineHandler.setup(directory)
 
-        log.log(
+        log.info(
             MarkupColors.header(
                 "\n" + "=" * 20 + " Loading Camera Bindings & Settings... " + "=" * 20
             )
@@ -200,7 +200,7 @@ class RuntimeManager:
                 cameraIndex=cameraIndex,
                 pipelineIndex=pipeline,
             )
-            log.log(f"Setup default pipeline (#{pipeline}) for camera ({cameraIndex})")
+            log.info(f"Setup default pipeline (#{pipeline}) for camera ({cameraIndex})")
 
     def startMetricsThread(self):
         """
@@ -265,7 +265,7 @@ class RuntimeManager:
                     continue
 
         self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
-        log.log("Startig metrics thread")
+        log.info("Startig metrics thread")
         self.metricsThread.start()
 
     def __setupPipelineForCamera(
@@ -492,7 +492,7 @@ class RuntimeManager:
             pipeline_config=settings,
         )
         self.onPipelineChanged.call(pipelineIndex, cameraIndex)
-        log.log(f"Set pipeline #{pipelineIndex} for camera ({cameraIndex})")
+        log.info(f"Set pipeline #{pipelineIndex} for camera ({cameraIndex})")
 
     def setNTPipelineIndex(
         self, cameraIndex: CameraID, pipelineIndex: PipelineID
@@ -533,7 +533,7 @@ class RuntimeManager:
         maxFps = float(camera.getMaxFPS())
         minInterval = 1.0 / maxFps if maxFps > 0 else 0.0
 
-        log.log(f"Started {camera.name} loop (maxFPS={maxFps})")
+        log.info(f"Started {camera.name} loop (maxFPS={maxFps})")
 
         while self.running.is_set() and camera.isRunning:
             loopStart = time.perf_counter()
@@ -614,7 +614,7 @@ class RuntimeManager:
         Runs the assigned pipelines on each frame captured from the cameras in parallel.
         """
 
-        log.log(
+        log.info(
             MarkupColors.header(
                 "\n" + "=" * 20 + " Synapse Runtime Starting... " + "=" * 20
             )
@@ -819,7 +819,7 @@ class RuntimeManager:
         self.savePipelines()
         self.saveCameras()
 
-        log.log(
+        log.info(
             MarkupColors.bold(f"Saved into {savefile.absolute().__str__()}"),
             shouldAlert=True,
         )
@@ -853,7 +853,7 @@ class RuntimeManager:
             thread.join()
         if self.metricsThread:
             self.metricsThread.join()
-        log.log("Cleaned up all resources.")
+        log.info("Cleaned up all resources.")
 
     def setupCallbacks(self):
         def onRemovePipeline(

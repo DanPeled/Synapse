@@ -3,10 +3,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import atexit
 import datetime
 import os
 import time
-from pathlib import Path
+from collections import deque
 from typing import Any, Optional
 
 import synapse_net.generated.messages.v1 as v1
@@ -24,6 +25,9 @@ os.makedirs("logs", exist_ok=True)
 
 # Generate a new log file name based on the current date and time
 LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+LOG_HANDLE = open(LOG_FILE, "a", buffering=1)
+
+atexit.register(LOG_HANDLE.close)
 
 
 class ErrorWriter(object):
@@ -33,7 +37,7 @@ class ErrorWriter(object):
 
 # sys.stderr = ErrorWriter()
 
-logs = []
+logs = deque(maxlen=1000)
 
 
 def socketLog(
@@ -62,35 +66,14 @@ def addTime(text: str) -> str:
 
 
 def logInternal(text: str):
-    """
-    Logs a message with the current timestamp to both the console and a log file.
-
-    Args:
-        text (str): The message to log.
-
-    Writes:
-        - The log message to the console.
-        - The log message to the log file `logs/logfile_<timestamp>.log`.
-    """
-
-    # Print the log message to the console if PRINTS is True
     if PRINTS:
         print(text)
 
-    # Ensure the parent directory exists
-    log_path = Path(LOG_FILE)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Ensure the file exists
-    if not log_path.exists():
-        log_path.touch()
-
-    # Write the log message
-    with open(LOG_FILE, "a") as f:
-        f.write(str(text) + "\n")
+    LOG_HANDLE.write(text + "\n")
+    LOG_HANDLE.flush()
 
 
-def log(text: str, shouldAlert=False):
+def info(text: str, shouldAlert=False):
     modifiedtext = addTime(text)
     logInternal(modifiedtext)
     socketLog(modifiedtext, v1.LogLevelProto.INFO, WebSocketServer.kInstance)
