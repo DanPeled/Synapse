@@ -29,7 +29,7 @@ class UDPDeviceResponder:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("0.0.0.0", self.port))
 
-        log.log(f"[UDPDeviceResponder] Listening on port {self.port}")
+        log.info(f"[UDPDeviceResponder] Listening on port {self.port}")
 
     def buildResponse(self) -> dict:
         return {
@@ -58,6 +58,6 @@ class UDPDeviceResponder:
                 self.handlePacket(data, addr)
 
         except KeyboardInterrupt:
-            log.log("[UDPDeviceResponder] Shutting down")
+            log.info("[UDPDeviceResponder] Shutting down")
         finally:
             self.sock.close()

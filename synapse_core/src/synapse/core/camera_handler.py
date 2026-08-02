@@ -132,7 +132,7 @@ class CameraHandler:
         if cameraID in self.cameraConfigBindings:
             self.cameraConfigBindings[cameraID].name = newName
             self.cameras[cameraID].name = newName
-            log.log(f"Camera #{cameraID} renamed to {newName}")
+            log.info(f"Camera #{cameraID} renamed to {newName}")
             self.onRenameCamera.call(cameraID, newName)
         else:
             log.err(
@@ -170,7 +170,7 @@ class CameraHandler:
                 )
 
                 if cameraConfig.id not in self.cameraUIDs:
-                    log.log(
+                    log.info(
                         f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
                     )
                     GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
@@ -280,7 +280,7 @@ class CameraHandler:
         )
         self.recordingResolutions[cameraIndex] = resolution
 
-        log.log(
+        log.info(
             f"Started recording camera {self.cameras[cameraIndex].name} to {filename}",
             shouldAlert=True,
         )
@@ -313,7 +313,7 @@ class CameraHandler:
                     cv2.resize(frame, self.recordingResolutions[camera.cameraIndex])
                 )
             elif camera.cameraIndex in self.recordingOutputs:
-                log.log(
+                log.info(
                     f"Written Camera {camera.name} recording to {self.recordFileNames[camera.cameraIndex]}",
                     shouldAlert=True,
                 )
@@ -389,7 +389,7 @@ class CameraHandler:
 
         self.onAddCamera.call(cameraIndex, cameraConfig.name, camera)
 
-        log.log(
+        log.info(
             f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
         )
 

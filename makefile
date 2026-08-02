@@ -70,7 +70,7 @@ format:
 
 test:
 	@echo Reinstalling Synapse Runtime...
-	@make install
+	@pip install .
 	@echo Starting Tests...
 	@python3 -m pytest . --ignore=synapse_lib/
 

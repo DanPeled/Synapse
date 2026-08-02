@@ -3,10 +3,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import atexit
 import datetime
 import os
 import time
-from pathlib import Path
+from collections import deque
+from io import TextIOWrapper
 from typing import Any, Optional
 
 import synapse_net.generated.messages.v1 as v1
@@ -24,6 +26,41 @@ os.makedirs("logs", exist_ok=True)
 
 # Generate a new log file name based on the current date and time
 LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+LOG_HANDLE: Optional[TextIOWrapper] = None
+
+
+def getLogFile() -> str:
+    global LOG_FILE
+
+    if LOG_FILE is None:
+        os.makedirs("logs", exist_ok=True)
+        LOG_FILE = (
+            f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        )
+
+    return LOG_FILE
+
+
+def getLogHandle():
+    global LOG_HANDLE
+
+    if LOG_HANDLE is None:
+        LOG_HANDLE = open(getLogFile(), "a", buffering=1)
+
+    return LOG_HANDLE
+
+
+def closeLogHandle():
+    global LOG_HANDLE, LOG_FILE
+
+    if LOG_HANDLE is not None:
+        LOG_HANDLE.close()
+
+    LOG_HANDLE = None
+    LOG_FILE = None
+
+
+atexit.register(closeLogHandle)
 
 
 class ErrorWriter(object):
@@ -33,7 +70,7 @@ class ErrorWriter(object):
 
 # sys.stderr = ErrorWriter()
 
-logs = []
+logs = deque(maxlen=1000)
 
 
 def socketLog(
@@ -62,35 +99,13 @@ def addTime(text: str) -> str:
 
 
 def logInternal(text: str):
-    """
-    Logs a message with the current timestamp to both the console and a log file.
-
-    Args:
-        text (str): The message to log.
-
-    Writes:
-        - The log message to the console.
-        - The log message to the log file `logs/logfile_<timestamp>.log`.
-    """
-
-    # Print the log message to the console if PRINTS is True
     if PRINTS:
         print(text)
 
-    # Ensure the parent directory exists
-    log_path = Path(LOG_FILE)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Ensure the file exists
-    if not log_path.exists():
-        log_path.touch()
-
-    # Write the log message
-    with open(LOG_FILE, "a") as f:
-        f.write(str(text) + "\n")
+    getLogHandle().write(text + "\n")
 
 
-def log(text: str, shouldAlert=False):
+def info(text: str, shouldAlert=False):
     modifiedtext = addTime(text)
     logInternal(modifiedtext)
     socketLog(modifiedtext, v1.LogLevelProto.INFO, WebSocketServer.kInstance)

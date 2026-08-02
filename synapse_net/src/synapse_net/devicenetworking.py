@@ -8,7 +8,7 @@ import subprocess
 import threading
 from typing import Optional
 
-from synapse.log import err, log, warn
+from synapse.log import err, info, warn
 
 CHECK_INTERVAL: int = 5
 
@@ -62,7 +62,7 @@ class NetworkingManager:
             NetworkingManager._runCommand(
                 ["sudo", "ip", "addr", "add", staticIp, "dev", interface]
             )
-            log(f"Static IP {staticIp} applied on {interface}")
+            info(f"Static IP {staticIp} applied on {interface}")
 
     @staticmethod
     def _startDhcp(interface: InterfaceName) -> None:
@@ -72,7 +72,7 @@ class NetworkingManager:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        log(f"DHCP started on {interface}")
+        info(f"DHCP started on {interface}")
 
     # ------------------------
     # Thread worker
@@ -119,19 +119,19 @@ class NetworkingManager:
             )
             self._thread.start()
 
-        log(f"Started static IP manager for {interface}")
+        info(f"Started static IP manager for {interface}")
 
     def removeStaticIp(self) -> None:
         """Stop the background worker."""
         with self._lock:
             self._stopWorkerLocked()
-        log("Stopped static IP manager")
+        info("Stopped static IP manager")
 
     def close(self) -> None:
         """Shutdown the manager cleanly."""
         with self._lock:
             self._stopWorkerLocked()
-        log("NetworkingManager shut down")
+        info("NetworkingManager shut down")
 
     # ------------------------
     # Internal lifecycle
@@ -164,7 +164,7 @@ def setHostname(hostname: str) -> None:
             )
 
         updateHostsFile(hostname)
-        log(f"Hostname set to '{hostname}'")
+        info(f"Hostname set to '{hostname}'")
 
     except Exception as e:
         err(f"Failed to set hostname: {e}")

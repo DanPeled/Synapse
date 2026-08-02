@@ -35,7 +35,7 @@ from ..bcolors import MarkupColors
 from ..hardware.deploy_dir import DeployDirectory
 from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
-from ..log import err, log, logs, missingFeature, warn
+from ..log import err, info, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
                       RecordingStatus)
 from ..util import getIP, resolveGenericArgument
@@ -101,7 +101,7 @@ class Synapse:
         if not self.__isHeadless:
             UIHandle.startUI()
 
-        log(
+        info(
             MarkupColors.bold(
                 MarkupColors.okgreen(
                     "\n" + "=" * 20 + " Synapse Initialize Starting... " + "=" * 20
@@ -120,7 +120,7 @@ class Synapse:
         if configPath.exists():
             ...
         else:
-            log("No config file!")
+            info("No config file!")
             configPath.parent.mkdir(exist_ok=True)
             with open(configPath, "w") as _:
                 ...
@@ -149,7 +149,7 @@ class Synapse:
 
             # Initialize NetworkTables
 
-            log(
+            info(
                 f"Network Config:\n  Team Number: {config.network.teamNumber}\n  Name: {config.network.name}\n  Is Server: {self.__isServer}\n  Is Sim: {self.__isSim}"
             )
 
@@ -180,7 +180,9 @@ class Synapse:
             errString = "".join(
                 traceback.format_exception(type(error), error, error.__traceback__)
             )
-            log(f"Something went wrong while reading settings config file. {errString}")
+            info(
+                f"Something went wrong while reading settings config file. {errString}"
+            )
             raise error
         return True
 
@@ -385,7 +387,7 @@ class Synapse:
         # Schedule the websocket server start coroutine in the new event loop
         asyncio.run_coroutine_threadsafe(run_server(), new_loop)
 
-        log("WebSocket server started on ws://localhost:8765")
+        info("WebSocket server started on ws://localhost:8765")
 
     def cleanup(self):
         if self.managerResponderProcess is not None:
@@ -594,7 +596,7 @@ class Synapse:
             )
             if pipeline is not None:
                 pipeline.name = setPipelineNameMsg.name
-                log(
+                info(
                     f"Changed name for pipeline #{setPipelineNameMsg.pipeline_index} to `{setPipelineNameMsg.name}`"
                 )
 
