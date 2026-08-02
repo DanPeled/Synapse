@@ -5,7 +5,9 @@
 
 import atexit
 import datetime
+from io import TextIOWrapper
 import os
+from pathlib import Path
 import time
 from collections import deque
 from typing import Any, Optional
@@ -25,9 +27,25 @@ os.makedirs("logs", exist_ok=True)
 
 # Generate a new log file name based on the current date and time
 LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
-LOG_HANDLE = open(LOG_FILE, "a", buffering=1)
+LOG_HANDLE: Optional[TextIOWrapper] = None
 
-atexit.register(LOG_HANDLE.close)
+
+def getLogHandle():
+    global LOG_HANDLE
+
+    if LOG_HANDLE is None:
+        Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
+        LOG_HANDLE = open(LOG_FILE, "a", buffering=1)
+
+    return LOG_HANDLE
+
+
+def closeLogHandle():
+    if LOG_HANDLE is not None:
+        LOG_HANDLE.close()
+
+
+atexit.register(closeLogHandle)
 
 
 class ErrorWriter(object):
@@ -69,8 +87,7 @@ def logInternal(text: str):
     if PRINTS:
         print(text)
 
-    LOG_HANDLE.write(text + "\n")
-    LOG_HANDLE.flush()
+    getLogHandle().write(text + "\n")
 
 
 def info(text: str, shouldAlert=False):
