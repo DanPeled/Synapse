@@ -13,6 +13,7 @@ import synapse.log as log
 
 @pytest.fixture
 def cleanupLogs() -> None:
+    log.closeLogHandle()
     for f in os.listdir("logs"):
         if f.startswith("logfile_"):
             os.remove(os.path.join("logs", f))

@@ -5,11 +5,10 @@
 
 import atexit
 import datetime
-from io import TextIOWrapper
 import os
-from pathlib import Path
 import time
 from collections import deque
+from io import TextIOWrapper
 from typing import Any, Optional
 
 import synapse_net.generated.messages.v1 as v1
@@ -30,19 +29,35 @@ LOG_FILE = f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 LOG_HANDLE: Optional[TextIOWrapper] = None
 
 
+def getLogFile() -> str:
+    global LOG_FILE
+
+    if LOG_FILE is None:
+        os.makedirs("logs", exist_ok=True)
+        LOG_FILE = (
+            f"logs/logfile_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        )
+
+    return LOG_FILE
+
+
 def getLogHandle():
     global LOG_HANDLE
 
     if LOG_HANDLE is None:
-        Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
-        LOG_HANDLE = open(LOG_FILE, "a", buffering=1)
+        LOG_HANDLE = open(getLogFile(), "a", buffering=1)
 
     return LOG_HANDLE
 
 
 def closeLogHandle():
+    global LOG_HANDLE, LOG_FILE
+
     if LOG_HANDLE is not None:
         LOG_HANDLE.close()
+
+    LOG_HANDLE = None
+    LOG_FILE = None
 
 
 atexit.register(closeLogHandle)
