@@ -17,7 +17,7 @@ function CategoryName({ text }: { text: string }) {
   const parts = text.split(/(<\w+\s*\/>)/g);
 
   return (
-    <span className="inline-flex items-center gap-2 text-lg">
+    <span className="inline-flex items-center gap-2 text-[1.1rem]">
       {parts.map((part, index) => {
         const match = part.match(/^<(\w+)\s*\/>$/);
 
