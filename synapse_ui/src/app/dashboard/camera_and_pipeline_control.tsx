@@ -122,7 +122,7 @@ export function CameraAndPipelineControls({
     <>
       <Card
         style={{ backgroundColor: baseCardColor, color: teamColor }}
-        className="border-gray-700"
+        className="border-gray-700 w-full"
       >
         {" "}
         <CardContent className="space-y-3">
