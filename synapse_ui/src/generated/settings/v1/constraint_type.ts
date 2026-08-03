@@ -12,6 +12,7 @@ import { EnumeratedConstraintProto } from "./enumerated";
 import { FileConstraintProto } from "./file";
 import { ListConstraintProto } from "./list";
 import { NumberConstraintProto } from "./number";
+import { RangeConstraintProto } from "./range";
 import { StringConstraintProto } from "./string";
 
 export const protobufPackage = "settings.v1";
@@ -36,6 +37,7 @@ export enum ConstraintTypeProto {
   /** CONSTRAINT_TYPE_PROTO_ENUMERATED - List options constraint */
   CONSTRAINT_TYPE_PROTO_ENUMERATED = 8,
   CONSTRAINT_TYPE_PROTO_FILE = 9,
+  CONSTRAINT_TYPE_PROTO_RANGE = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -65,6 +67,9 @@ export function constraintTypeProtoFromJSON(object: any): ConstraintTypeProto {
     case 9:
     case "CONSTRAINT_TYPE_PROTO_FILE":
       return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_FILE;
+    case 10:
+    case "CONSTRAINT_TYPE_PROTO_RANGE":
+      return ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -90,6 +95,8 @@ export function constraintTypeProtoToJSON(object: ConstraintTypeProto): string {
       return "CONSTRAINT_TYPE_PROTO_ENUMERATED";
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_FILE:
       return "CONSTRAINT_TYPE_PROTO_FILE";
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
+      return "CONSTRAINT_TYPE_PROTO_RANGE";
     case ConstraintTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -114,6 +121,7 @@ export interface ConstraintConfigProto {
   /** Boolean constraint */
   boolean?: BooleanConstraintProto | undefined;
   file?: FileConstraintProto | undefined;
+  range?: RangeConstraintProto | undefined;
 }
 
 function createBaseConstraintConfigProto(): ConstraintConfigProto {
@@ -125,6 +133,7 @@ function createBaseConstraintConfigProto(): ConstraintConfigProto {
     list: undefined,
     boolean: undefined,
     file: undefined,
+    range: undefined,
   };
 }
 
@@ -168,6 +177,12 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     }
     if (message.file !== undefined) {
       FileConstraintProto.encode(message.file, writer.uint32(58).fork()).join();
+    }
+    if (message.range !== undefined) {
+      RangeConstraintProto.encode(
+        message.range,
+        writer.uint32(66).fork(),
+      ).join();
     }
     return writer;
   },
@@ -251,6 +266,14 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
           message.file = FileConstraintProto.decode(reader, reader.uint32());
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.range = RangeConstraintProto.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -283,6 +306,9 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
       file: isSet(object.file)
         ? FileConstraintProto.fromJSON(object.file)
         : undefined,
+      range: isSet(object.range)
+        ? RangeConstraintProto.fromJSON(object.range)
+        : undefined,
     };
   },
 
@@ -308,6 +334,9 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     }
     if (message.file !== undefined) {
       obj.file = FileConstraintProto.toJSON(message.file);
+    }
+    if (message.range !== undefined) {
+      obj.range = RangeConstraintProto.toJSON(message.range);
     }
     return obj;
   },
@@ -348,6 +377,10 @@ export const ConstraintConfigProto: MessageFns<ConstraintConfigProto> = {
     message.file =
       object.file !== undefined && object.file !== null
         ? FileConstraintProto.fromPartial(object.file)
+        : undefined;
+    message.range =
+      object.range !== undefined && object.range !== null
+        ? RangeConstraintProto.fromPartial(object.range)
         : undefined;
     return message;
   },

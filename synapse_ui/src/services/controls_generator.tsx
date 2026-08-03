@@ -16,6 +16,7 @@ import { hasSettingValue } from "./backend/backendContext";
 import { PipelineProto } from "@/generated/messages/v1/pipeline";
 import { PipelineID } from "./backend/dataStractures";
 import { FileDropzone } from "@/widgets/file_upload";
+import { RangeSlider } from "@/widgets/range";
 
 export function generateControlFromSettingMeta({
   setting,
@@ -231,6 +232,27 @@ export function GenerateControl({
         </LabeledControl>
       );
     }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
+      const arr = val as number[];
+      const tuple = arr as [number, number];
+      return (
+        <LabeledControl label={settingName}>
+          <RangeSlider
+            step={setting.constraint.constraint?.range?.step ?? 1}
+            value={tuple}
+            onChange={([l, u]) => {
+              setValue(SettingValueProto.create({ floatArrayValue: [l, u] }));
+            }}
+            min={setting.constraint.constraint?.range?.min}
+            max={setting.constraint.constraint?.range?.max}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+            disabled={locked}
+          />
+        </LabeledControl>
+      );
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_NUMBER:
       if (setting.constraint.constraint?.numeric?.max) {
         return (

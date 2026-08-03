@@ -8,6 +8,7 @@ import "settings/v1/enumerated.proto";
 import "settings/v1/file.proto";
 import "settings/v1/list.proto";
 import "settings/v1/number.proto";
+import "settings/v1/range.proto";
 import "settings/v1/string.proto";
 
 // Configuration for different types of constraints on settings values.
@@ -33,6 +34,8 @@ message ConstraintConfigProto {
     BooleanConstraintProto boolean = 6;
 
     FileConstraintProto file = 7;
+
+    RangeConstraintProto range = 8;
   }
 }
 
@@ -61,4 +64,6 @@ enum ConstraintTypeProto {
   CONSTRAINT_TYPE_PROTO_ENUMERATED = 8;
 
   CONSTRAINT_TYPE_PROTO_FILE = 9;
+
+  CONSTRAINT_TYPE_PROTO_RANGE = 10;
 }

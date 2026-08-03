@@ -14,7 +14,8 @@ from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
                                    Setting, SettingsValue, SynapseCamera,
                                    pipelineResult)
 from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, settingField)
+                                       NumberConstraint, RangeConstraint,
+                                       settingField)
 from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.hardware.metrics import Platform
 from synapse.log import warn
@@ -116,24 +117,14 @@ class ApriltagPipelineSettings(PipelineSettings):
         description="Number of iterations for pose estimation refinement.",
         category="<Toolbox/> Engine Config",
     )
-    crop_x1 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
-        default=-1,
+    crop_x = settingField(
+        RangeConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=[-1, 1],
         category="<Funnel/> Filtering",
     )
-    crop_x2 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
-        default=1,
-        category="<Funnel/> Filtering",
-    )
-    crop_y1 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
-        default=-1,
-        category="<Funnel/> Filtering",
-    )
-    crop_y2 = settingField(
-        NumberConstraint(minValue=-1, maxValue=1, step=0.01),
-        default=1,
+    crop_y = settingField(
+        RangeConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=[-1, 1],
         category="<Funnel/> Filtering",
     )
     stick_to_ground = settingField(
@@ -241,10 +232,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
         if setting.key in [
-            self.settings.crop_x1,
-            self.settings.crop_x2,
-            self.settings.crop_y1,
-            self.settings.crop_y2,
+            self.settings.crop_x,
+            self.settings.crop_y,
         ]:
             self.cameraMatrix = (
                 self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
@@ -254,8 +243,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             config = self.poseEstimator.getConfig()
             h, w = self.getResolution()
 
-            crop_x1 = self.getSetting(self.settings.crop_x1)
-            crop_y1 = self.getSetting(self.settings.crop_y1)
+            crop_x1 = self.getSetting(self.settings.crop_x)[0]
+            crop_y1 = self.getSetting(self.settings.crop_y)[0]
 
             offset_x = int((crop_x1 + 1) * 0.5 * w)
             offset_y = int((crop_y1 + 1) * 0.5 * h)
@@ -294,23 +283,24 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     def cropImageToFit(self, img, drawOn):
         h, w = img.shape[:2]
 
-        nx1 = self.getSetting(self.settings.crop_x1)
-        nx2 = self.getSetting(self.settings.crop_x2)
-        ny1 = self.getSetting(self.settings.crop_y1)
-        ny2 = self.getSetting(self.settings.crop_y2)
+        crop_x = self.getSetting(self.settings.crop_x)
+        crop_y = self.getSetting(self.settings.crop_y)
 
         if (
-            nx1 == self.settings.crop_x1.defaultValue
-            and nx2 == self.settings.crop_x2.defaultValue
-            and ny1 == self.settings.crop_y1.defaultValue
-            and ny2 == self.settings.crop_y2.defaultValue
+            crop_x == self.settings.crop_x.defaultValue
+            and crop_y == self.settings.crop_y.defaultValue
         ):  # No Crop needed, return original image
             return img
 
-        x1 = int((nx1 + 1) * 0.5 * w)
-        x2 = int((nx2 + 1) * 0.5 * w)
-        y1 = int((ny1 + 1) * 0.5 * h)
-        y2 = int((ny2 + 1) * 0.5 * h)
+        x1 = min(crop_x)
+        x2 = max(crop_x)
+        y1 = min(crop_y)
+        y2 = max(crop_y)
+
+        x1 = int((x1 + 1) * 0.5 * w)
+        x2 = int((x2 + 1) * 0.5 * w)
+        y1 = int((y1 + 1) * 0.5 * h)
+        y2 = int((y2 + 1) * 0.5 * h)
 
         # Clamp
         x1 = max(0, min(x1, w))

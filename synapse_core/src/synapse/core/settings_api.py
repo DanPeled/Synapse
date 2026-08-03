@@ -26,6 +26,7 @@ from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
                                                FileConstraintProto,
                                                ListConstraintProto,
                                                NumberConstraintProto,
+                                               RangeConstraintProto,
                                                SettingMetaProto,
                                                SettingValueProto,
                                                StringConstraintProto)
@@ -69,6 +70,80 @@ class Constraint(ABC, Generic[TSettingValueType]):
     @abstractmethod
     def configToProto(self) -> ConstraintConfigProto:
         pass
+
+
+class RangeConstraint(Constraint[Union[List[float], List[int]]]):
+    """Constraint for numeric values inside a provided range"""
+
+    def __init__(
+        self,
+        minValue: Optional[float] = None,
+        maxValue: Optional[float] = None,
+        step: Optional[float] = None,
+    ):
+        """
+        Initialize a RangeConstraint instance.
+
+        Args:
+            minValue (Optional[Union[int, float]]): The minimum allowed value for the range.
+                If None, no minimum constraint is applied.
+            maxValue (Optional[Union[int, float]]): The maximum allowed value for the range.
+                If None, no maximum constraint is applied.
+            step (Optional[Union[int, float]]): The step size or increment within the range.
+                If None, any value within the range is allowed.
+
+        """
+        super().__init__(ConstraintTypeProto.RANGE)
+        self.minValue = minValue
+        self.maxValue = maxValue
+        self.step = step
+
+    def validate(
+        self, value: SettingsValue
+    ) -> ValidationResult[Union[List[float], List[int]]]:
+        try:
+            num_values = list(value)
+            normalized_values = []
+
+            for n in num_values:
+                if self.minValue is not None and n < self.minValue:
+                    return ValidationResult(
+                        False,
+                        f"Value {n} is less than minimum {self.minValue}",
+                    )
+
+                if self.maxValue is not None and n > self.maxValue:
+                    return ValidationResult(
+                        False,
+                        f"Value {n} is greater than maximum {self.maxValue}",
+                    )
+
+                normalized = n
+                if self.step and self.minValue is not None:
+                    steps = round((n - self.minValue) / self.step)
+                    normalized = self.minValue + (steps * self.step)
+
+                normalized_values.append(normalized)
+
+            return ValidationResult(True, None, normalized_values)
+
+        except (ValueError, TypeError):
+            return ValidationResult(False, f"Value {value} is not a valid number")
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            "type": self.constraintType.value,
+            "minValue": self.minValue,
+            "maxValue": self.maxValue,
+            "step": self.step,
+        }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            range=RangeConstraintProto(
+                min=self.minValue, max=self.maxValue, step=self.step
+            )
+        )
 
 
 class NumberConstraint(Constraint[Union[float, int]]):
@@ -1160,18 +1235,18 @@ class PipelineSettings(SettingsCollection):
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
     scalar_field = which_one_of(proto, "scalar_value")
 
-    if scalar_field is not None:
-        return scalar_field[1]
-    if proto.int_array_value:
+    if len(proto.int_array_value) > 0:
         return list(proto.int_array_value)
     elif proto.string_array_value:
         return list(proto.string_array_value)
     elif proto.bool_array_value:
         return list(proto.bool_array_value)
-    elif proto.float_array_value:
+    elif len(proto.float_array_value) > 0:
         return list(proto.float_array_value)
     elif proto.bytes_array_value:
         return list(proto.bytes_array_value)
+    if scalar_field is not None:
+        return scalar_field[1]
 
     raise ValueError("No value set in SettingValueProto")
 
