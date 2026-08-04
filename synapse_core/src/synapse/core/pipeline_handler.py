@@ -309,11 +309,11 @@ class PipelineHandler:
                 cameraIndex
             ].defaultPipeline
 
+        configPath = Config.getInstance().path.parent
+
         for cameraIndex in camera_configs.keys():
             with open(
-                Config.getInstance().path.parent
-                / f"camera_{cameraIndex}"
-                / "pipeline_settings.yml"
+                configPath / f"camera_{cameraIndex}" / "pipeline_settings.yml"
             ) as f:
                 pipeline_configs = yaml.full_load(f)
                 for pipelineIndex, pipeline in pipeline_configs[

@@ -531,13 +531,10 @@ class RuntimeManager:
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]
 
         maxFps = float(camera.getMaxFPS())
-        minInterval = 1.0 / maxFps if maxFps > 0 else 0.0
 
         log.info(f"Started {camera.name} loop (maxFPS={maxFps})")
 
         while self.running.is_set() and camera.isRunning:
-            loopStart = time.perf_counter()
-
             if camera.isConnected():
                 ret, frame = camera.grabFrame()
                 if not ret or frame is None:
@@ -548,12 +545,6 @@ class RuntimeManager:
                 self._processAndPublishFrame(cameraIndex, frame)
             else:
                 self.cameraHandler.publishFrame(camera.generateNoSignalFrame(), camera)
-
-            # Maintain camera FPS cap
-            elapsed = time.perf_counter() - loopStart
-            remaining = minInterval - elapsed
-            if remaining > 0:
-                time.sleep(remaining)
 
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         camera: SynapseCamera = self.cameraHandler.cameras[cameraIndex]

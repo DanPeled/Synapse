@@ -57,6 +57,9 @@ class CameraHandler:
         self.cameraUIDs: List[CameraUID] = []
         self.requestedCameraUIDs: Dict[CameraUID, CameraID] = {}
 
+        self.lastPublishTime: Dict[CameraID, float] = {}
+        self.publishInterval: float = 1.0 / 30.0
+
         self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
 
@@ -297,28 +300,37 @@ class CameraHandler:
             frame (Frame): The image frame to publish.
             camera (SynapseCamera): The camera that produced the frame.
         """
-        if frame is not None:
-            # Resize for display/output
-            resized_frame = cv2.resize(
-                frame,
-                self.streamSizes[camera.cameraIndex],
-                interpolation=cv2.INTER_AREA,
-            )
-            self.getOutput(camera.cameraIndex).putFrame(resized_frame)
+        assert frame is not None
 
-            # Write to MJPEG AVI if recording
-            if self.recordingStatus[camera.cameraIndex]:
-                videoWriter = self.getRecordOutput(camera.cameraIndex)
-                videoWriter.write(
-                    cv2.resize(frame, self.recordingResolutions[camera.cameraIndex])
-                )
-            elif camera.cameraIndex in self.recordingOutputs:
-                log.info(
-                    f"Written Camera {camera.name} recording to {self.recordFileNames[camera.cameraIndex]}",
-                    shouldAlert=True,
-                )
-                videoWriter = self.recordingOutputs.pop(camera.cameraIndex)
-                videoWriter.release()
+        now = time.perf_counter()
+        cameraIndex = camera.cameraIndex
+
+        lastTime = self.lastPublishTime.get(cameraIndex, 0.0)
+
+        if now - lastTime < self.publishInterval:
+            return
+
+        self.lastPublishTime[cameraIndex] = now
+
+        resized_frame = cv2.resize(
+            frame,
+            self.streamSizes[cameraIndex],
+            interpolation=cv2.INTER_AREA,
+        )
+
+        self.getOutput(cameraIndex).putFrame(resized_frame)
+
+        if self.recordingStatus[cameraIndex]:
+            videoWriter = self.getRecordOutput(cameraIndex)
+            videoWriter.write(cv2.resize(frame, self.recordingResolutions[cameraIndex]))
+
+        elif cameraIndex in self.recordingOutputs:
+            log.info(
+                f"Written Camera {camera.name} recording to {self.recordFileNames[cameraIndex]}",
+                shouldAlert=True,
+            )
+            videoWriter = self.recordingOutputs.pop(cameraIndex)
+            videoWriter.release()
 
     def addCamera(
         self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
@@ -403,7 +415,7 @@ class CameraHandler:
             settings (Dict[str, Any]): Dictionary of property names and values to apply.
             camera (SynapseCamera): The camera to configure.
 
-        Returns:
+            Returns:
             Dict[str, Any]: Dictionary of updated settings (currently unused).
         """
         updated_settings = {}
