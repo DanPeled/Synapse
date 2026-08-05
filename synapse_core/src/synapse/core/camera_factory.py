@@ -3,31 +3,23 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import queue
-import threading
-import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
-
-import cv2
-import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoProperty, VideoSource)
+from typing import Any, Dict, List, Optional, Type, Union
+from .camera.synapse_camera import SynapseCamera
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
+from .camera.cscore_camera import CsCoreCamera
 from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
 
-from ..log import err, warn
-from ..stypes import CameraID, Frame, Resolution
-
-Size = Tuple[int, int]
-PropName = str
-PropertyMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
-ResolutionString = str
+from ..log import err
+from ..stypes import (
+    CameraID,
+    Resolution,
+    ResolutionString,
+)
 
 
 class CameraPropKeys(Enum):
@@ -40,20 +32,6 @@ class CameraPropKeys(Enum):
     kWhiteBalanceTemperature = "white_balance_temperature"
     kSharpness = "sharpness"
     kOrientation = "orientation"
-
-
-CSCORE_TO_CV_PROPS = {
-    "brightness": cv2.CAP_PROP_BRIGHTNESS,
-    "contrast": cv2.CAP_PROP_CONTRAST,
-    "saturation": cv2.CAP_PROP_SATURATION,
-    "hue": cv2.CAP_PROP_HUE,
-    "gain": cv2.CAP_PROP_GAIN,
-    "exposure": cv2.CAP_PROP_EXPOSURE,
-    "white_balance_temperature": cv2.CAP_PROP_WHITE_BALANCE_BLUE_U,
-    "sharpness": cv2.CAP_PROP_SHARPNESS,
-}
-
-CV_TO_CSCORE_PROPS = {v: k for k, v in CSCORE_TO_CV_PROPS.items()}
 
 
 class CameraSettingsKeys(Enum):
@@ -145,519 +123,6 @@ class CameraConfigKey(Enum):
     kMeanErr = "mean_err"
 
 
-def cscoreToOpenCVProp(prop: str) -> Optional[int]:
-    return CSCORE_TO_CV_PROPS.get(prop)
-
-
-def opencvToCscoreProp(prop: int) -> Optional[str]:
-    return CV_TO_CSCORE_PROPS.get(prop)
-
-
-class SynapseCamera(ABC):
-    def __init__(self, name: str) -> None:
-        self.name: str = name
-        self.stream: str = ""
-        self.cameraIndex: CameraID = -1
-        self.isRunning: bool = True
-
-    def generateNoSignalFrame(self, size: Resolution = (640, 480)) -> Frame:
-        width, height = size
-
-        frame = np.zeros((height, width, 3), dtype=np.uint8)
-
-        colors = [
-            (255, 255, 255),  # white
-            (0, 255, 255),  # yellow
-            (255, 255, 0),  # cyan (0, 255, 0),  # green
-            (255, 0, 255),  # magenta
-            (0, 0, 255),  # red
-            (255, 0, 0),  # blue
-        ]
-
-        bar_width = width // len(colors)
-        for i, color in enumerate(colors):
-            frame[:, i * bar_width : (i + 1) * bar_width] = color
-
-        noise_intensity = np.random.randint(10, 40)
-        noise = np.random.randint(0, noise_intensity, frame.shape, dtype=np.uint8)
-        frame = cv2.add(frame, noise)
-
-        for y in range(0, height, 2):
-            frame[y : y + 1, :] = (frame[y : y + 1, :] * 0.6).astype(np.uint8)
-
-        if np.random.rand() > 0.7:
-            glitch_y = np.random.randint(0, height)
-            glitch_height = np.random.randint(5, 20)
-            shift = np.random.randint(-30, 30)
-            frame[glitch_y : glitch_y + glitch_height] = np.roll(
-                frame[glitch_y : glitch_y + glitch_height], shift, axis=1
-            )
-
-        text = f"NO SIGNAL ? {self.name} (#{self.cameraIndex})"
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = min(width, height) / 600
-        thickness = max(2, int(font_scale * 2))
-
-        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-        text_x = (width - text_size[0]) // 2
-        text_y = (height + text_size[1]) // 2
-
-        # Black outline
-        cv2.putText(
-            frame,
-            text,
-            (text_x, text_y),
-            font,
-            font_scale,
-            (0, 0, 0),
-            thickness + 3,
-            cv2.LINE_AA,
-        )
-
-        # White foreground
-        cv2.putText(
-            frame,
-            text,
-            (text_x, text_y),
-            font,
-            font_scale,
-            (255, 255, 255),
-            thickness,
-            cv2.LINE_AA,
-        )
-
-        return frame
-
-    @classmethod
-    @abstractmethod
-    def create(
-        cls,
-        *_,
-        path: Union[str, int],
-        name: str = "",
-        index: CameraID,
-    ) -> "SynapseCamera": ...
-
-    def setIndex(self, cameraIndex: CameraID) -> None:
-        self.cameraIndex: CameraID = cameraIndex
-        self.stream = ""
-
-    @abstractmethod
-    def grabFrame(self) -> Tuple[bool, Optional[Frame]]: ...
-
-    @abstractmethod
-    def close(self) -> None: ...
-
-    @abstractmethod
-    def isConnected(self) -> bool: ...
-
-    @abstractmethod
-    def setProperty(self, prop: str, value: Union[int, float]) -> None: ...
-
-    @abstractmethod
-    def getProperty(self, prop: str) -> Union[int, float, None]: ...
-
-    def getProperties(self) -> List[VideoProperty]:
-        return []
-
-    @abstractmethod
-    def setVideoMode(self, fps: int, width: int, height: int) -> None: ...
-
-    @abstractmethod
-    def getResolution(self) -> Size: ...
-
-    @abstractmethod
-    def getSupportedResolutions(self) -> List[Size]: ...
-
-    @abstractmethod
-    def getPropertyMeta(self) -> Optional[PropertyMetaDict]: ...
-
-    @abstractmethod
-    def getMaxFPS(self) -> float: ...
-
-    def getSettingEntry(self, key: str) -> Optional[NetworkTableEntry]:
-        if hasattr(self, "cameraIndex"):
-            table: NetworkTable = getCameraTable(self)
-            entry: NetworkTableEntry = table.getEntry(key)
-            return entry
-        return None
-
-    def getSetting(self, key: str, defaultValue: Any) -> Any:
-        if hasattr(self, "cameraIndex"):
-            table: NetworkTable = getCameraTable(self)
-            entry: NetworkTableEntry = table.getEntry(key)
-            if not entry.exists():
-                entry.setValue(defaultValue)
-            return entry.getValue()
-        return None
-
-    def setSetting(self, key: str, value: Any) -> None:
-        if hasattr(self, "cameraIndex"):
-            table: NetworkTable = getCameraTable(self)
-            entry: NetworkTableEntry = table.getEntry(key)
-            entry.setValue(value)
-
-
-class OpenCvCamera(SynapseCamera):
-    def __init__(self, name: str) -> None:
-        super().__init__(name=name)
-        self.cap: cv2.VideoCapture
-
-    @classmethod
-    def create(
-        cls,
-        *_,
-        name: str = "",
-        path: Union[str, int],
-        index: CameraID,
-    ) -> "OpenCvCamera":
-        inst = OpenCvCamera(name)
-        assert isinstance(path, int) or isinstance(path, str), (
-            f"No valid path for camera {index}"
-        )
-
-        if isinstance(path, int):
-            inst.cap = cv2.VideoCapture(path)
-        if isinstance(path, str):
-            inst.cap = cv2.VideoCapture(path, cv2.CAP_V4L2)
-
-        return inst
-
-    def getSupportedResolutions(self) -> List[Size]:
-        return [self.getResolution()]
-
-    def getPropertyMeta(self) -> Optional[PropertyMetaDict]:
-        return None
-
-    def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
-        return self.cap.read()
-
-    def isConnected(self) -> bool:
-        return self.cap.isOpened()
-
-    def close(self) -> None:
-        self.cap.release()
-
-    def setProperty(self, prop: str, value: Union[int, float]) -> None:
-        if isinstance(prop, int) and self.cap:
-            propInt = cscoreToOpenCVProp(prop)
-            if propInt is not None:
-                self.cap.set(propInt, value)
-
-    def getProperty(self, prop: str) -> Union[int, float, None]:
-        if isinstance(prop, int) and self.cap:
-            propInt = cscoreToOpenCVProp(prop)
-            if propInt is not None:
-                return self.cap.get(propInt)
-            else:
-                return None
-        return None
-
-    def setVideoMode(self, fps: int, width: int, height: int) -> None:
-        if self.cap:
-            self.cap.set(cv2.CAP_PROP_FPS, fps)
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-
-    def getResolution(self) -> Size:
-        return (
-            int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        )
-
-    def getMaxFPS(self) -> float:
-        desired_fps = 120
-        self.cap.set(cv2.CAP_PROP_FPS, desired_fps)
-        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
-        return actual_fps
-
-
-class CsCoreCamera(SynapseCamera):
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
-        self.camera: VideoCamera
-        self.sink: CvSink
-        self.propertyMeta: PropertyMetaDict = {}
-        self._properties: Dict[str, VideoProperty] = {}
-        self._videoModes: List[VideoMode] = []
-        self._validVideoModes: List[VideoMode] = []
-
-        self._poolSize: Final[int] = 2
-        self._bufferPool: List[np.ndarray] = []
-
-        # Queue now holds the INDEX of the filled buffer, not a copy of the frame data
-        # Tuple[bool, Optional[int]]: (hasFrame, buffer_index)
-        self._frameQueue: queue.Queue[Tuple[bool, Optional[int]]] = queue.Queue(
-            maxsize=1
-        )
-        # --- END FIX ---
-
-        self._running: bool = False
-        self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
-
-    def getProperties(self) -> List:
-        return list(self._properties.values())
-
-    @classmethod
-    def create(
-        cls,
-        *_,
-        path: Union[str, int],
-        name: str = "",
-        index: CameraID,
-    ) -> "CsCoreCamera":
-        inst = CsCoreCamera(name)
-
-        if isinstance(path, int):
-            inst.camera = UsbCamera(f"USB Camera {index}", path)
-        elif isinstance(path, str):
-            inst.camera = UsbCamera(f"USB Camera {index}", path)
-
-        inst.sink = CameraServer.getVideo(inst.camera)
-
-        # Cache properties and metadata
-        props = inst.camera.enumerateProperties()
-        inst._properties = {prop.getName(): prop for prop in props}
-        inst.propertyMeta = {
-            name: {
-                "min": prop.getMin(),
-                "max": prop.getMax(),
-                "default": prop.getDefault(),
-            }
-            for name, prop in inst._properties.items()
-        }
-
-        # Cache video modes and valid resolutions
-        inst._videoModes = inst.camera.enumerateVideoModes()
-        inst.camera.setExposureManual(1)
-        inst._validVideoModes = [mode for mode in inst._videoModes]
-
-        # # This will call setVideoMode, which now initializes the buffer pool.
-        inst.setVideoMode(100, 1920, 1080)
-
-        # Start background frame grabbing thread
-        inst._startFrameThread()
-
-        return inst
-
-    def getPropertyMeta(self) -> Optional[PropertyMetaDict]:
-        return self.propertyMeta
-
-    def _startFrameThread(self) -> None:
-        if self._running:
-            return
-
-        if not self._bufferPool:
-            warn(f"Camera {self.cameraIndex}: frame thread not started (no buffers)")
-            return
-
-        self._running = True
-        self._thread = threading.Thread(
-            target=self._frameGrabberLoop,
-            daemon=True,
-            name=f"FrameGrabber-{self.cameraIndex}",
-        )
-        self._thread.start()
-
-    def _frameGrabberLoop(self) -> None:
-        # Wait until camera connects
-        while self._running and not self.isConnected():
-            time.sleep(0.05)
-
-        buffer_index = 0
-        pool_size = len(self._bufferPool)
-
-        while self._running:
-            if not self._bufferPool:
-                time.sleep(0.05)
-                continue
-
-            buffer = self._bufferPool[buffer_index]
-
-            # IMPORTANT: no lock, grabFrame is thread-safe in CSCore
-            (timestamp, frame) = self.sink.grabFrame(buffer)
-
-            if timestamp > 0:
-                # If queue is full, drop oldest frame
-                if self._frameQueue.full():
-                    try:
-                        self._frameQueue.get_nowait()
-                    except queue.Empty:
-                        pass
-
-                self._frameQueue.put_nowait((True, buffer_index))
-
-                # advance buffer only on successful frame
-                buffer_index = (buffer_index + 1) % pool_size
-
-            else:
-                # small yield only on failure (prevents CPU spin)
-                time.sleep(0.001)
-
-    def _waitForNextFrame(self):
-        if self.isConnected():
-            mode = self.camera.getVideoMode()
-            if mode.fps > 0:
-                time.sleep(1.0 / mode.fps / 2.0)
-
-    def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        with self._lock:
-            try:
-                hasFrame, index = self._frameQueue.get(timeout=0.1)
-                if hasFrame and index is not None and index < len(self._bufferPool):
-                    return True, self._bufferPool[index]
-            except queue.Empty:
-                pass
-
-        return False, None
-
-    def isConnected(self) -> bool:
-        return self.camera.isConnected()
-
-    def close(self) -> None:
-        self._running = False
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
-        # Properly close camera connection
-        self.camera.setConnectionStrategy(
-            VideoSource.ConnectionStrategy.kConnectionForceClose
-        )
-
-    def setProperty(self, prop: str, value: Union[int, float, str]) -> None:
-        if prop == "orientation":
-            return
-        if prop == "resolution" and isinstance(value, str):
-            resolution = value.split("x")
-            width = int(resolution[0])
-            height = int(resolution[1])
-            self.setVideoMode(int(self.getMaxFPS()), width, height)
-        elif prop in self._properties:
-            meta = self.propertyMeta[prop]
-            value = int(np.clip(value, meta["min"], meta["max"]))
-            self._properties[prop].set(value)
-
-    def getProperty(self, prop: str) -> Union[int, float, None]:
-        if prop in self._properties:
-            return self._properties[prop].get()
-        return None
-
-    def _selectBestVideoMode(
-        self,
-        width: int,
-        height: int,
-        fps: int,
-        pixelFormat: VideoMode.PixelFormat,
-    ) -> Optional[VideoMode]:
-        if not self._videoModes:
-            return None
-
-        def score(mode: VideoMode):
-            area_diff = abs(mode.width * mode.height - width * height)
-            fps_diff = abs(mode.fps - fps)
-            exact_res = mode.width == width and mode.height == height
-            exact_fmt = mode.pixelFormat == pixelFormat
-
-            # Lower is better
-            return (
-                0 if exact_fmt else 1,
-                0 if exact_res else 1,
-                area_diff,
-                fps_diff,
-            )
-
-        return min(self._videoModes, key=score)
-
-    def setVideoMode(self, fps: int, width: int, height: int) -> None:
-        if self._videoModes is None or len(self._videoModes) == 0:
-            warn(f"No video modes on camera: {self.cameraIndex}")
-            return
-
-        pixelFormat = VideoMode.PixelFormat.kMJPEG
-
-        # Always select a valid mode
-        mode = self._selectBestVideoMode(width, height, fps, pixelFormat)
-
-        assert mode is not None
-
-        # Apply it
-        self.camera.setVideoMode(
-            width=mode.width,
-            height=mode.height,
-            fps=mode.fps,
-            pixelFormat=pixelFormat,
-        )
-
-        H, W = mode.height, mode.width
-
-        # Atomically rebuild buffers
-        with self._lock:
-            self._bufferPool = [
-                np.zeros((H, W, 3), dtype=np.uint8) for _ in range(self._poolSize)
-            ]
-
-            with self._frameQueue.mutex:
-                self._frameQueue.queue.clear()
-
-        requested = (width, height, fps)
-        selected = (mode.width, mode.height, mode.fps)
-
-        if requested != selected:
-            warn(
-                f"Using video mode {mode.width}x{mode.height}@{mode.fps} "
-                f"(requested {width}x{height}@{fps})"
-            )
-
-    def getResolution(self) -> Resolution:
-        videoMode = self.camera.getVideoMode()
-        return (videoMode.width, videoMode.height)
-
-    def getMaxFPS(self) -> float:
-        return self.camera.getVideoMode().fps
-
-    def getSupportedResolutions(self) -> List[Size]:
-        resolutions = []
-        for videomode in self._validVideoModes:
-            resolutions.append((videomode.width, videomode.height))
-        return resolutions
-
-
-class CameraFactory:
-    kOpenCV: Type[SynapseCamera] = OpenCvCamera
-    kCameraServer: Type[SynapseCamera] = CsCoreCamera
-    kDefault: Type[SynapseCamera] = kCameraServer
-
-    @classmethod
-    def create(
-        cls,
-        *_,
-        cameraType: Type[SynapseCamera] = kDefault,
-        cameraIndex: CameraID,
-        path: Union[str, int],
-        name: str = "",
-    ) -> "SynapseCamera":
-        cam: SynapseCamera = cameraType.create(
-            path=path,
-            name=name,
-            index=cameraIndex,
-        )
-        cam.setIndex(cameraIndex)
-        return cam
-
-
-@cache
-def getCameraTable(camera: SynapseCamera) -> NetworkTable:
-    return (
-        NetworkTableInstance.getDefault()
-        .getTable(NtClient.NT_TABLE)
-        .getSubTable(getCameraTableName(camera))
-    )
-
-
-def getCameraTableName(camera: SynapseCamera) -> str:
-    return camera.name
-
-
 def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
     """
     Converts a 2D list containing position and rotation data into a Transform3d object.
@@ -688,78 +153,44 @@ def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
         )
 
 
-class NoSignalCamera(SynapseCamera):
-    def __init__(self, name: str) -> None:
-        super().__init__(name=name)
-        self.resolution: Resolution = (640, 480)
+@cache
+def getCameraTable(camera: SynapseCamera) -> NetworkTable:
+    return (
+        NetworkTableInstance.getDefault()
+        .getTable(NtClient.NT_TABLE)
+        .getSubTable(getCameraTableName(camera))
+    )
+
+
+def getCameraTableName(camera: SynapseCamera) -> str:
+    return camera.name
+
+
+class CameraFactory:
+    kCameraServer: Type[SynapseCamera] = CsCoreCamera
+    kDefault: Type[SynapseCamera] = kCameraServer
 
     @classmethod
     def create(
-        cls, *_, path: Union[str, int] = 0, name: str = "", index: CameraID = -1
-    ) -> "NoSignalCamera":
-        inst = NoSignalCamera(name)
-        inst.setIndex(index)
-        return inst
-
-    def grabFrame(self) -> Tuple[bool, Optional[Frame]]:
-        # Always return a no-signal frame
-        return True, self.generateNoSignalFrame(self.resolution)
-
-    def isConnected(self) -> bool:
-        # Pretend the camera is never connected
-        return False
-
-    def close(self) -> None:
-        pass
-
-    def setProperty(self, prop: str, value: Union[int, float]) -> None:
-        # Ignore all property changes
-        pass
-
-    def getProperty(self, prop: str) -> Union[int, float, None]:
-        # No properties exist
-        return None
-
-    def setVideoMode(self, fps: int, width: int, height: int) -> None:
-        # Only store resolution for frame generation
-        self.resolution = (width, height)
-
-    def getResolution(self) -> Size:
-        return self.resolution
-
-    def getSupportedResolutions(self) -> List[Size]:
-        # Only support the current resolution
-        return [self.resolution]
-
-    def getPropertyMeta(self) -> Optional[PropertyMetaDict]:
-        return None
-
-    def getMaxFPS(self) -> float:
-        return 0.0
+        cls,
+        *_,
+        cameraType: Type[SynapseCamera] = kDefault,
+        cameraIndex: CameraID,
+        path: Union[str, int],
+        name: str = "",
+    ) -> "SynapseCamera":
+        cam: SynapseCamera = cameraType.create(
+            path=path,
+            name=name,
+            index=cameraIndex,
+        )
+        cam.setIndex(cameraIndex)
+        return cam
 
 
-def transform3dToList(transform: geometry.Transform3d) -> List[List[float]]:
-    """
-    Converts a Transform3d object into a 2D list containing position and rotation data.
-
-    The output list contains two sublists:
-    - The first sublist represents the translation (x, y, z).
-    - The second sublist represents the rotation (roll, pitch, yaw) in degrees.
-
-    Args:
-        transform (geometry.Transform3d): The Transform3d object to convert.
-
-    Returns:
-        List[List[float]]: A 2D list with translation and rotation values.
-    """
-    translation = transform.translation()
-    rotation = transform.rotation()
-
-    return [
-        [translation.x, translation.y, translation.z],
-        [
-            rotation.x_degrees,  # Roll
-            rotation.y_degrees,  # Pitch
-            rotation.z_degrees,  # Yaw
-        ],
-    ]
+def getCameraSettingEntry(
+    camera: SynapseCamera, key: str
+) -> Optional[NetworkTableEntry]:
+    table: NetworkTable = getCameraTable(camera)
+    entry: NetworkTableEntry = table.getEntry(key)
+    return entry

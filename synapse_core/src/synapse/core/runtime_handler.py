@@ -16,12 +16,21 @@ import cv2
 import numpy as np
 import synapse.__version__ as versionFile
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
-                    NetworkTableInstance, NetworkTableType, StringPublisher,
-                    ValueEventData)
-from synapse_net.generated.messages.v1 import (CameraPerformanceProto,
-                                               HardwareMetricsProto,
-                                               MessageTypeProto)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableEntry,
+    NetworkTableInstance,
+    NetworkTableType,
+    StringPublisher,
+    ValueEventData,
+)
+from synapse_net.generated.messages.v1 import (
+    CameraPerformanceProto,
+    HardwareMetricsProto,
+    MessageTypeProto,
+)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpimath.units import seconds, secondsToMilliseconds
@@ -30,12 +39,22 @@ from ..bcolors import MarkupColors
 from ..callback import Callback
 from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
 from ..util import Publisher, getIP, getPublisher
-from .camera_factory import CameraSettingsKeys, SynapseCamera, getCameraTable
+from .camera_factory import (
+    CameraSettingsKeys,
+    SynapseCamera,
+    getCameraTable,
+    getCameraSettingEntry,
+)
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .nt_keys import NTKeys
-from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
-                       PipelineSettings, getPipelineTypename)
+from .pipeline import (
+    FrameResult,
+    Pipeline,
+    PipelineProcessFrameResult,
+    PipelineSettings,
+    getPipelineTypename,
+)
 from .pipeline_handler import PipelineHandler
 from .settings_api import CameraSettings
 
@@ -677,7 +696,7 @@ class RuntimeManager:
 
     def setupNetworkTables(self) -> None:
         for cameraIndex, camera in self.cameraHandler.cameras.items():
-            entry = camera.getSettingEntry(CameraSettingsKeys.kPipeline.value)
+            entry = getCameraSettingEntry(camera, CameraSettingsKeys.kPipeline.value)
 
             if entry is None:
                 entry = getCameraTable(camera).getEntry(
@@ -704,7 +723,7 @@ class RuntimeManager:
             camera = self.cameraHandler.getCamera(cameraIndex)
             assert camera is not None
 
-            entry = camera.getSettingEntry("record")
+            entry = getCameraSettingEntry(camera, "record")
 
             assert entry is not None
 
@@ -890,7 +909,9 @@ class RuntimeManager:
 
                 self.cameraHandler.setRecordingStatus(cameraIndex, value)
 
-            recordEntry = camera.getSettingEntry(CameraSettingsKeys.kRecord.value)
+            recordEntry = getCameraSettingEntry(
+                camera, CameraSettingsKeys.kRecord.value
+            )
             assert recordEntry is not None
 
             NetworkTableInstance.getDefault().addListener(

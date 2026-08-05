@@ -12,15 +12,27 @@ from typing import Any, Dict, Final, List, Optional, Tuple
 
 import cscore as cs
 import cv2
+from .camera.no_signal import NoSignalCamera
 import synapse.log as log
 from ntcore import NetworkTableInstance
 from synapse_net.nt_client import NtClient
 
 from ..callback import Callback
-from ..stypes import (CameraID, CameraName, CameraUID, Frame,
-                      RecordingFilename, RecordingStatus, Resolution)
-from .camera_factory import (CameraConfig, CameraFactory, NoSignalCamera,
-                             SynapseCamera, getCameraTableName)
+from ..stypes import (
+    CameraID,
+    CameraName,
+    CameraUID,
+    Frame,
+    RecordingFilename,
+    RecordingStatus,
+    Resolution,
+)
+from .camera_factory import (
+    CameraConfig,
+    CameraFactory,
+    SynapseCamera,
+    getCameraTableName,
+)
 from .global_settings import GlobalSettings
 
 
