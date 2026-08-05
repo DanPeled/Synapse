@@ -13,7 +13,7 @@ from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
 from synapse.log import warn
 
 from ...stypes import CameraID, PropertyMetaDict, Resolution, Size
-from ..camera_factory import SynapseCamera
+from .synapse_camera import SynapseCamera
 
 
 class CsCoreCamera(SynapseCamera):
