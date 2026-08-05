@@ -7,12 +7,12 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from cscore import VideoMode
-from synapse.core.camera_factory import CsCoreCamera
+from synapse.core.camera.cscore_camera import CsCoreCamera
 
 
 class TestCsCoreCamera(unittest.TestCase):
-    @patch("synapse.core.camera_factory.UsbCamera")
-    @patch("synapse.core.camera_factory.CameraServer.getVideo")
+    @patch("synapse.core.camera.cscore_camera.UsbCamera")
+    @patch("synapse.core.camera.cscore_camera.CameraServer.getVideo")
     def test_create_with_usb_index(self, mock_get_video, mock_usb_camera):
         camera_instance = MagicMock()
         camera_instance.getVideoMode.return_value = VideoMode()
@@ -38,7 +38,7 @@ class TestCsCoreCamera(unittest.TestCase):
         self.assertIn("brightness", cam.propertyMeta)
         self.assertEqual(cam.propertyMeta["brightness"]["default"], 50)
 
-    @patch("synapse.core.camera_factory.CvSink")
+    @patch("synapse.core.camera.cscore_camera.CvSink")
     def test_grabFrame_logic(self, mock_sink):
         cam = CsCoreCamera("mock")
         cam.sink = MagicMock()
