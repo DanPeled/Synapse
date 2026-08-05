@@ -7,19 +7,16 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 from typing import Any, Dict, List, Optional, Type, Union
-from .camera.synapse_camera import SynapseCamera
+
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
-from .camera.cscore_camera import CsCoreCamera
 from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
 from wpimath import geometry
 
 from ..log import err
-from ..stypes import (
-    CameraID,
-    Resolution,
-    ResolutionString,
-)
+from ..stypes import CameraID, Resolution, ResolutionString
+from .camera.cscore_camera import CsCoreCamera
+from .camera.synapse_camera import SynapseCamera
 
 
 class CameraPropKeys(Enum):

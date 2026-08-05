@@ -3,20 +3,13 @@ import threading
 import time
 from typing import Dict, Final, List, Optional, Tuple, Union
 
+import numpy as np
+from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
+                    VideoProperty, VideoSource)
 from synapse.log import warn
 
 from ...stypes import CameraID, PropertyMetaDict, Resolution, Size
-import numpy as np
 from ..camera_factory import SynapseCamera
-from cscore import (
-    CameraServer,
-    CvSink,
-    UsbCamera,
-    VideoCamera,
-    VideoMode,
-    VideoProperty,
-    VideoSource,
-)
 
 
 class CsCoreCamera(SynapseCamera):

@@ -1,8 +1,9 @@
 from typing import List, Optional, Tuple, Union
 
-from .synapse_camera import SynapseCamera
-from ...stypes import PropertyMetaDict, Size
 from synapse.stypes import CameraID, Frame, Resolution
+
+from ...stypes import PropertyMetaDict, Size
+from .synapse_camera import SynapseCamera
 
 
 class NoSignalCamera(SynapseCamera):

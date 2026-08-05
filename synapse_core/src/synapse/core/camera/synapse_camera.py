@@ -3,17 +3,9 @@ from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
-from cscore import (
-    VideoProperty,
-)
+from cscore import VideoProperty
 
-from ...stypes import (
-    CameraID,
-    Frame,
-    PropertyMetaDict,
-    Resolution,
-    Size,
-)
+from ...stypes import CameraID, Frame, PropertyMetaDict, Resolution, Size
 
 
 class SynapseCamera(ABC):
