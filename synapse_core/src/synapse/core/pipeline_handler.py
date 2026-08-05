@@ -14,7 +14,7 @@ import yaml
 from ..callback import Callback
 from ..stypes import CameraID, PipelineID, PipelineName, PipelineTypeName
 from ..util import resolveGenericArgument
-from .camera_factory import SynapseCamera
+from .camera.synapse_camera import SynapseCamera
 from .config import Config
 from .global_settings import GlobalSettings
 from .nt_keys import NTKeys

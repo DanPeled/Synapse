@@ -39,7 +39,7 @@ from ..log import err, info, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
                       RecordingStatus)
 from ..util import getIP, resolveGenericArgument
-from .camera_factory import SynapseCamera
+from .camera.synapse_camera import SynapseCamera
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto

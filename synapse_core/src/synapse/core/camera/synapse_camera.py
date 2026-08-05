@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple, Union
 

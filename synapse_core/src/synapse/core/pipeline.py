@@ -16,7 +16,7 @@ from synapse_net.socketServer import WebSocketServer
 
 from ..log import createMessage, err, warn
 from ..stypes import CameraID, Frame, PipelineID, Resolution
-from .camera_factory import SynapseCamera
+from .camera.synapse_camera import SynapseCamera
 from .global_settings import GlobalSettings
 from .results_api import (PipelineResult, parsePipelineResult,
                           serializePipelineResult)
