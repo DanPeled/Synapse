@@ -39,7 +39,7 @@ from ..log import err, info, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
                       RecordingStatus)
 from ..util import getIP, resolveGenericArgument
-from .camera_factory import SynapseCamera
+from .camera.camera_handle import CameraHandle
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
@@ -328,15 +328,16 @@ class Synapse:
                 ).SerializeToString()
             )
 
-            for id, camera in self.runtimeHandler.cameraHandler.cameras.items():
+            for id, handle in self.runtimeHandler.cameraHandler.cameraHandles.items():
                 msg = cameraToProto(
                     id,
-                    camera.name,
-                    camera,
+                    handle.name,
+                    handle.camera,
                     self.runtimeHandler.pipelineBindings.get(id, 0),
                     self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
                         id, -1
                     ),
+                    handle.stream,
                     self.runtimeHandler.cameraHandler.cameraConfigBindings[id].id,
                 )
 
@@ -426,15 +427,16 @@ class Synapse:
                 createMessage(MessageTypeProto.ADD_PIPELINE, pipelineProto)
             )
 
-        def onAddCamera(cameraid: CameraID, name: str, camera: SynapseCamera) -> None:
+        def onAddCamera(cameraid: CameraID, name: str, handle: CameraHandle) -> None:
             cameraProto = cameraToProto(
                 cameraid,
                 name,
-                camera,
+                handle.camera,
                 self.runtimeHandler.pipelineBindings.get(cameraid, 0),
                 self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
                     cameraid, 0
                 ),
+                handle.stream,
                 self.runtimeHandler.cameraHandler.cameraConfigBindings[cameraid].id,
             )
 
@@ -476,16 +478,19 @@ class Synapse:
             Synapse.kInstance.websocket.sendToAllSync(msg)
 
         def onDefaultPipelineSet(pipelineIndex: PipelineID, cameraIndex: CameraID):
-            camera: Optional[SynapseCamera] = (
-                Synapse.kInstance.runtimeHandler.cameraHandler.getCamera(cameraIndex)
+            handle: Optional[CameraHandle] = (
+                Synapse.kInstance.runtimeHandler.cameraHandler.getCameraHandle(
+                    cameraIndex
+                )
             )
-            if camera:
+            if handle:
                 cameraMsg = cameraToProto(
                     cameraIndex,
-                    camera.name,
-                    camera,
+                    handle.name,
+                    handle.camera,
                     pipelineIndex=self.runtimeHandler.pipelineBindings[cameraIndex],
                     defaultPipeline=pipelineIndex,
+                    stream=handle.stream,
                     kind=self.runtimeHandler.cameraHandler.cameraConfigBindings[
                         cameraIndex
                     ].id,
@@ -495,15 +500,16 @@ class Synapse:
                 Synapse.kInstance.websocket.sendToAllSync(msg)
 
         def onCameraRename(cameraIndex: CameraID, newName: CameraName):
-            camera = self.runtimeHandler.cameraHandler.cameras[cameraIndex]
+            handle = self.runtimeHandler.cameraHandler.cameraHandles[cameraIndex]
             cameraMsg = cameraToProto(
                 cameraIndex,
-                camera.name,
-                camera,
+                handle.name,
+                handle.camera,
                 pipelineIndex=self.runtimeHandler.pipelineBindings[cameraIndex],
                 defaultPipeline=self.runtimeHandler.pipelineHandler.defaultPipelineIndexes[
                     cameraIndex
                 ],
+                stream=handle.stream,
                 kind=self.runtimeHandler.cameraHandler.cameraConfigBindings[
                     cameraIndex
                 ].id,
@@ -635,12 +641,12 @@ class Synapse:
                     addPipelineMsg.index, addPipelineMsg.cameraid
                 )
                 if pipeline is not None:
-                    camera = self.runtimeHandler.cameraHandler.getCamera(
+                    handle = self.runtimeHandler.cameraHandler.getCameraHandle(
                         addPipelineMsg.cameraid
                     )
-                    assert camera is not None
+                    assert handle is not None
 
-                    pipeline.bind(addPipelineMsg.cameraid, camera)
+                    pipeline.bind(addPipelineMsg.cameraid, handle.camera)
             else:
                 err(
                     f"Cannot add pipeline of type {addPipelineMsg.type}, it is an invalid typename"
