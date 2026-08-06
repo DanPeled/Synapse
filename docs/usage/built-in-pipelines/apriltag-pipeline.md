@@ -1,6 +1,0 @@
----
-icon: qrcode
----
-
-# Apriltag Pipeline
-
