@@ -184,8 +184,8 @@ class CameraFactory:
 
 
 def getCameraSettingEntry(
-    camera: SynapseCamera, key: str
+    handle: CameraHandle, key: str
 ) -> Optional[NetworkTableEntry]:
-    table: NetworkTable = getCameraTable(camera)
+    table: NetworkTable = getCameraTable(handle)
     entry: NetworkTableEntry = table.getEntry(key)
     return entry

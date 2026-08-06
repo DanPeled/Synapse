@@ -540,16 +540,13 @@ class RuntimeManager:
         while self.running.is_set():
             if handle.camera.isConnected():
                 ret, frame = handle.grabFrame()
-                if not ret or frame is None:
+                if ret and frame is not None:
+                    frame = self.fixtureFrame(cameraIndex, frame)
+                    self._processAndPublishFrame(cameraIndex, frame)
                     continue
-
-                frame = self.fixtureFrame(cameraIndex, frame)
-
-                self._processAndPublishFrame(cameraIndex, frame)
-            else:
-                self.cameraHandler.publishFrame(
-                    generateNoSignalFrame(handle.name, handle.cameraIndex), handle
-                )
+            self.cameraHandler.publishFrame(
+                generateNoSignalFrame(handle.name, handle.cameraIndex), handle
+            )
 
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         handle: CameraHandle = self.cameraHandler.cameraHandles[cameraIndex]
@@ -682,9 +679,7 @@ class RuntimeManager:
 
     def setupNetworkTables(self) -> None:
         for cameraIndex, handle in self.cameraHandler.cameraHandles.items():
-            entry = getCameraSettingEntry(
-                handle.camera, CameraSettingsKeys.kPipeline.value
-            )
+            entry = getCameraSettingEntry(handle, CameraSettingsKeys.kPipeline.value)
 
             if entry is None:
                 entry = getCameraTable(handle).getEntry(
@@ -711,7 +706,7 @@ class RuntimeManager:
             handle = self.cameraHandler.getCameraHandle(cameraIndex)
             assert handle is not None
 
-            entry = getCameraSettingEntry(handle.camera, "record")
+            entry = getCameraSettingEntry(handle, "record")
 
             assert entry is not None
 
@@ -898,7 +893,7 @@ class RuntimeManager:
                 self.cameraHandler.setRecordingStatus(cameraIndex, value)
 
             recordEntry = getCameraSettingEntry(
-                handle.camera, CameraSettingsKeys.kRecord.value
+                handle, CameraSettingsKeys.kRecord.value
             )
             assert recordEntry is not None
 

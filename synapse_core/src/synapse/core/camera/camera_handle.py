@@ -22,13 +22,12 @@ class CameraHandle:
         self.stream: str = ""
         self.cameraIndex = index
 
-        self._videoModes = self.camera.enumerateVideoModes()
-
-        self._videoModes: List[VideoMode] = []
-        self._validVideoModes: List[VideoMode] = []
+        self._videoModes: List[VideoMode] = self.camera.enumerateVideoModes()
 
         self._poolSize: Final[int] = 2
-        self._bufferPool: List[np.ndarray] = []
+        self._bufferPool: List[np.ndarray] = [
+            np.zeros((1920, 1080, 3), dtype=np.uint8) for _ in range(self._poolSize)
+        ]
 
         # Queue now holds the INDEX of the filled buffer, not a copy of the frame data
         # Tuple[bool, Optional[int]]: (hasFrame, buffer_index)
@@ -37,9 +36,11 @@ class CameraHandle:
         )
         # --- END FIX ---
 
-        self._running: bool = False
+        self._running: bool = True
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
+
+        self._startFrameThread()
 
     def setVideoMode(self, videoMode: VideoMode) -> None:
         if self._videoModes is None or len(self._videoModes) == 0:
@@ -140,9 +141,6 @@ class CameraHandle:
         return self.camera.getProperty(prop)
 
     def _startFrameThread(self) -> None:
-        if self._running:
-            return
-
         if not self._bufferPool:
             warn(f"Camera {self.cameraIndex}: frame thread not started (no buffers)")
             return
