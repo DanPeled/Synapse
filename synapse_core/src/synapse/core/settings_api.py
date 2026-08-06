@@ -1319,6 +1319,7 @@ def cameraToProto(
     camera: SynapseCamera,
     pipelineIndex: PipelineID,
     defaultPipeline: PipelineID,
+    stream: str,
     kind: str,
 ) -> CameraProto:
     cameraSettingsMetaValue = CameraSettings()
@@ -1326,7 +1327,7 @@ def cameraToProto(
     return CameraProto(
         name=name,
         index=camid,
-        stream_path=camera.stream,
+        stream_path=stream,
         kind=kind,
         pipeline_index=pipelineIndex,
         default_pipeline=defaultPipeline,

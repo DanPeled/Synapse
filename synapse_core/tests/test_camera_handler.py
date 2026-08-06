@@ -15,8 +15,8 @@ class TestCameraHandler(unittest.TestCase):
 
     def test_getCamera_returns_correct_camera(self):
         mock_camera = MagicMock()
-        self.handler.cameras[2] = mock_camera
-        self.assertEqual(self.handler.getCamera(2), mock_camera)
+        self.handler.cameraHandles[2] = mock_camera
+        self.assertEqual(self.handler.getCameraHandle(2), mock_camera)
 
     # TODO: add camera tests
 

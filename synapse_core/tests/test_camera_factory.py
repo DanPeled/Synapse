@@ -20,14 +20,14 @@ class TestCsCoreCamera(unittest.TestCase):
         mock_get_video.return_value = MagicMock()
         camera_instance.enumerateProperties.return_value = []
 
-        cam = CsCoreCamera.create(index=0, name="TestCam", path="/dev/video0")
+        cam = CsCoreCamera.create(index=0, path="/dev/video0")
 
         self.assertIsInstance(cam, CsCoreCamera)
         mock_usb_camera.assert_called_once()
         mock_get_video.assert_called_once_with(camera_instance)
 
     def test_set_and_get_property_meta(self):
-        cam = CsCoreCamera("mock")
+        cam = CsCoreCamera()
         cam._properties = {
             "brightness": MagicMock(
                 getMin=lambda: 0, getMax=lambda: 100, getDefault=lambda: 50
@@ -40,17 +40,16 @@ class TestCsCoreCamera(unittest.TestCase):
 
     @patch("synapse.core.camera.cscore_camera.CvSink")
     def test_grabFrame_logic(self, mock_sink):
-        cam = CsCoreCamera("mock")
+        cam = CsCoreCamera()
         cam.sink = MagicMock()
         cam.sink.grabFrame.return_value = 10
-        cam._running = False  # Skip the thread loop
 
         # Run a single iteration
         result = cam.sink.grabFrame()
         self.assertEqual(result, 10)
 
     def test_get_resolution(self):
-        cam = CsCoreCamera("mock")
+        cam = CsCoreCamera()
         cam.camera = MagicMock()
         cam.camera.getVideoMode.return_value.width = 640
         cam.camera.getVideoMode.return_value.height = 480
@@ -59,7 +58,7 @@ class TestCsCoreCamera(unittest.TestCase):
         self.assertEqual(res, (640, 480))
 
     def test_get_max_fps(self):
-        cam = CsCoreCamera("mock")
+        cam = CsCoreCamera()
         cam.camera = MagicMock()
         cam.camera.getVideoMode.return_value.fps = 30
         self.assertEqual(cam.getMaxFPS(), 30)

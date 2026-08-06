@@ -15,6 +15,7 @@ from wpimath import geometry
 
 from ..log import err
 from ..stypes import CameraID, Resolution, ResolutionString
+from .camera.camera_handle import CameraHandle
 from .camera.cscore_camera import CsCoreCamera
 from .camera.synapse_camera import SynapseCamera
 
@@ -151,16 +152,16 @@ def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
 
 
 @cache
-def getCameraTable(camera: SynapseCamera) -> NetworkTable:
+def getCameraTable(handle: CameraHandle) -> NetworkTable:
     return (
         NetworkTableInstance.getDefault()
         .getTable(NtClient.NT_TABLE)
-        .getSubTable(getCameraTableName(camera))
+        .getSubTable(getCameraTableName(handle))
     )
 
 
-def getCameraTableName(camera: SynapseCamera) -> str:
-    return camera.name
+def getCameraTableName(handle: CameraHandle) -> str:
+    return handle.name
 
 
 class CameraFactory:
@@ -174,14 +175,11 @@ class CameraFactory:
         cameraType: Type[SynapseCamera] = kDefault,
         cameraIndex: CameraID,
         path: Union[str, int],
-        name: str = "",
     ) -> "SynapseCamera":
         cam: SynapseCamera = cameraType.create(
             path=path,
-            name=name,
             index=cameraIndex,
         )
-        cam.setIndex(cameraIndex)
         return cam
 
 
