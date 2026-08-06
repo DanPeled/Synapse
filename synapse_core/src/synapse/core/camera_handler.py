@@ -7,7 +7,6 @@ import threading
 import time
 import traceback
 from datetime import datetime
-from functools import cache
 from typing import Any, Dict, Final, List, Optional, Tuple
 
 import cscore as cs
@@ -61,8 +60,9 @@ class CameraHandler:
         self.lastPublishTime: Dict[CameraID, float] = {}
         self.publishInterval: float = 1.0 / 30.0
 
-        self.cameraScanningThreadRunning: bool = True
         self.cameraScanningThread: threading.Thread
+
+        self.stopCameraScanEvent = threading.Event()
 
     def setRecordingStatus(
         self, cameraIndex: CameraID, status: RecordingStatus
@@ -88,9 +88,8 @@ class CameraHandler:
         self.createCameras()
 
         def cameraScanAction():
-            while self.cameraScanningThreadRunning:
+            while self.stopCameraScanEvent.wait(10):
                 self.scanCameras()
-                time.sleep(10)
 
         self.cameraScanningThread = threading.Thread(
             target=cameraScanAction, daemon=True
@@ -167,7 +166,7 @@ class CameraHandler:
                     if id in self.requestedCameraUIDs.keys():
                         newIndex = self.requestedCameraUIDs.pop(id)
                 else:
-                    m = max(self.cameraHandles.keys())
+                    m = max(self.cameraHandles.keys(), default=-1)
                     newIndex = m + 1
 
                 cameraIndex = newIndex
@@ -240,13 +239,14 @@ class CameraHandler:
             dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
             to their corresponding video output objects.
         """
+        assert cameraIndex in self.cameraHandles
+
         return cs.CameraServer.putVideo(
             name=f"{NtClient.NT_TABLE}/{getCameraTableName(self.cameraHandles[cameraIndex])}",
             width=self.getStreamRes(cameraIndex)[0],
             height=self.getStreamRes(cameraIndex)[1],
         )
 
-    @cache
     def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
         """
         Retrieves the video output stream for a specific camera.
@@ -259,7 +259,6 @@ class CameraHandler:
         """
         return self.streamOutputs[cameraIndex]
 
-    @cache
     def getRecordOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
         """
         Retrieves the recording output writer for a specific camera.
@@ -327,9 +326,17 @@ class CameraHandler:
 
         self.getOutput(cameraIndex).putFrame(resized_frame)
 
-        if self.recordingStatus[cameraIndex]:
+        if self.recordingStatus.get(cameraIndex, False):
             videoWriter = self.getRecordOutput(cameraIndex)
-            videoWriter.write(cv2.resize(frame, self.recordingResolutions[cameraIndex]))
+            videoWriter.write(
+                cv2.resize(
+                    frame,
+                    self.recordingResolutions.get(
+                        cameraIndex,
+                        self.cameraHandles[cameraIndex].camera.getResolution(),
+                    ),
+                )
+            )
 
         elif cameraIndex in self.recordingOutputs:
             log.info(
@@ -395,7 +402,7 @@ class CameraHandler:
             .getTable("CameraPublisher")
             .getSubTable(NtClient.NT_TABLE)
             .getSubTable(cameraConfig.name)
-            .getStringArray("streams", [])[1]
+            .getStringArray("streams", ["", ""])[1]
             .replace("mjpg:", "")
         )
 
@@ -437,7 +444,7 @@ class CameraHandler:
         """
         Releases all video writers and closes all active camera connections.
         """
-        self.cameraScanningThreadRunning = False
+        self.stopCameraScanEvent.set()
         self.cameraScanningThread.join()
 
         for record in self.recordingOutputs.values():
