@@ -39,7 +39,7 @@ class TestRuntimeManager(unittest.TestCase):
             self.handler = RuntimeManager(directory=Path("."))
 
     def test_assign_default_pipelines(self):
-        self.mock_camera_handler.cameras = {0: "Camera0", 1: "Camera1"}
+        self.mock_camera_handler.cameraHandles = {0: "Camera0", 1: "Camera1"}
         self.handler.pipelineHandler.getDefaultPipeline = MagicMock(
             side_effect=[10, 20]
         )
@@ -52,7 +52,7 @@ class TestRuntimeManager(unittest.TestCase):
         self.assertEqual(self.handler.setPipelineByIndex.call_count, 2)
 
     def test_set_pipeline_by_index_invalid_camera(self):
-        self.mock_camera_handler.cameras = {0: "Camera0"}
+        self.mock_camera_handler.cameraHandles = {0: "Camera0"}
         self.handler.pipelineHandler.pipelineTypeNames = {0: {1: "PipelineA"}}
 
         with patch("synapse.core.runtime_handler.log.err") as mock_log:
@@ -79,7 +79,7 @@ class TestRuntimeManager(unittest.TestCase):
             patch.object(self.handler, "setupNetworkTables") as setup_nt,
             patch.object(self.handler, "startMetricsThread") as start_metrics,
         ):
-            self.handler.setup(directory=Path("."))
+            self.handler.setup(directory=Path("."), sendSettingsInNT=False)
 
             setup_loader.assert_called_once()
             setup_cameras.assert_called_once()

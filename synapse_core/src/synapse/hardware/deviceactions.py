@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 
-from ..log import err, log, missingFeature
+from ..log import err, info, missingFeature
 from .metrics import Platform
 
 
@@ -22,5 +22,5 @@ def reboot():
 
 
 def restartRuntime():
-    log("Restarting Synapse...")
+    info("Restarting Synapse...")
     os.execv(sys.executable, [sys.executable] + sys.argv)

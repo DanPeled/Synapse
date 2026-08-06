@@ -7,29 +7,35 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union, overload
+from pathlib import Path
+from typing import (Any, Dict, Generic, List, Optional, Set, TypeVar, Union,
+                    cast, overload)
 
 from betterproto import which_one_of
 from cscore import VideoProperty
 from ntcore import NetworkTable, NetworkTableEntry
-from synapse_net.proto.settings.v1 import (BooleanConstraintProto,
-                                           ColorConstraintProto,
-                                           ColorFormatProto,
-                                           ConstraintConfigProto,
-                                           ConstraintProto,
-                                           ConstraintTypeProto,
-                                           EnumeratedConstraintProto,
-                                           EnumeratedOptionProto,
-                                           ListConstraintProto,
-                                           NumberConstraintProto,
-                                           SettingMetaProto, SettingValueProto,
-                                           StringConstraintProto)
-from synapse_net.proto.v1 import CameraProto
+from synapse_net.generated.messages.v1 import CameraProto
+from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
+                                               ColorConstraintProto,
+                                               ColorFormatProto,
+                                               ConstraintConfigProto,
+                                               ConstraintProto,
+                                               ConstraintTypeProto,
+                                               EnumeratedConstraintProto,
+                                               EnumeratedOptionProto,
+                                               FileConstraintProto,
+                                               ListConstraintProto,
+                                               NumberConstraintProto,
+                                               RangeConstraintProto,
+                                               SettingMetaProto,
+                                               SettingValueProto,
+                                               StringConstraintProto)
 
 from ..bcolors import MarkupColors
 from ..log import err
-from ..stypes import CameraID, PipelineID
-from .camera_factory import CameraPropKeys, PropertyMetaDict, SynapseCamera
+from ..stypes import CameraID, PipelineID, PropertyMetaDict
+from .camera.synapse_camera import SynapseCamera
+from .camera_factory import CameraPropKeys
 
 SettingsValue = Any
 
@@ -65,6 +71,80 @@ class Constraint(ABC, Generic[TSettingValueType]):
     @abstractmethod
     def configToProto(self) -> ConstraintConfigProto:
         pass
+
+
+class RangeConstraint(Constraint[Union[List[float], List[int]]]):
+    """Constraint for numeric values inside a provided range"""
+
+    def __init__(
+        self,
+        minValue: Optional[float] = None,
+        maxValue: Optional[float] = None,
+        step: Optional[float] = None,
+    ):
+        """
+        Initialize a RangeConstraint instance.
+
+        Args:
+            minValue (Optional[Union[int, float]]): The minimum allowed value for the range.
+                If None, no minimum constraint is applied.
+            maxValue (Optional[Union[int, float]]): The maximum allowed value for the range.
+                If None, no maximum constraint is applied.
+            step (Optional[Union[int, float]]): The step size or increment within the range.
+                If None, any value within the range is allowed.
+
+        """
+        super().__init__(ConstraintTypeProto.RANGE)
+        self.minValue = minValue
+        self.maxValue = maxValue
+        self.step = step
+
+    def validate(
+        self, value: SettingsValue
+    ) -> ValidationResult[Union[List[float], List[int]]]:
+        try:
+            num_values = list(value)
+            normalized_values = []
+
+            for n in num_values:
+                if self.minValue is not None and n < self.minValue:
+                    return ValidationResult(
+                        False,
+                        f"Value {n} is less than minimum {self.minValue}",
+                    )
+
+                if self.maxValue is not None and n > self.maxValue:
+                    return ValidationResult(
+                        False,
+                        f"Value {n} is greater than maximum {self.maxValue}",
+                    )
+
+                normalized = n
+                if self.step and self.minValue is not None:
+                    steps = round((n - self.minValue) / self.step)
+                    normalized = self.minValue + (steps * self.step)
+
+                normalized_values.append(normalized)
+
+            return ValidationResult(True, None, normalized_values)
+
+        except (ValueError, TypeError):
+            return ValidationResult(False, f"Value {value} is not a valid number")
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            "type": self.constraintType.value,
+            "minValue": self.minValue,
+            "maxValue": self.maxValue,
+            "step": self.step,
+        }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            range=RangeConstraintProto(
+                min=self.minValue, max=self.maxValue, step=self.step
+            )
+        )
 
 
 class NumberConstraint(Constraint[Union[float, int]]):
@@ -142,10 +222,33 @@ class EnumeratedOption(Generic[TEnumeratedType]):
     value: TEnumeratedType
 
 
+TEnum = TypeVar("TEnum", bound=Enum)
+
+
 class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]):
     """Constraint for selecting from predefined options"""
 
-    def __init__(self, options: Union[List[EnumeratedOption], List[TEnumeratedType]]):
+    @overload
+    def __init__(self, options: List[EnumeratedOption[TEnumeratedType]]) -> None: ...
+
+    @overload
+    def __init__(self, options: List[TEnumeratedType]) -> None: ...
+
+    @staticmethod
+    def fromEnum(
+        enum_type: type[TEnum],
+    ) -> "EnumeratedConstraint[TEnumeratedType]":
+        return EnumeratedConstraint(
+            [
+                EnumeratedOption(member.name, cast(TEnumeratedType, member.value))
+                for member in enum_type
+            ]
+        )
+
+    def __init__(
+        self,
+        options: Union[List[EnumeratedOption[TEnumeratedType]], List[TEnumeratedType]],
+    ):
         """
         Initialize a ListOptionsConstraint instance.
 
@@ -157,9 +260,12 @@ class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]
         """
         assert options
         if options and not isinstance(options[0], EnumeratedOption):
-            options = [EnumeratedOption(str(o), o) for o in options]
+            raw_options = cast(List[TEnumeratedType], options)
+            options = [EnumeratedOption(str(o), o) for o in raw_options]
         super().__init__(ConstraintTypeProto.ENUMERATED)
-        self.options: List[EnumeratedOption] = options  # pyright: ignore
+        self.options: List[EnumeratedOption[TEnumeratedType]] = cast(
+            List[EnumeratedOption[TEnumeratedType]], options
+        )
 
     def validate(self, value: SettingsValue) -> ValidationResult:
         expectedType = type(self.options[0].value)
@@ -446,7 +552,7 @@ class StringConstraint(Constraint[str]):
         self.maxLength = maxLength
         self.pattern = pattern
 
-    def validate(self, value: SettingsValue) -> ValidationResult:
+    def validate(self, value: SettingsValue) -> ValidationResult[str]:
         if not isinstance(value, str):
             return ValidationResult(False, "Value must be a string")
 
@@ -487,6 +593,33 @@ class StringConstraint(Constraint[str]):
                 max_length=self.maxLength,
                 pattern=self.pattern,
             )
+        )
+
+
+class FileConstraint(Constraint[Optional[Path]]):
+    def __init__(self, fileTypes: Optional[Set[str]] = None):
+        super().__init__(ConstraintTypeProto.FILE)
+        self.fileTypes: Optional[Set[str]] = fileTypes
+
+    def validate(self, value: SettingsValue) -> ValidationResult[Optional[Path]]:
+        if isinstance(value, Path):
+            return ValidationResult(True, None, value.absolute())
+        elif isinstance(value, str):
+            if Path(value).exists():
+                return ValidationResult(True, None, Path(value))
+            return ValidationResult(False, "Path must exist")
+        return ValidationResult(False, "Path must be either Path or str")
+
+    def toDict(self) -> Dict[str, Any]:
+        return {"type": self.constraintType.value, "file_types": self.fileTypes or None}
+
+    @classmethod
+    def fromDict(cls, data: Dict[str, Any]) -> "FileConstraint":
+        return FileConstraint(data.get("file_types", None))
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            file=FileConstraintProto(file_types=list(self.fileTypes or []))
         )
 
 
@@ -729,7 +862,7 @@ class SettingsCollection:
             setting = self._settingsApi.settings[field]
             validation = setting.validate(value)
             if validation.errorMessage is None:
-                self._settingsApi.setValue(field, value)
+                self._settingsApi.setValue(field, validation.normalizedValue)
             else:
                 err(
                     f"Error validating {MarkupColors.bold(field)}"
@@ -750,7 +883,7 @@ class SettingsCollection:
         elif prop.getKind().value == VideoProperty.Kind.kString.value:
             constraint = StringConstraint()
         elif prop.getKind().value == VideoProperty.Kind.kEnum.value:
-            options = []
+            options: List[EnumeratedOption] = []
             for i in range(len(prop.getChoices())):
                 if prop.getChoices()[i]:
                     options.append(EnumeratedOption(prop.getChoices()[i], i))
@@ -995,7 +1128,7 @@ def setEntryValue(entry: NetworkTableEntry, value):
 
 
 class CameraSettings(SettingsCollection):
-    kCameraPropsCategory = "Camera Properties"
+    kCameraPropsCategory = "<Camera/> Camera Properties"
 
     brightness = settingField(
         NumberConstraint(0, 100),
@@ -1103,18 +1236,18 @@ class PipelineSettings(SettingsCollection):
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
     scalar_field = which_one_of(proto, "scalar_value")
 
-    if scalar_field is not None:
-        return scalar_field[1]
-    if proto.int_array_value:
+    if len(proto.int_array_value) > 0:
         return list(proto.int_array_value)
     elif proto.string_array_value:
         return list(proto.string_array_value)
     elif proto.bool_array_value:
         return list(proto.bool_array_value)
-    elif proto.float_array_value:
+    elif len(proto.float_array_value) > 0:
         return list(proto.float_array_value)
     elif proto.bytes_array_value:
         return list(proto.bytes_array_value)
+    if scalar_field is not None:
+        return scalar_field[1]
 
     raise ValueError("No value set in SettingValueProto")
 
@@ -1186,6 +1319,7 @@ def cameraToProto(
     camera: SynapseCamera,
     pipelineIndex: PipelineID,
     defaultPipeline: PipelineID,
+    stream: str,
     kind: str,
 ) -> CameraProto:
     cameraSettingsMetaValue = CameraSettings()
@@ -1193,12 +1327,13 @@ def cameraToProto(
     return CameraProto(
         name=name,
         index=camid,
-        stream_path=camera.stream,
+        stream_path=stream,
         kind=kind,
         pipeline_index=pipelineIndex,
         default_pipeline=defaultPipeline,
         max_fps=int(camera.getMaxFPS()),
         settings=settingsToProto(
-            typename="Camera Props", settings=cameraSettingsMetaValue
+            typename=CameraSettings.kCameraPropsCategory,
+            settings=cameraSettingsMetaValue,
         ),
     )

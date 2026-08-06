@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
-from synapse.log import log
+from synapse.log import info
 
 
 class FileServerHandler(http.server.SimpleHTTPRequestHandler):
@@ -211,7 +211,7 @@ class FileServer:
 
         self._server = ReusableTCPServer((self.host, self.port), Handler)
 
-        log(f"File server running at http://{self.host}:{self.port}/")
+        info(f"File server running at http://{self.host}:{self.port}/")
 
         self._thread = threading.Thread(
             target=self._server.serve_forever,

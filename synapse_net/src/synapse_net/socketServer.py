@@ -16,7 +16,7 @@ from websockets.exceptions import ConnectionClosed
 from websockets.legacy.server import WebSocketServerProtocol, serve
 from websockets.typing import Data
 
-from .proto.v1 import MessageProto, MessageTypeProto
+from .generated.messages.v1 import MessageProto, MessageTypeProto
 
 
 class SocketEvent(Enum):

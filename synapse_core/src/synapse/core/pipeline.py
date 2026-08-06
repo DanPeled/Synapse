@@ -21,12 +21,16 @@ from typing import (
 )
 
 from ntcore import GenericPublisher, NetworkTable, Value
-from synapse_net.proto.v1 import MessageTypeProto, PipelineProto, PipelineResultProto
+from synapse_net.generated.messages.v1 import (
+    MessageTypeProto,
+    PipelineProto,
+    PipelineResultProto,
+)
 from synapse_net.socketServer import WebSocketServer
 
 from ..log import createMessage, err, warn
 from ..stypes import CameraID, Frame, PipelineID, Resolution
-from .camera_factory import SynapseCamera
+from .camera.synapse_camera import SynapseCamera
 from .global_settings import GlobalSettings
 from .results_api import PipelineResult, parsePipelineResult, serializePipelineResult
 from .settings_api import (
@@ -91,8 +95,8 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     __is_enabled__ = True
     ntTable: Optional[NetworkTable] = None
 
-    _ntDataTable: Optional[NetworkTable]
-    _ntPublishers: Dict[str, GenericPublisher]
+    _ntDataTable: Optional[NetworkTable] = None
+    _ntPublishers: Dict[str, GenericPublisher] = {}
 
     @abstractmethod
     def __init__(self, settings: TSettingsType):

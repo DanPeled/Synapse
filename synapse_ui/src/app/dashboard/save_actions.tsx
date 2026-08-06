@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { baseCardColor, teamColor } from "@/services/style";
-import { Row } from "@/widgets/containers";
+import { Column, Row } from "@/widgets/containers";
 import { Lock, Save, Unlock, Video, VideoOff } from "lucide-react";
 import { ReactNode } from "react";
 
@@ -50,7 +50,7 @@ export function SaveActionsDialog({
       className="border-gray-700 flex flex-col h-full p-2"
     >
       <CardContent>
-        <Row gap="gap-4" justify="center">
+        <Column gap="gap-4" justify="center">
           <ActionButton
             text="Save"
             icon={<Save className="size-10" />}
@@ -82,7 +82,7 @@ export function SaveActionsDialog({
               onClick={() => setRecordingStatus(true)}
             />
           )}
-        </Row>
+        </Column>
       </CardContent>
     </Card>
   );

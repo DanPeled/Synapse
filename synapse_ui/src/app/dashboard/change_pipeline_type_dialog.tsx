@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { X, Check } from "lucide-react";
 import { teamColor } from "@/services/style";
 import { Column } from "@/widgets/containers";
-import { PipelineTypeProto } from "@/proto/v1/pipeline";
+import { PipelineTypeProto } from "@/generated/messages/v1/pipeline";
 import { AlertDialog } from "@/widgets/alertDialog";
 
 export function ChangePipelineTypeDialog({

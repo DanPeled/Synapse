@@ -9,27 +9,30 @@ import React, {
   useRef,
 } from "react";
 import { BackendStateSystem } from "./dataStractures";
-import {
-  DeviceInfoProto,
-  HardwareMetricsProto,
-  SetNetworkSettingsProto,
-} from "@/proto/v1/device";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
 import { WebSocketWrapper } from "../websocket";
 import { formatHHMMSSLocal } from "../timeUtil";
+import assert from "assert";
+import { toast } from "sonner";
+import { teamColor } from "../style";
+import { parseStyledMessage } from "../parseColoredString";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
+import { LogMessageProto } from "@/generated/messages/v1/log";
 import {
   PipelineProto,
   PipelineTypeProto,
   SetPipelineNameMessageProto,
-} from "@/proto/v1/pipeline";
-import { CameraProto } from "@/proto/v1/camera";
-import { SettingValueProto } from "@/proto/settings/v1/value";
-import { LogMessageProto } from "@/proto/v1/log";
-import assert from "assert";
-import { toast } from "sonner";
-import { teamColor } from "../style";
-import { AlertTypeProto } from "@/proto/v1/alert";
-import { parseStyledMessage } from "../parseColoredString";
+} from "@/generated/messages/v1/pipeline";
+import { CameraProto } from "@/generated/messages/v1/camera";
+import {
+  DeviceInfoProto,
+  HardwareMetricsProto,
+  SetNetworkSettingsProto,
+} from "@/generated/messages/v1/device";
+import { AlertTypeProto } from "@/generated/messages/v1/alert";
+import { SettingValueProto } from "@/generated/settings/v1/value";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (

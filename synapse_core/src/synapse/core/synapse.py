@@ -2,31 +2,29 @@
 # SPDX-FileCopyrightText: 2026 Dan Peled
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 import asyncio
 import os
 import threading
 import time
 import traceback
+from multiprocessing import Process
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Final, List, Optional
 
 import psutil
+from synapse.__version__ import SYNAPSE_VERSION
 from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.file_server import FileServer
+from synapse_net.generated.messages.v1 import (
+    DeviceInfoProto, MessageProto, MessageTypeProto, PipelineProto,
+    PipelineTypeProto, RemovePipelineMessageProto,
+    SetCameraRecordingStatusMessageProto, SetConnectionInfoProto,
+    SetDefaultPipelineMessageProto, SetNetworkSettingsProto,
+    SetPipelineIndexMessageProto, SetPipelineNameMessageProto,
+    SetPipleineSettingMessageProto)
+from synapse_net.manager_discover import UDPDeviceResponder
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.proto.v1 import (DeviceInfoProto, MessageProto,
-                                  MessageTypeProto, PipelineProto,
-                                  PipelineTypeProto,
-                                  RemovePipelineMessageProto,
-                                  SetCameraRecordingStatusMessageProto,
-                                  SetConnectionInfoProto,
-                                  SetDefaultPipelineMessageProto,
-                                  SetNetworkSettingsProto,
-                                  SetPipelineIndexMessageProto,
-                                  SetPipelineNameMessageProto,
-                                  SetPipleineSettingMessageProto)
 from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
                                       createMessage)
 from synapse_net.ui_handle import UIHandle
@@ -37,11 +35,11 @@ from ..bcolors import MarkupColors
 from ..hardware.deploy_dir import DeployDirectory
 from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
-from ..log import err, log, logs, missingFeature, warn
+from ..log import err, info, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
                       RecordingStatus)
 from ..util import getIP, resolveGenericArgument
-from .camera_factory import SynapseCamera
+from .camera.camera_handle import CameraHandle
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
@@ -62,11 +60,14 @@ class Synapse:
 
     kInstance: "Synapse"
 
-    def __init__(self) -> None:
+    def __init__(self, sendSettingsInNT: bool) -> None:
         self.runtimeHandler: RuntimeManager
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
         self.fileServer: Optional[FileServer] = None
+        self.managerResponder: Optional[UDPDeviceResponder] = None
+        self.managerResponderProcess: Optional[Process] = None
+        self.__sendSettingsInNT: Final[bool] = sendSettingsInNT
 
     def init(
         self,
@@ -100,7 +101,7 @@ class Synapse:
         if not self.__isHeadless:
             UIHandle.startUI()
 
-        log(
+        info(
             MarkupColors.bold(
                 MarkupColors.okgreen(
                     "\n" + "=" * 20 + " Synapse Initialize Starting... " + "=" * 20
@@ -119,7 +120,7 @@ class Synapse:
         if configPath.exists():
             ...
         else:
-            log("No config file!")
+            info("No config file!")
             configPath.parent.mkdir(exist_ok=True)
             with open(configPath, "w") as _:
                 ...
@@ -148,13 +149,26 @@ class Synapse:
 
             # Initialize NetworkTables
 
-            log(
+            info(
                 f"Network Config:\n  Team Number: {config.network.teamNumber}\n  Name: {config.network.name}\n  Is Server: {self.__isServer}\n  Is Sim: {self.__isSim}"
             )
 
+            self.managerResponder = UDPDeviceResponder(
+                config.network.name,
+                config.network.teamNumber,
+                SYNAPSE_VERSION,
+            )
+
+            self.managerResponderProcess = Process(
+                target=self.managerResponder.run,
+                daemon=True,  # auto-kill when main process exits
+            )
+
+            self.managerResponderProcess.start()
+
             nt_good = self.__init_networktables(config.network)
             if nt_good:
-                self.runtimeHandler.setup(Path(os.getcwd()))
+                self.runtimeHandler.setup(Path(os.getcwd()), self.__sendSettingsInNT)
             else:
                 err(
                     f"Something went wrong while setting up networktables with params: {config.network}"
@@ -166,7 +180,9 @@ class Synapse:
             errString = "".join(
                 traceback.format_exception(type(error), error, error.__traceback__)
             )
-            log(f"Something went wrong while reading settings config file. {errString}")
+            info(
+                f"Something went wrong while reading settings config file. {errString}"
+            )
             raise error
         return True
 
@@ -312,15 +328,16 @@ class Synapse:
                 ).SerializeToString()
             )
 
-            for id, camera in self.runtimeHandler.cameraHandler.cameras.items():
+            for id, handle in self.runtimeHandler.cameraHandler.cameraHandles.items():
                 msg = cameraToProto(
                     id,
-                    camera.name,
-                    camera,
+                    handle.name,
+                    handle.camera,
                     self.runtimeHandler.pipelineBindings.get(id, 0),
                     self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
                         id, -1
                     ),
+                    handle.stream,
                     self.runtimeHandler.cameraHandler.cameraConfigBindings[id].id,
                 )
 
@@ -371,9 +388,14 @@ class Synapse:
         # Schedule the websocket server start coroutine in the new event loop
         asyncio.run_coroutine_threadsafe(run_server(), new_loop)
 
-        log("WebSocket server started on ws://localhost:8765")
+        info("WebSocket server started on ws://localhost:8765")
 
     def cleanup(self):
+        if self.managerResponderProcess is not None:
+            if self.managerResponderProcess.is_alive():
+                self.managerResponderProcess.terminate()
+                self.managerResponderProcess.join(timeout=5)
+
         if NtClient.INSTANCE is not None:
             NtClient.INSTANCE.cleanup()
 
@@ -405,15 +427,16 @@ class Synapse:
                 createMessage(MessageTypeProto.ADD_PIPELINE, pipelineProto)
             )
 
-        def onAddCamera(cameraid: CameraID, name: str, camera: SynapseCamera) -> None:
+        def onAddCamera(cameraid: CameraID, name: str, handle: CameraHandle) -> None:
             cameraProto = cameraToProto(
                 cameraid,
                 name,
-                camera,
+                handle.camera,
                 self.runtimeHandler.pipelineBindings.get(cameraid, 0),
                 self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
                     cameraid, 0
                 ),
+                handle.stream,
                 self.runtimeHandler.cameraHandler.cameraConfigBindings[cameraid].id,
             )
 
@@ -455,16 +478,19 @@ class Synapse:
             Synapse.kInstance.websocket.sendToAllSync(msg)
 
         def onDefaultPipelineSet(pipelineIndex: PipelineID, cameraIndex: CameraID):
-            camera: Optional[SynapseCamera] = (
-                Synapse.kInstance.runtimeHandler.cameraHandler.getCamera(cameraIndex)
+            handle: Optional[CameraHandle] = (
+                Synapse.kInstance.runtimeHandler.cameraHandler.getCameraHandle(
+                    cameraIndex
+                )
             )
-            if camera:
+            if handle:
                 cameraMsg = cameraToProto(
                     cameraIndex,
-                    camera.name,
-                    camera,
+                    handle.name,
+                    handle.camera,
                     pipelineIndex=self.runtimeHandler.pipelineBindings[cameraIndex],
                     defaultPipeline=pipelineIndex,
+                    stream=handle.stream,
                     kind=self.runtimeHandler.cameraHandler.cameraConfigBindings[
                         cameraIndex
                     ].id,
@@ -474,15 +500,16 @@ class Synapse:
                 Synapse.kInstance.websocket.sendToAllSync(msg)
 
         def onCameraRename(cameraIndex: CameraID, newName: CameraName):
-            camera = self.runtimeHandler.cameraHandler.cameras[cameraIndex]
+            handle = self.runtimeHandler.cameraHandler.cameraHandles[cameraIndex]
             cameraMsg = cameraToProto(
                 cameraIndex,
-                camera.name,
-                camera,
+                handle.name,
+                handle.camera,
                 pipelineIndex=self.runtimeHandler.pipelineBindings[cameraIndex],
                 defaultPipeline=self.runtimeHandler.pipelineHandler.defaultPipelineIndexes[
                     cameraIndex
                 ],
+                stream=handle.stream,
                 kind=self.runtimeHandler.cameraHandler.cameraConfigBindings[
                     cameraIndex
                 ].id,
@@ -575,7 +602,7 @@ class Synapse:
             )
             if pipeline is not None:
                 pipeline.name = setPipelineNameMsg.name
-                log(
+                info(
                     f"Changed name for pipeline #{setPipelineNameMsg.pipeline_index} to `{setPipelineNameMsg.name}`"
                 )
 
@@ -614,12 +641,12 @@ class Synapse:
                     addPipelineMsg.index, addPipelineMsg.cameraid
                 )
                 if pipeline is not None:
-                    camera = self.runtimeHandler.cameraHandler.getCamera(
+                    handle = self.runtimeHandler.cameraHandler.getCameraHandle(
                         addPipelineMsg.cameraid
                     )
-                    assert camera is not None
+                    assert handle is not None
 
-                    pipeline.bind(addPipelineMsg.cameraid, camera)
+                    pipeline.bind(addPipelineMsg.cameraid, handle.camera)
             else:
                 err(
                     f"Cannot add pipeline of type {addPipelineMsg.type}, it is an invalid typename"
@@ -735,9 +762,9 @@ class Synapse:
         self.cleanup()
 
     @staticmethod
-    def createAndRunRuntime(root: Path) -> None:
+    def createAndRunRuntime(root: Path, sendSettingsInNT: bool = False) -> None:
         handler = RuntimeManager(root)
-        s = Synapse()
+        s = Synapse(sendSettingsInNT)
         if s.init(handler, root / "config" / "settings.yml"):
             s.run()
         s.close()

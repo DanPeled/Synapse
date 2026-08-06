@@ -14,7 +14,7 @@ import yaml
 from ..callback import Callback
 from ..stypes import CameraID, PipelineID, PipelineName, PipelineTypeName
 from ..util import resolveGenericArgument
-from .camera_factory import SynapseCamera
+from .camera.camera_handle import CameraHandle
 from .config import Config
 from .global_settings import GlobalSettings
 from .nt_keys import NTKeys
@@ -66,7 +66,7 @@ class PipelineHandler:
         self.loadPipelineInstances()
 
     def onAddCamera(
-        self, cameraIndex: CameraID, name: str, camera: SynapseCamera
+        self, cameraIndex: CameraID, name: str, handle: CameraHandle
     ) -> None:
         if cameraIndex not in self.pipelineInstanceBindings.keys():
             self.pipelineInstanceBindings[cameraIndex] = {}
@@ -130,7 +130,7 @@ class PipelineHandler:
     ) -> None:
         if pipelineIndex in self.pipelineSettings[cameraIndex].keys():
             self.defaultPipelineIndexes[cameraIndex] = pipelineIndex
-            log.log(
+            log.info(
                 f"Default Pipeline set (#{pipelineIndex}) for Camera #{cameraIndex}"
             )
             self.onDefaultPipelineSet.call(pipelineIndex, cameraIndex)
@@ -224,7 +224,7 @@ class PipelineHandler:
             self.pipelineTypeNames[cameraid][index] = typename
             self.pipelineSettings[cameraid][index] = settingsInst
 
-            log.log(
+            log.info(
                 f"Added Pipeline #{index} with type {typename} to camera #{cameraid}"
             )
             self.onAddPipeline.call(index, currPipeline, cameraid)
@@ -272,7 +272,7 @@ class PipelineHandler:
                                 and cls is not Pipeline
                             ):
                                 if cls.__is_enabled__:
-                                    log.log(
+                                    log.info(
                                         f"Loaded {getPipelineTypename(cls)} pipeline"
                                     )
                                     pipelineClasses[getPipelineTypename(cls)] = cls
@@ -294,7 +294,7 @@ class PipelineHandler:
             # in reading this file twice when reading from the project dir and this dir
             pipelines.update(loadPipelineClasses(Path(__file__).parent.parent))
 
-        log.log("Loaded pipeline classes successfully")
+        log.info("Loaded pipeline classes successfully")
         return pipelines
 
     def loadPipelineSettings(self) -> None:
@@ -309,17 +309,17 @@ class PipelineHandler:
                 cameraIndex
             ].defaultPipeline
 
+        configPath = Config.getInstance().path.parent
+
         for cameraIndex in camera_configs.keys():
             with open(
-                Config.getInstance().path.parent
-                / f"camera_{cameraIndex}"
-                / "pipeline_settings.yml"
+                configPath / f"camera_{cameraIndex}" / "pipeline_settings.yml"
             ) as f:
                 pipeline_configs = yaml.full_load(f)
                 for pipelineIndex, pipeline in pipeline_configs[
                     "pipeline_configs"
                 ].items():
-                    log.log(
+                    log.info(
                         f"Loaded pipeline #{pipelineIndex} (Camera #{cameraIndex}) from disk with type {pipeline[self.kPipelineTypeKey]}"
                     )
 
@@ -343,7 +343,7 @@ class PipelineHandler:
                         cameraid=cameraIndex,
                     )
 
-        log.log("Loaded pipeline settings successfully")
+        log.info("Loaded pipeline settings successfully")
 
     def createPipelineSettings(
         self,

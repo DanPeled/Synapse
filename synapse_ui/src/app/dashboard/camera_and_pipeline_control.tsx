@@ -26,9 +26,15 @@ import {
   PipelineProto,
   PipelineTypeProto,
   SetPipelineNameMessageProto,
-} from "@/proto/v1/pipeline";
-import { CameraProto, SetDefaultPipelineMessageProto } from "@/proto/v1/camera";
-import { MessageProto, MessageTypeProto } from "@/proto/v1/message";
+} from "@/generated/messages/v1/pipeline";
+import {
+  CameraProto,
+  SetDefaultPipelineMessageProto,
+} from "@/generated/messages/v1/camera";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { AddPipelineDialog } from "./addPipelineDialog";
 import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
 import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
@@ -116,7 +122,7 @@ export function CameraAndPipelineControls({
     <>
       <Card
         style={{ backgroundColor: baseCardColor, color: teamColor }}
-        className="border-gray-700"
+        className="border-gray-700 w-full"
       >
         {" "}
         <CardContent className="space-y-3">
@@ -163,8 +169,9 @@ export function CameraAndPipelineControls({
                   label="Pipeline"
                   value={selectedPipelineIndex}
                   onValueChange={(val) => setSelectedPipelineIndex(val)}
-                  options={Array.from(pipelines.entries()).map(
-                    ([index, pipeline]) => ({
+                  options={Array.from(pipelines.entries())
+                    .filter(([index]) => index !== 9999)
+                    .map(([index, pipeline]) => ({
                       label: (
                         <span className="inline-flex items-center gap-2">
                           {pipeline.name} (#{index}){" "}
@@ -179,8 +186,7 @@ export function CameraAndPipelineControls({
                       ),
                       value: index,
                       key: index.toString(),
-                    }),
-                  )}
+                    }))}
                 />
 
                 {/* Pipeline actions */}

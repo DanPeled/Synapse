@@ -16,7 +16,7 @@ def test_startUI_logs_error_when_module_missing(monkeypatch):
         lambda name: None,
     )
     monkeypatch.setattr(
-        "synapse_net.ui_handle.log",
+        "synapse_net.ui_handle.info",
         lambda msg: logged.append(msg),
     )
 
@@ -48,7 +48,7 @@ def test_startUI_starts_thread_when_module_exists(monkeypatch, tmp_path):
         FakeThread,
     )
     monkeypatch.setattr(
-        "synapse_net.ui_handle.log",
+        "synapse_net.ui_handle.info",
         lambda *_: None,
     )
 

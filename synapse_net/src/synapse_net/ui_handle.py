@@ -9,7 +9,7 @@ from pathlib import Path
 from socketserver import TCPServer
 from threading import Thread
 
-from synapse.log import log
+from synapse.log import info
 from synapse.util import getIP
 
 
@@ -71,7 +71,7 @@ class UIHandle:
         # Find the synapse_ui module to determine the serve directory
         spec = importlib.util.find_spec("synapse_ui")
         if not spec or not spec.origin:
-            log("Error: synapse_ui module not found!")
+            info("Error: synapse_ui module not found!")
             return
 
         serve_dir = Path(spec.origin).parent
@@ -89,10 +89,10 @@ class UIHandle:
                     ),
                 ) as httpd:
                     actual_port = httpd.server_address[1]
-                    log(f"UI available at: https://{getIP()}:{actual_port}")
+                    info(f"UI available at: https://{getIP()}:{actual_port}")
                     httpd.serve_forever()
             except OSError as e:
-                log(f"Failed to start server on port {port}: {e}")
+                info(f"Failed to start server on port {port}: {e}")
 
         # Run server in a daemon thread (will stop automatically when app exits)
         thread = Thread(target=serve, daemon=True)

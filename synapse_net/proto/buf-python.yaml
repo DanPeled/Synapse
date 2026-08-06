@@ -1,5 +1,5 @@
 version: v1
 plugins:
   - name: python_betterproto
-    out: ../src/synapse_net
+    out: ../src/synapse_net/generated
     opt: paths=source_relative

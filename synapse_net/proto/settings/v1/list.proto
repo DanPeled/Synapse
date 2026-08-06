@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package settings.v1;
+
+// Constraint defining allowed length boundaries for a list setting
+message ListConstraintProto {
+  // Minimum number of elements required in the list (inclusive)
+  int32 min_length = 2;
+
+  // Maximum number of elements allowed in the list (inclusive)
+  int32 max_length = 3;
+}

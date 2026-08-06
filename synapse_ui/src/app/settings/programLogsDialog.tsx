@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { LogMessageProto, LogLevelProto } from "@/proto/v1/log";
+import { LogMessageProto, LogLevelProto } from "@/generated/messages/v1/log";
 import { AlertDialog } from "@/widgets/alertDialog";
 import { Button } from "@/widgets/button";
 import { Column, Row } from "@/widgets/containers";

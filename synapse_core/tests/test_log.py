@@ -13,6 +13,7 @@ import synapse.log as log
 
 @pytest.fixture
 def cleanupLogs() -> None:
+    log.closeLogHandle()
     for f in os.listdir("logs"):
         if f.startswith("logfile_"):
             os.remove(os.path.join("logs", f))
@@ -20,7 +21,7 @@ def cleanupLogs() -> None:
 
 def test_log_creates_file_and_logs_text(cleanupLogs) -> None:
     test_message = "Test log message"
-    log.log(test_message)
+    log.info(test_message)
 
     log_files = [f for f in os.listdir("logs") if f.startswith("logfile_")]
     assert log_files, "No log files created"

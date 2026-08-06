@@ -85,7 +85,7 @@ setup(
         synapseInstallerDep("toml"),
         hardwareManagementDep("psutil"),
         synapseNetDep("protobuf"),
-        synapseNetDep("betterproto==2.0.0b7"),
+        synapseNetDep("betterproto[compiler]==2.0.0b7"),
         synapseNetDep("websockets"),
     ],
     extras_require={
@@ -95,7 +95,7 @@ setup(
             "pytest",
             "pytest-asyncio",
             "pytest-mock",
-            "ruff",
+            "ruff==0.15.20",
             "isort",
             "pyright",
             "build",
