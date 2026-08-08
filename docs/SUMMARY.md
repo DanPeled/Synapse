@@ -12,6 +12,7 @@
 * [Hardware Selection](getting-started/hardware-selection/README.md)
   * [Selecting Hardware](getting-started/hardware-selection/selecting-hardware.md)
   * [Deploying on Custom Hardware](getting-started/hardware-selection/deploying-on-custom-hardware.md)
+  * [Performance Matrix](getting-started/hardware-selection/performance-matrix.md)
 * [Installing Software](getting-started/installing-software.md)
 
 ## Usage
