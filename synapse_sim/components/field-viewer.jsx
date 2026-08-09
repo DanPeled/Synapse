@@ -53,14 +53,19 @@ function Kitbot() {
       modelUrl="/kitbot2026.glb"
       pose={{
         position: [fieldWidthMeters / 2, fieldLengthMeters / 2, 0.05],
-        rotations: [{ axis: "z", degrees: 0 }],
+        rotations: [
+          {
+            axis: "z",
+            degrees: 0,
+          },
+        ],
       }}
       cameraOffsetWpi={{
-        position: [0, 0, 0.2],
+        position: [0, 1, 1],
         rotations: [
           {
             axis: "x",
-            degrees: 90,
+            degrees: 0,
           },
           {
             axis: "y",
@@ -68,7 +73,7 @@ function Kitbot() {
           },
           {
             axis: "z",
-            degrees: 0,
+            degrees: 45,
           },
         ],
       }}
