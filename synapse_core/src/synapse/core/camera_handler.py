@@ -7,6 +7,7 @@ import threading
 import time
 import traceback
 from datetime import datetime
+from itertools import chain
 from typing import Any, Dict, Final, List, Optional, Tuple
 
 import cscore as cs
@@ -88,7 +89,7 @@ class CameraHandler:
         self.createCameras()
 
         def cameraScanAction():
-            while self.stopCameraScanEvent.wait(10):
+            while not self.stopCameraScanEvent.wait(10):
                 self.scanCameras()
 
         self.cameraScanningThread = threading.Thread(
@@ -165,9 +166,21 @@ class CameraHandler:
                 if len(self.requestedCameraUIDs.keys()) > 0:
                     if id in self.requestedCameraUIDs.keys():
                         newIndex = self.requestedCameraUIDs.pop(id)
+                    else:
+                        newIndex = (
+                            max(
+                                chain(
+                                    self.requestedCameraUIDs.values(),
+                                    self.cameraHandles.keys(),
+                                )
+                            )
+                            + 1
+                        )
                 else:
                     m = max(self.cameraHandles.keys(), default=-1)
                     newIndex = m + 1
+
+                print(newIndex)
 
                 cameraIndex = newIndex
                 cameraConfig = CameraConfig(

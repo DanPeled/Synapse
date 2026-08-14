@@ -362,7 +362,12 @@ class RuntimeManager:
             self.pipelineBindings[cameraIndex], cameraIndex
         )
         setting = settings.getAPI().getSetting(prop)
-        if setting is not None:
+
+        if prop in camSettings:
+            assert camera is not None
+            camera.setProperty(prop=prop, value=value)
+            pipeline.setCameraSetting(prop, value)
+        elif setting is not None:
             pipeline.setSetting(prop, value)
             pipeline.onSettingChanged(setting, settings.getSetting(prop))
         else:
@@ -370,11 +375,6 @@ class RuntimeManager:
                 f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
             )
             return
-
-        if prop in camSettings:
-            assert camera is not None
-            camera.setProperty(prop=prop, value=value)
-            pipeline.setCameraSetting(prop, value)
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 
