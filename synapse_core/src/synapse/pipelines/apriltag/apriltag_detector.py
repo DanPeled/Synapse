@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Iterable, List, Protocol, Sequence, Tuple
@@ -116,6 +117,12 @@ class AprilTagDetector(ABC):
         refineEdges: bool = True
         quadDecimate: float = 2.0
         quadSigma: float = 0.0
+        minClusterPixels: int = 300
+        maxNumMaxima: int = 10
+        criticalAngle: float = math.radians(45)
+        minWhiteBlackDiff: int = 3
+        maxLineFitMSE: float = 10.0
+        deglitch: bool = False
 
     @abstractmethod
     def detect(self, frame: Buffer) -> List[AprilTagDetection]:

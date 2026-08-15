@@ -54,7 +54,16 @@ class RobotpyApriltagDetector(AprilTagDetector):
             rpy_config.refineEdges = config.refineEdges
             rpy_config.numThreads = config.numThreads
 
+            quad_params = self.detector.getQuadThresholdParameters()
+            quad_params.criticalAngle = config.criticalAngle
+            quad_params.deglitch = config.deglitch
+            quad_params.maxLineFitMSE = config.maxLineFitMSE
+            quad_params.maxNumMaxima = config.maxNumMaxima
+            quad_params.minClusterPixels = config.minClusterPixels
+            quad_params.minWhiteBlackDiff = config.minWhiteBlackDiff
+
             self.detector.setConfig(rpy_config)
+            self.detector.setQuadThresholdParameters(quad_params)
 
     def getConfig(self) -> AprilTagDetector.Config:
         with self.lock:
