@@ -75,48 +75,80 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
 
 
 class ApriltagPipelineSettings(PipelineSettings):
+    # ==================== Target ====================
+
     tag_size = settingField(
         NumberConstraint(minValue=0, maxValue=None),
         default=units.meters(0.1651),
         description="Physical size of the AprilTag in meters.",
-        category="<Toolbox/> Engine Config",
+        category="<Toolbox/> Target",
     )
     tag_family = settingField(
         EnumeratedConstraint(["tag36h11", "tag16h5"]),
         default="tag36h11",
         description="AprilTag family to detect.",
-        category="<Toolbox/> Engine Config",
+        category="<Toolbox/> Target",
     )
+
+    # ==================== Detection ====================
+
     num_threads = settingField(
         NumberConstraint(minValue=1, maxValue=Platform.getThreadCount(), step=1),
         default=1,
         description="Number of CPU threads used for AprilTag detection.",
-        category="<Toolbox/> Engine Config",
+        category="<Toolbox/> Detection",
     )
     refine_edges = settingField(
         BooleanConstraint(renderAsButton=False),
         default=False,
         description="If True, perform edge refinement to improve detection accuracy.",
-        category="<Toolbox/> Engine Config",
+        category="<Toolbox/> Detection",
     )
     quad_decimate = settingField(
         NumberConstraint(minValue=1.0, maxValue=None),
         default=1.0,
         description="Decimation factor for the input image to speed up detection.",
-        category="<Toolbox/> Engine Config",
+        category="<Toolbox/> Detection",
     )
     quad_sigma = settingField(
         NumberConstraint(minValue=0.0, maxValue=None),
         default=0.0,
         description="Gaussian blur sigma applied to the input image before detection.",
-        category="<Toolbox/> Engine Config",
+        category="<Toolbox/> Detection",
     )
-    iteration_count = settingField(
+    min_cluster_pixels = settingField(
         NumberConstraint(minValue=1, maxValue=None, step=1),
-        default=4,
-        description="Number of iterations for pose estimation refinement.",
-        category="<Toolbox/> Engine Config",
+        default=300,
+        category="<Toolbox/> Detection",
     )
+    max_num_maxima = settingField(
+        NumberConstraint(minValue=1, maxValue=None, step=1),
+        default=10,
+        category="<Toolbox/> Detection",
+    )
+    critical_angle = settingField(
+        NumberConstraint(minValue=0, maxValue=90),
+        default=45,
+        category="<Toolbox/> Detection",
+    )
+    max_line_fit_mse = settingField(
+        NumberConstraint(minValue=0, maxValue=None),
+        default=10,
+        category="<Toolbox/> Detection",
+    )
+    min_white_black_diff = settingField(
+        NumberConstraint(minValue=0, maxValue=255, step=1),
+        default=5,
+        category="<Toolbox/> Detection",
+    )
+    deglitch = settingField(
+        BooleanConstraint(renderAsButton=False),
+        default=False,
+        category="<Toolbox/> Detection",
+    )
+
+    # ==================== Filtering ====================
+
     crop_x = settingField(
         RangeConstraint(minValue=-1, maxValue=1, step=0.01),
         default=[-1, 1],
@@ -127,6 +159,15 @@ class ApriltagPipelineSettings(PipelineSettings):
         default=[-1, 1],
         category="<Funnel/> Filtering",
     )
+
+    # ==================== Results ====================
+
+    iteration_count = settingField(
+        NumberConstraint(minValue=1, maxValue=None, step=1),
+        default=4,
+        description="Number of iterations for pose estimation refinement.",
+        category="<Activity/> Results",
+    )
     stick_to_ground = settingField(
         BooleanConstraint(),
         default=False,
@@ -136,18 +177,18 @@ class ApriltagPipelineSettings(PipelineSettings):
     publish_camera_field_pose = settingField(
         BooleanConstraint(),
         default=True,
-        description="If True, estimate the cameras's pose relative to the field coordinate frame.",
+        description="If True, estimate the camera's pose relative to the field coordinate frame.",
+        category="<Activity/> Results",
+    )
+    publish_tag_pose_3d = settingField(
+        BooleanConstraint(),
+        default=False,
         category="<Activity/> Results",
     )
     verbosity = settingField(
         EnumeratedConstraint.fromEnum(ApriltagVerbosity),
         default=ApriltagVerbosity.kPoseOnly.value,
         description="Level of logging and debug output.",
-        category="<Activity/> Results",
-    )
-    publish_tag_pose_3d = settingField(
-        BooleanConstraint(),
-        default=False,
         category="<Activity/> Results",
     )
 
@@ -183,10 +224,15 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     def __init__(self, settings: ApriltagPipelineSettings):
         super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
+        self.cameraMatrix = self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
+        self.apriltagDetector: AprilTagDetector = RobotpyApriltagDetector()
         self.combinedApriltagPoseEstimator: ICombinedApriltagCameraPoseEstimator = (
             WeightedAverageMultiTagEstimator()
         )
-        self.setConfig(self.cameraIndex)
+        self.setDetectorConfig(self.cameraIndex)
+        self.apriltagDetector.setFamily(
+            self.settings.getSetting(self.settings.tag_family)
+        )
 
         ApriltagPipeline.fmap = ApriltagFieldJson.loadField(
             DeployDirectory.getDir() / "fmap.json"
@@ -194,25 +240,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         self.__hadResults: bool = False
         self.tagEstimates: List[ApriltagDetectionResult] = []
-
-    def setConfig(self, cameraIndex: CameraID) -> None:
-        self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
-
-        self.distCoeffs = self.getDistCoeffs(cameraIndex)
-        self.apriltagDetector = RobotpyApriltagDetector()
-
-        detectorConfig: AprilTagDetector.Config = AprilTagDetector.Config()
-
-        detectorConfig.numThreads = int(self.getSetting(self.settings.num_threads))
-        detectorConfig.quadDecimate = self.getSetting(self.settings.quad_decimate)
-        detectorConfig.quadSigma = self.getSetting(self.settings.quad_sigma)
-        detectorConfig.refineEdges = self.getSetting(self.settings.refine_edges)
-
-        self.apriltagDetector.setConfig(detectorConfig)
-
-        self.apriltagDetector.setFamily(
-            self.settings.getSetting(self.settings.tag_family)
-        )
 
         self.poseEstimator: ApriltagPoseEstimator = RobotpyApriltagPoseEstimator(
             config=ApriltagPoseEstimator.Config(
@@ -224,11 +251,31 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             )
         )
 
-        self.distCoeffs = self.getDistCoeffs(cameraIndex)
+    def setDetectorConfig(self, cameraIndex: CameraID) -> None:
+        detectorConfig = self.apriltagDetector.getConfig()
+
+        detectorConfig.numThreads = int(self.getSetting(self.settings.num_threads))
+        detectorConfig.quadDecimate = self.getSetting(self.settings.quad_decimate)
+        detectorConfig.quadSigma = self.getSetting(self.settings.quad_sigma)
+        detectorConfig.refineEdges = self.getSetting(self.settings.refine_edges)
+        detectorConfig.deglitch = self.getSetting(self.settings.deglitch)
+        detectorConfig.minClusterPixels = int(
+            self.getSetting(self.settings.min_cluster_pixels)
+        )
+        detectorConfig.maxLineFitMSE = self.getSetting(self.settings.max_line_fit_mse)
+        detectorConfig.maxNumMaxima = int(self.getSetting(self.settings.max_num_maxima))
+        detectorConfig.criticalAngle = self.getSetting(self.settings.critical_angle)
+        detectorConfig.minWhiteBlackDiff = int(
+            self.getSetting(self.settings.min_white_black_diff)
+        )
+
+        self.apriltagDetector.setConfig(detectorConfig)
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         super().bind(cameraIndex, camera)
-        self.setConfig(cameraIndex)
+
+        self.setDetectorConfig(cameraIndex)
+        self.apriltagDetector.setFamily(self.getSetting(self.settings.tag_family))
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
         if setting.key in [
@@ -256,17 +303,16 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             self.settings.num_threads.key,
             self.settings.quad_decimate.key,
             self.settings.quad_sigma.key,
+            self.settings.refine_edges.key,
+            self.settings.deglitch.key,
+            self.settings.min_cluster_pixels.key,
+            self.settings.max_line_fit_mse.key,
+            self.settings.max_num_maxima.key,
+            self.settings.critical_angle.key,
+            self.settings.min_white_black_diff.key,
             self.settings.tag_family.key,
         ]:
-            config = self.apriltagDetector.getConfig()
-
-            config.numThreads = int(self.getSetting(self.settings.num_threads))
-            config.quadDecimate = self.getSetting(self.settings.quad_decimate)
-            config.quadSigma = self.getSetting(self.settings.quad_sigma)
-            config.refineEdges = self.getSetting(self.settings.refine_edges)
-
-            self.apriltagDetector.setConfig(config)
-
+            self.setDetectorConfig(self.cameraIndex)
             self.apriltagDetector.setFamily(
                 self.settings.getSetting(self.settings.tag_family)
             )
