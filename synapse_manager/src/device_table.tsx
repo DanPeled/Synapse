@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Table,
@@ -17,6 +17,7 @@ import {
 } from "./components/ui/dialog";
 
 import {
+  Folder,
   Globe,
   Hash,
   Info,
@@ -25,6 +26,7 @@ import {
   ShieldCheck,
   Tag,
   Terminal as TerminalIcon,
+  Unlink,
   Upload,
 } from "lucide-react";
 
@@ -47,6 +49,40 @@ const handleDeploy = async (device: DiscoveryResponse) => {
   try {
     await invoke("deploy", {
       hostname: device.hostname,
+      nickname: device.nickname,
+    });
+  } catch (error) {
+    console.error("Deploy failed:", error);
+  }
+};
+
+const handleOpenFolder = async (device: DiscoveryResponse) => {
+  try {
+    await invoke("open_linked_folder", {
+      nickname: device.nickname,
+    });
+  } catch (error) {
+    console.error("Deploy failed:", error);
+  }
+};
+
+const getLinkedFolder = async (
+  device: DiscoveryResponse,
+): Promise<string | null> => {
+  try {
+    return await invoke<string | null>("get_linked_folder", {
+      nickname: device.nickname,
+    });
+  } catch (error) {
+    console.error("Failed to get linked folder:", error);
+    return null;
+  }
+};
+
+const handleUnlinkFolder = async (device: DiscoveryResponse) => {
+  try {
+    await invoke("unlink_folder", {
+      nickname: device.nickname,
     });
   } catch (error) {
     console.error("Deploy failed:", error);
@@ -160,14 +196,31 @@ export default function DeviceTable({
             <DialogTitle className="text-2xl">Device Info</DialogTitle>
           </DialogHeader>
 
-          {selectedDevice && <DeviceDialog device={selectedDevice} />}
+          {selectedDevice && (
+            <DeviceDialog
+              device={selectedDevice}
+              setSelectedDevice={setSelectedDevice}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
-function DeviceDialog({ device }: { device: DiscoveryResponse }) {
+function DeviceDialog({
+  device,
+  setSelectedDevice,
+}: {
+  device: DiscoveryResponse;
+  setSelectedDevice: (device: DiscoveryResponse | null) => void;
+}) {
+  const [linkedFolder, setLinkedFolder] = useState<string | null>(null);
+
+  useEffect(() => {
+    getLinkedFolder(device).then(setLinkedFolder);
+  }, [device.nickname]);
+
   return (
     <div className="space-y-3 text-xl min-w-0">
       <p className="flex items-center gap-2">
@@ -199,6 +252,29 @@ function DeviceDialog({ device }: { device: DiscoveryResponse }) {
         <strong>Version:</strong>
         <span>{device.version}</span>
       </p>
+      <div className="flex-row space-x-2">
+        <button
+          onClick={() => handleOpenFolder(device)}
+          disabled={linkedFolder == null}
+        >
+          <Folder />
+        </button>
+
+        <button
+          onClick={() => {
+            handleUnlinkFolder(device);
+            setLinkedFolder(null);
+            setSelectedDevice(null);
+          }}
+          disabled={linkedFolder == null}
+        >
+          <Unlink />
+        </button>
+
+        <button title="Deploy" onClick={() => handleDeploy(device)}>
+          <Upload />
+        </button>
+      </div>
     </div>
   );
 }

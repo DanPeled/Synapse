@@ -3,17 +3,19 @@ mod udp;
 
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
 };
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 use terminal::open_ssh_terminal;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AppConfig {
-    linked_folder: Option<String>,
+    linked_folders: HashMap<String, String>,
 }
 
 fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -48,50 +50,46 @@ fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     fs::write(&path, contents).map_err(|e| format!("Failed to write config: {e}"))
 }
 
+fn get_folder_for_processor(app: &AppHandle, nickname: &str) -> Result<PathBuf, String> {
+    let mut config = load_config(app)?;
+
+    if let Some(folder) = config.linked_folders.get(nickname) {
+        let path = PathBuf::from(folder);
+
+        if path.is_dir() {
+            return Ok(path);
+        }
+
+        // The previously linked folder no longer exists.
+        config.linked_folders.remove(nickname);
+        save_config(app, &config)?;
+    }
+
+    let selected = app
+        .dialog()
+        .file()
+        .set_title(format!("Select project folder for {nickname}"))
+        .blocking_pick_folder();
+
+    let selected = selected.ok_or_else(|| "No folder selected".to_string())?;
+
+    let folder = selected
+        .as_path()
+        .ok_or_else(|| "Selected path is invalid".to_string())?
+        .to_path_buf();
+
+    config
+        .linked_folders
+        .insert(nickname.to_string(), folder.to_string_lossy().into_owned());
+
+    save_config(app, &config)?;
+
+    Ok(folder)
+}
+
 #[tauri::command]
-async fn deploy(app: AppHandle, hostname: String) -> Result<(), String> {
-    let mut config = load_config(&app)?;
-
-    let folder = match &config.linked_folder {
-        Some(folder) => {
-            let path = PathBuf::from(folder);
-
-            if !path.is_dir() {
-                config.linked_folder = None;
-                save_config(&app, &config)?;
-                None
-            } else {
-                Some(path)
-            }
-        }
-
-        None => None,
-    };
-
-    let folder = match folder {
-        Some(folder) => folder,
-
-        None => {
-            let selected = app
-                .dialog()
-                .file()
-                .set_title("Select project folder")
-                .blocking_pick_folder();
-
-            let selected = selected.ok_or_else(|| "No folder selected".to_string())?;
-
-            let folder = selected
-                .as_path()
-                .ok_or_else(|| "Selected path is invalid".to_string())?
-                .to_path_buf();
-
-            config.linked_folder = Some(folder.to_string_lossy().into_owned());
-
-            save_config(&app, &config)?;
-
-            folder
-        }
-    };
+async fn deploy(app: AppHandle, hostname: String, nickname: String) -> Result<(), String> {
+    let folder = get_folder_for_processor(&app, &nickname)?;
 
     deploy_cmd(&folder, &hostname)
 }
@@ -154,18 +152,39 @@ fn deploy_cmd(folder: &Path, hostname: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_linked_folder(app: AppHandle) -> Result<Option<String>, String> {
+fn get_linked_folder(app: AppHandle, nickname: String) -> Result<Option<String>, String> {
     let config = load_config(&app)?;
-    Ok(config.linked_folder)
+
+    Ok(config.linked_folders.get(&nickname).cloned())
 }
 
 #[tauri::command]
-fn unlink_folder(app: AppHandle) -> Result<(), String> {
+fn unlink_folder(app: AppHandle, nickname: String) -> Result<(), String> {
     let mut config = load_config(&app)?;
 
-    config.linked_folder = None;
+    config.linked_folders.remove(&nickname);
 
     save_config(&app, &config)
+}
+
+#[tauri::command]
+fn open_linked_folder(app: AppHandle, nickname: String) -> Result<(), String> {
+    let config = load_config(&app)?;
+
+    let folder = config
+        .linked_folders
+        .get(&nickname)
+        .ok_or_else(|| format!("No folder is linked to processor '{nickname}'"))?;
+
+    let path = PathBuf::from(folder);
+
+    if !path.is_dir() {
+        return Err("Linked folder does not exist".to_string());
+    }
+
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<String>)
+        .map_err(|e| format!("Failed to open linked folder: {e}"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -178,7 +197,8 @@ pub fn run() {
             deploy,
             get_linked_folder,
             unlink_folder,
-            open_ssh_terminal
+            open_ssh_terminal,
+            open_linked_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
