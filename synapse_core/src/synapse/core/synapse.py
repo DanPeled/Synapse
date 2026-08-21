@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import asyncio
+import getpass
 import os
 import threading
 import time
@@ -155,6 +156,7 @@ class Synapse:
 
             self.managerResponder = UDPDeviceResponder(
                 config.network.name,
+                getpass.getuser(),
                 config.network.teamNumber,
                 SYNAPSE_VERSION,
             )

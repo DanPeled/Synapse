@@ -15,6 +15,7 @@ class UDPDeviceResponder:
     def __init__(
         self,
         nickname: str,
+        user: str,
         team_number: int,
         version: str,
         ping_message: str = "PING_DISCOVERY",
@@ -22,6 +23,7 @@ class UDPDeviceResponder:
     ):
         self.port = port
         self.nickname = nickname
+        self.user = user
         self.team_number = team_number
         self.version = version
         self.ping_message = ping_message
@@ -38,6 +40,7 @@ class UDPDeviceResponder:
             "nickname": self.nickname,
             "team_number": self.team_number,
             "version": self.version,
+            "username": self.user,
         }
 
     def handlePacket(self, data: bytes, addr: Tuple[str, int]):
