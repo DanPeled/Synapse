@@ -22,14 +22,36 @@ import {
   Info,
   Laptop,
   LayoutDashboard,
-  // Link,
   ShieldCheck,
   Tag,
-  // Terminal,
-  // Upload,
+  Terminal as TerminalIcon,
+  Upload,
 } from "lucide-react";
+
 import { openWindow } from "./lib/utils";
 import { DiscoveryResponse } from "./udp";
+import { invoke } from "@tauri-apps/api/core";
+
+async function ssh(ip: string, username: string) {
+  try {
+    await invoke("open_ssh_terminal", {
+      ip,
+      username,
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+const handleDeploy = async (device: DiscoveryResponse) => {
+  try {
+    await invoke("deploy", {
+      hostname: device.hostname,
+    });
+  } catch (error) {
+    console.error("Deploy failed:", error);
+  }
+};
 
 export default function DeviceTable({
   devices,
@@ -92,11 +114,6 @@ export default function DeviceTable({
                       <Info />
                     </button>
 
-                    {/** TODO
-                    <button title="Deploy" disabled>
-                     <Upload />
-                      </button>  **/}
-
                     <button
                       title="Open Dashboard"
                       onClick={() => {
@@ -108,6 +125,19 @@ export default function DeviceTable({
                     >
                       <LayoutDashboard />
                     </button>
+
+                    <button
+                      title="Open Terminal"
+                      onClick={() => {
+                        ssh(device.ip, device.username);
+                      }}
+                    >
+                      <TerminalIcon />
+                    </button>
+
+                    <button title="Deploy" onClick={() => handleDeploy(device)}>
+                      <Upload />
+                    </button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -116,6 +146,7 @@ export default function DeviceTable({
         </Table>
       </div>
 
+      {/* Device Info */}
       <Dialog
         open={selectedDevice !== null}
         onOpenChange={(open) => {
@@ -168,17 +199,6 @@ function DeviceDialog({ device }: { device: DiscoveryResponse }) {
         <strong>Version:</strong>
         <span>{device.version}</span>
       </p>
-      {/** TODO
-      <div className="row space-x-2 mt-15">
-        <button title="Link To Project" disabled>
-          <Link />
-        </button>
-
-        <button title="Open Terminal" disabled>
-          <Terminal />
-        </button>
-      </div>
-      **/}
     </div>
   );
 }
