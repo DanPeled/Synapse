@@ -12,7 +12,6 @@ import cv2
 import numpy as np
 from synapse.stypes import Frame
 from typing_extensions import Buffer
-from wpimath import units
 from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 
 Homography = Tuple[float, float, float, float, float, float, float, float, float]
@@ -151,55 +150,6 @@ class AprilTagDetector(ABC):
 
         Args:
             config (Config): Detection configuration.
-        """
-        ...
-
-    @abstractmethod
-    def getConfig(self) -> Config: ...
-
-
-class ApriltagPoseEstimator(ABC):
-    """Abstract base class for AprilTag pose estimators."""
-
-    @dataclass
-    class Config:
-        """Camera and tag configuration for pose estimation.
-
-        Attributes:
-            cx (float): Principal point x-coordinate.
-            cy (float): Principal point y-coordinate.
-            fx (float): Focal length in x direction.
-            fy (float): Focal length in y direction.
-            tagSize (units.meters): Physical size of the AprilTag.
-        """
-
-        cx: float
-        cy: float
-        fx: float
-        fy: float
-        tagSize: units.meters
-
-    @abstractmethod
-    def estimate(
-        self, tagDetection: AprilTagDetection, nIters: int
-    ) -> ApriltagPoseEstimate:
-        """Estimate the pose of a detected AprilTag.
-
-        Args:
-            tagDetection (AprilTagDetection): Detected AprilTag data.
-            nIters (int): Number of iterations for refinement.
-
-        Returns:
-            ApriltagPoseEstimate: Estimated 3D pose.
-        """
-        ...
-
-    @abstractmethod
-    def setConfig(self, config: Config) -> None:
-        """Set the estimator configuration.
-
-        Args:
-            config (Config): Pose estimation configuration.
         """
         ...
 
