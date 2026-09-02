@@ -91,7 +91,9 @@ class PnPPoseEstimator:
             else cv2.SOLVEPNP_ITERATIVE,
         )
 
-        camera_to_field_pose = openCvPoseToWpilib(tvecs[0], rvecs[0])
+        best = int(np.argmin(errors))
+
+        camera_to_field_pose = openCvPoseToWpilib(tvecs[best], rvecs[best])
         camera_to_field = Transform3d(
             camera_to_field_pose.translation(), camera_to_field_pose.rotation()
         )
@@ -100,7 +102,7 @@ class PnPPoseEstimator:
             field_to_camera.translation(), field_to_camera.rotation()
         )
 
-        return CameraPoseEstimate(errors, field_to_camera_pose)
+        return CameraPoseEstimate(float(errors[best]), field_to_camera_pose)
 
 
 def openCvPoseToWpilib(tvec: np.ndarray, rvec: np.ndarray) -> Pose3d:

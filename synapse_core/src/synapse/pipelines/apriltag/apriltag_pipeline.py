@@ -214,6 +214,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
     kCameraPoseEstimateKey: Final[str] = "cameraEstimate_fieldSpace"
     kTagDetectionsKey: Final[str] = "tags"
+    kReprojectionErrorKey: Final[str] = "reprojection_error"
 
     def __init__(self, settings: ApriltagPipelineSettings):
         super().__init__(settings)
@@ -446,8 +447,9 @@ class ApriltagsJson:
             )
 
         return {
-            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate.cameraPoseEstimate,
             ApriltagPipeline.kTagDetectionsKey: tags,
+            ApriltagPipeline.kReprojectionErrorKey: result.cameraPoseEstimate.reprojectionError,
         }
 
     @classmethod
