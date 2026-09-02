@@ -6,7 +6,7 @@
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, List, Protocol, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -17,19 +17,6 @@ from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 Homography = Tuple[float, float, float, float, float, float, float, float, float]
 Corners = Tuple[float, float, float, float, float, float, float, float]
 Scalar = Sequence[float | int]
-
-
-@dataclass
-class CameraPoseEstimate:
-    """Represents a Camera pose estimate in both tag space and field space.
-
-    Attributes:
-        cameraPose_tagSpace (Transform3d): The Camera pose relative to the AprilTag (tag space).
-        cameraPose_fieldSpace (Pose3d): The Camera pose relative to the field (field space).
-    """
-
-    cameraPose_tagSpace: Transform3d
-    cameraPose_fieldSpace: Pose3d
 
 
 def makeCorners(
@@ -157,11 +144,6 @@ class AprilTagDetector(ABC):
     def getConfig(self) -> Config: ...
 
 
-class ICombinedApriltagCameraPoseEstimator(Protocol):
-    @staticmethod
-    def estimate(tags: Iterable[CameraPoseEstimate], **kwargs) -> Pose3d: ...
-
-
 def drawTagDetectionMarker(
     tag: AprilTagDetection,
     img: Frame,
@@ -201,24 +183,6 @@ def drawTagDetectionMarker(
     )
 
 
-def tagToCameraPose(
-    tagFieldPose: Pose3d,
-    cameraToTagTransform: Transform3d,
-) -> CameraPoseEstimate:
-    """Compute the Camera's pose on the field given a tag's field pose.
-
-    Args:
-        tagFieldPose (Pose3d): AprilTag pose in field coordinates.
-        cameraToTagTransform (Transform3d): Transform from camera to tag coordinates.
-
-    Returns:
-        CameraPoseEstimate: Camera pose in both tag and field spaces.
-    """
-    cameraInTagSpace = cameraToTagTransform.inverse()
-    cameraInField: Pose3d = tagFieldPose.transformBy(cameraInTagSpace)
-    return CameraPoseEstimate(cameraInTagSpace, cameraInField)
-
-
 def opencvToWPI(opencv: Transform3d) -> Transform3d:
     """Convert an OpenCV-style Transform3d to a WPILib-style Transform3d.
 
@@ -240,3 +204,9 @@ def opencvToWPI(opencv: Transform3d) -> Transform3d:
             yaw=opencv.rotation().Y(),
         ),
     )
+
+
+@dataclass
+class CameraPoseEstimate:
+    errors: List[float]
+    cameraPoseEstimate: Pose3d

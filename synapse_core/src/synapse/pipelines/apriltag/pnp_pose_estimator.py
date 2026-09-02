@@ -1,13 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import math
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import cv2
 import numpy as np
+from synapse.pipelines.apriltag.apriltag_detector import CameraPoseEstimate
 from synapse.pipelines.apriltag.apriltag_robotpy import AprilTagDetection
+from synapse.pipelines.apriltag.field_loader import TagId
 from wpimath import units
 from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
-from synapse.pipelines.apriltag.field_loader import TagId
-import math
 
 
 class PnPPoseEstimator:
@@ -53,9 +58,12 @@ class PnPPoseEstimator:
         self,
         tags: List[AprilTagDetection],
         getTagPose: Callable[[TagId], Pose3d | None],
-    ) -> Pose3d | None:
+    ) -> Optional[CameraPoseEstimate]:
         objectPoints = []
         imagePoints = []
+
+        if len(tags) == 0:
+            return None
 
         for tag in tags:
             tagPose = getTagPose(tag.tagID)
@@ -78,7 +86,9 @@ class PnPPoseEstimator:
             imagePoints,
             self.config.cameraMatrix,
             self.config.distCoeffs,
-            flags=self.config.method,
+            flags=cv2.SOLVEPNP_IPPE_SQUARE
+            if len(tags) == 1
+            else cv2.SOLVEPNP_ITERATIVE,
         )
 
         camera_to_field_pose = openCvPoseToWpilib(tvecs[0], rvecs[0])
@@ -89,7 +99,8 @@ class PnPPoseEstimator:
         field_to_camera_pose = Pose3d(
             field_to_camera.translation(), field_to_camera.rotation()
         )
-        return field_to_camera_pose
+
+        return CameraPoseEstimate(errors, field_to_camera_pose)
 
 
 def openCvPoseToWpilib(tvec: np.ndarray, rvec: np.ndarray) -> Pose3d:

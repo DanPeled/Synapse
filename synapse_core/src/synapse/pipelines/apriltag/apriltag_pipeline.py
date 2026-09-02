@@ -10,39 +10,25 @@ from typing import Any, Dict, Final, List, Optional, Set, cast
 
 import cv2
 import numpy as np
-from synapse.core.pipeline import (
-    FrameResult,
-    Pipeline,
-    PipelineSettings,
-    Setting,
-    SettingsValue,
-    SynapseCamera,
-    pipelineResult,
-)
-from synapse.core.settings_api import (
-    BooleanConstraint,
-    EnumeratedConstraint,
-    NumberConstraint,
-    RangeConstraint,
-    settingField,
-)
+from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
+                                   Setting, SettingsValue, SynapseCamera,
+                                   pipelineResult)
+from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
+                                       NumberConstraint, RangeConstraint,
+                                       settingField)
 from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.hardware.metrics import Platform
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
-    AprilTagDetection,
-    AprilTagDetector,
-    CameraPoseEstimate,
-    drawTagDetectionMarker,
-    tagToCameraPose,
-)
+    AprilTagDetection, AprilTagDetector, CameraPoseEstimate,
+    drawTagDetectionMarker)
 from synapse.pipelines.apriltag.apriltag_robotpy import RobotpyApriltagDetector
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
+from synapse.pipelines.apriltag.pnp_pose_estimator import PnPPoseEstimator
 from synapse.stypes import CameraID
 from typing_extensions import Buffer
 from wpimath import units
-from wpimath.geometry import Pose3d, Transform3d
-from synapse.pipelines.apriltag.pnp_pose_estimator import PnPPoseEstimator
+from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 
 
 class ApriltagVerbosity(Enum):
@@ -172,12 +158,12 @@ class ApriltagPipelineSettings(PipelineSettings):
 
     # ==================== Results ====================
 
-    iteration_count = settingField(
-        NumberConstraint(minValue=1, maxValue=None, step=1),
-        default=4,
-        description="Number of iterations for pose estimation refinement.",
-        category="<Activity/> Results",
-    )
+    # iteration_count = settingField(
+    #     NumberConstraint(minValue=1, maxValue=None, step=1),
+    #     default=4,
+    #     description="Number of iterations for pose estimation refinement.",
+    #     category="<Activity/> Results",
+    # )
     stick_to_ground = settingField(
         BooleanConstraint(),
         default=False,
@@ -211,7 +197,7 @@ class ApriltagDetectionResult:
 
 @pipelineResult
 class ApriltagResult:
-    cameraPoseEstimate: Optional[Pose3d]
+    cameraPoseEstimate: Optional[CameraPoseEstimate]
     tagDetections: List[ApriltagDetectionResult]
 
 
@@ -399,13 +385,31 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             )
 
         fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
-        iterationCount = int(self.getSetting(self.settings.iteration_count))
-        estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
+        stickToGround = self.getSetting(self.settings.stick_to_ground)
+        # estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
+
+        cameraPoseEstimate: Optional[CameraPoseEstimate] = (
+            self.poseEstimator.estimate(tags, self.fmap.getTagPose)
+            if fieldposeEnabled
+            else None
+        )
+
+        if stickToGround:
+            if cameraPoseEstimate is not None:
+                cameraPoseEstimate.cameraPoseEstimate = Pose3d(
+                    Translation3d(
+                        cameraPoseEstimate.cameraPoseEstimate.X(),
+                        cameraPoseEstimate.cameraPoseEstimate.Y(),
+                        0,
+                    ),
+                    Rotation3d(
+                        0, 0, cameraPoseEstimate.cameraPoseEstimate.rotation().Z()
+                    ),
+                )
 
         self.setDataValue("hasResults", True)
         result = ApriltagResult(
-            None,
-            # self.poseEstimator.estimate(tags, self.fmap.getTagPose), # TODO: convert to wpilib units
+            cameraPoseEstimate,
             self.tagEstimates,
         )
 
@@ -426,15 +430,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.setDataValue(self.kTagIDKey, tag.tagID)
 
 
-def estimateCameraPose(
-    tagFieldPose: Pose3d, tagRelativePose: Transform3d
-) -> CameraPoseEstimate:
-    return tagToCameraPose(
-        tagFieldPose=tagFieldPose,
-        cameraToTagTransform=tagRelativePose,
-    )
-
-
 class ApriltagsJson:
     @classmethod
     def toDict(cls, result: ApriltagResult) -> Dict[str, Any]:
@@ -451,7 +446,7 @@ class ApriltagsJson:
             )
 
         return {
-            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,  # Maybe switch to combining pose on the robot instead?
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,
             ApriltagPipeline.kTagDetectionsKey: tags,
         }
 
