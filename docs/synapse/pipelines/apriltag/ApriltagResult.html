@@ -80,8 +80,9 @@ loadScripts(document, 'script');</script>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
 <div class="block">Represents the result of detecting AprilTags in a single frame or input source.
 
- <p>This class contains the list of detected tags and an estimate of the camera's pose in field
- space. It is typically produced by an AprilTag pipeline.</div>
+ <p>This class contains the list of detected tags, an estimate of the camera's pose in field
+ space, and the reprojection error of the pose estimate. It is typically produced by an AprilTag
+ pipeline.</div>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -99,9 +100,14 @@ loadScripts(document, 'script');</script>
 <div class="col-last even-row-color">
 <div class="block">The estimated camera pose in field space represented as an array of doubles.</div>
 </div>
-<div class="col-first odd-row-color"><code><a href="ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a>[]</code></div>
-<div class="col-second odd-row-color"><code><a href="#tags" class="member-name-link">tags</a></code></div>
+<div class="col-first odd-row-color"><code>float</code></div>
+<div class="col-second odd-row-color"><code><a href="#reprojectionError" class="member-name-link">reprojectionError</a></code></div>
 <div class="col-last odd-row-color">
+<div class="block">The reprojection error of the camera pose estimate.</div>
+</div>
+<div class="col-first even-row-color"><code><a href="ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a>[]</code></div>
+<div class="col-second even-row-color"><code><a href="#tags" class="member-name-link">tags</a></code></div>
+<div class="col-last even-row-color">
 <div class="block">The array of detected AprilTags with their associated detection data.</div>
 </div>
 </div>
@@ -141,8 +147,8 @@ loadScripts(document, 'script');</script>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>int</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#hashCode()" class="member-name-link">hashCode</a>()</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Computes a hash code for this result based on its detected tags and camera field space
- estimate.</div>
+<div class="block">Computes a hash code for this result based on its detected tags, camera field space estimate,
+ and reprojection error.</div>
 </div>
 </div>
 </div>
@@ -174,7 +180,18 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double[]</span>&nbsp;<span class="element-name">cameraEstimate_fieldSpace</span></div>
 <div class="block">The estimated camera pose in field space represented as an array of doubles.
 
- <p>(<code>[x, y, z, roll, pitch, yaw]</code>).</div>
+ <p>The values are ordered as <code>[x, y, z, roll, pitch, yaw]</code>.</div>
+</section>
+</li>
+<li>
+<section class="detail" id="reprojectionError">
+<h3>reprojectionError</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">float</span>&nbsp;<span class="element-name">reprojectionError</span></div>
+<div class="block">The reprojection error of the camera pose estimate.
+
+ <p>This represents the error between the observed AprilTag image points and the points
+ projected into the image using the estimated camera pose. Lower values generally indicate a
+ better-fitting pose estimate.</div>
 </section>
 </li>
 </ul>
@@ -207,8 +224,8 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="equals(java.lang.Object)">
 <h3>equals</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">boolean</span>&nbsp;<span class="element-name">equals</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&nbsp;o)</span></div>
-<div class="block">Compares this result to another object for equality. Two results are considered equal if both
- their detected tags and camera field space estimates are equal.</div>
+<div class="block">Compares this result to another object for equality. Two results are considered equal if their
+ detected tags, camera field space estimates, and reprojection errors are equal.</div>
 <dl class="notes">
 <dt>Overrides:</dt>
 <dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html#equals(java.lang.Object)" title="class or interface in java.lang" class="external-link">equals</a></code>&nbsp;in class&nbsp;<code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></code></dd>
@@ -223,8 +240,8 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="hashCode()">
 <h3>hashCode</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">int</span>&nbsp;<span class="element-name">hashCode</span>()</div>
-<div class="block">Computes a hash code for this result based on its detected tags and camera field space
- estimate.</div>
+<div class="block">Computes a hash code for this result based on its detected tags, camera field space estimate,
+ and reprojection error.</div>
 <dl class="notes">
 <dt>Overrides:</dt>
 <dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html#hashCode()" title="class or interface in java.lang" class="external-link">hashCode</a></code>&nbsp;in class&nbsp;<code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></code></dd>

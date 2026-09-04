@@ -53,15 +53,6 @@ loadScripts(document, 'script');</script>
 <a href="#I:A">A</a>&nbsp;<a href="#I:B">B</a>&nbsp;<a href="#I:C">C</a>&nbsp;<a href="#I:D">D</a>&nbsp;<a href="#I:E">E</a>&nbsp;<a href="#I:G">G</a>&nbsp;<a href="#I:H">H</a>&nbsp;<a href="#I:I">I</a>&nbsp;<a href="#I:K">K</a>&nbsp;<a href="#I:M">M</a>&nbsp;<a href="#I:N">N</a>&nbsp;<a href="#I:R">R</a>&nbsp;<a href="#I:S">S</a>&nbsp;<a href="#I:T">T</a>&nbsp;<a href="#I:V">V</a>&nbsp;<a href="#I:W">W</a>&nbsp;<br><a href="allclasses-index.html">All&nbsp;Classes&nbsp;and&nbsp;Interfaces</a><span class="vertical-separator">|</span><a href="allpackages-index.html">All&nbsp;Packages</a><span class="vertical-separator">|</span><a href="constant-values.html">Constant&nbsp;Field&nbsp;Values</a><span class="vertical-separator">|</span><a href="serialized-form.html">Serialized&nbsp;Form</a>
 <h2 class="title" id="I:A">A</h2>
 <dl class="index">
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#acceptedError" class="member-name-link">acceptedError</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
-<dd>
-<div class="block">The error metric (e.g., reprojection error) associated with <a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#acceptedPose"><code>ApriltagPoseEstimate.acceptedPose</code></a>.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#acceptedPose" class="member-name-link">acceptedPose</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
-<dd>
-<div class="block">The first possible 3D pose of the AprilTag relative to the camera or robot frame, represented
- as <code>[x, y, z, roll, pitch, yaw]</code>.</div>
-</dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html" class="type-name-link" title="class in synapse.pipelines.apriltag">ApriltagDetection</a> - Class in <a href="synapse/pipelines/apriltag/package-summary.html">synapse.pipelines.apriltag</a></dt>
 <dd>
 <div class="block">Represents a single detected AprilTag along with its associated metadata and pose estimates.</div>
@@ -69,15 +60,6 @@ loadScripts(document, 'script');</script>
 <dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#%3Cinit%3E()" class="member-name-link">ApriltagDetection()</a> - Constructor for class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
 <dd>
 <div class="block">Creates a new, empty <code>ApriltagDetection</code>.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" class="type-name-link" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a> - Class in <a href="synapse/pipelines/apriltag/package-summary.html">synapse.pipelines.apriltag</a></dt>
-<dd>
-<div class="block">Represents the candidate 3D pose estimates of an AprilTag detection.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#%3Cinit%3E()" class="member-name-link">ApriltagPoseEstimate()</a> - Constructor for class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
-<dd>
-<div class="block">Creates a new <code>ApriltagPoseEstimate</code> with errors initialized to <code>0.0</code> and poses set
- to <code>null</code>.</div>
 </dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html" class="type-name-link" title="class in synapse.pipelines.apriltag">ApriltagResult</a> - Class in <a href="synapse/pipelines/apriltag/package-summary.html">synapse.pipelines.apriltag</a></dt>
 <dd>
@@ -104,14 +86,6 @@ loadScripts(document, 'script');</script>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#cameraEstimate_fieldSpace" class="member-name-link">cameraEstimate_fieldSpace</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
 <div class="block">The estimated camera pose in field space represented as an array of doubles.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#cameraPose_fieldSpace" class="member-name-link">cameraPose_fieldSpace</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
-<dd>
-<div class="block">The estimated pose of the camera in the <b>field coordinate system</b>.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#cameraPose_tagSpace" class="member-name-link">cameraPose_tagSpace</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
-<dd>
-<div class="block">The estimated pose of the camera relative to the <b>detected tag</b>.</div>
 </dd>
 <dt><a href="synapse/pipelines/color/ColorDetection.html#center" class="member-name-link">center</a> - Variable in class synapse.pipelines.color.<a href="synapse/pipelines/color/ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a></dt>
 <dd>
@@ -162,10 +136,6 @@ loadScripts(document, 'script');</script>
 <dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#equals(java.lang.Object)" class="member-name-link">equals(Object)</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
 <dd>
 <div class="block">Compares this <code>ApriltagDetection</code> with another object for equality.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#equals(java.lang.Object)" class="member-name-link">equals(Object)</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
-<dd>
-<div class="block">Checks whether this <code>ApriltagPoseEstimate</code> is equal to another object.</div>
 </dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#equals(java.lang.Object)" class="member-name-link">equals(Object)</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
@@ -276,14 +246,10 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Computes a hash code for this <code>ApriltagDetection</code>.</div>
 </dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#hashCode()" class="member-name-link">hashCode()</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
-<dd>
-<div class="block">Computes a hash code for this <code>ApriltagPoseEstimate</code>.</div>
-</dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#hashCode()" class="member-name-link">hashCode()</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
-<div class="block">Computes a hash code for this result based on its detected tags and camera field space
- estimate.</div>
+<div class="block">Computes a hash code for this result based on its detected tags, camera field space estimate,
+ and reprojection error.</div>
 </dd>
 <dt><a href="synapse/pipelines/color/ColorDetection.html#hashCode()" class="member-name-link">hashCode()</a> - Method in class synapse.pipelines.color.<a href="synapse/pipelines/color/ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a></dt>
 <dd>
@@ -429,14 +395,9 @@ loadScripts(document, 'script');</script>
 </dl>
 <h2 class="title" id="I:R">R</h2>
 <dl class="index">
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#rejectedError" class="member-name-link">rejectedError</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
+<dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#reprojectionError" class="member-name-link">reprojectionError</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
-<div class="block">The error metric (e.g., reprojection error) associated with <a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#rejectedPose"><code>ApriltagPoseEstimate.rejectedPose</code></a>.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html#rejectedPose" class="member-name-link">rejectedPose</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagPoseEstimate.html" title="class in synapse.pipelines.apriltag">ApriltagPoseEstimate</a></dt>
-<dd>
-<div class="block">The second possible 3D pose of the AprilTag relative to the camera or robot frame, represented
- as <code>[x, y, z, roll, pitch, yaw]</code>.</div>
+<div class="block">The reprojection error of the camera pose estimate.</div>
 </dd>
 </dl>
 <h2 class="title" id="I:S">S</h2>
@@ -517,18 +478,9 @@ loadScripts(document, 'script');</script>
 </dl>
 <h2 class="title" id="I:T">T</h2>
 <dl class="index">
-<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#tag_estimate" class="member-name-link">tag_estimate</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
-<dd>
-<div class="block">The estimated pose(s) of the detected AprilTag, including multiple hypotheses or refined
- estimates if available.</div>
-</dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#tagID" class="member-name-link">tagID</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
 <dd>
 <div class="block">The unique ID of the detected AprilTag.</div>
-</dd>
-<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#tagPose_screenSpace" class="member-name-link">tagPose_screenSpace</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
-<dd>
-<div class="block">The estimated pose of the tag in <b>screen coordinates</b>.</div>
 </dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#tags" class="member-name-link">tags</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
