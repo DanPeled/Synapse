@@ -11,10 +11,10 @@ SOURCE_DIR: Final[str] = "src"
 
 setup(
     name="synapsefrclib",
-    version="2025.0.1",
+    version="2027.0.0a1",
     packages=find_packages(where=SOURCE_DIR),
     package_dir={"": SOURCE_DIR},
-    python_requires=">=3.9, <3.12",
+    python_requires=">=3.11, <=3.14",
     install_requires=["pyntcore", "msgpack"],
     extras_require={"dev": []},
     include_package_data=True,
