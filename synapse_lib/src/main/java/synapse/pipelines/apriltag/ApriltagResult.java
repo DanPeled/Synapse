@@ -1,6 +1,9 @@
 package synapse.pipelines.apriltag;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation3d;
 import java.util.Arrays;
 
 /**
@@ -39,6 +42,23 @@ public class ApriltagResult {
    * instantiation when no initial values are provided.
    */
   public ApriltagResult() {}
+
+  /**
+   * Returns the camera's estimated pose in field space as a 3D pose.
+   *
+   * @return the camera's estimated field-space 3D pose
+   */
+  public Pose3d cameraEstimate_fieldSpace3d() {
+    return new Pose3d(
+        new Translation3d(
+            cameraEstimate_fieldSpace[0],
+            cameraEstimate_fieldSpace[1],
+            cameraEstimate_fieldSpace[2]),
+        new Rotation3d(
+            cameraEstimate_fieldSpace[3],
+            cameraEstimate_fieldSpace[4],
+            cameraEstimate_fieldSpace[5]));
+  }
 
   /**
    * Compares this result to another object for equality. Two results are considered equal if their

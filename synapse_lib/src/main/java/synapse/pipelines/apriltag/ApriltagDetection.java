@@ -31,6 +31,24 @@ public class ApriltagDetection {
   public float[] tagPose_screenSpace;
 
   /**
+   * Returns the tag's horizontal position in screen space.
+   *
+   * @return the tag's horizontal screen-space position
+   */
+  public float tx() {
+    return tagPose_screenSpace[0];
+  }
+
+  /**
+   * Returns the tag's vertical position in screen space.
+   *
+   * @return the tag's vertical screen-space position
+   */
+  public float ty() {
+    return tagPose_screenSpace[1];
+  }
+
+  /**
    * Creates a new, empty {@code ApriltagDetection}.
    *
    * <p>This constructor is primarily used for JSON deserialization by Jackson and for general

@@ -6,6 +6,8 @@
 from dataclasses import dataclass
 from typing import List
 
+from wpimath.geometry import Pose3d, Rotation3d, Translation3d
+
 
 @dataclass(frozen=True)
 class ApriltagDetection:
@@ -25,6 +27,19 @@ class ApriltagDetection:
 
     tagPose_screenSpace: List[float]
     """Estimated pose of the detected AprilTag in screen space."""
+
+    @property
+    def tx(self) -> float:
+        """
+        Returns the tag's horizontal position in screen space.
+        """
+        return self.tagPose_screenSpace[0]
+
+    def ty(self) -> float:
+        """
+        Returns the tag's vertical position in screen space.
+        """
+        return self.tagPose_screenSpace[1]
 
     def __hash__(self) -> int:
         return hash(
@@ -53,6 +68,24 @@ class ApriltagResult:
 
     reprojection_error: float
     """The reprojection error of the camera pose estimate. """
+
+    @property
+    def cameraEstimate_fieldSpace3d(self) -> Pose3d:
+        """
+        Returns the camera's estimated pose in field space as a 3D pose.
+        """
+        return Pose3d(
+            translation=Translation3d(
+                self.cameraEstimate_fieldSpace[0],
+                self.cameraEstimate_fieldSpace[1],
+                self.cameraEstimate_fieldSpace[2],
+            ),
+            rotation=Rotation3d(
+                self.cameraEstimate_fieldSpace[3],
+                self.cameraEstimate_fieldSpace[4],
+                self.cameraEstimate_fieldSpace[5],
+            ),
+        )
 
     def __hash__(self) -> int:
         return hash(

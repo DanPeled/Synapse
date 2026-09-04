@@ -15,7 +15,7 @@ setup(
     packages=find_packages(where=SOURCE_DIR),
     package_dir={"": SOURCE_DIR},
     python_requires=">=3.11, <=3.14",
-    install_requires=["pyntcore", "msgpack"],
+    install_requires=["pyntcore", "msgpack", "robotpy_wpimath"],
     extras_require={"dev": []},
     include_package_data=True,
 )
