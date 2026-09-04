@@ -9,9 +9,7 @@ from typing import List
 import robotpy_apriltag as rpy_apriltag
 from typing_extensions import Buffer
 
-from .apriltag_detector import (AprilTagDetection, AprilTagDetector,
-                                ApriltagPoseEstimate, ApriltagPoseEstimator,
-                                makeCorners)
+from .apriltag_detector import AprilTagDetection, AprilTagDetector, makeCorners
 
 
 class RobotpyApriltagDetector(AprilTagDetector):
@@ -74,65 +72,4 @@ class RobotpyApriltagDetector(AprilTagDetector):
                 config.refineEdges,
                 config.quadDecimate,
                 config.quadSigma,
-            )
-
-
-class RobotpyApriltagPoseEstimator(ApriltagPoseEstimator):
-    def __init__(self, config: ApriltagPoseEstimator.Config) -> None:
-        self.estimator = rpy_apriltag.AprilTagPoseEstimator(
-            rpy_apriltag.AprilTagPoseEstimator.Config(
-                config.tagSize,
-                config.fx,
-                config.fy,
-                config.cx,
-                config.cy,
-            )
-        )
-        self.lock = threading.Lock()
-
-    def estimate(
-        self, tagDetection: AprilTagDetection, nIters: int
-    ) -> ApriltagPoseEstimate:
-        with self.lock:
-            estimate = self.estimator.estimateOrthogonalIteration(
-                tagDetection.homography,
-                tagDetection.corners,
-                nIters,
-            )
-
-        rejected, rejectedErr = estimate.pose1, estimate.error1
-        accepted, acceptedErr = estimate.pose2, estimate.error2
-
-        if estimate.error1 < estimate.error2:
-            rejected, rejectedErr = estimate.pose2, estimate.error2
-            accepted, acceptedErr = estimate.pose1, estimate.error1
-
-        return ApriltagPoseEstimate(
-            estimate.getAmbiguity(),
-            acceptedPose=accepted,
-            acceptedError=acceptedErr,
-            rejectedPose=rejected,
-            rejectedError=rejectedErr,
-        )
-
-    def setConfig(self, config: ApriltagPoseEstimator.Config) -> None:
-        with self.lock:
-            estimatorConfig = self.estimator.getConfig()
-            estimatorConfig.tagSize = config.tagSize
-            estimatorConfig.fx = config.fx
-            estimatorConfig.fy = config.fy
-            estimatorConfig.cx = config.cx
-            estimatorConfig.cy = config.cy
-            self.estimator.setConfig(estimatorConfig)
-
-    def getConfig(self) -> ApriltagPoseEstimator.Config:
-        with self.lock:
-            config = self.estimator.getConfig()
-
-            return ApriltagPoseEstimator.Config(
-                config.cx,
-                config.cy,
-                config.fx,
-                config.fy,
-                config.tagSize,
             )

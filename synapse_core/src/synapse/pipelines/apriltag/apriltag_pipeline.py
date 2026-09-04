@@ -20,19 +20,15 @@ from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.hardware.metrics import Platform
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
-    AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
-    ApriltagPoseEstimator, CameraPoseEstimate,
-    ICombinedApriltagCameraPoseEstimator, drawTagDetectionMarker,
-    tagToCameraPose)
-from synapse.pipelines.apriltag.apriltag_robotpy import (
-    RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
+    AprilTagDetection, AprilTagDetector, CameraPoseEstimate,
+    drawTagDetectionMarker)
+from synapse.pipelines.apriltag.apriltag_robotpy import RobotpyApriltagDetector
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
-from synapse.pipelines.apriltag.multi_tag_estimator import \
-    WeightedAverageMultiTagEstimator
+from synapse.pipelines.apriltag.pnp_pose_estimator import PnPPoseEstimator
 from synapse.stypes import CameraID
 from typing_extensions import Buffer
 from wpimath import units
-from wpimath.geometry import Pose3d, Transform3d
+from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 
 
 class ApriltagVerbosity(Enum):
@@ -162,12 +158,12 @@ class ApriltagPipelineSettings(PipelineSettings):
 
     # ==================== Results ====================
 
-    iteration_count = settingField(
-        NumberConstraint(minValue=1, maxValue=None, step=1),
-        default=4,
-        description="Number of iterations for pose estimation refinement.",
-        category="<Activity/> Results",
-    )
+    # iteration_count = settingField(
+    #     NumberConstraint(minValue=1, maxValue=None, step=1),
+    #     default=4,
+    #     description="Number of iterations for pose estimation refinement.",
+    #     category="<Activity/> Results",
+    # )
     stick_to_ground = settingField(
         BooleanConstraint(),
         default=False,
@@ -197,13 +193,11 @@ class ApriltagPipelineSettings(PipelineSettings):
 class ApriltagDetectionResult:
     detection: AprilTagDetection
     timestamp: float
-    cameraPoseEstimate: CameraPoseEstimate
-    tagPoseEstimate: ApriltagPoseEstimate
 
 
 @pipelineResult
 class ApriltagResult:
-    cameraPoseEstimate: Optional[Pose3d]
+    cameraPoseEstimate: Optional[CameraPoseEstimate]
     tagDetections: List[ApriltagDetectionResult]
 
 
@@ -220,15 +214,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
     kCameraPoseEstimateKey: Final[str] = "cameraEstimate_fieldSpace"
     kTagDetectionsKey: Final[str] = "tags"
+    kReprojectionErrorKey: Final[str] = "reprojection_error"
 
     def __init__(self, settings: ApriltagPipelineSettings):
         super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
         self.cameraMatrix = self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
         self.apriltagDetector: AprilTagDetector = RobotpyApriltagDetector()
-        self.combinedApriltagPoseEstimator: ICombinedApriltagCameraPoseEstimator = (
-            WeightedAverageMultiTagEstimator()
-        )
         self.setDetectorConfig(self.cameraIndex)
         self.apriltagDetector.setFamily(
             self.settings.getSetting(self.settings.tag_family)
@@ -240,14 +232,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         self.__hadResults: bool = False
         self.tagEstimates: List[ApriltagDetectionResult] = []
-
-        self.poseEstimator: ApriltagPoseEstimator = RobotpyApriltagPoseEstimator(
-            config=ApriltagPoseEstimator.Config(
-                tagSize=(self.settings.getSetting(ApriltagPipelineSettings.tag_size)),
-                fx=self.cameraMatrix[0][0],
-                fy=self.cameraMatrix[1][1],
-                cx=self.cameraMatrix[0][2],
-                cy=self.cameraMatrix[1][2],
+        self.poseEstimator: PnPPoseEstimator = PnPPoseEstimator(
+            PnPPoseEstimator.Config(
+                self.getSetting(self.settings.tag_size),
+                np.array(self.cameraMatrix, dtype=np.float64),
+                np.array(
+                    self.getDistCoeffs(self.cameraIndex) or [0] * 5, dtype=np.float64
+                ),
             )
         )
 
@@ -287,7 +278,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             )
             cx = self.cameraMatrix[0][2]
             cy = self.cameraMatrix[1][2]
-            config = self.poseEstimator.getConfig()
             h, w = self.getResolution()
 
             crop_x1 = self.getSetting(self.settings.crop_x)[0]
@@ -296,9 +286,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             offset_x = int((crop_x1 + 1) * 0.5 * w)
             offset_y = int((crop_y1 + 1) * 0.5 * h)
 
-            config.cx = cx - offset_x
-            config.cy = cy - offset_y
-            self.poseEstimator.setConfig(config)
+            self.poseEstimator.config.cameraMatrix[0, 2] = cx - offset_x
+            self.poseEstimator.config.cameraMatrix[1, 2] = cy - offset_y
         if setting.key in [
             self.settings.num_threads.key,
             self.settings.quad_decimate.key,
@@ -317,14 +306,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 self.settings.getSetting(self.settings.tag_family)
             )
         elif setting.key == self.settings.tag_size.key:
-            config = self.poseEstimator.getConfig()
-            config.tagSize = value
-            self.poseEstimator.setConfig(config)
-
-    def estimateTagPose(
-        self, tag: AprilTagDetection, iterationCount: int = 1
-    ) -> ApriltagPoseEstimate:
-        return self.poseEstimator.estimate(tag, nIters=iterationCount)
+            self.poseEstimator.config.tagSize = value
 
     def cropImageToFit(self, img, drawOn):
         h, w = img.shape[:2]
@@ -380,7 +362,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         if not cropped.flags["C_CONTIGUOUS"]:
             cropped = np.ascontiguousarray(cropped)
 
-        tags = self.apriltagDetector.detect(cast(Buffer, cropped))  # pyright: ignore
+        tags = self.apriltagDetector.detect(cast(Buffer, cropped))
 
         if not tags:
             if self.__hadResults:
@@ -392,17 +374,10 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.__hadResults = tags is not None
         self.tagEstimates.clear()
 
-        fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
-        iterationCount = int(self.getSetting(self.settings.iteration_count))
-        estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
-
         for tag in tags:
             self.processTag(
                 tag,
                 timestamp,
-                estimateTag3DPose,
-                fieldposeEnabled,
-                iterationCount,
             )
 
             drawTagDetectionMarker(
@@ -410,11 +385,32 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 img=img,
             )
 
+        fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
+        stickToGround = self.getSetting(self.settings.stick_to_ground)
+        # estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
+
+        cameraPoseEstimate: Optional[CameraPoseEstimate] = (
+            self.poseEstimator.estimate(tags, self.fmap.getTagPose)
+            if fieldposeEnabled
+            else None
+        )
+
+        if stickToGround:
+            if cameraPoseEstimate is not None:
+                cameraPoseEstimate.cameraPoseEstimate = Pose3d(
+                    Translation3d(
+                        cameraPoseEstimate.cameraPoseEstimate.X(),
+                        cameraPoseEstimate.cameraPoseEstimate.Y(),
+                        0,
+                    ),
+                    Rotation3d(
+                        0, 0, cameraPoseEstimate.cameraPoseEstimate.rotation().Z()
+                    ),
+                )
+
         self.setDataValue("hasResults", True)
         result = ApriltagResult(
-            self.combinedApriltagPoseEstimator.estimate(
-                [estimate.cameraPoseEstimate for estimate in self.tagEstimates]
-            ),
+            cameraPoseEstimate,
             self.tagEstimates,
         )
 
@@ -426,60 +422,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self,
         tag: AprilTagDetection,
         timestamp: float,
-        estimateTag3DPose: bool,
-        fieldposeEnabled: bool,
-        poseEstimationIterationCount: int,
     ) -> None:
         if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap:
             warn(f"Invalid tagID: {tag.tagID}")
             return
 
+        self.tagEstimates.append(ApriltagDetectionResult(tag, timestamp))
         self.setDataValue(self.kTagIDKey, tag.tagID)
-
-        if estimateTag3DPose or fieldposeEnabled:
-            tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(
-                tag, poseEstimationIterationCount
-            )
-
-            tagRelativePose: Transform3d = (
-                tagPoseEstimate.acceptedPose
-            )  # TODO: check if needs to switch with pose2 sometimes
-
-            if estimateTag3DPose:
-                self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
-                self.setDataValue(
-                    self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
-                )
-
-            if fieldposeEnabled:
-                tagFieldPose = self.fmap.getTagPose(tag.tagID)
-
-                if tagFieldPose:
-                    cameraPoseEstimate = estimateCameraPose(
-                        tagFieldPose, tagRelativePose
-                    )
-                    self.setDataValue(
-                        self.kCameraPoseFieldSpaceKey,
-                        cameraPoseEstimate.cameraPose_fieldSpace,
-                    )
-
-                    self.tagEstimates.append(
-                        ApriltagDetectionResult(
-                            detection=tag,
-                            timestamp=timestamp,
-                            cameraPoseEstimate=cameraPoseEstimate,
-                            tagPoseEstimate=tagPoseEstimate,
-                        )
-                    )
-
-
-def estimateCameraPose(
-    tagFieldPose: Pose3d, tagRelativePose: Transform3d
-) -> CameraPoseEstimate:
-    return tagToCameraPose(
-        tagFieldPose=tagFieldPose,
-        cameraToTagTransform=tagRelativePose,
-    )
 
 
 class ApriltagsJson:
@@ -493,15 +442,14 @@ class ApriltagsJson:
                 {
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
-                    ApriltagPipeline.kTagAmbiguityKey: tag.tagPoseEstimate.ambiguity,
-                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate.acceptedPose,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
                 }
             )
 
         return {
-            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,  # Maybe switch to combining pose on the robot instead?
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate.cameraPoseEstimate,
             ApriltagPipeline.kTagDetectionsKey: tags,
+            ApriltagPipeline.kReprojectionErrorKey: result.cameraPoseEstimate.reprojectionError,
         }
 
     @classmethod

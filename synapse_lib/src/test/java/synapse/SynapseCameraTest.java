@@ -40,10 +40,11 @@ class SynapseCameraTest {
 
     ApriltagResult original = new ApriltagResult();
     original.cameraEstimate_fieldSpace = new double[] {1, 2, 3};
+    original.reprojectionError = 0.42f;
+
     original.tags = new ApriltagDetection[] {new ApriltagDetection()};
     original.tags[0].hamming = 2;
     original.tags[0].tagID = 7;
-    original.tags[0].cameraPose_fieldSpace = new double[] {1, 2, 3, 4, 5, 6};
 
     byte[] serialized = mapper.writeValueAsBytes(original);
 
@@ -51,6 +52,6 @@ class SynapseCameraTest {
         camera.deserializeResults(new TypeReference<ApriltagResult>() {}, serialized);
 
     assertTrue(results.isPresent());
-    assertEquals(results.get(), original);
+    assertEquals(original, results.get());
   }
 }
