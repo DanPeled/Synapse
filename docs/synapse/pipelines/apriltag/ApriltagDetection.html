@@ -78,10 +78,10 @@ loadScripts(document, 'script');</script>
 <hr>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">ApriltagDetection</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
-<div class="block">Represents a single detected AprilTag along with its associated metadata and pose estimates.
+<div class="block">Represents a single detected AprilTag along with its associated metadata and pose estimate.
 
- <p>This class contains the tag's ID, detection accuracy metrics. It is typically produced by an
- AprilTag detection pipeline.</div>
+ <p>This class contains the tag's ID, detection accuracy metrics, and the tag's estimated pose in
+ screen space. It is typically produced by an AprilTag detection pipeline.</div>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -103,6 +103,11 @@ loadScripts(document, 'script');</script>
 <div class="col-second odd-row-color"><code><a href="#tagID" class="member-name-link">tagID</a></code></div>
 <div class="col-last odd-row-color">
 <div class="block">The unique ID of the detected AprilTag.</div>
+</div>
+<div class="col-first even-row-color"><code>float[]</code></div>
+<div class="col-second even-row-color"><code><a href="#tagPose_screenSpace" class="member-name-link">tagPose_screenSpace</a></code></div>
+<div class="col-last even-row-color">
+<div class="block">The estimated pose of the detected AprilTag in screen space.</div>
 </div>
 </div>
 </section>
@@ -143,6 +148,16 @@ loadScripts(document, 'script');</script>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Computes a hash code for this <code>ApriltagDetection</code>.</div>
 </div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>float</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#tx()" class="member-name-link">tx</a>()</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the tag's horizontal position in screen space.</div>
+</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>float</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#ty()" class="member-name-link">ty</a>()</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the tag's vertical position in screen space.</div>
+</div>
 </div>
 </div>
 </div>
@@ -178,6 +193,13 @@ loadScripts(document, 'script');</script>
  <p>Lower values indicate a more accurate detection.</div>
 </section>
 </li>
+<li>
+<section class="detail" id="tagPose_screenSpace">
+<h3>tagPose_screenSpace</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">float[]</span>&nbsp;<span class="element-name">tagPose_screenSpace</span></div>
+<div class="block">The estimated pose of the detected AprilTag in screen space.</div>
+</section>
+</li>
 </ul>
 </section>
 </li>
@@ -204,6 +226,28 @@ loadScripts(document, 'script');</script>
 <section class="method-details" id="method-detail">
 <h2>Method Details</h2>
 <ul class="member-list">
+<li>
+<section class="detail" id="tx()">
+<h3>tx</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">float</span>&nbsp;<span class="element-name">tx</span>()</div>
+<div class="block">Returns the tag's horizontal position in screen space.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>the tag's horizontal screen-space position</dd>
+</dl>
+</section>
+</li>
+<li>
+<section class="detail" id="ty()">
+<h3>ty</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">float</span>&nbsp;<span class="element-name">ty</span>()</div>
+<div class="block">Returns the tag's vertical position in screen space.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>the tag's vertical screen-space position</dd>
+</dl>
+</section>
+</li>
 <li>
 <section class="detail" id="equals(java.lang.Object)">
 <h3>equals</h3>

@@ -55,7 +55,7 @@ loadScripts(document, 'script');</script>
 <dl class="index">
 <dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html" class="type-name-link" title="class in synapse.pipelines.apriltag">ApriltagDetection</a> - Class in <a href="synapse/pipelines/apriltag/package-summary.html">synapse.pipelines.apriltag</a></dt>
 <dd>
-<div class="block">Represents a single detected AprilTag along with its associated metadata and pose estimates.</div>
+<div class="block">Represents a single detected AprilTag along with its associated metadata and pose estimate.</div>
 </dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#%3Cinit%3E()" class="member-name-link">ApriltagDetection()</a> - Constructor for class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
 <dd>
@@ -86,6 +86,10 @@ loadScripts(document, 'script');</script>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#cameraEstimate_fieldSpace" class="member-name-link">cameraEstimate_fieldSpace</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
 <div class="block">The estimated camera pose in field space represented as an array of doubles.</div>
+</dd>
+<dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#cameraEstimate_fieldSpace3d()" class="member-name-link">cameraEstimate_fieldSpace3d()</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
+<dd>
+<div class="block">Returns the camera's estimated pose in field space as a 3D pose.</div>
 </dd>
 <dt><a href="synapse/pipelines/color/ColorDetection.html#center" class="member-name-link">center</a> - Variable in class synapse.pipelines.color.<a href="synapse/pipelines/color/ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a></dt>
 <dd>
@@ -482,6 +486,10 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">The unique ID of the detected AprilTag.</div>
 </dd>
+<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#tagPose_screenSpace" class="member-name-link">tagPose_screenSpace</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
+<dd>
+<div class="block">The estimated pose of the detected AprilTag in screen space.</div>
+</dd>
 <dt><a href="synapse/pipelines/apriltag/ApriltagResult.html#tags" class="member-name-link">tags</a> - Variable in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagResult.html" title="class in synapse.pipelines.apriltag">ApriltagResult</a></dt>
 <dd>
 <div class="block">The array of detected AprilTags with their associated detection data.</div>
@@ -489,6 +497,14 @@ loadScripts(document, 'script');</script>
 <dt><a href="synapse/pipelines/color/ColorResult.html#timestamp" class="member-name-link">timestamp</a> - Variable in class synapse.pipelines.color.<a href="synapse/pipelines/color/ColorResult.html" title="class in synapse.pipelines.color">ColorResult</a></dt>
 <dd>
 <div class="block">Timestamp (in seconds) at which this result was captured or processed.</div>
+</dd>
+<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#tx()" class="member-name-link">tx()</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
+<dd>
+<div class="block">Returns the tag's horizontal position in screen space.</div>
+</dd>
+<dt><a href="synapse/pipelines/apriltag/ApriltagDetection.html#ty()" class="member-name-link">ty()</a> - Method in class synapse.pipelines.apriltag.<a href="synapse/pipelines/apriltag/ApriltagDetection.html" title="class in synapse.pipelines.apriltag">ApriltagDetection</a></dt>
+<dd>
+<div class="block">Returns the tag's vertical position in screen space.</div>
 </dd>
 <dt><a href="synapse/SynapsePipelineType.html#typestring" class="member-name-link">typestring</a> - Variable in class synapse.<a href="synapse/SynapsePipelineType.html" title="class in synapse">SynapsePipelineType</a></dt>
 <dd>
