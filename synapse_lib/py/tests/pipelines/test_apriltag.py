@@ -5,9 +5,11 @@
 
 import unittest
 
-from synapselib.pipelines.apriltag import (ApriltagDetection,
-                                           ApriltagPoseEstimate,
-                                           ApriltagResult)
+from synapselib.pipelines.apriltag import (
+    ApriltagDetection,
+    ApriltagPoseEstimate,
+    ApriltagResult,
+)
 
 
 class TestApriltagClasses(unittest.TestCase):

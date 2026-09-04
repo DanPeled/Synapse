@@ -8,8 +8,12 @@ from __future__ import annotations
 from typing import Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
-from ntcore import (NetworkTable, NetworkTableEntry, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    NetworkTable,
+    NetworkTableEntry,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 
 from ._deserialization import dataclass_object_hook
 from .pipelines.apriltag import ApriltagResult
