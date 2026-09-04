@@ -6,42 +6,7 @@
 from dataclasses import dataclass
 from typing import List
 
-
-@dataclass(frozen=True)
-class ApriltagPoseEstimate:
-    """
-    Represents the candidate 3D pose estimates of an AprilTag detection.
-
-    When estimating the pose of an AprilTag, the algorithm may return two possible
-    solutions due to perspective ambiguity. This class stores both candidate poses
-    along with their associated error metrics, allowing downstream logic to
-    determine which pose is more reliable.
-
-    Each pose is represented as a 6-element tuple of floats:
-    (x, y, z, roll, pitch, yaw).
-    """
-
-    acceptedError: float
-    """The error metric associated with `acceptedPose`. Lower values indicate higher confidence."""
-
-    rejectedError: float
-    """The error metric associated with `rejectedPose`. Lower values indicate higher confidence."""
-
-    acceptedPose: List[float]
-    """The first possible 3D pose of the AprilTag relative to the camera frame."""
-
-    rejectedPose: List[float]
-    """The second possible 3D pose, typically the ambiguous alternative."""
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.acceptedError,
-                self.rejectedError,
-                tuple(self.acceptedPose),
-                tuple(self.rejectedPose),
-            )
-        )
+from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 
 
 @dataclass(frozen=True)
@@ -60,27 +25,28 @@ class ApriltagDetection:
     hamming: float
     """The Hamming distance of the detected tag. Lower values indicate a more accurate detection."""
 
-    cameraPose_fieldSpace: List[float]
-    """The estimated pose of the camera in the field coordinate system."""
-
-    cameraPose_tagSpace: List[float]
-    """The estimated pose of the camera relative to the detected tag."""
-
     tagPose_screenSpace: List[float]
-    """The estimated pose of the tag in screen coordinates."""
+    """Estimated pose of the detected AprilTag in screen space."""
 
-    tag_estimate: ApriltagPoseEstimate
-    """The estimated pose(s) of the detected AprilTag, including multiple hypotheses."""
+    @property
+    def tx(self) -> float:
+        """
+        Returns the tag's horizontal position in screen space.
+        """
+        return self.tagPose_screenSpace[0]
+
+    def ty(self) -> float:
+        """
+        Returns the tag's vertical position in screen space.
+        """
+        return self.tagPose_screenSpace[1]
 
     def __hash__(self) -> int:
         return hash(
             (
                 self.tag_id,
                 self.hamming,
-                tuple(self.cameraPose_fieldSpace),
-                tuple(self.cameraPose_tagSpace),
                 tuple(self.tagPose_screenSpace),
-                self.tag_estimate,
             )
         )
 
@@ -100,5 +66,32 @@ class ApriltagResult:
     cameraEstimate_fieldSpace: List[float]
     """The estimated camera pose in field space, format (x, y, z, roll, pitch, yaw)."""
 
+    reprojection_error: float
+    """The reprojection error of the camera pose estimate. """
+
+    @property
+    def cameraEstimate_fieldSpace3d(self) -> Pose3d:
+        """
+        Returns the camera's estimated pose in field space as a 3D pose.
+        """
+        return Pose3d(
+            translation=Translation3d(
+                self.cameraEstimate_fieldSpace[0],
+                self.cameraEstimate_fieldSpace[1],
+                self.cameraEstimate_fieldSpace[2],
+            ),
+            rotation=Rotation3d(
+                self.cameraEstimate_fieldSpace[3],
+                self.cameraEstimate_fieldSpace[4],
+                self.cameraEstimate_fieldSpace[5],
+            ),
+        )
+
     def __hash__(self) -> int:
-        return hash((tuple(self.tags), tuple(self.cameraEstimate_fieldSpace)))
+        return hash(
+            (
+                tuple(self.tags),
+                tuple(self.cameraEstimate_fieldSpace),
+                self.reprojection_error,
+            )
+        )

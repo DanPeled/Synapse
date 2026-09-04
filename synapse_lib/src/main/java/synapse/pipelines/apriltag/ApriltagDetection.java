@@ -1,13 +1,14 @@
 package synapse.pipelines.apriltag;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Represents a single detected AprilTag along with its associated metadata and pose estimates.
+ * Represents a single detected AprilTag along with its associated metadata and pose estimate.
  *
- * <p>This class contains the tag's ID, detection accuracy metrics. It is typically produced by an
- * AprilTag detection pipeline.
+ * <p>This class contains the tag's ID, detection accuracy metrics, and the tag's estimated pose in
+ * screen space. It is typically produced by an AprilTag detection pipeline.
  */
 public class ApriltagDetection {
 
@@ -25,6 +26,27 @@ public class ApriltagDetection {
    * <p>Lower values indicate a more accurate detection.
    */
   public float hamming;
+
+  /** The estimated pose of the detected AprilTag in screen space. */
+  public float[] tagPose_screenSpace;
+
+  /**
+   * Returns the tag's horizontal position in screen space.
+   *
+   * @return the tag's horizontal screen-space position
+   */
+  public float tx() {
+    return tagPose_screenSpace[0];
+  }
+
+  /**
+   * Returns the tag's vertical position in screen space.
+   *
+   * @return the tag's vertical screen-space position
+   */
+  public float ty() {
+    return tagPose_screenSpace[1];
+  }
 
   /**
    * Creates a new, empty {@code ApriltagDetection}.
@@ -45,7 +67,9 @@ public class ApriltagDetection {
     if (this == o) return true;
     if (!(o instanceof ApriltagDetection)) return false;
     ApriltagDetection that = (ApriltagDetection) o;
-    return tagID == that.tagID && Float.compare(that.hamming, hamming) == 0;
+    return tagID == that.tagID
+        && Float.compare(that.hamming, hamming) == 0
+        && Arrays.equals(tagPose_screenSpace, that.tagPose_screenSpace);
   }
 
   /**
@@ -55,7 +79,6 @@ public class ApriltagDetection {
    */
   @Override
   public int hashCode() {
-    int result = Objects.hash(tagID, hamming);
-    return result;
+    return Objects.hash(tagID, hamming, Arrays.hashCode(tagPose_screenSpace));
   }
 }
