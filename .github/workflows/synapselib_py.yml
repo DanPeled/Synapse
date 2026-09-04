@@ -74,7 +74,9 @@ jobs:
           python-version: "3.10.7"
 
       - name: Install Ruff and isort
-        run: pip install ruff isort
+        run: |
+          pip install ruff==0.15.20
+          pip install isort
 
       - name: Run Ruff linting
         run: ruff check .
