@@ -88,6 +88,9 @@ class RuntimeManager:
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
+        # Last known "view id" per camera, kept up to date by an NT listener so
+        # the per-frame path does not have to read NetworkTables.
+        self.cameraViewIDs: Dict[CameraID, str] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
@@ -694,27 +697,37 @@ class RuntimeManager:
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        if cameraIndex not in self.cameraFrameEntries:
+        entry = self.cameraFrameEntries.get(cameraIndex)
+        if entry is None:
             entry = getCameraTable(
                 self.cameraHandler.getCameraHandle(cameraIndex)
             ).getEntry(CameraSettingsKeys.kViewID.value)
             if not entry.exists():
                 entry.setString(self.DEFAULT_STEP)
             self.cameraFrameEntries[cameraIndex] = entry
-        entry = self.cameraFrameEntries[cameraIndex]
+
+            # Read the view id once and keep it in sync through a listener
+            # instead of hitting NetworkTables for every published frame.
+            self.cameraViewIDs[cameraIndex] = entry.getString(
+                defaultValue=self.DEFAULT_STEP
+            )
+
+            def onViewIDChanged(event: Event, cameraIndex=cameraIndex) -> None:
+                assert isinstance(event.data, ValueEventData)
+                self.cameraViewIDs[cameraIndex] = event.data.value.getString()
+
+            NetworkTableInstance.getDefault().addListener(
+                entry, EventFlags.kValueRemote, onViewIDChanged
+            )
 
         if result is None:
             return
 
-        entry_exists = entry.exists()
-        entry_value = (
-            entry.getString(defaultValue=self.DEFAULT_STEP)
-            if entry_exists
-            else self.DEFAULT_STEP
-        )
-
         if isinstance(result, Frame):
-            if entry_value == self.DEFAULT_STEP:
+            if (
+                self.cameraViewIDs.get(cameraIndex, self.DEFAULT_STEP)
+                == self.DEFAULT_STEP
+            ):
                 return result
 
     def sendLatency(

@@ -18,6 +18,11 @@ from websockets.typing import Data
 
 from .generated.messages.v1 import MessageProto, MessageTypeProto
 
+# Cache the payload field names once; `createMessage` is called for every log,
+# result and metric sent to the UI, so rebuilding this set per message is pure
+# overhead.
+_MESSAGE_FIELD_NAMES = frozenset(f.name for f in fields(MessageProto))
+
 
 class SocketEvent(Enum):
     kConnect = "connect"
@@ -42,7 +47,7 @@ def createMessage(
     message.type = messageType
 
     field_name = getMessageDataFieldName(type(data).__name__)
-    if field_name in {f.name for f in fields(message)}:
+    if field_name in _MESSAGE_FIELD_NAMES:
         setattr(message, field_name, data)
     else:
         raise ValueError(
@@ -62,6 +67,13 @@ class WebSocketServer:
         self.clients: Set[WebSocketServerProtocol] = set()
         self._server = None
         self.loop: Optional[Any] = None
+        # Background send queue. `sendToAllSync` is called from arbitrary
+        # threads (runtime, logging, metrics), so instead of scheduling a new
+        # task per message we hand messages to a single long-lived task on the
+        # websocket loop. This keeps message ordering and avoids the cost of
+        # creating a Task per frame.
+        self._sendQueue: Optional[asyncio.Queue] = None
+        self._sendTask: Optional[asyncio.Task] = None
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable[..., Coroutine]):
@@ -109,13 +121,35 @@ class WebSocketServer:
     def sendToAllSync(self, message: Data):
         try:
             if self.loop and self.loop.is_running():
-                # Submit to the existing background event loop
-                asyncio.run_coroutine_threadsafe(self.sendToAll(message), self.loop)
+                # Hand the message to the background send loop. Running the
+                # enqueue on the websocket loop keeps the queue and the send
+                # task bound to the loop that actually performs the I/O.
+                self.loop.call_soon_threadsafe(self._enqueue, message)
                 return
             # Run in a temporary event loop (e.g. during test or before full setup)
             asyncio.run(self.sendToAll(message))
         except Exception:
             pass
+
+    def _enqueue(self, message: Data):
+        """Queue a message for the background sender (must run on the loop)."""
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+        self._sendQueue.put_nowait(message)
+        if self._sendTask is None or self._sendTask.done():
+            self._sendTask = asyncio.get_running_loop().create_task(self._sendLoop())
+
+    async def _sendLoop(self):
+        """Drain the send queue sequentially, one message at a time."""
+        assert self._sendQueue is not None
+        while True:
+            message = await self._sendQueue.get()
+            try:
+                await self.sendToAll(message)
+            except Exception:
+                pass
+            finally:
+                self._sendQueue.task_done()
 
     async def sendToClient(
         self,
@@ -130,6 +164,14 @@ class WebSocketServer:
         return serve(self.handler, self.host, self.port)
 
     async def close(self):
+        if self._sendTask is not None and not self._sendTask.done():
+            self._sendTask.cancel()
+            try:
+                await self._sendTask
+            except asyncio.CancelledError:
+                pass
+        self._sendTask = None
+        self._sendQueue = None
         if self._server:
             # If _server is a coroutine, await it first
             if asyncio.iscoroutine(self._server):
