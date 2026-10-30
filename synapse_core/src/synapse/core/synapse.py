@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import asyncio
 import getpass
+import json
 import os
 import threading
 import traceback
@@ -17,16 +18,28 @@ from synapse_installer.util import IsValidIP
 from synapse_net.devicenetworking import NetworkingManager
 from synapse_net.file_server import FileServer
 from synapse_net.generated.messages.v1 import (
-    DeviceInfoProto, MessageProto, MessageTypeProto, PipelineProto,
-    PipelineTypeProto, RemovePipelineMessageProto,
-    SetCameraRecordingStatusMessageProto, SetConnectionInfoProto,
-    SetDefaultPipelineMessageProto, SetNetworkSettingsProto,
-    SetPipelineIndexMessageProto, SetPipelineNameMessageProto,
-    SetPipleineSettingMessageProto)
+    DeviceInfoProto,
+    MessageProto,
+    MessageTypeProto,
+    PipelineProto,
+    PipelineTypeProto,
+    RemovePipelineMessageProto,
+    SetCameraRecordingStatusMessageProto,
+    SetConnectionInfoProto,
+    SetDefaultPipelineMessageProto,
+    SetNetworkSettingsProto,
+    SetPipelineIndexMessageProto,
+    SetPipelineNameMessageProto,
+    SetPipleineSettingMessageProto,
+)
 from synapse_net.manager_discover import UDPDeviceResponder
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
-from synapse_net.socketServer import (SocketEvent, WebSocketServer, assert_set,
-                                      createMessage)
+from synapse_net.socketServer import (
+    SocketEvent,
+    WebSocketServer,
+    assert_set,
+    createMessage,
+)
 from synapse_net.ui_handle import UIHandle
 
 from synapse_net import devicenetworking
@@ -36,16 +49,31 @@ from ..hardware.deploy_dir import DeployDirectory
 from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
 from ..log import err, info, logs, missingFeature, warn
-from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
-                      RecordingStatus)
+from ..stypes import (
+    CameraID,
+    CameraName,
+    PipelineID,
+    RecordingFilename,
+    RecordingStatus,
+    ResolutionString,
+)
 from ..util import getIP, resolveGenericArgument
 from .camera.camera_handle import CameraHandle
+from .camera_factory import CalibrationData
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import (cameraToProto, protoToSettingValue, settingsToProto,
-                           settingValueToProto)
+from .settings_api import (
+    CameraSettings,
+    cameraToProto,
+    protoToSettingValue,
+    settingsToProto,
+    settingValueToProto,
+)
+
+
+kCalibrationImportDirectory: Final[str] = ".calibration_import"
 
 
 class Synapse:
@@ -592,6 +620,85 @@ class Synapse:
         self.ntClient.onConnect.add(onConnect)
         self.ntClient.onDisconnect.add(onDisconnect)
 
+    def importCalibration(
+        self,
+        cameraIndex: CameraID,
+        filePath: str,
+        resolution: Optional[ResolutionString] = None,
+    ) -> bool:
+        """Imports a CalibDB/WPIcal calibration JSON uploaded to the file server.
+
+        Args:
+            cameraIndex: Camera whose calibration should be replaced.
+            filePath: Uploaded file path, relative to the file server root.
+            resolution: Optional resolution to use when the JSON has no image size.
+
+        Returns:
+            True if the calibration was imported and saved, otherwise False.
+        """
+        cameraConfigs = self.runtimeHandler.cameraHandler.cameraConfigBindings
+        cameraConfig = cameraConfigs.get(cameraIndex)
+        if cameraConfig is None:
+            err(f"Cannot import calibration for unknown camera #{cameraIndex}")
+            return False
+
+        root = Config.getInstance().path.parent.parent.resolve()
+        candidate = (root / filePath.lstrip("/\\")).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            err(f"Calibration import file does not exist: {filePath}")
+            return False
+
+        try:
+            with open(candidate, encoding="utf-8") as file:
+                data = json.load(file)
+
+            fallbackResolution = resolution or self.getCalibrationResolution(
+                cameraIndex
+            )
+            calibration, resolutionKey = CalibrationData.fromCalibDbJson(
+                data, fallbackResolution
+            )
+
+            cameraConfig.calibration[resolutionKey] = calibration
+            self.runtimeHandler.save()
+            self.websocket.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.CALIBRATION_DATA,
+                    calibration.toProto(cameraIndex),
+                )
+            )
+            info(f"Imported calibration for camera #{cameraIndex} at {resolutionKey}")
+            return True
+        except (OSError, ValueError) as error:
+            err(f"Failed to import calibration for camera #{cameraIndex}: {error}")
+            return False
+        finally:
+            # Only clean up files uploaded to the dedicated import directory.
+            if candidate.is_relative_to(root / kCalibrationImportDirectory):
+                candidate.unlink(missing_ok=True)
+
+    def getCalibrationResolution(
+        self, cameraIndex: CameraID
+    ) -> Optional[ResolutionString]:
+        """Returns the current resolution for a camera, if one can be determined."""
+        pipelineIndex = self.runtimeHandler.pipelineBindings.get(cameraIndex)
+        if pipelineIndex is not None:
+            pipeline = self.runtimeHandler.pipelineHandler.getPipeline(
+                pipelineIndex, cameraIndex
+            )
+            if pipeline is not None:
+                resolution = pipeline.getCameraSetting(CameraSettings.resolution)
+                if resolution:
+                    return resolution
+
+        cameraConfig = self.runtimeHandler.cameraHandler.cameraConfigBindings.get(
+            cameraIndex
+        )
+        if cameraConfig is not None:
+            return f"{cameraConfig.streamRes[0]}x{cameraConfig.streamRes[1]}"
+
+        return None
+
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
         msgType = msgObj.type
@@ -736,6 +843,15 @@ class Synapse:
                 ].calibration.pop(deleteCalibrationMsg.resolution)
 
                 # TODO Send back delete message to let the client know its been deleted
+        elif msgType == MessageTypeProto.IMPORT_CALIBRATION:
+            assert_set(msgObj.import_calibration)
+            importCalibrationMsg = msgObj.import_calibration
+
+            self.importCalibration(
+                importCalibrationMsg.camera_index,
+                importCalibrationMsg.file_path,
+                importCalibrationMsg.resolution or None,
+            )
         elif msgType == MessageTypeProto.SET_CAMERA_RECORDING_STATUS:
             assert_set(msgObj.set_camera_recording_status)
 

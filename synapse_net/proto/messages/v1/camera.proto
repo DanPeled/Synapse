@@ -42,6 +42,14 @@ message CalibrationDataProto {
   repeated float dist_coeffs = 5;
 }
 
+// Requests importing a calibration JSON file previously uploaded through the
+// device file server. The path is relative to the file server root.
+message ImportCalibrationMessageProto {
+  int32 camera_index = 1;
+  string file_path = 2;
+  string resolution = 3;
+}
+
 message RemoveCalibrationDataMessageProto {
   int32 camera_index = 1;
   string resolution = 2;

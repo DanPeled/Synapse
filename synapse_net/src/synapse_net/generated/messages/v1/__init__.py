@@ -68,6 +68,7 @@ class MessageTypeProto(betterproto.Enum):
     SET_DEVICE_CONNECTION_STATUS = 24
     SET_PIPELINE_RESULT = 25
     ALERT = 26
+    IMPORT_CALIBRATION = 27
 
 
 @dataclass(eq=False, repr=False)
@@ -119,6 +120,18 @@ class CalibrationDataProto(betterproto.Message):
     resolution: str = betterproto.string_field(3)
     camera_matrix: List[float] = betterproto.float_field(4)
     dist_coeffs: List[float] = betterproto.float_field(5)
+
+
+@dataclass(eq=False, repr=False)
+class ImportCalibrationMessageProto(betterproto.Message):
+    """
+    Requests importing a calibration JSON file previously uploaded through the
+     device file server. The path is relative to the file server root.
+    """
+
+    camera_index: int = betterproto.int32_field(1)
+    file_path: str = betterproto.string_field(2)
+    resolution: str = betterproto.string_field(3)
 
 
 @dataclass(eq=False, repr=False)
@@ -373,4 +386,7 @@ class MessageProto(betterproto.Message):
         21, group="payload"
     )
     alert: "AlertProto" = betterproto.message_field(22, group="payload")
+    import_calibration: "ImportCalibrationMessageProto" = betterproto.message_field(
+        23, group="payload"
+    )
     pipeline_type_info: List["PipelineTypeProto"] = betterproto.message_field(20)
