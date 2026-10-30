@@ -378,11 +378,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         height, width = img.shape[:2]
 
         buffer = self.__grayscaleBuffer
-        if (
-            buffer is None
-            or buffer.shape[0] != height
-            or buffer.shape[1] != width
-        ):
+        if buffer is None or buffer.shape[0] != height or buffer.shape[1] != width:
             buffer = np.empty((height, width), dtype=np.uint8)
             self.__grayscaleBuffer = buffer
 

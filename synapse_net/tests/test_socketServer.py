@@ -8,11 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from synapse_net.generated.messages.v1 import MessageProto
-from synapse_net.socketServer import (
-    SocketEvent,
-    WebSocketServer,
-    getMessageDataFieldName,
-)
+from synapse_net.socketServer import (SocketEvent, WebSocketServer,
+                                      getMessageDataFieldName)
 
 
 def test_getMessageDataFieldName_valid():
