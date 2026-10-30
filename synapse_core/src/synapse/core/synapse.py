@@ -265,7 +265,8 @@ class Synapse:
                     await self.websocket.sendToClient(
                         ws,
                         createMessage(
-                            MessageTypeProto.SET_DEVICE_CONNECTION_STATUS, connectionDetails
+                            MessageTypeProto.SET_DEVICE_CONNECTION_STATUS,
+                            connectionDetails,
                         ),
                     )
 
@@ -303,7 +304,9 @@ class Synapse:
                     except Exception:
                         break
 
-                pipeline_bindings = getattr(self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {})
+                pipeline_bindings = getattr(
+                    self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {}
+                )
                 for cameraid, pipelines in pipeline_bindings.items():
                     for id, pipeline in pipelines.items():
                         try:
@@ -315,7 +318,9 @@ class Synapse:
                             continue
 
                 typeMessages: List[PipelineTypeProto] = []
-                pipeline_types = getattr(self.runtimeHandler.pipelineHandler, "pipelineTypesViaName", {})
+                pipeline_types = getattr(
+                    self.runtimeHandler.pipelineHandler, "pipelineTypesViaName", {}
+                )
                 for typename, typecls in pipeline_types.items():
                     try:
                         settingType = resolveGenericArgument(typecls)
@@ -338,10 +343,18 @@ class Synapse:
                 except Exception:
                     pass
 
-                camera_handles = getattr(self.runtimeHandler.cameraHandler, "cameraHandles", {})
-                camera_configs = getattr(self.runtimeHandler.cameraHandler, "cameraConfigBindings", {})
-                pipeline_bindings_map = getattr(self.runtimeHandler, "pipelineBindings", {})
-                default_pipes = getattr(self.runtimeHandler.pipelineHandler, "defaultPipelineIndexes", {})
+                camera_handles = getattr(
+                    self.runtimeHandler.cameraHandler, "cameraHandles", {}
+                )
+                camera_configs = getattr(
+                    self.runtimeHandler.cameraHandler, "cameraConfigBindings", {}
+                )
+                pipeline_bindings_map = getattr(
+                    self.runtimeHandler, "pipelineBindings", {}
+                )
+                default_pipes = getattr(
+                    self.runtimeHandler.pipelineHandler, "defaultPipelineIndexes", {}
+                )
                 for id, handle in camera_handles.items():
                     try:
                         msg = cameraToProto(

@@ -148,7 +148,9 @@ def generateNoSignalFrame(
             if glitch_height > 0:
                 roi = frame[glitch_y : glitch_y + glitch_height]
                 if roi.size > 0:
-                    frame[glitch_y : glitch_y + glitch_height] = np.roll(roi, shift, axis=1)
+                    frame[glitch_y : glitch_y + glitch_height] = np.roll(
+                        roi, shift, axis=1
+                    )
     except Exception:
         pass
 

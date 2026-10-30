@@ -551,7 +551,9 @@ class RuntimeManager:
         last_no_signal_publish = 0.0
 
         try:
-            log.info(f"Started {getattr(handle, 'name', cameraIndex)} loop (maxFPS={maxFps})")
+            log.info(
+                f"Started {getattr(handle, 'name', cameraIndex)} loop (maxFPS={maxFps})"
+            )
         except Exception:
             pass
 
@@ -583,7 +585,9 @@ class RuntimeManager:
                 pass
 
             now = time.perf_counter()
-            if now - last_no_signal_publish < 0.02:  # throttle no-signal more aggressively
+            if (
+                now - last_no_signal_publish < 0.02
+            ):  # throttle no-signal more aggressively
                 time.sleep(0.002)
                 continue
 
