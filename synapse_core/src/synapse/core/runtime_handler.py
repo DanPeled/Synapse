@@ -90,6 +90,7 @@ class RuntimeManager:
         self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
+        self._lastLatencyReportTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
 
@@ -534,6 +535,7 @@ class RuntimeManager:
         handle: CameraHandle = self.cameraHandler.cameraHandles[cameraIndex]
 
         maxFps = float(handle.camera.getMaxFPS())
+        noSignalFrame: Optional[Frame] = None
 
         log.info(f"Started {handle.name} loop (maxFPS={maxFps})")
 
@@ -544,9 +546,11 @@ class RuntimeManager:
                     frame = self.fixtureFrame(cameraIndex, frame)
                     self._processAndPublishFrame(cameraIndex, frame)
                     continue
-            self.cameraHandler.publishFrame(
-                generateNoSignalFrame(handle.name, handle.cameraIndex), handle
-            )
+
+            if noSignalFrame is None:
+                noSignalFrame = generateNoSignalFrame(handle.name, handle.cameraIndex)
+            self.cameraHandler.publishFrame(noSignalFrame, handle)
+            time.sleep(0.05)
 
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         handle: CameraHandle = self.cameraHandler.cameraHandles[cameraIndex]
@@ -556,7 +560,8 @@ class RuntimeManager:
         # ---- Camera FPS (frame-to-frame) ----
         lastTime = self._lastFrameTime.get(cameraIndex)
         if lastTime is not None:
-            cameraFps = 1.0 / (now - lastTime)
+            frameInterval = now - lastTime
+            cameraFps = 1.0 / frameInterval if frameInterval > 0 else 0.0
         else:
             cameraFps = 0.0
         self._lastFrameTime[cameraIndex] = now
@@ -655,10 +660,11 @@ class RuntimeManager:
         fps: float,
     ) -> None:
         current_time = time.time()
-        if current_time - self.lastLatencyReportTime < 1.0:
+        last_report_time = self._lastLatencyReportTime.get(cameraIndex, 0.0)
+        if current_time - last_report_time < 1.0:
             return  # Skip sending
 
-        self.lastLatencyReportTime = current_time
+        self._lastLatencyReportTime[cameraIndex] = current_time
 
         cameraTable = getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex))
         cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
