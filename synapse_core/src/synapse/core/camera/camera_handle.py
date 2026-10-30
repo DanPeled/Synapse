@@ -58,28 +58,44 @@ class CameraHandle:
             self._videoModes,
         )
 
-        assert mode is not None
+        if mode is None:
+            return
 
         # Apply it
-        self.camera.setVideoMode(
-            VideoMode(
-                pixelFormat,
-                mode.width,
-                mode.height,
-                mode.fps,
+        try:
+            self.camera.setVideoMode(
+                VideoMode(
+                    pixelFormat,
+                    mode.width,
+                    mode.height,
+                    mode.fps,
+                )
             )
-        )
+        except Exception:
+            try:
+                # Try to set with exact requested values
+                self.camera.setVideoMode(videoMode)
+            except Exception:
+                return
 
         H, W = mode.height, mode.width
 
         # Atomically rebuild buffers
-        with self._lock:
-            self._bufferPool = [
-                np.zeros((H, W, 3), dtype=np.uint8) for _ in range(self._poolSize)
-            ]
+        try:
+            with self._lock:
+                self._bufferPool = [
+                    np.zeros((H, W, 3), dtype=np.uint8) for _ in range(self._poolSize)
+                ]
 
-            with self._frameQueue.mutex:
-                self._frameQueue.queue.clear()
+                try:
+                    with self._frameQueue.mutex:
+                        self._frameQueue.queue.clear()
+                except Exception:
+                    pass
+        except Exception:
+            return
+        # Give camera a moment to start producing frames
+        time.sleep(0.01)
 
         requested = (mode.width, mode.height, mode.fps)
         selected = (mode.width, mode.height, mode.fps)
@@ -154,24 +170,35 @@ class CameraHandle:
         self._thread.start()
 
     def _frameGrabberLoop(self) -> None:
-        # Wait until camera connects
-        while self._running and not self.camera.isConnected():
-            time.sleep(0.05)
-
         buffer_index = 0
-        pool_size = len(self._bufferPool)
 
         while self._running:
-            if not self._bufferPool:
-                time.sleep(0.05)
+            try:
+                if not self.camera.isConnected():
+                    time.sleep(0.005)
+                    continue
+            except Exception:
+                time.sleep(0.005)
                 continue
 
-            buffer = self._bufferPool[buffer_index]
+            pool = self._bufferPool
+            if not pool:
+                time.sleep(0.01)
+                continue
+            pool_size = len(pool)
+            if buffer_index >= pool_size:
+                buffer_index = 0
+
+            buffer = pool[buffer_index]
 
             # IMPORTANT: no lock, grabFrame is thread-safe in CSCore
-            (timestamp, frame) = self.camera.grabFrame(buffer)
+            try:
+                (timestamp, frame) = self.camera.grabFrame(buffer)
+            except Exception:
+                time.sleep(0.002)
+                continue
 
-            if timestamp > 0:
+            if timestamp and timestamp > 0:
                 # If queue is full, drop oldest frame
                 if self._frameQueue.full():
                     try:
@@ -179,14 +206,17 @@ class CameraHandle:
                     except queue.Empty:
                         pass
 
-                self._frameQueue.put_nowait((True, buffer_index))
+                try:
+                    self._frameQueue.put_nowait((True, buffer_index))
+                except queue.Full:
+                    pass
 
                 # advance buffer only on successful frame
                 buffer_index = (buffer_index + 1) % pool_size
 
             else:
                 # small yield only on failure (prevents CPU spin)
-                time.sleep(0.001)
+                time.sleep(0.002)
 
     def _waitForNextFrame(self):
         if self.camera.isConnected():
@@ -195,13 +225,16 @@ class CameraHandle:
                 time.sleep(1.0 / mode.fps / 2.0)
 
     def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        with self._lock:
-            try:
-                hasFrame, index = self._frameQueue.get(timeout=0.1)
-                if hasFrame and index is not None and index < len(self._bufferPool):
-                    return True, self._bufferPool[index]
-            except queue.Empty:
-                pass
+        try:
+            hasFrame, index = self._frameQueue.get(timeout=0.02)
+            if hasFrame and index is not None:
+                pool = self._bufferPool
+                if index < len(pool):
+                    return True, pool[index]
+        except queue.Empty:
+            pass
+        except Exception:
+            pass
 
         return False, None
 
