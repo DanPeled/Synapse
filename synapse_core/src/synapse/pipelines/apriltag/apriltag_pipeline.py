@@ -6,7 +6,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Final, List, Optional, Set, cast
+from typing import Any, Dict, Final, List, Optional, Set, Tuple, cast
 
 import cv2
 import numpy as np
@@ -226,12 +226,15 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             self.settings.getSetting(self.settings.tag_family)
         )
 
-        ApriltagPipeline.fmap = ApriltagFieldJson.loadField(
+        ApriltagPipeline.fmap = ApriltagFieldJson.loadFieldCached(
             DeployDirectory.getDir() / "fmap.json"
         )
 
         self.__hadResults: bool = False
         self.__lastTagID: Optional[int] = None
+        self.__cropSignature: Optional[Tuple[int, int, Tuple, Tuple]] = None
+        self.__cropBounds: Optional[Tuple[int, int, int, int]] = None
+        self.__grayscaleBuffer: Optional[np.ndarray] = None
         self.tagEstimates: List[ApriltagDetectionResult] = []
         self.poseEstimator: PnPPoseEstimator = PnPPoseEstimator(
             PnPPoseEstimator.Config(
@@ -309,39 +312,57 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         elif setting.key == self.settings.tag_size.key:
             self.poseEstimator.config.tagSize = value
 
-    def cropImageToFit(self, img, drawOn):
-        h, w = img.shape[:2]
-
-        crop_x = self.getSetting(self.settings.crop_x)
-        crop_y = self.getSetting(self.settings.crop_y)
-
+    def __calculateCropBounds(
+        self, width: int, height: int, crop_x, crop_y
+    ) -> Optional[Tuple[int, int, int, int]]:
         if (
             crop_x == self.settings.crop_x.defaultValue
             and crop_y == self.settings.crop_y.defaultValue
-        ):  # No Crop needed, return original image
-            return img
+        ):  # No Crop needed
+            return None
 
         x1 = min(crop_x)
         x2 = max(crop_x)
         y1 = min(crop_y)
         y2 = max(crop_y)
 
-        x1 = int((x1 + 1) * 0.5 * w)
-        x2 = int((x2 + 1) * 0.5 * w)
-        y1 = int((y1 + 1) * 0.5 * h)
-        y2 = int((y2 + 1) * 0.5 * h)
+        x1 = int((x1 + 1) * 0.5 * width)
+        x2 = int((x2 + 1) * 0.5 * width)
+        y1 = int((y1 + 1) * 0.5 * height)
+        y2 = int((y2 + 1) * 0.5 * height)
 
         # Clamp
-        x1 = max(0, min(x1, w))
-        x2 = max(0, min(x2, w))
-        y1 = max(0, min(y1, h))
-        y2 = max(0, min(y2, h))
+        x1 = max(0, min(x1, width))
+        x2 = max(0, min(x2, width))
+        y1 = max(0, min(y1, height))
+        y2 = max(0, min(y2, height))
 
         # Fix corner ordering
         left = min(x1, x2)
         right = max(x1, x2)
         top = min(y1, y2)
         bottom = max(y1, y2)
+
+        return (left, top, right, bottom)
+
+    def cropImageToFit(self, img, drawOn):
+        h, w = img.shape[:2]
+
+        crop_x = self.getSetting(self.settings.crop_x)
+        crop_y = self.getSetting(self.settings.crop_y)
+
+        # The crop rectangle only depends on the image size and the crop
+        # settings, so only recompute it when one of those changes.
+        signature = (w, h, tuple(crop_x), tuple(crop_y))
+        if signature != self.__cropSignature:
+            self.__cropSignature = signature
+            self.__cropBounds = self.__calculateCropBounds(w, h, crop_x, crop_y)
+
+        bounds = self.__cropBounds
+        if bounds is None:  # No Crop needed, return original image
+            return img
+
+        left, top, right, bottom = bounds
 
         cv2.rectangle(
             drawOn,
@@ -353,15 +374,26 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
         return img[top:bottom, left:right]
 
+    def __toGrayscale(self, img: np.ndarray) -> np.ndarray:
+        height, width = img.shape[:2]
+
+        buffer = self.__grayscaleBuffer
+        if (
+            buffer is None
+            or buffer.shape[0] != height
+            or buffer.shape[1] != width
+        ):
+            buffer = np.empty((height, width), dtype=np.uint8)
+            self.__grayscaleBuffer = buffer
+
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY, dst=buffer)
+
     def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
         #
         # TODO: Check equalizing histogram (white and black levels)
         cropped_color = self.cropImageToFit(img, img)
-        cropped = cv2.cvtColor(cropped_color, cv2.COLOR_BGR2GRAY)
-
-        if not cropped.flags["C_CONTIGUOUS"]:
-            cropped = np.ascontiguousarray(cropped)
+        cropped = self.__toGrayscale(cropped_color)
 
         tags = self.apriltagDetector.detect(cast(Buffer, cropped))
 

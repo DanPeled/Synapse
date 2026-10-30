@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -23,6 +24,12 @@ class ApriltagFieldJson:
         with open(filePath, "r") as file:
             jsonDict: dict = json.load(file)
             return ApriltagFieldJson.loadFieldJson(jsonDict)
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def loadFieldCached(filePath: str | Path) -> "ApriltagFieldJson":
+        """Loads a field map once, reusing it for every pipeline instance."""
+        return ApriltagFieldJson.loadField(filePath)
 
     @staticmethod
     def loadFieldJson(data: dict) -> "ApriltagFieldJson":

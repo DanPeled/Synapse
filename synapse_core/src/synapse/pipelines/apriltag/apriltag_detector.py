@@ -156,17 +156,23 @@ def drawTagDetectionMarker(
         img (Frame): Image frame on which to draw.
     """
     # Convert flat tuple to 4 (x, y) points
-    corners = np.array(tag.corners, dtype=int).reshape(4, 2)
+    corners = tag.corners
+    points = np.array(
+        [
+            (corners[0], corners[1]),
+            (corners[2], corners[3]),
+            (corners[4], corners[5]),
+            (corners[6], corners[7]),
+        ],
+        dtype=np.int32,
+    )
 
-    # Draw the boundary
-    for i in range(4):
-        pt1 = tuple(corners[i])
-        pt2 = tuple(corners[(i + 1) % 4])
-        cv2.line(img, pt1, pt2, color=(0, 255, 0), thickness=2)
+    # Draw the boundary with a single call instead of four separate lines
+    cv2.polylines(img, [points], True, (0, 255, 0), 2)
 
     # Draw the center
-    center_x = int(sum(c[0] for c in corners) / 4)
-    center_y = int(sum(c[1] for c in corners) / 4)
+    center_x = int((corners[0] + corners[2] + corners[4] + corners[6]) / 4)
+    center_y = int((corners[1] + corners[3] + corners[5] + corners[7]) / 4)
     cv2.circle(img, (center_x, center_y), radius=4, color=(0, 0, 255), thickness=-1)
 
     # Draw the tag ID above the tag
