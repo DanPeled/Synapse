@@ -231,6 +231,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         )
 
         self.__hadResults: bool = False
+        self.__lastTagID: Optional[int] = None
         self.tagEstimates: List[ApriltagDetectionResult] = []
         self.poseEstimator: PnPPoseEstimator = PnPPoseEstimator(
             PnPPoseEstimator.Config(
@@ -371,7 +372,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 self.setResults(None)
             return img
 
-        self.__hadResults = tags is not None
         self.tagEstimates.clear()
 
         for tag in tags:
@@ -408,7 +408,9 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                     ),
                 )
 
-        self.setDataValue("hasResults", True)
+        if not self.__hadResults:
+            self.__hadResults = True
+            self.setDataValue("hasResults", True)
         result = ApriltagResult(
             cameraPoseEstimate,
             self.tagEstimates,
@@ -428,7 +430,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             return
 
         self.tagEstimates.append(ApriltagDetectionResult(tag, timestamp))
-        self.setDataValue(self.kTagIDKey, tag.tagID)
+
+        # Only publish when the value actually changes; this key would otherwise
+        # be re-sent (and serialized to NetworkTables + the UI) for every tag on
+        # every frame.
+        if tag.tagID != self.__lastTagID:
+            self.__lastTagID = tag.tagID
+            self.setDataValue(self.kTagIDKey, tag.tagID)
 
 
 class ApriltagsJson:
