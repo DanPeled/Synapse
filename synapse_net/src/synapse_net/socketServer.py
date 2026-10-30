@@ -93,18 +93,29 @@ class WebSocketServer:
             await self._emit(SocketEvent.kDisconnect, websocket)
 
     async def sendToAll(self, message: Data):
-        if self.clients:
-            await asyncio.gather(
-                *(client.send(message) for client in self.clients if client.open)
-            )
+        if not self.clients:
+            return
+        # Avoid creating many tasks if none open
+        coros = []
+        for client in list(self.clients):
+            try:
+                if client.open:
+                    coros.append(client.send(message))
+            except Exception:
+                continue
+        if coros:
+            await asyncio.gather(*coros, return_exceptions=True)
 
     def sendToAllSync(self, message: Data):
-        if self.loop and self.loop.is_running():
-            # Submit to the existing background event loop
-            asyncio.run_coroutine_threadsafe(self.sendToAll(message), self.loop)
-        else:
+        try:
+            if self.loop and self.loop.is_running():
+                # Submit to the existing background event loop
+                asyncio.run_coroutine_threadsafe(self.sendToAll(message), self.loop)
+                return
             # Run in a temporary event loop (e.g. during test or before full setup)
             asyncio.run(self.sendToAll(message))
+        except Exception:
+            pass
 
     async def sendToClient(
         self,

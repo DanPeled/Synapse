@@ -6,7 +6,6 @@ import asyncio
 import getpass
 import os
 import threading
-import time
 import traceback
 from multiprocessing import Process
 from pathlib import Path
@@ -256,115 +255,144 @@ class Synapse:
 
             from ..__version__ import SYNAPSE_VERSION
 
-            if self.ntClient:
-                connectionDetails = SetConnectionInfoProto(
-                    connected_to_networktables=self.ntClient.nt_inst.isConnected()
+            try:
+                if self.ntClient:
+                    connectionDetails = SetConnectionInfoProto(
+                        connected_to_networktables=self.ntClient.nt_inst.isConnected()
+                    )
+
+                    await self.websocket.sendToClient(
+                        ws,
+                        createMessage(
+                            MessageTypeProto.SET_DEVICE_CONNECTION_STATUS,
+                            connectionDetails,
+                        ),
+                    )
+
+                deviceInfo: DeviceInfoProto = DeviceInfoProto(
+                    ip=getIP(),
+                    version=SYNAPSE_VERSION,
+                    platform=metrics.Platform.getCurrentPlatform().getOSType().value,
+                    hostname=self.runtimeHandler.networkSettings.hostname,
+                )
+
+                try:
+                    deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
+                except Exception:
+                    pass
+
+                await self.websocket.sendToClient(
+                    ws,
+                    createMessage(
+                        MessageTypeProto.SET_NETWORK_SETTINGS,
+                        self.runtimeHandler.networkSettings.toProto(),
+                    ),
                 )
 
                 await self.websocket.sendToClient(
                     ws,
                     createMessage(
-                        MessageTypeProto.SET_DEVICE_CONNECTION_STATUS, connectionDetails
+                        MessageTypeProto.SEND_DEVICE_INFO,
+                        deviceInfo,
                     ),
                 )
 
-            deviceInfo: DeviceInfoProto = DeviceInfoProto(
-                ip=getIP(),
-                version=SYNAPSE_VERSION,
-                platform=metrics.Platform.getCurrentPlatform().getOSType().value,
-                hostname=self.runtimeHandler.networkSettings.hostname,
-            )
+                while not getattr(self.runtimeHandler, "isSetup", False):
+                    try:
+                        await asyncio.sleep(0.01)
+                    except Exception:
+                        break
 
-            deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
+                pipeline_bindings = getattr(
+                    self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {}
+                )
+                for cameraid, pipelines in pipeline_bindings.items():
+                    for id, pipeline in pipelines.items():
+                        try:
+                            msg = pipelineToProto(pipeline, id, cameraid)
+                            await self.websocket.sendToAll(
+                                createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+                            )
+                        except Exception:
+                            continue
 
-            await self.websocket.sendToClient(
-                ws,
-                createMessage(
-                    MessageTypeProto.SET_NETWORK_SETTINGS,
-                    self.runtimeHandler.networkSettings.toProto(),
-                ),
-            )
+                typeMessages: List[PipelineTypeProto] = []
+                pipeline_types = getattr(
+                    self.runtimeHandler.pipelineHandler, "pipelineTypesViaName", {}
+                )
+                for typename, typecls in pipeline_types.items():
+                    try:
+                        settingType = resolveGenericArgument(typecls)
+                        if settingType:
+                            settings = settingType({})
+                            settingsProto = settingsToProto(settings, typename)
+                            typeMessages.append(
+                                PipelineTypeProto(type=typename, settings=settingsProto)
+                            )
+                    except Exception:
+                        continue
 
-            await self.websocket.sendToClient(
-                ws,
-                createMessage(
-                    MessageTypeProto.SEND_DEVICE_INFO,
-                    deviceInfo,
-                ),
-            )
-
-            while not self.runtimeHandler.isSetup:
                 try:
-                    time.sleep(0.1)
-                except Exception:
-                    ...
-
-            for (
-                cameraid,
-                pipelines,
-            ) in self.runtimeHandler.pipelineHandler.pipelineInstanceBindings.items():
-                for id, pipeline in pipelines.items():
-                    msg = pipelineToProto(pipeline, id, cameraid)
-
-                    await self.websocket.sendToAll(
-                        createMessage(MessageTypeProto.ADD_PIPELINE, msg)
-                    )
-
-            typeMessages: List[PipelineTypeProto] = []
-            for (
-                typename,
-                type,
-            ) in self.runtimeHandler.pipelineHandler.pipelineTypesViaName.items():
-                settingType = resolveGenericArgument(type)
-                if settingType:
-                    settings = settingType({})
-                    settingsProto = settingsToProto(settings, typename)
-                    typeMessages.append(
-                        PipelineTypeProto(type=typename, settings=settingsProto)
-                    )
-
-            await self.websocket.sendToAll(
-                MessageProto(
-                    MessageTypeProto.SEND_PIPELINE_TYPES,
-                    pipeline_type_info=typeMessages,
-                ).SerializeToString()
-            )
-
-            for id, handle in self.runtimeHandler.cameraHandler.cameraHandles.items():
-                msg = cameraToProto(
-                    id,
-                    handle.name,
-                    handle.camera,
-                    self.runtimeHandler.pipelineBindings.get(id, 0),
-                    self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
-                        id, -1
-                    ),
-                    handle.stream,
-                    self.runtimeHandler.cameraHandler.cameraConfigBindings[id].id,
-                )
-
-                await self.websocket.sendToAll(
-                    createMessage(MessageTypeProto.ADD_CAMERA, msg)
-                )
-
-            for (
-                id,
-                config,
-            ) in self.runtimeHandler.cameraHandler.cameraConfigBindings.items():
-                calibrations = config.calibration
-
-                for calib in calibrations.values():
-                    calibProto = calib.toProto(id)
                     await self.websocket.sendToAll(
                         MessageProto(
-                            type=MessageTypeProto.CALIBRATION_DATA,
-                            calibration_data=calibProto,
+                            MessageTypeProto.SEND_PIPELINE_TYPES,
+                            pipeline_type_info=typeMessages,
                         ).SerializeToString()
                     )
+                except Exception:
+                    pass
 
-            for log_ in logs:
-                msg = createMessage(MessageTypeProto.LOG, log_)
-                await self.websocket.sendToAll(msg)
+                camera_handles = getattr(
+                    self.runtimeHandler.cameraHandler, "cameraHandles", {}
+                )
+                camera_configs = getattr(
+                    self.runtimeHandler.cameraHandler, "cameraConfigBindings", {}
+                )
+                pipeline_bindings_map = getattr(
+                    self.runtimeHandler, "pipelineBindings", {}
+                )
+                default_pipes = getattr(
+                    self.runtimeHandler.pipelineHandler, "defaultPipelineIndexes", {}
+                )
+                for id, handle in camera_handles.items():
+                    try:
+                        msg = cameraToProto(
+                            id,
+                            handle.name,
+                            handle.camera,
+                            pipeline_bindings_map.get(id, 0),
+                            default_pipes.get(id, -1),
+                            handle.stream,
+                            camera_configs[id].id if id in camera_configs else "",
+                        )
+                        await self.websocket.sendToAll(
+                            createMessage(MessageTypeProto.ADD_CAMERA, msg)
+                        )
+                    except Exception:
+                        continue
+
+                for id, config in camera_configs.items():
+                    try:
+                        calibrations = getattr(config, "calibration", {}) or {}
+                        for calib in calibrations.values():
+                            calibProto = calib.toProto(id)
+                            await self.websocket.sendToAll(
+                                MessageProto(
+                                    type=MessageTypeProto.CALIBRATION_DATA,
+                                    calibration_data=calibProto,
+                                ).SerializeToString()
+                            )
+                    except Exception:
+                        continue
+
+                try:
+                    for log_ in logs:
+                        msg = createMessage(MessageTypeProto.LOG, log_)
+                        await self.websocket.sendToAll(msg)
+                except Exception:
+                    pass
+            except Exception as e:
+                err(f"Error in websocket on_connect: {e}")
 
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):

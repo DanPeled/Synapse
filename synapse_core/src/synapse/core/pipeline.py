@@ -168,18 +168,22 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         if pub:
             pub.set(_makeNtValue(parsed, isMsgpack=isMsgpack))
 
-        if WebSocketServer.kInstance:
-            WebSocketServer.kInstance.sendToAllSync(
-                createMessage(
-                    MessageTypeProto.SET_PIPELINE_RESULT,
-                    PipelineResultProto(
-                        is_msgpack=isMsgpack,
-                        key=key,
-                        value=settingValueToProto(parsed),
-                        pipeline_index=self.pipelineIndex,
-                    ),
+        ws = WebSocketServer.kInstance
+        if ws:
+            try:
+                ws.sendToAllSync(
+                    createMessage(
+                        MessageTypeProto.SET_PIPELINE_RESULT,
+                        PipelineResultProto(
+                            is_msgpack=isMsgpack,
+                            key=key,
+                            value=settingValueToProto(parsed),
+                            pipeline_index=self.pipelineIndex,
+                        ),
+                    )
                 )
-            )
+            except Exception:
+                pass
 
     def setResults(self, value: TResultType | None) -> None:
         self.setDataValue(

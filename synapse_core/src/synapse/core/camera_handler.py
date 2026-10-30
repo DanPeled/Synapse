@@ -180,8 +180,6 @@ class CameraHandler:
                     m = max(self.cameraHandles.keys(), default=-1)
                     newIndex = m + 1
 
-                print(newIndex)
-
                 cameraIndex = newIndex
                 cameraConfig = CameraConfig(
                     name=info.name,
@@ -283,16 +281,24 @@ class CameraHandler:
             cv2.VideoWriter: The associated video writer.
         """
 
-        assert cameraIndex in self.cameraHandles
+        if cameraIndex not in self.cameraHandles:
+            raise KeyError(f"Camera {cameraIndex} not found")
 
         if cameraIndex in self.recordingOutputs:
             return self.recordingOutputs[cameraIndex]
         fourcc = cv2.VideoWriter.fourcc(*"mp4v")  # efficient MP4 codec
 
-        resolution = self.cameraHandles[cameraIndex].camera.getResolution()
+        try:
+            resolution = self.cameraHandles[cameraIndex].camera.getResolution()
+        except Exception:
+            resolution = self.streamSizes.get(cameraIndex, (640, 480))
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"records/{NtClient.NT_TABLE}_camera{cameraIndex}_{timestamp}.mp4"
+        try:
+            nt_table_name = NtClient.NT_TABLE
+        except Exception:
+            nt_table_name = "Synapse"
+        filename = f"records/{nt_table_name}_camera{cameraIndex}_{timestamp}.mp4"
 
         self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
             filename=filename,
@@ -302,10 +308,13 @@ class CameraHandler:
         )
         self.recordingResolutions[cameraIndex] = resolution
 
-        log.info(
-            f"Started recording camera {self.cameraHandles[cameraIndex].name} to {filename}",
-            shouldAlert=True,
-        )
+        try:
+            log.info(
+                f"Started recording camera {self.cameraHandles[cameraIndex].name} to {filename}",
+                shouldAlert=True,
+            )
+        except Exception:
+            pass
         self.recordFileNames[cameraIndex] = filename
 
         return self.recordingOutputs[cameraIndex]
@@ -331,9 +340,12 @@ class CameraHandler:
 
         self.lastPublishTime[cameraIndex] = now
 
+        streamSize = self.streamSizes.get(cameraIndex)
+        if streamSize is None:
+            streamSize = self.getStreamRes(cameraIndex)
         resized_frame = cv2.resize(
             frame,
-            self.streamSizes[cameraIndex],
+            streamSize,
             interpolation=cv2.INTER_AREA,
         )
 
@@ -341,13 +353,14 @@ class CameraHandler:
 
         if self.recordingStatus.get(cameraIndex, False):
             videoWriter = self.getRecordOutput(cameraIndex)
+            recordRes = self.recordingResolutions.get(cameraIndex)
+            if recordRes is None:
+                recordRes = self.cameraHandles[cameraIndex].camera.getResolution()
+                self.recordingResolutions[cameraIndex] = recordRes
             videoWriter.write(
                 cv2.resize(
                     frame,
-                    self.recordingResolutions.get(
-                        cameraIndex,
-                        self.cameraHandles[cameraIndex].camera.getResolution(),
-                    ),
+                    recordRes,
                 )
             )
 

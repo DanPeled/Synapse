@@ -68,22 +68,16 @@ class PipelineHandler:
     def onAddCamera(
         self, cameraIndex: CameraID, name: str, handle: CameraHandle
     ) -> None:
-        if cameraIndex not in self.pipelineInstanceBindings.keys():
-            self.pipelineInstanceBindings[cameraIndex] = {}
-        if cameraIndex not in self.pipelineNames:
-            self.pipelineNames[cameraIndex] = {}
-        if cameraIndex not in self.pipelineSettings:
-            self.pipelineSettings[cameraIndex] = {}
-        if cameraIndex not in self.pipelineTypeNames:
-            self.pipelineTypeNames[cameraIndex] = {}
-        if cameraIndex not in self.defaultPipelineIndexes:
-            self.defaultPipelineIndexes[cameraIndex] = 0
-        if cameraIndex not in self.cameraPipelineSettings:
-            self.cameraPipelineSettings[cameraIndex] = {}
+        self.pipelineInstanceBindings.setdefault(cameraIndex, {})
+        self.pipelineNames.setdefault(cameraIndex, {})
+        self.pipelineSettings.setdefault(cameraIndex, {})
+        self.pipelineTypeNames.setdefault(cameraIndex, {})
+        self.defaultPipelineIndexes.setdefault(cameraIndex, 0)
+        self.cameraPipelineSettings.setdefault(cameraIndex, {})
 
     def loadPipelineCameraSettings(self):
         camera_configs = GlobalSettings.getCameraConfigMap()
-        for cameraid in camera_configs.keys():
+        for cameraid in camera_configs:
             path = (
                 Config.getInstance().path.parent
                 / f"camera_{cameraid}"
@@ -104,16 +98,14 @@ class PipelineHandler:
                 )
 
     def loadPipelineInstances(self):
-        for cameraid in self.pipelineSettings.keys():
-            for pipelineIndex in self.pipelineSettings[cameraid].keys():
+        for cameraid, pipeline_settings in self.pipelineSettings.items():
+            for pipelineIndex, settings in pipeline_settings.items():
                 pipelineType = self.getPipelineTypeByIndex(pipelineIndex, cameraid)
-                settings = self.pipelineSettings[cameraid].get(pipelineIndex)
                 settingsMap: Dict = {}
                 if settings:
-                    settingsMap = {
-                        key: settings.getAPI().getValue(key)
-                        for key in settings.getSchema().keys()
-                    }
+                    schema = settings.getSchema()
+                    getValue = settings.getAPI().getValue
+                    settingsMap = {key: getValue(key) for key in schema}
                 else:
                     settingsMap = {}
 
@@ -311,7 +303,7 @@ class PipelineHandler:
 
         configPath = Config.getInstance().path.parent
 
-        for cameraIndex in camera_configs.keys():
+        for cameraIndex in camera_configs:
             with open(
                 configPath / f"camera_{cameraIndex}" / "pipeline_settings.yml"
             ) as f:
@@ -399,9 +391,10 @@ class PipelineHandler:
         Returns:
             Optional[Pipeline]: The pipeline instance, or None if not bound.
         """
-        if cameraid in self.pipelineInstanceBindings:
-            return self.pipelineInstanceBindings[cameraid].get(pipelineIndex)
-        return None
+        bindings = self.pipelineInstanceBindings.get(cameraid)
+        if bindings is None:
+            return None
+        return bindings.get(pipelineIndex)
 
     def setPipelineInstance(
         self, pipelineIndex: PipelineID, pipeline: Pipeline, cameraid: CameraID
