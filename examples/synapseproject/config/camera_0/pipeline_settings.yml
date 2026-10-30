@@ -3,54 +3,51 @@ pipeline_configs:
     name: FieldPose
     type: ApriltagPipeline
     settings:
-      {
-        crop_x1: -1,
-        crop_x2: 1,
-        crop_y1: -1,
-        crop_y2: 1,
-        iteration_count: 4,
-        num_threads: 1,
-        publish_camera_field_pose: true,
-        publish_tag_pose_3d: false,
-        quad_decimate: 1.0,
-        quad_sigma: 0.0,
-        refine_edges: true,
-        tag_family: tag36h11,
-        tag_size: 0.1651,
-        verbosity: 0,
-        brightness: 50,
-        gain: 50,
-        orientation: 0,
-        resolution: 1920x1080,
-        saturation: 50,
-        sharpness: 50,
-        contrast: 32,
-        hue: 50,
-        white_balance_automatic: 1,
-        power_line_frequency: 1,
-        white_balance_temperature: 4600,
-        auto_exposure: 3,
-        exposure_time_absolute: 12,
-      }
+      critical_angle: 45
+      crop_x: [-1, 1]
+      crop_y: [-1, 1]
+      deglitch: false
+      max_line_fit_mse: 10
+      max_num_maxima: 10
+      min_cluster_pixels: 300
+      min_white_black_diff: 5
+      num_threads: 1
+      publish_camera_field_pose: true
+      publish_tag_pose_3d: false
+      quad_decimate: 1.0
+      quad_sigma: 0.0
+      refine_edges: false
+      stick_to_ground: false
+      tag_family: tag36h11
+      tag_size: 0.1651
+      verbosity: 0
+      brightness: 50
+      gain: 50
+      orientation: 0
+      resolution: 1920x1080
+      saturation: 50
+      sharpness: 50
+      contrast: 32
+      hue: 50
+      white_balance_automatic: 1
+      power_line_frequency: 1
+      white_balance_temperature: 4600
+      auto_exposure: 3
+      exposure_time_absolute: 12
   1:
     name: Cheese
     type: ColorPipeline
     settings:
-      {
-        h_lower: 0,
-        h_upper: 10,
-        min_area: 500,
-        morph_kernel: 5,
-        publish_all_detections: true,
-        result_strategy: largest_area,
-        s_lower: 100,
-        s_upper: 255,
-        v_lower: 100,
-        v_upper: 255,
-        brightness: 50,
-        gain: 50,
-        orientation: 0,
-        resolution: 1920x1080,
-        saturation: 50,
-        sharpness: 50,
-      }
+      h: [0, 120]
+      min_area: 500
+      morph_kernel: 5
+      publish_all_detections: true
+      result_strategy: largest_area
+      s: [0, 100]
+      v: [100, 255]
+      brightness: 50
+      gain: 50
+      orientation: 0
+      resolution: 1920x1080
+      saturation: 50
+      sharpness: 50
