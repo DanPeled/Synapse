@@ -6,7 +6,6 @@ import asyncio
 import getpass
 import os
 import threading
-import time
 import traceback
 from multiprocessing import Process
 from pathlib import Path
