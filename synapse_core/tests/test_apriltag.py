@@ -44,7 +44,10 @@ class TestApriltagFieldJson(unittest.TestCase):
 
         self.assertIs(first, second)
         json_load.assert_called_once()
-        self.assertEqual(first.getTagPose(1).translation().x, 1.0)
+        tagPose = first.getTagPose(1)
+        self.assertIsNotNone(tagPose)
+        if tagPose is not None:
+            self.assertEqual(tagPose.translation().x, 1.0)
 
 
 class TestDrawTagDetectionMarker(unittest.TestCase):
@@ -52,7 +55,7 @@ class TestDrawTagDetectionMarker(unittest.TestCase):
         img = np.zeros((100, 100, 3), dtype=np.uint8)
         tag = AprilTagDetection(
             tagID=7,
-            homography=(1.0,) * 9,
+            homography=(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
             hamming=0,
             corners=makeCorners(10, 10, 40, 10, 40, 40, 10, 40),
             center=(25, 25),
