@@ -12,6 +12,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple
 
 import cscore as cs
 import cv2
+import numpy as np
 import synapse.log as log
 from ntcore import NetworkTableInstance
 from synapse_net.nt_client import NtClient
@@ -60,6 +61,12 @@ class CameraHandler:
 
         self.lastPublishTime: Dict[CameraID, float] = {}
         self.publishInterval: float = 1.0 / 30.0
+
+        # Reusable resize destinations, keyed by camera. Streaming resizes every
+        # captured frame, so allocating a new output image per frame shows up in
+        # profiles; these buffers let `cv2.resize` write in place instead.
+        self._streamFrameBuffers: Dict[CameraID, np.ndarray] = {}
+        self._recordFrameBuffers: Dict[CameraID, np.ndarray] = {}
 
         self.cameraScanningThread: threading.Thread
 
@@ -319,6 +326,51 @@ class CameraHandler:
 
         return self.recordingOutputs[cameraIndex]
 
+    def _resizeFrame(
+        self,
+        frame: Frame,
+        size: Resolution,
+        buffers: Dict[CameraID, np.ndarray],
+        cameraIndex: CameraID,
+    ) -> Frame:
+        """
+        Resizes `frame` to `size`, reusing a per-camera destination buffer.
+
+        Frames are already allocated by the camera handle buffer pool, so an
+        extra allocation (and copy) for every published frame is avoidable.
+        When the frame is already at the requested size no work is done at all.
+
+        Args:
+            frame (Frame): Source frame.
+            size (Resolution): Target (width, height).
+            buffers (Dict[CameraID, np.ndarray]): Destination cache to use.
+            cameraIndex (CameraID): Camera the frame belongs to.
+
+        Returns:
+            Frame: The resized frame (or `frame` itself if no resize is needed).
+        """
+        width, height = int(size[0]), int(size[1])
+
+        if frame.shape[1] == width and frame.shape[0] == height:
+            return frame
+
+        destination = buffers.get(cameraIndex)
+        if (
+            destination is None
+            or destination.shape[0] != height
+            or destination.shape[1] != width
+            or destination.dtype != frame.dtype
+        ):
+            destination = np.empty((height, width) + frame.shape[2:], dtype=frame.dtype)
+            buffers[cameraIndex] = destination
+
+        return cv2.resize(
+            frame,
+            (width, height),
+            dst=destination,
+            interpolation=cv2.INTER_AREA,
+        )
+
     def publishFrame(self, frame: Frame, handle: CameraHandle) -> None:
         """
         Publishes a frame to the output stream and optionally writes it to the recording output
@@ -343,10 +395,8 @@ class CameraHandler:
         streamSize = self.streamSizes.get(cameraIndex)
         if streamSize is None:
             streamSize = self.getStreamRes(cameraIndex)
-        resized_frame = cv2.resize(
-            frame,
-            streamSize,
-            interpolation=cv2.INTER_AREA,
+        resized_frame = self._resizeFrame(
+            frame, streamSize, self._streamFrameBuffers, cameraIndex
         )
 
         self.getOutput(cameraIndex).putFrame(resized_frame)
@@ -358,9 +408,8 @@ class CameraHandler:
                 recordRes = self.cameraHandles[cameraIndex].camera.getResolution()
                 self.recordingResolutions[cameraIndex] = recordRes
             videoWriter.write(
-                cv2.resize(
-                    frame,
-                    recordRes,
+                self._resizeFrame(
+                    frame, recordRes, self._recordFrameBuffers, cameraIndex
                 )
             )
 
@@ -371,6 +420,7 @@ class CameraHandler:
             )
             videoWriter = self.recordingOutputs.pop(cameraIndex)
             videoWriter.release()
+            self._recordFrameBuffers.pop(cameraIndex, None)
 
     def addCamera(
         self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
@@ -475,5 +525,7 @@ class CameraHandler:
 
         for record in self.recordingOutputs.values():
             record.release()
+        self._streamFrameBuffers.clear()
+        self._recordFrameBuffers.clear()
         for camera in self.cameraHandles.values():
             camera.close()
