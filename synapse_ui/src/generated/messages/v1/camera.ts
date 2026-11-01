@@ -48,6 +48,16 @@ export interface CalibrationDataProto {
   distCoeffs: number[];
 }
 
+/**
+ * Requests importing a calibration JSON file previously uploaded through the
+ * device file server. The path is relative to the file server root.
+ */
+export interface ImportCalibrationMessageProto {
+  cameraIndex: number;
+  filePath: string;
+  resolution: string;
+}
+
 export interface RemoveCalibrationDataMessageProto {
   cameraIndex: number;
   resolution: string;
@@ -738,6 +748,116 @@ export const CalibrationDataProto: MessageFns<CalibrationDataProto> = {
     return message;
   },
 };
+
+function createBaseImportCalibrationMessageProto(): ImportCalibrationMessageProto {
+  return { cameraIndex: 0, filePath: "", resolution: "" };
+}
+
+export const ImportCalibrationMessageProto: MessageFns<ImportCalibrationMessageProto> =
+  {
+    encode(
+      message: ImportCalibrationMessageProto,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.cameraIndex !== 0) {
+        writer.uint32(8).int32(message.cameraIndex);
+      }
+      if (message.filePath !== "") {
+        writer.uint32(18).string(message.filePath);
+      }
+      if (message.resolution !== "") {
+        writer.uint32(26).string(message.resolution);
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): ImportCalibrationMessageProto {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseImportCalibrationMessageProto();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.cameraIndex = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.filePath = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.resolution = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): ImportCalibrationMessageProto {
+      return {
+        cameraIndex: isSet(object.cameraIndex)
+          ? globalThis.Number(object.cameraIndex)
+          : 0,
+        filePath: isSet(object.filePath)
+          ? globalThis.String(object.filePath)
+          : "",
+        resolution: isSet(object.resolution)
+          ? globalThis.String(object.resolution)
+          : "",
+      };
+    },
+
+    toJSON(message: ImportCalibrationMessageProto): unknown {
+      const obj: any = {};
+      if (message.cameraIndex !== 0) {
+        obj.cameraIndex = Math.round(message.cameraIndex);
+      }
+      if (message.filePath !== "") {
+        obj.filePath = message.filePath;
+      }
+      if (message.resolution !== "") {
+        obj.resolution = message.resolution;
+      }
+      return obj;
+    },
+
+    create<I extends Exact<DeepPartial<ImportCalibrationMessageProto>, I>>(
+      base?: I,
+    ): ImportCalibrationMessageProto {
+      return ImportCalibrationMessageProto.fromPartial(base ?? ({} as any));
+    },
+    fromPartial<I extends Exact<DeepPartial<ImportCalibrationMessageProto>, I>>(
+      object: I,
+    ): ImportCalibrationMessageProto {
+      const message = createBaseImportCalibrationMessageProto();
+      message.cameraIndex = object.cameraIndex ?? 0;
+      message.filePath = object.filePath ?? "";
+      message.resolution = object.resolution ?? "";
+      return message;
+    },
+  };
 
 function createBaseRemoveCalibrationDataMessageProto(): RemoveCalibrationDataMessageProto {
   return { cameraIndex: 0, resolution: "" };

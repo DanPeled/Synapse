@@ -3,33 +3,20 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, List, Protocol, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 import cv2
 import numpy as np
 from synapse.stypes import Frame
 from typing_extensions import Buffer
-from wpimath import units
 from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 
 Homography = Tuple[float, float, float, float, float, float, float, float, float]
 Corners = Tuple[float, float, float, float, float, float, float, float]
 Scalar = Sequence[float | int]
-
-
-@dataclass
-class CameraPoseEstimate:
-    """Represents a Camera pose estimate in both tag space and field space.
-
-    Attributes:
-        cameraPose_tagSpace (Transform3d): The Camera pose relative to the AprilTag (tag space).
-        cameraPose_fieldSpace (Pose3d): The Camera pose relative to the field (field space).
-    """
-
-    cameraPose_tagSpace: Transform3d
-    cameraPose_fieldSpace: Pose3d
 
 
 def makeCorners(
@@ -116,6 +103,12 @@ class AprilTagDetector(ABC):
         refineEdges: bool = True
         quadDecimate: float = 2.0
         quadSigma: float = 0.0
+        minClusterPixels: int = 300
+        maxNumMaxima: int = 10
+        criticalAngle: float = math.radians(45)
+        minWhiteBlackDiff: int = 3
+        maxLineFitMSE: float = 10.0
+        deglitch: bool = False
 
     @abstractmethod
     def detect(self, frame: Buffer) -> List[AprilTagDetection]:
@@ -151,60 +144,6 @@ class AprilTagDetector(ABC):
     def getConfig(self) -> Config: ...
 
 
-class ApriltagPoseEstimator(ABC):
-    """Abstract base class for AprilTag pose estimators."""
-
-    @dataclass
-    class Config:
-        """Camera and tag configuration for pose estimation.
-
-        Attributes:
-            cx (float): Principal point x-coordinate.
-            cy (float): Principal point y-coordinate.
-            fx (float): Focal length in x direction.
-            fy (float): Focal length in y direction.
-            tagSize (units.meters): Physical size of the AprilTag.
-        """
-
-        cx: float
-        cy: float
-        fx: float
-        fy: float
-        tagSize: units.meters
-
-    @abstractmethod
-    def estimate(
-        self, tagDetection: AprilTagDetection, nIters: int
-    ) -> ApriltagPoseEstimate:
-        """Estimate the pose of a detected AprilTag.
-
-        Args:
-            tagDetection (AprilTagDetection): Detected AprilTag data.
-            nIters (int): Number of iterations for refinement.
-
-        Returns:
-            ApriltagPoseEstimate: Estimated 3D pose.
-        """
-        ...
-
-    @abstractmethod
-    def setConfig(self, config: Config) -> None:
-        """Set the estimator configuration.
-
-        Args:
-            config (Config): Pose estimation configuration.
-        """
-        ...
-
-    @abstractmethod
-    def getConfig(self) -> Config: ...
-
-
-class ICombinedApriltagCameraPoseEstimator(Protocol):
-    @staticmethod
-    def estimate(tags: Iterable[CameraPoseEstimate], **kwargs) -> Pose3d: ...
-
-
 def drawTagDetectionMarker(
     tag: AprilTagDetection,
     img: Frame,
@@ -217,17 +156,23 @@ def drawTagDetectionMarker(
         img (Frame): Image frame on which to draw.
     """
     # Convert flat tuple to 4 (x, y) points
-    corners = np.array(tag.corners, dtype=int).reshape(4, 2)
+    corners = tag.corners
+    points = np.array(
+        [
+            (corners[0], corners[1]),
+            (corners[2], corners[3]),
+            (corners[4], corners[5]),
+            (corners[6], corners[7]),
+        ],
+        dtype=np.int32,
+    )
 
-    # Draw the boundary
-    for i in range(4):
-        pt1 = tuple(corners[i])
-        pt2 = tuple(corners[(i + 1) % 4])
-        cv2.line(img, pt1, pt2, color=(0, 255, 0), thickness=2)
+    # Draw the boundary with a single call instead of four separate lines
+    cv2.polylines(img, [points], True, (0, 255, 0), 2)
 
     # Draw the center
-    center_x = int(sum(c[0] for c in corners) / 4)
-    center_y = int(sum(c[1] for c in corners) / 4)
+    center_x = int((corners[0] + corners[2] + corners[4] + corners[6]) / 4)
+    center_y = int((corners[1] + corners[3] + corners[5] + corners[7]) / 4)
     cv2.circle(img, (center_x, center_y), radius=4, color=(0, 0, 255), thickness=-1)
 
     # Draw the tag ID above the tag
@@ -242,24 +187,6 @@ def drawTagDetectionMarker(
         2,
         cv2.LINE_AA,
     )
-
-
-def tagToCameraPose(
-    tagFieldPose: Pose3d,
-    cameraToTagTransform: Transform3d,
-) -> CameraPoseEstimate:
-    """Compute the Camera's pose on the field given a tag's field pose.
-
-    Args:
-        tagFieldPose (Pose3d): AprilTag pose in field coordinates.
-        cameraToTagTransform (Transform3d): Transform from camera to tag coordinates.
-
-    Returns:
-        CameraPoseEstimate: Camera pose in both tag and field spaces.
-    """
-    cameraInTagSpace = cameraToTagTransform.inverse()
-    cameraInField: Pose3d = tagFieldPose.transformBy(cameraInTagSpace)
-    return CameraPoseEstimate(cameraInTagSpace, cameraInField)
 
 
 def opencvToWPI(opencv: Transform3d) -> Transform3d:
@@ -283,3 +210,9 @@ def opencvToWPI(opencv: Transform3d) -> Transform3d:
             yaw=opencv.rotation().Y(),
         ),
     )
+
+
+@dataclass
+class CameraPoseEstimate:
+    reprojectionError: float
+    cameraPoseEstimate: Pose3d

@@ -4,15 +4,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional
 
 from wpimath.geometry import Pose3d, Quaternion, Rotation3d, Translation3d
 
+TagId = int
+
 
 class ApriltagFieldJson:
-    TagId = int
-
     def __init__(self, jsonDict: Dict[TagId, Pose3d], length: float, width: float):
         self.fieldMap = jsonDict
         self.length = length
@@ -25,8 +26,14 @@ class ApriltagFieldJson:
             return ApriltagFieldJson.loadFieldJson(jsonDict)
 
     @staticmethod
+    @lru_cache(maxsize=1)
+    def loadFieldCached(filePath: str | Path) -> "ApriltagFieldJson":
+        """Loads a field map once, reusing it for every pipeline instance."""
+        return ApriltagFieldJson.loadField(filePath)
+
+    @staticmethod
     def loadFieldJson(data: dict) -> "ApriltagFieldJson":
-        tagsDict: Dict[ApriltagFieldJson.TagId, Pose3d] = {}
+        tagsDict: Dict[TagId, Pose3d] = {}
         for tag in data.get("tags", {}):
             poseDict = tag["pose"]
             rotation = poseDict["rotation"]["quaternion"]

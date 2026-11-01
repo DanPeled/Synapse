@@ -83,38 +83,37 @@ def parsePipelineResult(result: Any, _cache: dict[int, Any] | None = None) -> An
     if isinstance(result, (int, float, str, bool, type(None))):
         return result
 
-    # --- Geometry types ---
-    import wpimath.geometry as geom
-
-    if isinstance(result, geom.Translation2d):
-        out = serializeTranslation2d(result)
-    elif isinstance(result, geom.Translation3d):
-        out = serializeTranslation3d(result)
-    elif isinstance(result, geom.Rotation2d):
-        out = serializeRotation2d(result)
-    elif isinstance(result, geom.Rotation3d):
-        out = serializeRotation3d(result)
-    elif isinstance(result, geom.Pose2d):
-        out = serializePose2d(result)
-    elif isinstance(result, geom.Pose3d):
-        out = serializePose3d(result)
-    elif isinstance(result, geom.Transform2d):
-        out = serializeTransform2d(result)
-    elif isinstance(result, geom.Transform3d):
-        out = serializeTransform3d(result)
-    elif isinstance(result, geom.Twist2d):
-        out = serializeTwist2d(result)
-    elif isinstance(result, geom.Twist3d):
-        out = serializeTwist3d(result)
-
-    # --- Containers ---
-    elif isinstance(result, (list, tuple, set)):
+    # --- Containers (checked before geometry: they are the most common result
+    # shape and would otherwise pay for every geometry isinstance check) ---
+    if isinstance(result, (list, tuple, set)):
         out = [parsePipelineResult(v, _cache) for v in result]
     elif isinstance(result, dict):
         out = {
             parsePipelineResult(k, _cache): parsePipelineResult(v, _cache)
             for k, v in result.items()
         }
+
+    # --- Geometry types ---
+    elif isinstance(result, geometry.Translation2d):
+        out = serializeTranslation2d(result)
+    elif isinstance(result, geometry.Translation3d):
+        out = serializeTranslation3d(result)
+    elif isinstance(result, geometry.Rotation2d):
+        out = serializeRotation2d(result)
+    elif isinstance(result, geometry.Rotation3d):
+        out = serializeRotation3d(result)
+    elif isinstance(result, geometry.Pose2d):
+        out = serializePose2d(result)
+    elif isinstance(result, geometry.Pose3d):
+        out = serializePose3d(result)
+    elif isinstance(result, geometry.Transform2d):
+        out = serializeTransform2d(result)
+    elif isinstance(result, geometry.Transform3d):
+        out = serializeTransform3d(result)
+    elif isinstance(result, geometry.Twist2d):
+        out = serializeTwist2d(result)
+    elif isinstance(result, geometry.Twist3d):
+        out = serializeTwist3d(result)
 
     # --- Dataclasses ---
     elif is_dataclass(result):

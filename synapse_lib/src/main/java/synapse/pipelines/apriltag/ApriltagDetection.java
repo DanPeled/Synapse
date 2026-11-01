@@ -5,11 +5,10 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Represents a single detected AprilTag along with its associated metadata and pose estimates.
+ * Represents a single detected AprilTag along with its associated metadata and pose estimate.
  *
- * <p>This class contains the tag's ID, detection accuracy metrics, and the estimated poses of the
- * camera and tag in multiple coordinate systems. It is typically produced by an AprilTag detection
- * pipeline.
+ * <p>This class contains the tag's ID, detection accuracy metrics, and the tag's estimated pose in
+ * screen space. It is typically produced by an AprilTag detection pipeline.
  */
 public class ApriltagDetection {
 
@@ -28,32 +27,26 @@ public class ApriltagDetection {
    */
   public float hamming;
 
-  /**
-   * The estimated pose of the camera in the <b>field coordinate system</b>.
-   *
-   * <p>Format: {@code [x, y, z, roll, pitch, yaw]}.
-   */
-  public double[] cameraPose_fieldSpace;
+  /** The estimated pose of the detected AprilTag in screen space. */
+  public float[] tagPose_screenSpace;
 
   /**
-   * The estimated pose of the camera relative to the <b>detected tag</b>.
+   * Returns the tag's horizontal position in screen space.
    *
-   * <p>Format: {@code [x, y, z, roll, pitch, yaw]}.
+   * @return the tag's horizontal screen-space position
    */
-  public double[] cameraPose_tagSpace;
+  public float tx() {
+    return tagPose_screenSpace[0];
+  }
 
   /**
-   * The estimated pose of the tag in <b>screen coordinates</b>.
+   * Returns the tag's vertical position in screen space.
    *
-   * <p>Format: {@code [x, y, z, roll, pitch, yaw]}.
+   * @return the tag's vertical screen-space position
    */
-  public double[] tagPose_screenSpace;
-
-  /**
-   * The estimated pose(s) of the detected AprilTag, including multiple hypotheses or refined
-   * estimates if available.
-   */
-  public ApriltagPoseEstimate tag_estimate;
+  public float ty() {
+    return tagPose_screenSpace[1];
+  }
 
   /**
    * Creates a new, empty {@code ApriltagDetection}.
@@ -66,17 +59,6 @@ public class ApriltagDetection {
   /**
    * Compares this {@code ApriltagDetection} with another object for equality.
    *
-   * <p>Two {@code ApriltagDetection} objects are considered equal if all of the following are true:
-   *
-   * <ul>
-   *   <li>Their {@link #tagID} values are the same.
-   *   <li>Their {@link #hamming} values are numerically equal.
-   *   <li>Their {@link #cameraPose_fieldSpace}, {@link #cameraPose_tagSpace}, and {@link
-   *       #tagPose_screenSpace} arrays contain the same elements in the same order.
-   *   <li>Their {@link #tag_estimate} objects are equal according to {@link
-   *       ApriltagPoseEstimate#equals(Object)}.
-   * </ul>
-   *
    * @param o the object to compare with this instance
    * @return {@code true} if the objects are equal, {@code false} otherwise
    */
@@ -87,27 +69,16 @@ public class ApriltagDetection {
     ApriltagDetection that = (ApriltagDetection) o;
     return tagID == that.tagID
         && Float.compare(that.hamming, hamming) == 0
-        && Arrays.equals(cameraPose_fieldSpace, that.cameraPose_fieldSpace)
-        && Arrays.equals(cameraPose_tagSpace, that.cameraPose_tagSpace)
-        && Arrays.equals(tagPose_screenSpace, that.tagPose_screenSpace)
-        && Objects.equals(tag_estimate, that.tag_estimate);
+        && Arrays.equals(tagPose_screenSpace, that.tagPose_screenSpace);
   }
 
   /**
    * Computes a hash code for this {@code ApriltagDetection}.
    *
-   * <p>The hash code is based on the same fields used in {@link #equals(Object)}: {@link #tagID},
-   * {@link #hamming}, {@link #cameraPose_fieldSpace}, {@link #cameraPose_tagSpace}, {@link
-   * #tagPose_screenSpace}, and {@link #tag_estimate}.
-   *
    * @return a hash code value for this object
    */
   @Override
   public int hashCode() {
-    int result = Objects.hash(tagID, hamming, tag_estimate);
-    result = 31 * result + Arrays.hashCode(cameraPose_fieldSpace);
-    result = 31 * result + Arrays.hashCode(cameraPose_tagSpace);
-    result = 31 * result + Arrays.hashCode(tagPose_screenSpace);
-    return result;
+    return Objects.hash(tagID, hamming, Arrays.hashCode(tagPose_screenSpace));
   }
 }

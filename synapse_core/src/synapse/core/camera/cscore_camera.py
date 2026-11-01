@@ -78,12 +78,18 @@ class CsCoreCamera(SynapseCamera):
         return None
 
     def setVideoMode(self, videoMode: VideoMode) -> None:
-        self.camera.setVideoMode(
-            width=videoMode.width,
-            height=videoMode.height,
-            fps=videoMode.fps,
-            pixelFormat=VideoMode.PixelFormat.kMJPEG,
-        )
+        try:
+            self.camera.setVideoMode(
+                width=videoMode.width,
+                height=videoMode.height,
+                fps=videoMode.fps,
+                pixelFormat=VideoMode.PixelFormat.kMJPEG,
+            )
+        except Exception:
+            try:
+                self.camera.setVideoMode(videoMode)
+            except Exception:
+                raise
 
     def getResolution(self) -> Resolution:
         videoMode = self.camera.getVideoMode()

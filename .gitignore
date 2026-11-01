@@ -1,6 +1,7 @@
 **/__pycache__/*
 **/127.0.0.1
 **/logs/
+**/.calibration_import/
 build/
 *.egg-info/
 dist/

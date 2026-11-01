@@ -48,6 +48,19 @@ generate_buf:
 license:
 	shopt -s globstar; python3 -m reuse annotate --license GPL-3.0-or-later --copyright "Dan Peled" **/*.py
 
+
+format_lib:
+	@${CD} synapse_lib && ./gradlew spotlessApply
+	@${CD} synapse_lib/py && python3 -m ruff format .
+	@echo "Isort format..."
+	@${CD} synapse_lib/py && python3 -m isort .
+
+test:
+	@echo Reinstalling Synapse Runtime...
+	@pip install .
+	@echo Starting Tests...
+	@python3 -m pytest . --ignore=synapse_lib/
+
 format:
 	make license
 	@echo Ruff format...
@@ -65,14 +78,7 @@ format:
 		buf format -w
 	@cd ..
 	@echo SynapseLib SpotlessApply
-	@${CD} synapse_lib && \
-		./gradlew spotlessApply
-
-test:
-	@echo Reinstalling Synapse Runtime...
-	@pip install .
-	@echo Starting Tests...
-	@python3 -m pytest . --ignore=synapse_lib/
+	make format_lib
 
 # Build Python and UI
 build:

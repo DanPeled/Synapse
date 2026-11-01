@@ -7,11 +7,12 @@ import threading
 import time
 import traceback
 from datetime import datetime
-from functools import cache
+from itertools import chain
 from typing import Any, Dict, Final, List, Optional, Tuple
 
 import cscore as cs
 import cv2
+import numpy as np
 import synapse.log as log
 from ntcore import NetworkTableInstance
 from synapse_net.nt_client import NtClient
@@ -61,8 +62,15 @@ class CameraHandler:
         self.lastPublishTime: Dict[CameraID, float] = {}
         self.publishInterval: float = 1.0 / 30.0
 
-        self.cameraScanningThreadRunning: bool = True
+        # Reusable resize destinations, keyed by camera. Streaming resizes every
+        # captured frame, so allocating a new output image per frame shows up in
+        # profiles; these buffers let `cv2.resize` write in place instead.
+        self._streamFrameBuffers: Dict[CameraID, np.ndarray] = {}
+        self._recordFrameBuffers: Dict[CameraID, np.ndarray] = {}
+
         self.cameraScanningThread: threading.Thread
+
+        self.stopCameraScanEvent = threading.Event()
 
     def setRecordingStatus(
         self, cameraIndex: CameraID, status: RecordingStatus
@@ -88,9 +96,8 @@ class CameraHandler:
         self.createCameras()
 
         def cameraScanAction():
-            while self.cameraScanningThreadRunning:
+            while not self.stopCameraScanEvent.wait(10):
                 self.scanCameras()
-                time.sleep(10)
 
         self.cameraScanningThread = threading.Thread(
             target=cameraScanAction, daemon=True
@@ -166,8 +173,18 @@ class CameraHandler:
                 if len(self.requestedCameraUIDs.keys()) > 0:
                     if id in self.requestedCameraUIDs.keys():
                         newIndex = self.requestedCameraUIDs.pop(id)
+                    else:
+                        newIndex = (
+                            max(
+                                chain(
+                                    self.requestedCameraUIDs.values(),
+                                    self.cameraHandles.keys(),
+                                )
+                            )
+                            + 1
+                        )
                 else:
-                    m = max(self.cameraHandles.keys())
+                    m = max(self.cameraHandles.keys(), default=-1)
                     newIndex = m + 1
 
                 cameraIndex = newIndex
@@ -240,13 +257,14 @@ class CameraHandler:
             dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
             to their corresponding video output objects.
         """
+        assert cameraIndex in self.cameraHandles
+
         return cs.CameraServer.putVideo(
             name=f"{NtClient.NT_TABLE}/{getCameraTableName(self.cameraHandles[cameraIndex])}",
             width=self.getStreamRes(cameraIndex)[0],
             height=self.getStreamRes(cameraIndex)[1],
         )
 
-    @cache
     def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
         """
         Retrieves the video output stream for a specific camera.
@@ -259,7 +277,6 @@ class CameraHandler:
         """
         return self.streamOutputs[cameraIndex]
 
-    @cache
     def getRecordOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
         """
         Retrieves the recording output writer for a specific camera.
@@ -271,16 +288,24 @@ class CameraHandler:
             cv2.VideoWriter: The associated video writer.
         """
 
-        assert cameraIndex in self.cameraHandles
+        if cameraIndex not in self.cameraHandles:
+            raise KeyError(f"Camera {cameraIndex} not found")
 
         if cameraIndex in self.recordingOutputs:
             return self.recordingOutputs[cameraIndex]
         fourcc = cv2.VideoWriter.fourcc(*"mp4v")  # efficient MP4 codec
 
-        resolution = self.cameraHandles[cameraIndex].camera.getResolution()
+        try:
+            resolution = self.cameraHandles[cameraIndex].camera.getResolution()
+        except Exception:
+            resolution = self.streamSizes.get(cameraIndex, (640, 480))
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"records/{NtClient.NT_TABLE}_camera{cameraIndex}_{timestamp}.mp4"
+        try:
+            nt_table_name = NtClient.NT_TABLE
+        except Exception:
+            nt_table_name = "Synapse"
+        filename = f"records/{nt_table_name}_camera{cameraIndex}_{timestamp}.mp4"
 
         self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
             filename=filename,
@@ -290,13 +315,61 @@ class CameraHandler:
         )
         self.recordingResolutions[cameraIndex] = resolution
 
-        log.info(
-            f"Started recording camera {self.cameraHandles[cameraIndex].name} to {filename}",
-            shouldAlert=True,
-        )
+        try:
+            log.info(
+                f"Started recording camera {self.cameraHandles[cameraIndex].name} to {filename}",
+                shouldAlert=True,
+            )
+        except Exception:
+            pass
         self.recordFileNames[cameraIndex] = filename
 
         return self.recordingOutputs[cameraIndex]
+
+    def _resizeFrame(
+        self,
+        frame: Frame,
+        size: Resolution,
+        buffers: Dict[CameraID, np.ndarray],
+        cameraIndex: CameraID,
+    ) -> Frame:
+        """
+        Resizes `frame` to `size`, reusing a per-camera destination buffer.
+
+        Frames are already allocated by the camera handle buffer pool, so an
+        extra allocation (and copy) for every published frame is avoidable.
+        When the frame is already at the requested size no work is done at all.
+
+        Args:
+            frame (Frame): Source frame.
+            size (Resolution): Target (width, height).
+            buffers (Dict[CameraID, np.ndarray]): Destination cache to use.
+            cameraIndex (CameraID): Camera the frame belongs to.
+
+        Returns:
+            Frame: The resized frame (or `frame` itself if no resize is needed).
+        """
+        width, height = int(size[0]), int(size[1])
+
+        if frame.shape[1] == width and frame.shape[0] == height:
+            return frame
+
+        destination = buffers.get(cameraIndex)
+        if (
+            destination is None
+            or destination.shape[0] != height
+            or destination.shape[1] != width
+            or destination.dtype != frame.dtype
+        ):
+            destination = np.empty((height, width) + frame.shape[2:], dtype=frame.dtype)
+            buffers[cameraIndex] = destination
+
+        return cv2.resize(
+            frame,
+            (width, height),
+            dst=destination,
+            interpolation=cv2.INTER_AREA,
+        )
 
     def publishFrame(self, frame: Frame, handle: CameraHandle) -> None:
         """
@@ -319,17 +392,26 @@ class CameraHandler:
 
         self.lastPublishTime[cameraIndex] = now
 
-        resized_frame = cv2.resize(
-            frame,
-            self.streamSizes[cameraIndex],
-            interpolation=cv2.INTER_AREA,
+        streamSize = self.streamSizes.get(cameraIndex)
+        if streamSize is None:
+            streamSize = self.getStreamRes(cameraIndex)
+        resized_frame = self._resizeFrame(
+            frame, streamSize, self._streamFrameBuffers, cameraIndex
         )
 
         self.getOutput(cameraIndex).putFrame(resized_frame)
 
-        if self.recordingStatus[cameraIndex]:
+        if self.recordingStatus.get(cameraIndex, False):
             videoWriter = self.getRecordOutput(cameraIndex)
-            videoWriter.write(cv2.resize(frame, self.recordingResolutions[cameraIndex]))
+            recordRes = self.recordingResolutions.get(cameraIndex)
+            if recordRes is None:
+                recordRes = self.cameraHandles[cameraIndex].camera.getResolution()
+                self.recordingResolutions[cameraIndex] = recordRes
+            videoWriter.write(
+                self._resizeFrame(
+                    frame, recordRes, self._recordFrameBuffers, cameraIndex
+                )
+            )
 
         elif cameraIndex in self.recordingOutputs:
             log.info(
@@ -338,6 +420,7 @@ class CameraHandler:
             )
             videoWriter = self.recordingOutputs.pop(cameraIndex)
             videoWriter.release()
+            self._recordFrameBuffers.pop(cameraIndex, None)
 
     def addCamera(
         self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
@@ -395,7 +478,7 @@ class CameraHandler:
             .getTable("CameraPublisher")
             .getSubTable(NtClient.NT_TABLE)
             .getSubTable(cameraConfig.name)
-            .getStringArray("streams", [])[1]
+            .getStringArray("streams", ["", ""])[1]
             .replace("mjpg:", "")
         )
 
@@ -437,10 +520,12 @@ class CameraHandler:
         """
         Releases all video writers and closes all active camera connections.
         """
-        self.cameraScanningThreadRunning = False
+        self.stopCameraScanEvent.set()
         self.cameraScanningThread.join()
 
         for record in self.recordingOutputs.values():
             record.release()
+        self._streamFrameBuffers.clear()
+        self._recordFrameBuffers.clear()
         for camera in self.cameraHandles.values():
             camera.close()

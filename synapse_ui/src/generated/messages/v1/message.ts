@@ -11,6 +11,7 @@ import {
   CalibrationDataProto,
   CameraPerformanceProto,
   CameraProto,
+  ImportCalibrationMessageProto,
   RemoveCalibrationDataMessageProto,
   RenameCameraMessageProto,
   SetCameraRecordingStatusMessageProto,
@@ -65,6 +66,7 @@ export enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24,
   MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT = 25,
   MESSAGE_TYPE_PROTO_ALERT = 26,
+  MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION = 27,
   UNRECOGNIZED = -1,
 }
 
@@ -151,6 +153,9 @@ export function messageTypeProtoFromJSON(object: any): MessageTypeProto {
     case 26:
     case "MESSAGE_TYPE_PROTO_ALERT":
       return MessageTypeProto.MESSAGE_TYPE_PROTO_ALERT;
+    case 27:
+    case "MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION":
+      return MessageTypeProto.MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -214,6 +219,8 @@ export function messageTypeProtoToJSON(object: MessageTypeProto): string {
       return "MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT";
     case MessageTypeProto.MESSAGE_TYPE_PROTO_ALERT:
       return "MESSAGE_TYPE_PROTO_ALERT";
+    case MessageTypeProto.MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION:
+      return "MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION";
     case MessageTypeProto.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -263,6 +270,8 @@ export interface MessageProto {
   pipelineResult?: PipelineResultProto | undefined;
   /** Alert message containing alert data */
   alert?: AlertProto | undefined;
+  /** Request to import an uploaded calibration JSON */
+  importCalibration?: ImportCalibrationMessageProto | undefined;
   /** List of pipeline types available in the system */
   pipelineTypeInfo: PipelineTypeProto[];
 }
@@ -290,6 +299,7 @@ function createBaseMessageProto(): MessageProto {
     setConnectionInfo: undefined,
     pipelineResult: undefined,
     alert: undefined,
+    importCalibration: undefined,
     pipelineTypeInfo: [],
   };
 }
@@ -412,6 +422,12 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.alert !== undefined) {
       AlertProto.encode(message.alert, writer.uint32(178).fork()).join();
+    }
+    if (message.importCalibration !== undefined) {
+      ImportCalibrationMessageProto.encode(
+        message.importCalibration,
+        writer.uint32(186).fork(),
+      ).join();
     }
     for (const v of message.pipelineTypeInfo) {
       PipelineTypeProto.encode(v!, writer.uint32(162).fork()).join();
@@ -641,6 +657,17 @@ export const MessageProto: MessageFns<MessageProto> = {
           message.alert = AlertProto.decode(reader, reader.uint32());
           continue;
         }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.importCalibration = ImportCalibrationMessageProto.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
         case 20: {
           if (tag !== 162) {
             break;
@@ -722,6 +749,9 @@ export const MessageProto: MessageFns<MessageProto> = {
         : undefined,
       alert: isSet(object.alert)
         ? AlertProto.fromJSON(object.alert)
+        : undefined,
+      importCalibration: isSet(object.importCalibration)
+        ? ImportCalibrationMessageProto.fromJSON(object.importCalibration)
         : undefined,
       pipelineTypeInfo: globalThis.Array.isArray(object?.pipelineTypeInfo)
         ? object.pipelineTypeInfo.map((e: any) => PipelineTypeProto.fromJSON(e))
@@ -820,6 +850,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     }
     if (message.alert !== undefined) {
       obj.alert = AlertProto.toJSON(message.alert);
+    }
+    if (message.importCalibration !== undefined) {
+      obj.importCalibration = ImportCalibrationMessageProto.toJSON(
+        message.importCalibration,
+      );
     }
     if (message.pipelineTypeInfo?.length) {
       obj.pipelineTypeInfo = message.pipelineTypeInfo.map((e) =>
@@ -929,6 +964,11 @@ export const MessageProto: MessageFns<MessageProto> = {
     message.alert =
       object.alert !== undefined && object.alert !== null
         ? AlertProto.fromPartial(object.alert)
+        : undefined;
+    message.importCalibration =
+      object.importCalibration !== undefined &&
+      object.importCalibration !== null
+        ? ImportCalibrationMessageProto.fromPartial(object.importCalibration)
         : undefined;
     message.pipelineTypeInfo =
       object.pipelineTypeInfo?.map((e) => PipelineTypeProto.fromPartial(e)) ||

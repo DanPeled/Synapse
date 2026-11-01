@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
 
+import numpy as np
 from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
@@ -86,6 +87,43 @@ class TestRuntimeManager(unittest.TestCase):
             assign_defaults.assert_called_once()
             setup_nt.assert_called_once()
             start_metrics.assert_called_once()
+
+
+class TestHandleFramePublishing(unittest.TestCase):
+    def setUp(self):
+        self.mock_camera_handler = MagicMock()
+
+        with patch(
+            "synapse.core.runtime_handler.CameraHandler",
+            return_value=self.mock_camera_handler,
+        ):
+            self.handler = RuntimeManager(directory=Path("."))
+
+        self.frame = np.zeros((10, 10, 3), dtype=np.uint8)
+
+    def test_returns_frame_for_default_view_id(self):
+        entry = MagicMock()
+        self.handler.cameraFrameEntries[0] = entry
+        self.handler.cameraViewIDs[0] = self.handler.DEFAULT_STEP
+
+        result = self.handler.handleFramePublishing(self.frame, 0)
+
+        self.assertIs(result, self.frame)
+        # The cached view id avoids any per-frame NetworkTables reads.
+        entry.exists.assert_not_called()
+        entry.getString.assert_not_called()
+
+    def test_hides_frame_for_non_default_view_id(self):
+        self.handler.cameraFrameEntries[0] = MagicMock()
+        self.handler.cameraViewIDs[0] = "overlay"
+
+        self.assertIsNone(self.handler.handleFramePublishing(self.frame, 0))
+
+    def test_returns_none_for_missing_result(self):
+        self.handler.cameraFrameEntries[0] = MagicMock()
+        self.handler.cameraViewIDs[0] = self.handler.DEFAULT_STEP
+
+        self.assertIsNone(self.handler.handleFramePublishing(None, 0))
 
 
 if __name__ == "__main__":

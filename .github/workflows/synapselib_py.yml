@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           cache: pip
-          python-version: "3.10.7"
+          python-version: "3.12.3"
 
       - name: Install Python dependencies
         run: |
@@ -71,10 +71,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: "3.12.3"
 
       - name: Install Ruff and isort
-        run: pip install ruff isort
+        run: |
+          pip install ruff==0.15.20
+          pip install isort
 
       - name: Run Ruff linting
         run: ruff check .
@@ -96,7 +98,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: "3.12.3"
 
       - name: Install Python dependencies
         run: pip install .
@@ -121,7 +123,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10.7"
+          python-version: "3.12.3"
 
       - name: Install Python dependencies
         run: pip install .

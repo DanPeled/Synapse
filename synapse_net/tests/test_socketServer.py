@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -132,6 +133,36 @@ def test_sendToAllSync_calls_asyncio_run(monkeypatch):
     monkeypatch.setattr(server, "sendToAll", mock_sendToAll)
     server.sendToAllSync(b"message")
     assert called.get("called") is True
+
+
+@pytest.mark.asyncio
+async def test_sendToAllSync_queues_messages_when_loop_running():
+    server = WebSocketServer("localhost", 8765)
+    server.loop = asyncio.get_running_loop()
+
+    client = AsyncMock()
+    client.open = True
+    server.clients.add(client)
+
+    messages = [b"one", b"two", b"three"]
+    for message in messages:
+        server.sendToAllSync(message)
+
+    # The queue is created by a callback scheduled on the loop, so yield until
+    # it exists before waiting for it to drain.
+    for _ in range(10):
+        if server._sendQueue is not None:
+            break
+        await asyncio.sleep(0)
+
+    assert server._sendQueue is not None
+    await asyncio.wait_for(server._sendQueue.join(), timeout=1)
+
+    assert [call.args[0] for call in client.send.await_args_list] == messages
+
+    await server.close()
+    assert server._sendQueue is None
+    assert server._sendTask is None
 
 
 @pytest.mark.asyncio

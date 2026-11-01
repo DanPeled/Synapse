@@ -88,8 +88,12 @@ class RuntimeManager:
         self.cameraHandler: CameraHandler = CameraHandler()
         self.pipelineBindings: Dict[CameraID, PipelineID] = {}
         self.cameraFrameEntries: Dict[CameraID, NetworkTableEntry] = {}
+        # Last known "view id" per camera, kept up to date by an NT listener so
+        # the per-frame path does not have to read NetworkTables.
+        self.cameraViewIDs: Dict[CameraID, str] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
+        self._lastLatencyReportTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
 
@@ -244,26 +248,33 @@ class RuntimeManager:
                     npuUsage,
                 ]
 
-                if WebSocketServer.kInstance is not None:
-                    metricsMessage = HardwareMetricsProto()
-                    metricsMessage.cpu_temp = cpuTemp
-                    metricsMessage.cpu_usage = cpuUsage
-                    metricsMessage.uptime = uptime
-                    metricsMessage.memory = memory
-                    metricsMessage.ram_usage = usedRam
-                    metricsMessage.disk_usage = usedDiskPct
+                ws = WebSocketServer.kInstance
+                if ws is not None:
+                    try:
+                        metricsMessage = HardwareMetricsProto()
+                        metricsMessage.cpu_temp = cpuTemp
+                        metricsMessage.cpu_usage = cpuUsage
+                        metricsMessage.uptime = uptime
+                        metricsMessage.memory = memory
+                        metricsMessage.ram_usage = usedRam
+                        metricsMessage.disk_usage = usedDiskPct
 
-                    WebSocketServer.kInstance.sendToAllSync(
-                        createMessage(
-                            MessageTypeProto.SEND_METRICS,
-                            metricsMessage,
+                        ws.sendToAllSync(
+                            createMessage(
+                                MessageTypeProto.SEND_METRICS,
+                                metricsMessage,
+                            )
                         )
-                    )
-
-                entry.set(metrics)
+                    except Exception:
+                        pass
 
                 try:
-                    time.sleep(1.4)
+                    entry.set(metrics)
+                except Exception:
+                    pass
+
+                try:
+                    time.sleep(1.0)
                 except Exception:
                     continue
 
@@ -362,7 +373,12 @@ class RuntimeManager:
             self.pipelineBindings[cameraIndex], cameraIndex
         )
         setting = settings.getAPI().getSetting(prop)
-        if setting is not None:
+
+        if prop in camSettings:
+            assert camera is not None
+            camera.setProperty(prop=prop, value=value)
+            pipeline.setCameraSetting(prop, value)
+        elif setting is not None:
             pipeline.setSetting(prop, value)
             pipeline.onSettingChanged(setting, settings.getSetting(prop))
         else:
@@ -370,11 +386,6 @@ class RuntimeManager:
                 f"Attempted to set setting {prop} on pipeline #{pipeline.pipelineIndex} but it was not found!"
             )
             return
-
-        if prop in camSettings:
-            assert camera is not None
-            camera.setProperty(prop=prop, value=value)
-            pipeline.setCameraSetting(prop, value)
 
         self.onSettingChanged.call(prop, value, cameraIndex)
 
@@ -395,7 +406,10 @@ class RuntimeManager:
                 )
                 return
 
-        self.propPubs[key].set(value)
+        try:
+            self.propPubs[key].set(value)
+        except Exception:
+            pass
 
     @staticmethod
     def getEventDataValue(
@@ -417,26 +431,25 @@ class RuntimeManager:
 
         if topic_type == NetworkTableType.kBoolean:
             return value.getBoolean()
-        elif topic_type == NetworkTableType.kFloat:
+        if topic_type == NetworkTableType.kFloat:
             return value.getFloat()
-        elif topic_type == NetworkTableType.kDouble:
+        if topic_type == NetworkTableType.kDouble:
             return value.getDouble()
-        elif topic_type == NetworkTableType.kInteger:
+        if topic_type == NetworkTableType.kInteger:
             return value.getInteger()
-        elif topic_type == NetworkTableType.kString:
+        if topic_type == NetworkTableType.kString:
             return value.getString()
-        elif topic_type == NetworkTableType.kBooleanArray:
+        if topic_type == NetworkTableType.kBooleanArray:
             return value.getBooleanArray()
-        elif topic_type == NetworkTableType.kFloatArray:
+        if topic_type == NetworkTableType.kFloatArray:
             return value.getFloatArray()
-        elif topic_type == NetworkTableType.kDoubleArray:
+        if topic_type == NetworkTableType.kDoubleArray:
             return value.getDoubleArray()
-        elif topic_type == NetworkTableType.kIntegerArray:
+        if topic_type == NetworkTableType.kIntegerArray:
             return value.getIntegerArray()
-        elif topic_type == NetworkTableType.kStringArray:
+        if topic_type == NetworkTableType.kStringArray:
             return value.getStringArray()
-        else:
-            raise ValueError(f"Unsupported topic type: {topic_type}")
+        raise ValueError(f"Unsupported topic type: {topic_type}")
 
     def setPipelineByIndex(
         self, cameraIndex: CameraID, pipelineIndex: PipelineID
@@ -533,30 +546,80 @@ class RuntimeManager:
     def processCamera(self, cameraIndex: CameraID):
         handle: CameraHandle = self.cameraHandler.cameraHandles[cameraIndex]
 
-        maxFps = float(handle.camera.getMaxFPS())
+        try:
+            maxFps = float(handle.camera.getMaxFPS())
+        except Exception:
+            maxFps = 30.0
+        noSignalFrame: Optional[Frame] = None
+        last_no_signal_publish = 0.0
 
-        log.info(f"Started {handle.name} loop (maxFPS={maxFps})")
+        try:
+            log.info(
+                f"Started {getattr(handle, 'name', cameraIndex)} loop (maxFPS={maxFps})"
+            )
+        except Exception:
+            pass
 
         while self.running.is_set():
-            if handle.camera.isConnected():
-                ret, frame = handle.grabFrame()
-                if ret and frame is not None:
-                    frame = self.fixtureFrame(cameraIndex, frame)
-                    self._processAndPublishFrame(cameraIndex, frame)
-                    continue
-            self.cameraHandler.publishFrame(
-                generateNoSignalFrame(handle.name, handle.cameraIndex), handle
-            )
+            cam = handle.camera
+            try:
+                if cam.isConnected():
+                    ret, frame = handle.grabFrame()
+                    if ret and frame is not None:
+                        # If we just switched resolution, sometimes the first frame might be bad
+                        try:
+                            h, w = frame.shape[:2]
+                            if h == 0 or w == 0:
+                                raise ValueError("bad frame")
+                        except Exception:
+                            # Try again quickly without going to no-signal
+                            time.sleep(0.002)
+                            continue
+                        try:
+                            frame = self.fixtureFrame(cameraIndex, frame)
+                        except Exception:
+                            pass
+                        try:
+                            self._processAndPublishFrame(cameraIndex, frame)
+                        except Exception:
+                            pass
+                        continue
+            except Exception:
+                pass
+
+            now = time.perf_counter()
+            if (
+                now - last_no_signal_publish < 0.02
+            ):  # throttle no-signal more aggressively
+                time.sleep(0.002)
+                continue
+
+            try:
+                if noSignalFrame is None:
+                    noSignalFrame = generateNoSignalFrame(
+                        getattr(handle, "name", str(cameraIndex)),
+                        handle.cameraIndex,
+                    )
+                self.cameraHandler.publishFrame(noSignalFrame, handle)
+                last_no_signal_publish = now
+            except Exception:
+                pass
+            time.sleep(0.002)
 
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
-        handle: CameraHandle = self.cameraHandler.cameraHandles[cameraIndex]
+        camera_handles = self.cameraHandler.cameraHandles
+        handle = camera_handles[cameraIndex]
 
         now = time.perf_counter()
 
         # ---- Camera FPS (frame-to-frame) ----
         lastTime = self._lastFrameTime.get(cameraIndex)
         if lastTime is not None:
-            cameraFps = 1.0 / (now - lastTime)
+            frameInterval = now - lastTime
+            if frameInterval > 0:
+                cameraFps = 1.0 / frameInterval
+            else:
+                cameraFps = 0.0
         else:
             cameraFps = 0.0
         self._lastFrameTime[cameraIndex] = now
@@ -564,8 +627,9 @@ class RuntimeManager:
         # ---- Processing latency ----
         processStart = time.perf_counter()
 
+        pipeline_bindings = self.pipelineBindings
         pipeline = self.pipelineHandler.getPipeline(
-            self.pipelineBindings.get(cameraIndex, -1), cameraIndex
+            pipeline_bindings.get(cameraIndex, -1), cameraIndex
         )
 
         processedFrame = frame
@@ -577,30 +641,39 @@ class RuntimeManager:
                     processedFrame = out
             except Exception as e:
                 log.err(
-                    f"Pipeline error for camera {handle.name}: {e}\n{traceback.format_exc()}"
+                    f"Pipeline error for camera {getattr(handle, 'name', cameraIndex)}: {e}\n{traceback.format_exc()}"
                 )
 
         processLatency = time.perf_counter() - processStart
 
-        cv2.putText(
-            processedFrame,
-            f"FPS: {int(cameraFps)}",
-            FPSView.position,
-            FPSView.font,
-            FPSView.fontScale,
-            FPSView.color,
-            FPSView.thickness,
-            lineType=cv2.LINE_8,
-        )
+        try:
+            cv2.putText(
+                processedFrame,
+                f"FPS: {int(cameraFps)}",
+                FPSView.position,
+                FPSView.font,
+                FPSView.fontScale,
+                FPSView.color,
+                FPSView.thickness,
+                lineType=cv2.LINE_8,
+            )
+        except Exception:
+            pass
 
-        self.sendLatency(
-            cameraIndex,
-            0,
-            processLatency,
-            cameraFps,
-        )
+        try:
+            self.sendLatency(
+                cameraIndex,
+                0.0,
+                processLatency,
+                cameraFps,
+            )
+        except Exception:
+            pass
 
-        self.cameraHandler.publishFrame(processedFrame, handle)
+        try:
+            self.cameraHandler.publishFrame(processedFrame, handle)
+        except Exception:
+            pass
 
     def run(self):
         """
@@ -614,7 +687,7 @@ class RuntimeManager:
         )
 
         while self.running.is_set():
-            time.sleep(0.05)
+            time.sleep(0.01)
 
     def handleResults(
         self, result: PipelineProcessFrameResult, cameraIndex: CameraID
@@ -624,27 +697,37 @@ class RuntimeManager:
     def handleFramePublishing(
         self, result: FrameResult, cameraIndex: CameraID
     ) -> Optional[Frame]:
-        if cameraIndex not in self.cameraFrameEntries:
+        entry = self.cameraFrameEntries.get(cameraIndex)
+        if entry is None:
             entry = getCameraTable(
                 self.cameraHandler.getCameraHandle(cameraIndex)
             ).getEntry(CameraSettingsKeys.kViewID.value)
             if not entry.exists():
                 entry.setString(self.DEFAULT_STEP)
             self.cameraFrameEntries[cameraIndex] = entry
-        entry = self.cameraFrameEntries[cameraIndex]
+
+            # Read the view id once and keep it in sync through a listener
+            # instead of hitting NetworkTables for every published frame.
+            self.cameraViewIDs[cameraIndex] = entry.getString(
+                defaultValue=self.DEFAULT_STEP
+            )
+
+            def onViewIDChanged(event: Event, cameraIndex=cameraIndex) -> None:
+                assert isinstance(event.data, ValueEventData)
+                self.cameraViewIDs[cameraIndex] = event.data.value.getString()
+
+            NetworkTableInstance.getDefault().addListener(
+                entry, EventFlags.kValueRemote, onViewIDChanged
+            )
 
         if result is None:
             return
 
-        entry_exists = entry.exists()
-        entry_value = (
-            entry.getString(defaultValue=self.DEFAULT_STEP)
-            if entry_exists
-            else self.DEFAULT_STEP
-        )
-
         if isinstance(result, Frame):
-            if entry_value == self.DEFAULT_STEP:
+            if (
+                self.cameraViewIDs.get(cameraIndex, self.DEFAULT_STEP)
+                == self.DEFAULT_STEP
+            ):
                 return result
 
     def sendLatency(
@@ -655,10 +738,11 @@ class RuntimeManager:
         fps: float,
     ) -> None:
         current_time = time.time()
-        if current_time - self.lastLatencyReportTime < 1.0:
+        last_report_time = self._lastLatencyReportTime.get(cameraIndex, 0.0)
+        if current_time - last_report_time < 1.0:
             return  # Skip sending
 
-        self.lastLatencyReportTime = current_time
+        self._lastLatencyReportTime[cameraIndex] = current_time
 
         cameraTable = getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex))
         cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
@@ -742,20 +826,22 @@ class RuntimeManager:
         return (image * 255).astype(np.uint8)
 
     def fixtureFrame(self, cameraIndex: CameraID, frame: Frame) -> Frame:
-        if (
-            cameraIndex in self.pipelineBindings
-            and self.pipelineBindings[cameraIndex]
-            in self.pipelineHandler.pipelineInstanceBindings
-        ):
-            pipeline = self.pipelineHandler.getPipeline(
-                self.pipelineBindings[cameraIndex], cameraIndex
-            )
-            if pipeline is None:
-                return frame
-            settings: Optional[CameraSettings] = pipeline.getCameraSettings()
-            if settings is not None:
-                frame = self.rotateCameraBySettings(settings, frame)
-
+        pipelineIndex = self.pipelineBindings.get(cameraIndex)
+        if pipelineIndex is None:
+            return frame
+        pipeline = self.pipelineHandler.getPipeline(pipelineIndex, cameraIndex)
+        if pipeline is None:
+            return frame
+        settings = pipeline.getCameraSettings()
+        if settings is not None:
+            orientation = settings.getSetting(CameraSettings.orientation.key)
+            if orientation in (90, 180, 270):
+                rotations = {
+                    90: cv2.ROTATE_90_CLOCKWISE,
+                    180: cv2.ROTATE_180,
+                    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+                }
+                frame = cv2.rotate(frame, rotations[orientation])
         return frame
 
     def toDict(self) -> Dict:

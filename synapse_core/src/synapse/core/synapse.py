@@ -3,9 +3,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import asyncio
+import getpass
+import json
 import os
 import threading
-import time
 import traceback
 from multiprocessing import Process
 from pathlib import Path
@@ -37,15 +38,18 @@ from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
 from ..log import err, info, logs, missingFeature, warn
 from ..stypes import (CameraID, CameraName, PipelineID, RecordingFilename,
-                      RecordingStatus)
+                      RecordingStatus, ResolutionString)
 from ..util import getIP, resolveGenericArgument
 from .camera.camera_handle import CameraHandle
+from .camera_factory import CalibrationData
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
-from .settings_api import (cameraToProto, protoToSettingValue, settingsToProto,
-                           settingValueToProto)
+from .settings_api import (CameraSettings, cameraToProto, protoToSettingValue,
+                           settingsToProto, settingValueToProto)
+
+kCalibrationImportDirectory: Final[str] = ".calibration_import"
 
 
 class Synapse:
@@ -155,6 +159,7 @@ class Synapse:
 
             self.managerResponder = UDPDeviceResponder(
                 config.network.name,
+                getpass.getuser(),
                 config.network.teamNumber,
                 SYNAPSE_VERSION,
             )
@@ -254,115 +259,144 @@ class Synapse:
 
             from ..__version__ import SYNAPSE_VERSION
 
-            if self.ntClient:
-                connectionDetails = SetConnectionInfoProto(
-                    connected_to_networktables=self.ntClient.nt_inst.isConnected()
+            try:
+                if self.ntClient:
+                    connectionDetails = SetConnectionInfoProto(
+                        connected_to_networktables=self.ntClient.nt_inst.isConnected()
+                    )
+
+                    await self.websocket.sendToClient(
+                        ws,
+                        createMessage(
+                            MessageTypeProto.SET_DEVICE_CONNECTION_STATUS,
+                            connectionDetails,
+                        ),
+                    )
+
+                deviceInfo: DeviceInfoProto = DeviceInfoProto(
+                    ip=getIP(),
+                    version=SYNAPSE_VERSION,
+                    platform=metrics.Platform.getCurrentPlatform().getOSType().value,
+                    hostname=self.runtimeHandler.networkSettings.hostname,
+                )
+
+                try:
+                    deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
+                except Exception:
+                    pass
+
+                await self.websocket.sendToClient(
+                    ws,
+                    createMessage(
+                        MessageTypeProto.SET_NETWORK_SETTINGS,
+                        self.runtimeHandler.networkSettings.toProto(),
+                    ),
                 )
 
                 await self.websocket.sendToClient(
                     ws,
                     createMessage(
-                        MessageTypeProto.SET_DEVICE_CONNECTION_STATUS, connectionDetails
+                        MessageTypeProto.SEND_DEVICE_INFO,
+                        deviceInfo,
                     ),
                 )
 
-            deviceInfo: DeviceInfoProto = DeviceInfoProto(
-                ip=getIP(),
-                version=SYNAPSE_VERSION,
-                platform=metrics.Platform.getCurrentPlatform().getOSType().value,
-                hostname=self.runtimeHandler.networkSettings.hostname,
-            )
+                while not getattr(self.runtimeHandler, "isSetup", False):
+                    try:
+                        await asyncio.sleep(0.01)
+                    except Exception:
+                        break
 
-            deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
+                pipeline_bindings = getattr(
+                    self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {}
+                )
+                for cameraid, pipelines in pipeline_bindings.items():
+                    for id, pipeline in pipelines.items():
+                        try:
+                            msg = pipelineToProto(pipeline, id, cameraid)
+                            await self.websocket.sendToAll(
+                                createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+                            )
+                        except Exception:
+                            continue
 
-            await self.websocket.sendToClient(
-                ws,
-                createMessage(
-                    MessageTypeProto.SET_NETWORK_SETTINGS,
-                    self.runtimeHandler.networkSettings.toProto(),
-                ),
-            )
+                typeMessages: List[PipelineTypeProto] = []
+                pipeline_types = getattr(
+                    self.runtimeHandler.pipelineHandler, "pipelineTypesViaName", {}
+                )
+                for typename, typecls in pipeline_types.items():
+                    try:
+                        settingType = resolveGenericArgument(typecls)
+                        if settingType:
+                            settings = settingType({})
+                            settingsProto = settingsToProto(settings, typename)
+                            typeMessages.append(
+                                PipelineTypeProto(type=typename, settings=settingsProto)
+                            )
+                    except Exception:
+                        continue
 
-            await self.websocket.sendToClient(
-                ws,
-                createMessage(
-                    MessageTypeProto.SEND_DEVICE_INFO,
-                    deviceInfo,
-                ),
-            )
-
-            while not self.runtimeHandler.isSetup:
                 try:
-                    time.sleep(0.1)
-                except Exception:
-                    ...
-
-            for (
-                cameraid,
-                pipelines,
-            ) in self.runtimeHandler.pipelineHandler.pipelineInstanceBindings.items():
-                for id, pipeline in pipelines.items():
-                    msg = pipelineToProto(pipeline, id, cameraid)
-
-                    await self.websocket.sendToAll(
-                        createMessage(MessageTypeProto.ADD_PIPELINE, msg)
-                    )
-
-            typeMessages: List[PipelineTypeProto] = []
-            for (
-                typename,
-                type,
-            ) in self.runtimeHandler.pipelineHandler.pipelineTypesViaName.items():
-                settingType = resolveGenericArgument(type)
-                if settingType:
-                    settings = settingType({})
-                    settingsProto = settingsToProto(settings, typename)
-                    typeMessages.append(
-                        PipelineTypeProto(type=typename, settings=settingsProto)
-                    )
-
-            await self.websocket.sendToAll(
-                MessageProto(
-                    MessageTypeProto.SEND_PIPELINE_TYPES,
-                    pipeline_type_info=typeMessages,
-                ).SerializeToString()
-            )
-
-            for id, handle in self.runtimeHandler.cameraHandler.cameraHandles.items():
-                msg = cameraToProto(
-                    id,
-                    handle.name,
-                    handle.camera,
-                    self.runtimeHandler.pipelineBindings.get(id, 0),
-                    self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
-                        id, -1
-                    ),
-                    handle.stream,
-                    self.runtimeHandler.cameraHandler.cameraConfigBindings[id].id,
-                )
-
-                await self.websocket.sendToAll(
-                    createMessage(MessageTypeProto.ADD_CAMERA, msg)
-                )
-
-            for (
-                id,
-                config,
-            ) in self.runtimeHandler.cameraHandler.cameraConfigBindings.items():
-                calibrations = config.calibration
-
-                for calib in calibrations.values():
-                    calibProto = calib.toProto(id)
                     await self.websocket.sendToAll(
                         MessageProto(
-                            type=MessageTypeProto.CALIBRATION_DATA,
-                            calibration_data=calibProto,
+                            MessageTypeProto.SEND_PIPELINE_TYPES,
+                            pipeline_type_info=typeMessages,
                         ).SerializeToString()
                     )
+                except Exception:
+                    pass
 
-            for log_ in logs:
-                msg = createMessage(MessageTypeProto.LOG, log_)
-                await self.websocket.sendToAll(msg)
+                camera_handles = getattr(
+                    self.runtimeHandler.cameraHandler, "cameraHandles", {}
+                )
+                camera_configs = getattr(
+                    self.runtimeHandler.cameraHandler, "cameraConfigBindings", {}
+                )
+                pipeline_bindings_map = getattr(
+                    self.runtimeHandler, "pipelineBindings", {}
+                )
+                default_pipes = getattr(
+                    self.runtimeHandler.pipelineHandler, "defaultPipelineIndexes", {}
+                )
+                for id, handle in camera_handles.items():
+                    try:
+                        msg = cameraToProto(
+                            id,
+                            handle.name,
+                            handle.camera,
+                            pipeline_bindings_map.get(id, 0),
+                            default_pipes.get(id, -1),
+                            handle.stream,
+                            camera_configs[id].id if id in camera_configs else "",
+                        )
+                        await self.websocket.sendToAll(
+                            createMessage(MessageTypeProto.ADD_CAMERA, msg)
+                        )
+                    except Exception:
+                        continue
+
+                for id, config in camera_configs.items():
+                    try:
+                        calibrations = getattr(config, "calibration", {}) or {}
+                        for calib in calibrations.values():
+                            calibProto = calib.toProto(id)
+                            await self.websocket.sendToAll(
+                                MessageProto(
+                                    type=MessageTypeProto.CALIBRATION_DATA,
+                                    calibration_data=calibProto,
+                                ).SerializeToString()
+                            )
+                    except Exception:
+                        continue
+
+                try:
+                    for log_ in logs:
+                        msg = createMessage(MessageTypeProto.LOG, log_)
+                        await self.websocket.sendToAll(msg)
+                except Exception:
+                    pass
+            except Exception as e:
+                err(f"Error in websocket on_connect: {e}")
 
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):
@@ -562,6 +596,85 @@ class Synapse:
         self.ntClient.onConnect.add(onConnect)
         self.ntClient.onDisconnect.add(onDisconnect)
 
+    def importCalibration(
+        self,
+        cameraIndex: CameraID,
+        filePath: str,
+        resolution: Optional[ResolutionString] = None,
+    ) -> bool:
+        """Imports a CalibDB/WPIcal calibration JSON uploaded to the file server.
+
+        Args:
+            cameraIndex: Camera whose calibration should be replaced.
+            filePath: Uploaded file path, relative to the file server root.
+            resolution: Optional resolution to use when the JSON has no image size.
+
+        Returns:
+            True if the calibration was imported and saved, otherwise False.
+        """
+        cameraConfigs = self.runtimeHandler.cameraHandler.cameraConfigBindings
+        cameraConfig = cameraConfigs.get(cameraIndex)
+        if cameraConfig is None:
+            err(f"Cannot import calibration for unknown camera #{cameraIndex}")
+            return False
+
+        root = Config.getInstance().path.parent.parent.resolve()
+        candidate = (root / filePath.lstrip("/\\")).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            err(f"Calibration import file does not exist: {filePath}")
+            return False
+
+        try:
+            with open(candidate, encoding="utf-8") as file:
+                data = json.load(file)
+
+            fallbackResolution = resolution or self.getCalibrationResolution(
+                cameraIndex
+            )
+            calibration, resolutionKey = CalibrationData.fromCalibDbJson(
+                data, fallbackResolution
+            )
+
+            cameraConfig.calibration[resolutionKey] = calibration
+            self.runtimeHandler.save()
+            self.websocket.sendToAllSync(
+                createMessage(
+                    MessageTypeProto.CALIBRATION_DATA,
+                    calibration.toProto(cameraIndex),
+                )
+            )
+            info(f"Imported calibration for camera #{cameraIndex} at {resolutionKey}")
+            return True
+        except (OSError, ValueError) as error:
+            err(f"Failed to import calibration for camera #{cameraIndex}: {error}")
+            return False
+        finally:
+            # Only clean up files uploaded to the dedicated import directory.
+            if candidate.is_relative_to(root / kCalibrationImportDirectory):
+                candidate.unlink(missing_ok=True)
+
+    def getCalibrationResolution(
+        self, cameraIndex: CameraID
+    ) -> Optional[ResolutionString]:
+        """Returns the current resolution for a camera, if one can be determined."""
+        pipelineIndex = self.runtimeHandler.pipelineBindings.get(cameraIndex)
+        if pipelineIndex is not None:
+            pipeline = self.runtimeHandler.pipelineHandler.getPipeline(
+                pipelineIndex, cameraIndex
+            )
+            if pipeline is not None:
+                resolution = pipeline.getCameraSetting(CameraSettings.resolution)
+                if resolution:
+                    return resolution
+
+        cameraConfig = self.runtimeHandler.cameraHandler.cameraConfigBindings.get(
+            cameraIndex
+        )
+        if cameraConfig is not None:
+            return f"{cameraConfig.streamRes[0]}x{cameraConfig.streamRes[1]}"
+
+        return None
+
     def onMessage(self, ws, msg) -> None:
         msgObj = MessageProto().parse(msg)
         msgType = msgObj.type
@@ -706,6 +819,15 @@ class Synapse:
                 ].calibration.pop(deleteCalibrationMsg.resolution)
 
                 # TODO Send back delete message to let the client know its been deleted
+        elif msgType == MessageTypeProto.IMPORT_CALIBRATION:
+            assert_set(msgObj.import_calibration)
+            importCalibrationMsg = msgObj.import_calibration
+
+            self.importCalibration(
+                importCalibrationMsg.camera_index,
+                importCalibrationMsg.file_path,
+                importCalibrationMsg.resolution or None,
+            )
         elif msgType == MessageTypeProto.SET_CAMERA_RECORDING_STATUS:
             assert_set(msgObj.set_camera_recording_status)
 
