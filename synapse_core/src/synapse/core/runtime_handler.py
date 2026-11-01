@@ -587,24 +587,24 @@ class RuntimeManager:
             except Exception:
                 pass
 
-            now = time.perf_counter()
-            if (
-                now - last_no_signal_publish < 0.02
-            ):  # throttle no-signal more aggressively
-                time.sleep(0.002)
-                continue
-
-            try:
-                if noSignalFrame is None:
-                    noSignalFrame = generateNoSignalFrame(
-                        getattr(handle, "name", str(cameraIndex)),
-                        handle.cameraIndex,
-                    )
-                self.cameraHandler.publishFrame(noSignalFrame, handle)
-                last_no_signal_publish = now
-            except Exception:
-                pass
-            time.sleep(0.002)
+            # now = time.perf_counter()
+            # if (
+            #     now - last_no_signal_publish < 0.02
+            # ):  # throttle no-signal more aggressively
+            #     time.sleep(0.002)
+            #     continue
+            #
+            # try:
+            #     if noSignalFrame is None:
+            #         noSignalFrame = generateNoSignalFrame(
+            #             getattr(handle, "name", str(cameraIndex)),
+            #             handle.cameraIndex,
+            #         )
+            #     self.cameraHandler.publishFrame(noSignalFrame, handle)
+            #     last_no_signal_publish = now
+            # except Exception:
+            #     pass
+            # time.sleep(0.002)
 
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         camera_handles = self.cameraHandler.cameraHandles

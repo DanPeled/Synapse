@@ -51,6 +51,30 @@ class ApriltagVerbosity(Enum):
         return cls.kPoseOnly
 
 
+class ApriltagDetectorType(Enum):
+    Robotpy = "robotpy"
+    Napa = "napa"
+
+
+def createApriltagDetector(detectorType: ApriltagDetectorType) -> AprilTagDetector:
+    """Create an AprilTag detector for the selected backend.
+
+    NAPA is an optional native dependency. If it cannot be loaded, fall back
+    to the RobotPy/PhotonVision detector so the pipeline still runs.
+    """
+    if detectorType == ApriltagDetectorType.Napa:
+        try:
+            from synapse.pipelines.apriltag.apriltag_napa import \
+                NapaApriltagDetector
+
+            return NapaApriltagDetector()
+        except Exception as e:
+            warn(f"Failed to initialize NAPA AprilTag detector: {e}")
+            warn("Falling back to the RobotPy AprilTag detector")
+
+    return RobotpyApriltagDetector()
+
+
 @cache
 def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]]:
     if verbosity == ApriltagVerbosity.kAll:
@@ -88,6 +112,12 @@ class ApriltagPipelineSettings(PipelineSettings):
 
     # ==================== Detection ====================
 
+    detector_type = settingField(
+        EnumeratedConstraint.fromEnum(ApriltagDetectorType),
+        default=ApriltagDetectorType.Robotpy.value,
+        description="AprilTag detector backend to use.",
+        category="<Toolbox/> Detection",
+    )
     num_threads = settingField(
         NumberConstraint(minValue=1, maxValue=Platform.getThreadCount(), step=1),
         default=1,
@@ -141,6 +171,56 @@ class ApriltagPipelineSettings(PipelineSettings):
         BooleanConstraint(renderAsButton=False),
         default=False,
         category="<Toolbox/> Detection",
+    )
+
+    # ==================== NAPA Detection ====================
+
+    napa_min_tag_px = settingField(
+        NumberConstraint(minValue=8, maxValue=30000, step=1),
+        default=32,
+        description=(
+            "NAPA: smallest tag side, in pixels, that is guaranteed to be "
+            "sampled. Lower values find smaller/farther tags but cost more."
+        ),
+        category="<Toolbox/> NAPA Detection",
+    )
+    napa_max_hamming = settingField(
+        NumberConstraint(minValue=-1, maxValue=3, step=1),
+        default=-1,
+        description=(
+            "NAPA: payload bits that may be corrected. -1 uses the tag "
+            "family's default."
+        ),
+        category="<Toolbox/> NAPA Detection",
+    )
+    napa_min_contrast = settingField(
+        NumberConstraint(minValue=1, maxValue=255, step=1),
+        default=20,
+        description=(
+            "NAPA: minimum grey-level difference between the tag and its white margin."
+        ),
+        category="<Toolbox/> NAPA Detection",
+    )
+    napa_min_border_cells = settingField(
+        NumberConstraint(minValue=0, maxValue=28, step=1),
+        default=22,
+        description=(
+            "NAPA: border cells that must read dark before decoding, scaled "
+            "for the selected family."
+        ),
+        category="<Toolbox/> NAPA Detection",
+    )
+    napa_sharpening = settingField(
+        NumberConstraint(minValue=0.0, maxValue=1.0),
+        default=0.25,
+        description="NAPA: cell sharpening applied before decoding.",
+        category="<Toolbox/> NAPA Detection",
+    )
+    napa_max_detections = settingField(
+        NumberConstraint(minValue=1, maxValue=None, step=1),
+        default=64,
+        description="NAPA: maximum number of tags returned per frame.",
+        category="<Toolbox/> NAPA Detection",
     )
 
     # ==================== Filtering ====================
@@ -220,7 +300,9 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
         self.cameraMatrix = self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
-        self.apriltagDetector: AprilTagDetector = RobotpyApriltagDetector()
+        self.apriltagDetector: AprilTagDetector = createApriltagDetector(
+            ApriltagDetectorType(self.getSetting(self.settings.detector_type))
+        )
         self.setDetectorConfig(self.cameraIndex)
         self.apriltagDetector.setFamily(
             self.settings.getSetting(self.settings.tag_family)
@@ -264,6 +346,22 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             self.getSetting(self.settings.min_white_black_diff)
         )
 
+        napaMaxHamming = int(self.getSetting(self.settings.napa_max_hamming))
+        detectorConfig.minTagPx = int(self.getSetting(self.settings.napa_min_tag_px))
+        detectorConfig.maxHamming = None if napaMaxHamming < 0 else napaMaxHamming
+        detectorConfig.minContrast = int(
+            self.getSetting(self.settings.napa_min_contrast)
+        )
+        detectorConfig.minBorderCells = int(
+            self.getSetting(self.settings.napa_min_border_cells)
+        )
+        detectorConfig.sharpening = float(
+            self.getSetting(self.settings.napa_sharpening)
+        )
+        detectorConfig.maxDetections = int(
+            self.getSetting(self.settings.napa_max_detections)
+        )
+
         self.apriltagDetector.setConfig(detectorConfig)
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
@@ -292,7 +390,16 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
 
             self.poseEstimator.config.cameraMatrix[0, 2] = cx - offset_x
             self.poseEstimator.config.cameraMatrix[1, 2] = cy - offset_y
-        if setting.key in [
+        if setting.key == self.settings.detector_type.key:
+            oldDetector = self.apriltagDetector
+            self.apriltagDetector = createApriltagDetector(ApriltagDetectorType(value))
+            oldDetector.close()
+
+            self.setDetectorConfig(self.cameraIndex)
+            self.apriltagDetector.setFamily(
+                self.settings.getSetting(self.settings.tag_family)
+            )
+        elif setting.key in [
             self.settings.num_threads.key,
             self.settings.quad_decimate.key,
             self.settings.quad_sigma.key,
@@ -303,6 +410,12 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             self.settings.max_num_maxima.key,
             self.settings.critical_angle.key,
             self.settings.min_white_black_diff.key,
+            self.settings.napa_min_tag_px.key,
+            self.settings.napa_max_hamming.key,
+            self.settings.napa_min_contrast.key,
+            self.settings.napa_min_border_cells.key,
+            self.settings.napa_sharpening.key,
+            self.settings.napa_max_detections.key,
             self.settings.tag_family.key,
         ]:
             self.setDetectorConfig(self.cameraIndex)
@@ -443,7 +556,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             cameraPoseEstimate,
             self.tagEstimates,
         )
-
         self.setResults(ApriltagsJson.toDict(result))  # TODO: Rate Limit NT
 
         return img
@@ -483,9 +595,13 @@ class ApriltagsJson:
             )
 
         return {
-            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate.cameraPoseEstimate,
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate.cameraPoseEstimate
+            if result.cameraPoseEstimate is not None
+            else None,
             ApriltagPipeline.kTagDetectionsKey: tags,
-            ApriltagPipeline.kReprojectionErrorKey: result.cameraPoseEstimate.reprojectionError,
+            ApriltagPipeline.kReprojectionErrorKey: result.cameraPoseEstimate.reprojectionError
+            if result.cameraPoseEstimate is not None
+            else 0.0,
         }
 
     @classmethod

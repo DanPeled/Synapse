@@ -76,6 +76,7 @@ setup(
         wpilibDep("pyntcore"),
         visionProcessingDep("opencv_python==4.8.0.74"),
         visionProcessingDep("opencv_contrib_python==4.8.0.74"),
+        visionProcessingDep("napa-vision==0.5.1"),
         deviceAccessDep("PyYAML"),
         deviceAccessDep("pathspec"),
         synapseInstallerDep("paramiko"),
