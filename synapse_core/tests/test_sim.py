@@ -14,24 +14,16 @@ import cv2
 import numpy as np
 from cscore import VideoMode
 from ntcore import NetworkTableInstance
-from synapse.core.camera_handler import CameraHandler
 from synapse.core.camera_factory import CameraConfig
+from synapse.core.camera_handler import CameraHandler
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.sim.camera import SimCamera
-from synapse.core.sim.model import (
-    DEFAULT_CAMERA_OFFSET,
-    DEFAULT_ROBOT_POSE,
-    FIELD_OF_VIEW_DEGREES,
-    SUPPORTED_RESOLUTIONS,
-    cameraMatrix,
-)
+from synapse.core.sim.model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE,
+                                    FIELD_OF_VIEW_DEGREES,
+                                    SUPPORTED_RESOLUTIONS, cameraMatrix)
 from synapse.core.sim.setup import installSimulation
-from synapse.core.sim.three import (
-    L_METERS,
-    W_METERS,
-    camera_spec,
-    wpi_camera_to_three,
-)
+from synapse.core.sim.three import (L_METERS, W_METERS, camera_spec,
+                                    wpi_camera_to_three)
 from synapse.core.sim.viewer import SimulationViewer, findChrome
 from synapse.pipelines.apriltag.apriltag_robotpy import RobotpyApriltagDetector
 from synapse_net.nt_client import NtClient

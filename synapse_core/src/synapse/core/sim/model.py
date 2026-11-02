@@ -9,8 +9,8 @@ from typing import List, Tuple
 
 import numpy as np
 
-from ..camera_factory import CalibrationData
 from ...stypes import Resolution
+from ..camera_factory import CalibrationData
 
 #: Horizontal field of view of the simulated camera, in degrees.
 FIELD_OF_VIEW_DEGREES = 70.0

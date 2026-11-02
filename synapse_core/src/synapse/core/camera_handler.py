@@ -18,15 +18,8 @@ from ntcore import NetworkTableInstance
 from synapse_net.nt_client import NtClient
 
 from ..callback import Callback
-from ..stypes import (
-    CameraID,
-    CameraName,
-    CameraUID,
-    Frame,
-    RecordingFilename,
-    RecordingStatus,
-    Resolution,
-)
+from ..stypes import (CameraID, CameraName, CameraUID, Frame,
+                      RecordingFilename, RecordingStatus, Resolution)
 from .camera.camera_handle import CameraHandle
 from .camera.no_signal import NoSignalCamera, generateNoSignalFrame
 from .camera.synapse_camera import SynapseCamera

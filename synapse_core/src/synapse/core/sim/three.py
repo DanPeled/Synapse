@@ -18,7 +18,6 @@ from wpimath.geometry import Pose3d, Rotation3d
 
 from .model import cameraMatrix
 
-
 #: Field dimensions as used by the viewer (inches converted).
 L_METERS = 651.22 * 0.0254
 W_METERS = 317.677 * 0.0254

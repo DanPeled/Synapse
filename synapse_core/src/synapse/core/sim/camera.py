@@ -24,12 +24,8 @@ from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 from ...log import warn
 from ...stypes import CameraID, Frame, PropertyMetaDict, Size
 from ..camera.synapse_camera import SynapseCamera
-from .model import (
-    DEFAULT_CAMERA_OFFSET,
-    DEFAULT_ROBOT_POSE,
-    MAX_FPS,
-    SUPPORTED_RESOLUTIONS,
-)
+from .model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE, MAX_FPS,
+                    SUPPORTED_RESOLUTIONS)
 from .three import camera_spec
 from .viewer import STARTUP_TIMEOUT, getViewer
 

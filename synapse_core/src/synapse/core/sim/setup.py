@@ -14,12 +14,8 @@ from ...stypes import ResolutionString
 from ..camera_factory import CalibrationData, CameraConfig
 from ..global_settings import GlobalSettings
 from .camera import SimCamera
-from .model import (
-    DEFAULT_CAMERA_OFFSET,
-    DEFAULT_ROBOT_POSE,
-    SUPPORTED_RESOLUTIONS,
-    calibrationFor,
-)
+from .model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE,
+                    SUPPORTED_RESOLUTIONS, calibrationFor)
 
 DEFAULT_CAMERA_INDEX = 0
 DEFAULT_STREAM_RESOLUTION = (320, 240)
