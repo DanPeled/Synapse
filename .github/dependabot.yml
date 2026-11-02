@@ -8,3 +8,7 @@ updates:
     directory: "/ui/synapseui"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/synapse_sim"
+    schedule:
+      interval: "weekly"

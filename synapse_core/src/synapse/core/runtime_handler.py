@@ -31,7 +31,6 @@ from ..callback import Callback
 from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
 from ..util import Publisher, getIP, getPublisher
 from .camera.camera_handle import CameraHandle
-from .camera.no_signal import generateNoSignalFrame
 from .camera_factory import (CameraSettingsKeys, getCameraSettingEntry,
                              getCameraTable)
 from .camera_handler import CameraHandler

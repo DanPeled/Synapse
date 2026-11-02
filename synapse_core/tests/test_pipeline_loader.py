@@ -3,10 +3,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+from synapse.core.config import Config
+from synapse.core.global_settings import GlobalSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
 from synapse.core.pipeline_handler import (Pipeline, PipelineHandler,
                                            PipelineSettings)
@@ -33,6 +36,39 @@ class TestPipelineHandler(unittest.TestCase):
         self.loader = PipelineHandler(self.pipeline_dir)
         # Ensure camera 0 is initialized since tests expect it
         self.loader.onAddCamera(0, "cam0", MagicMock())
+
+    def test_load_pipeline_settings_skips_missing_and_empty_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            configPath = Path(directory) / "config" / "settings.yml"
+            configPath.parent.mkdir()
+            configPath.write_text("network: {}\n")
+
+            # Camera 1 has a file but no pipeline_configs entry.
+            cameraDirectory = configPath.parent / "camera_1"
+            cameraDirectory.mkdir()
+            (cameraDirectory / "pipeline_settings.yml").write_text(
+                "pipeline_configs:\n"
+            )
+
+            configs = {
+                1: MagicMock(defaultPipeline=1),
+                2: MagicMock(defaultPipeline=3),
+            }
+            fakeConfig = MagicMock()
+            fakeConfig.path = configPath
+
+            with (
+                patch.object(Config, "getInstance", return_value=fakeConfig),
+                patch.object(
+                    GlobalSettings, "getCameraConfigMap", return_value=configs
+                ),
+            ):
+                self.loader.loadPipelineSettings()
+
+        self.assertEqual(self.loader.defaultPipelineIndexes[1], 1)
+        self.assertEqual(self.loader.defaultPipelineIndexes[2], 3)
+        self.assertNotIn(1, self.loader.pipelineSettings)
+        self.assertNotIn(2, self.loader.pipelineSettings)
 
     @patch("synapse.core.pipeline_handler.importlib.util.spec_from_file_location")
     @patch("synapse.core.pipeline_handler.importlib.util.module_from_spec")

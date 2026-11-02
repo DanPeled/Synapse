@@ -8,12 +8,20 @@ on:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - "synapse_sim/**"
+      - "setup.py"
+      - "MANIFEST.in"
+      - "pyproject.toml"
       - ".github/workflows/synapse_ci.yml"
   pull_request:
     paths:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - "synapse_sim/**"
+      - "setup.py"
+      - "MANIFEST.in"
+      - "pyproject.toml"
       - ".github/workflows/synapse_ci.yml"
 
 jobs:
@@ -66,15 +74,32 @@ jobs:
         run: |
           pip install wheel
           python - <<'EOF'
-          import sys, glob, zipfile, re
+          import sys, glob, zipfile
           wheel_files = glob.glob('dist/*.whl')
           if not wheel_files:
               sys.exit("No wheel file found")
-          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          required = [
+              'synapse_sim/assets/field.glb',
+              'synapse_sim/assets/apriltag-config.json',
+              'synapse_sim/assets/viewer.bundle.js',
+              'synapse_sim/assets/index.html',
+          ]
           with zipfile.ZipFile(wheel_files[0]) as zf:
-              for info in zf.infolist():
-                  if pattern.search(info.filename):
-                      print(info.filename)
+              names = zf.namelist()
+              missing = [path for path in required if path not in names]
+              if missing:
+                  sys.exit("Wheel is missing simulator assets: " + ", ".join(missing))
+              if not any(
+                  name.startswith('synapse_sim/assets/apriltags/')
+                  and name.endswith('.png')
+                  for name in names
+              ):
+                  sys.exit("Wheel is missing simulator AprilTag textures")
+              if 'synapse_sim/assets/field.png' in names:
+                  sys.exit("Wheel contains the retired baked field.png")
+              for name in sorted(names):
+                  if name.startswith('synapse_sim/assets/'):
+                      print(name)
           EOF
 
   # ARM64 builds for Jetson, Orange Pi 5, Raspberry Pi 5
@@ -156,15 +181,32 @@ jobs:
         run: |
           source .venv/bin/activate
           python - <<'EOF'
-          import sys, glob, zipfile, re
+          import sys, glob, zipfile
           wheel_files = glob.glob('dist/*.whl')
           if not wheel_files:
               sys.exit("No wheel file found")
-          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          required = [
+              'synapse_sim/assets/field.glb',
+              'synapse_sim/assets/apriltag-config.json',
+              'synapse_sim/assets/viewer.bundle.js',
+              'synapse_sim/assets/index.html',
+          ]
           with zipfile.ZipFile(wheel_files[0]) as zf:
-              for info in zf.infolist():
-                  if pattern.search(info.filename):
-                      print(info.filename)
+              names = zf.namelist()
+              missing = [path for path in required if path not in names]
+              if missing:
+                  sys.exit("Wheel is missing simulator assets: " + ", ".join(missing))
+              if not any(
+                  name.startswith('synapse_sim/assets/apriltags/')
+                  and name.endswith('.png')
+                  for name in names
+              ):
+                  sys.exit("Wheel is missing simulator AprilTag textures")
+              if 'synapse_sim/assets/field.png' in names:
+                  sys.exit("Wheel contains the retired baked field.png")
+              for name in sorted(names):
+                  if name.startswith('synapse_sim/assets/'):
+                      print(name)
           EOF
 
   # Lint
@@ -225,4 +267,14 @@ jobs:
           # make install
           pip install ".[dev]"
       - run: pip install pytest
-      - run: make test
+
+      - name: Check Chrome
+        run: google-chrome --version
+
+      - name: Run tests
+        env:
+          # Exercise the headless simulator renderer in CI.
+          SYNAPSE_TEST_SIM_BROWSER: "1"
+          # GitHub runners have no GPU, so render through SwiftShader.
+          SYNAPSE_SIM_ANGLE: swiftshader
+        run: make test

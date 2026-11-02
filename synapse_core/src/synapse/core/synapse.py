@@ -173,6 +173,10 @@ class Synapse:
 
             nt_good = self.__init_networktables(config.network)
             if nt_good:
+                if self.__isSim:
+                    from synapse_sim.setup import installSimulation
+
+                    installSimulation(self.runtimeHandler)
                 self.runtimeHandler.setup(Path(os.getcwd()), self.__sendSettingsInNT)
             else:
                 err(
