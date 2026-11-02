@@ -4,10 +4,8 @@ import { Suspense, useState, useEffect, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Html } from "@react-three/drei";
 import AprilTag from "./apriltag";
+import { TAG_SIZE_METERS } from "./apriltag-three";
 import { fieldLengthMeters, RobotModel, fieldWidthMeters } from "./glbModel";
-
-// Tag size: 6.5 inches in meters
-const TAG_SIZE_METERS = 10.5 * 0.0254;
 
 /** Field model */
 function FieldModel({ url }) {

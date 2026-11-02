@@ -104,6 +104,15 @@ setup(
         ]
     },
     include_package_data=True,
+    package_data={
+        "synapse": [
+            "core/sim/assets/*.glb",
+            "core/sim/assets/*.json",
+            "core/sim/assets/*.js",
+            "core/sim/assets/*.html",
+            "core/sim/assets/apriltags/*.png",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "synapse_installer=synapse_installer.__main__:main",
