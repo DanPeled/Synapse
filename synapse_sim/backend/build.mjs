@@ -9,10 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const outDir = resolve(
-  root,
-  "../synapse_core/src/synapse/core/sim/assets",
-);
+const outDir = resolve(root, "src/synapse_sim/assets");
 
 await mkdir(outDir, { recursive: true });
 

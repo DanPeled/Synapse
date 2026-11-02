@@ -17,20 +17,20 @@ from ntcore import NetworkTableInstance
 from synapse.core.camera_factory import CameraConfig
 from synapse.core.camera_handler import CameraHandler
 from synapse.core.global_settings import GlobalSettings
-from synapse.core.sim.camera import SimCamera
-from synapse.core.sim.model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE,
-                                    FIELD_OF_VIEW_DEGREES,
-                                    SUPPORTED_RESOLUTIONS, cameraMatrix)
-from synapse.core.sim.setup import installSimulation
-from synapse.core.sim.three import (L_METERS, W_METERS, camera_spec,
-                                    wpi_camera_to_three)
-from synapse.core.sim.viewer import SimulationViewer, findChrome
 from synapse.pipelines.apriltag.apriltag_robotpy import RobotpyApriltagDetector
 from synapse_net.nt_client import NtClient
+from synapse_sim.camera import SimCamera
+from synapse_sim.model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE,
+                               FIELD_OF_VIEW_DEGREES, SUPPORTED_RESOLUTIONS,
+                               cameraMatrix)
+from synapse_sim.setup import installSimulation
+from synapse_sim.three import (L_METERS, W_METERS, camera_spec,
+                               wpi_camera_to_three)
+from synapse_sim.viewer import SimulationViewer, findChrome
 from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 
 REPO_ROOT = Path(__file__).parents[2]
-SIM_ASSETS = Path(__file__).parents[1] / "src" / "synapse" / "core" / "sim" / "assets"
+SIM_ASSETS = Path(__file__).parents[1] / "src" / "synapse_sim" / "assets"
 TAG_ASSETS = SIM_ASSETS / "apriltags"
 SYNAPSE_SIM_PUBLIC = REPO_ROOT / "synapse_sim" / "public"
 SYNAPSE_SIM_CONFIG = SYNAPSE_SIM_PUBLIC / "apriltag-config.json"
@@ -149,7 +149,7 @@ class TestSimCameraPoses(unittest.TestCase):
     def test_invalid_values_fall_back_and_warn_once(self):
         self.table.getEntry(SimCamera.ROBOT_POSE_KEY).setDoubleArray([1.0])
 
-        with patch("synapse.core.sim.camera.warn") as warn:
+        with patch("synapse_sim.camera.warn") as warn:
             firstRobotPose, _ = self.camera.poses()
             secondRobotPose, _ = self.camera.poses()
 

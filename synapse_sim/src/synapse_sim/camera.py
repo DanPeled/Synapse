@@ -18,12 +18,12 @@ import cv2
 import numpy as np
 from cscore import VideoMode
 from ntcore import NetworkTable, NetworkTableInstance
+from synapse.core.camera.synapse_camera import SynapseCamera
+from synapse.log import warn
+from synapse.stypes import CameraID, Frame, PropertyMetaDict, Size
 from synapse_net.nt_client import NtClient
 from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 
-from ...log import warn
-from ...stypes import CameraID, Frame, PropertyMetaDict, Size
-from ..camera.synapse_camera import SynapseCamera
 from .model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE, MAX_FPS,
                     SUPPORTED_RESOLUTIONS)
 from .three import camera_spec

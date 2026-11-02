@@ -32178,7 +32178,7 @@ async function createFieldScene({
   return { scene: scene2, config, tags, field: gltf.scene };
 }
 
-// headless/renderer.js
+// backend/renderer.js
 var MAX_FPS = 30;
 var canvas = document.createElement("canvas");
 var renderer = new WebGLRenderer({

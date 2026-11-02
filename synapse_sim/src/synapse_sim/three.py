@@ -6,7 +6,7 @@
 
 The renderer lives in ``synapse_sim/`` and uses the same field model/tag
 config as the viewer. These helpers convert WPIlib field coordinates and
-camera poses into the values consumed by ``headless/renderer.js``.
+camera poses into the values consumed by ``backend/renderer.js``.
 """
 
 from __future__ import annotations

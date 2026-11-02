@@ -16,6 +16,7 @@ WPILIB_VERSION = version_vars["WPILIB_VERSION"]
 modules = {
     "synapse_net": "synapse_net/src",
     "synapse_installer": "synapse_installer/src",
+    "synapse_sim": "synapse_sim/src",
     "synapse": "synapse_core/src",
     "synapse_ui": "synapse_ui/out",
 }
@@ -105,12 +106,12 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "synapse": [
-            "core/sim/assets/*.glb",
-            "core/sim/assets/*.json",
-            "core/sim/assets/*.js",
-            "core/sim/assets/*.html",
-            "core/sim/assets/apriltags/*.png",
+        "synapse_sim": [
+            "assets/*.glb",
+            "assets/*.json",
+            "assets/*.js",
+            "assets/*.html",
+            "assets/apriltags/*.png",
         ],
     },
     entry_points={

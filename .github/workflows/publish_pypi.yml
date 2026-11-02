@@ -27,6 +27,17 @@ jobs:
         working-directory: synapse_ui
         run: npm install
 
+      - name: Install simulator Node.js dependencies
+        working-directory: synapse_sim
+        run: npm ci
+
+      - name: Verify committed simulator renderer bundle
+        run: |
+          npm --prefix synapse_sim run build:headless
+          git diff --exit-code -- \
+            synapse_sim/src/synapse_sim/assets/viewer.bundle.js \
+            synapse_sim/src/synapse_sim/assets/index.html
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

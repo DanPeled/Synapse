@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "build:headless": "node headless/build.mjs"
+    "build:headless": "node backend/build.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

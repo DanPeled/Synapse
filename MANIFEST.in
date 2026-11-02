@@ -1,2 +1,2 @@
 recursive-include ./synapse_ui/out *
-recursive-include synapse_core/src/synapse/core/sim/assets *.png *.json *.js *.html *.glb
+recursive-include synapse_sim/src/synapse_sim/assets *.png *.json *.js *.html *.glb

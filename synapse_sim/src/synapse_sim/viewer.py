@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
-from ...log import warn
+from synapse.log import warn
 
 #: Directory containing the committed viewer bundle and field assets.
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
@@ -249,6 +249,11 @@ class SimulationViewer:
         self._userDataDir = tempfile.TemporaryDirectory(prefix="synapse-sim-")
         self._browserLog = tempfile.TemporaryFile(mode="w+b")
 
+        # Prefer the GPU-backed Vulkan backend, but allow headless CI or
+        # machines without a Vulkan driver to force SwiftShader.
+        angleBackend = os.environ.get("SYNAPSE_SIM_ANGLE", "vulkan").strip()
+        angleBackend = angleBackend or "vulkan"
+
         args = [
             chrome,
             "--headless=new",
@@ -264,7 +269,7 @@ class SimulationViewer:
             "--window-size=1920,1080",
             "--enable-unsafe-swiftshader",
             "--use-gl=angle",
-            "--use-angle=vulkan",
+            f"--use-angle={angleBackend}",
             "--ignore-gpu-blocklist",
             "--enable-gpu",
             f"--user-data-dir={self._userDataDir.name}",

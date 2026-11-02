@@ -7,12 +7,12 @@
 from typing import Dict, SupportsFloat, cast
 
 from ntcore import NetworkTableInstance
+from synapse.core.camera_factory import CalibrationData, CameraConfig
+from synapse.core.global_settings import GlobalSettings
+from synapse.log import info
+from synapse.stypes import ResolutionString
 from synapse_net.nt_client import NtClient
 
-from ...log import info
-from ...stypes import ResolutionString
-from ..camera_factory import CalibrationData, CameraConfig
-from ..global_settings import GlobalSettings
 from .camera import SimCamera
 from .model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE,
                     SUPPORTED_RESOLUTIONS, calibrationFor)
