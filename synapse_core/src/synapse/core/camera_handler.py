@@ -8,7 +8,7 @@ import time
 import traceback
 from datetime import datetime
 from itertools import chain
-from typing import Any, Dict, Final, List, Optional, Tuple
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cscore as cs
 import cv2
@@ -22,6 +22,7 @@ from ..stypes import (CameraID, CameraName, CameraUID, Frame,
                       RecordingFilename, RecordingStatus, Resolution)
 from .camera.camera_handle import CameraHandle
 from .camera.no_signal import NoSignalCamera, generateNoSignalFrame
+from .camera.synapse_camera import SynapseCamera
 from .camera_factory import CameraConfig, CameraFactory, getCameraTableName
 from .global_settings import GlobalSettings
 
@@ -58,6 +59,7 @@ class CameraHandler:
         self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
         self.cameraUIDs: List[CameraUID] = []
         self.requestedCameraUIDs: Dict[CameraUID, CameraID] = {}
+        self.cameraType: Type[SynapseCamera] = CameraFactory.kDefault
 
         self.lastPublishTime: Dict[CameraID, float] = {}
         self.publishInterval: float = 1.0 / 30.0
@@ -87,6 +89,10 @@ class CameraHandler:
             self.recordFileNames.get(cameraIndex, "Unknown filename"),
         )
 
+    def setCameraType(self, cameraType: Type[SynapseCamera]) -> None:
+        """Selects the camera implementation used to create configured cameras."""
+        self.cameraType = cameraType
+
     def setup(self) -> None:
         """
         Sets up the camera system by creating cameras, generating output streams,
@@ -94,6 +100,10 @@ class CameraHandler:
         """
         os.makedirs("records", exist_ok=True)
         self.createCameras()
+
+        if self.cameraType is not CameraFactory.kDefault:
+            # Non-USB backends produce their cameras from configuration only.
+            return
 
         def cameraScanAction():
             while not self.stopCameraScanEvent.wait(10):
@@ -110,6 +120,14 @@ class CameraHandler:
         each configured camera to the handler.
         """
         self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
+
+        if self.cameraType is not CameraFactory.kDefault:
+            # Non-USB backends create one camera per configured index; the
+            # camera index is the identity, so no USB-style UID matching.
+            for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
+                self.addCamera(cameraIndex, cameraConfig, cameraIndex)
+            return
+
         self.usbCameraInfos = {
             f"{info.name}_{info.productId}": info
             for info in cs.UsbCamera.enumerateUsbCameras()
@@ -423,13 +441,18 @@ class CameraHandler:
             self._recordFrameBuffers.pop(cameraIndex, None)
 
     def addCamera(
-        self, cameraIndex: CameraID, cameraConfig: CameraConfig, dev: int
+        self,
+        cameraIndex: CameraID,
+        cameraConfig: CameraConfig,
+        path: Union[str, int],
     ) -> bool:
         """
-        Adds a camera to the handler by opening it through OpenCV.
+        Adds a camera to the handler using the configured camera backend.
 
         Args:
-            cameraIndex (CameraID): Camera index to open.
+            cameraIndex (CameraID): Camera index to add.
+            cameraConfig (CameraConfig): Configuration for the camera.
+            path (Union[str, int]): Backend-specific camera path/device.
 
         Returns:
             bool: True if the camera was successfully added, False otherwise.
@@ -437,9 +460,9 @@ class CameraHandler:
 
         try:
             camera = CameraFactory.create(
-                cameraType=CameraFactory.kCameraServer,
+                cameraType=self.cameraType,
                 cameraIndex=cameraIndex,
-                path=dev,
+                path=path,
             )
             handle = CameraHandle(camera, cameraConfig.name, cameraIndex)
             handle.setIndex(cameraIndex)
@@ -521,7 +544,8 @@ class CameraHandler:
         Releases all video writers and closes all active camera connections.
         """
         self.stopCameraScanEvent.set()
-        self.cameraScanningThread.join()
+        if hasattr(self, "cameraScanningThread"):
+            self.cameraScanningThread.join()
 
         for record in self.recordingOutputs.values():
             record.release()

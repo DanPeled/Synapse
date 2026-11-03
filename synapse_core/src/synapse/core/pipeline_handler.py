@@ -304,36 +304,44 @@ class PipelineHandler:
         configPath = Config.getInstance().path.parent
 
         for cameraIndex in camera_configs:
-            with open(
+            settingsPath = (
                 configPath / f"camera_{cameraIndex}" / "pipeline_settings.yml"
-            ) as f:
-                pipeline_configs = yaml.full_load(f)
-                for pipelineIndex, pipeline in pipeline_configs[
-                    "pipeline_configs"
-                ].items():
-                    log.info(
-                        f"Loaded pipeline #{pipelineIndex} (Camera #{cameraIndex}) from disk with type {pipeline[self.kPipelineTypeKey]}"
-                    )
+            )
+            if not settingsPath.exists():
+                log.info(
+                    f"No pipeline settings file for camera #{cameraIndex}; skipping"
+                )
+                continue
 
-                    if cameraIndex not in self.pipelineTypeNames:
-                        self.pipelineTypeNames[cameraIndex] = {}
-                        self.pipelineNames[cameraIndex] = {}
+            with open(settingsPath) as f:
+                pipeline_configs = yaml.full_load(f) or {}
 
-                    self.pipelineTypeNames[cameraIndex][pipelineIndex] = pipeline[
-                        self.kPipelineTypeKey
-                    ]
-                    self.pipelineNames[cameraIndex][pipelineIndex] = pipeline[
-                        self.kPipelineNameKey
-                    ]
+            for pipelineIndex, pipeline in (
+                pipeline_configs.get(self.kPipelinesArrayKey) or {}
+            ).items():
+                log.info(
+                    f"Loaded pipeline #{pipelineIndex} (Camera #{cameraIndex}) from disk with type {pipeline[self.kPipelineTypeKey]}"
+                )
 
-                    self.createPipelineSettings(
-                        self.pipelineTypesViaName[
-                            self.pipelineTypeNames[cameraIndex][pipelineIndex]
-                        ],
-                        pipelineIndex,
-                        pipeline[NTKeys.kSettings.value],
-                        cameraid=cameraIndex,
-                    )
+                if cameraIndex not in self.pipelineTypeNames:
+                    self.pipelineTypeNames[cameraIndex] = {}
+                    self.pipelineNames[cameraIndex] = {}
+
+                self.pipelineTypeNames[cameraIndex][pipelineIndex] = pipeline[
+                    self.kPipelineTypeKey
+                ]
+                self.pipelineNames[cameraIndex][pipelineIndex] = pipeline[
+                    self.kPipelineNameKey
+                ]
+
+                self.createPipelineSettings(
+                    self.pipelineTypesViaName[
+                        self.pipelineTypeNames[cameraIndex][pipelineIndex]
+                    ],
+                    pipelineIndex,
+                    pipeline[NTKeys.kSettings.value],
+                    cameraid=cameraIndex,
+                )
 
         log.info("Loaded pipeline settings successfully")
 

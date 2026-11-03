@@ -31,7 +31,6 @@ from ..callback import Callback
 from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
 from ..util import Publisher, getIP, getPublisher
 from .camera.camera_handle import CameraHandle
-from .camera.no_signal import generateNoSignalFrame
 from .camera_factory import (CameraSettingsKeys, getCameraSettingEntry,
                              getCameraTable)
 from .camera_handler import CameraHandler
@@ -550,8 +549,6 @@ class RuntimeManager:
             maxFps = float(handle.camera.getMaxFPS())
         except Exception:
             maxFps = 30.0
-        noSignalFrame: Optional[Frame] = None
-        last_no_signal_publish = 0.0
 
         try:
             log.info(
@@ -586,25 +583,6 @@ class RuntimeManager:
                         continue
             except Exception:
                 pass
-
-            # now = time.perf_counter()
-            # if (
-            #     now - last_no_signal_publish < 0.02
-            # ):  # throttle no-signal more aggressively
-            #     time.sleep(0.002)
-            #     continue
-            #
-            # try:
-            #     if noSignalFrame is None:
-            #         noSignalFrame = generateNoSignalFrame(
-            #             getattr(handle, "name", str(cameraIndex)),
-            #             handle.cameraIndex,
-            #         )
-            #     self.cameraHandler.publishFrame(noSignalFrame, handle)
-            #     last_no_signal_publish = now
-            # except Exception:
-            #     pass
-            # time.sleep(0.002)
 
     def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
         camera_handles = self.cameraHandler.cameraHandles
