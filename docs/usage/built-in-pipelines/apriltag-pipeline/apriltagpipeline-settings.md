@@ -1,57 +1,55 @@
 ---
 description: >-
-  The AprilTag pipeline provides settings for controlling detection accuracy,
-  performance, filtering, and output data.
+  Every setting exposed by the AprilTag pipeline, with defaults, effects, and
+  tuning advice.
 icon: gear-api
 ---
 
 # ApriltagPipeline Settings
 
-## Detector settings
+The AprilTag pipeline settings are grouped into **Target**, **Detection**, **Filtering**, and **Results** in the dashboard. Start with the defaults. Change one setting at a time and watch latency, detection rate, and pose stability.
 
-These settings control AprilTag detection and pose estimation. Start with the defaults. Change one setting at a time while monitoring latency and pose stability.
+## Target
 
 ### Tag Size
 
 **Type:** Number\
-**Default:** `0.1651 m` (6.5 in)
+**Default:** `0.1651 m` (6.5 in)\
+**Range:** `0` and up
 
-The physical width of one AprilTag, in meters.
+The physical width of one AprilTag in meters.
 
-Measure the printed tag itself. Do not include its white border or mounting material. This value must match every tag that the camera detects. An incorrect size causes incorrect distance and field-pose estimates.
+Measure the printed tag itself, not the white border or mounting material. This value must be the same for every tag the camera sees. An incorrect size makes distance and field-pose estimates wrong.
+
+If you print your own tags, measure them with calipers. Printer scaling is a common source of error.
 
 ***
 
 ### Tag Family
 
 **Type:** Enum\
-**Options:**
-
-* `tag36h11`
-* `tag16h5`
-
+**Options:** `tag36h11`, `tag16h5`\
 **Default:** `tag36h11`
 
-The tag encoding family to detect.
+The tag encoding family the detector looks for.
 
-This must match the physical tags. A detector cannot identify tags from another family. Use `tag36h11` for the official FRC field layout.
+The setting must match the physical tags. A `tag36h11` detector cannot read `tag16h5` tags. Official FRC field tags use `tag36h11`.
 
 ***
+
+## Detection
+
+These settings control the AprilTag detector itself. They come from WPILib's AprilTag implementation.
 
 ### Number of Threads
 
 **Type:** Integer\
-**Default:** `1`
+**Default:** `1`\
+**Range:** `1` to the device's CPU thread count
 
-The CPU threads available to the detector.
+The number of CPU threads used for detection.
 
-More threads can reduce detection latency. They also leave fewer resources for other cameras and pipelines. The best value depends on the coprocessor, camera resolution, and active workloads.
-
-{% hint style="info" icon="thumbs-up" %}
-* Start with `1-2` threads.
-* Increase it only if latency remains high.
-* Reserve CPU capacity for other vision tasks.
-{% endhint %}
+More threads can reduce latency on multi-core devices, but they compete with camera capture, streaming, and other pipelines. Start with `1` or `2`, then increase only if detection latency is the bottleneck.
 
 ***
 
@@ -60,56 +58,114 @@ More threads can reduce detection latency. They also leave fewer resources for o
 **Type:** Boolean\
 **Default:** `False`
 
-Enables extra corner refinement after tag detection.
+Refines tag corners after the initial detection.
 
-Refined corners can improve pose estimates. They also increase processing time.
+Refinement can improve pose accuracy, especially with noisy or slightly blurred images. It also costs CPU time.
 
-{% hint style="info" icon="thumbs-up" %}
-Enable this when pose accuracy matters more than latency. Disable it for higher frame rates.
-{% endhint %}
+Enable it when accuracy matters more than frame rate.
 
 ***
 
 ### Quad Decimate
 
 **Type:** Number\
-**Default:** `1.0`
+**Default:** `1.0`\
+**Range:** `1.0` and up
 
-Controls how much the detector downsamples the image.
+Downsamples the image before detection.
 
-A higher value uses a smaller image. This lowers CPU use and latency. It also reduces detection range and corner accuracy.
+| Value | Effect |
+| --- | --- |
+| `1.0` | Full resolution, best accuracy and range |
+| `2.0` | Half resolution, faster, shorter range |
+| `3.0`+ | Much faster, but may miss small or distant tags |
 
-Examples:
-
-* `1.0` — full resolution and best accuracy.
-* `2.0` — half resolution and faster detection.
-* Higher values — lower latency with less range.
+This is the first setting to change when detection is too slow.
 
 ***
 
 ### Quad Sigma
 
 **Type:** Number\
-**Default:** `0.0`
+**Default:** `0.0`\
+**Range:** `0.0` and up
 
 Applies Gaussian blur before detection.
 
-Small values can reduce image noise. Large values blur tag edges and reduce detection quality.
+A small amount can reduce sensor noise. Too much blurs tag edges and reduces detection quality. Leave it at `0.0` unless you have a specific noise problem.
 
-{% hint style="info" icon="thumbs-up" %}
-Keep this at `0.0` unless image noise causes repeatable detection failures.
+***
+
+### Min Cluster Pixels
+
+**Type:** Integer\
+**Default:** `300`\
+**Range:** `1` and up
+
+Rejects candidate quads that contain too few pixels.
+
+Raise it to ignore small, distant, or noisy candidates. Lower it if you need to detect very small tags, at the cost of more false candidates.
+
+***
+
+### Max Num Maxima
+
+**Type:** Integer\
+**Default:** `10`\
+**Range:** `1` and up
+
+The number of corner candidates considered when grouping pixels into a quad.
+
+Higher values can help in cluttered scenes but cost processing time.
+
+***
+
+### Critical Angle
+
+**Type:** Number\
+**Default:** `45`\
+**Range:** `0`–`90`
+
+Controls rejection of quads whose edge pairs are nearly straight or nearly reversed. `0` disables this rejection.
+
+{% hint style="warning" %}
+WPILib expects this value in radians, but the pipeline currently forwards the configured value without converting degrees to radians. With the default `45`, the threshold is effectively very large and the rejection is mostly disabled. Leave it at the default unless you are testing this behavior. See [Known Issues](../../../additional-resources/known-issues.md).
 {% endhint %}
 
 ***
 
-### Iteration Count
+### Max Line Fit MSE
+
+**Type:** Number\
+**Default:** `10`\
+**Range:** `0` and up
+
+The maximum mean squared error allowed when fitting lines to a contour.
+
+Lower values reject non-quad shapes earlier, which saves processing time but may reject valid tags in blurry images. Raise it if tags are being missed.
+
+***
+
+### Min White Black Diff
 
 **Type:** Integer\
-**Default:** `4`
+**Default:** `5`\
+**Range:** `0`–`255`
 
-The pose-estimation refinement iterations.
+The minimum brightness difference between the white and black models of a tag.
 
-Higher values may improve pose accuracy. They increase processing time.
+Raise it in low-contrast or brightly lit scenes to reject false positives. Lower it if real tags are being missed.
+
+***
+
+### Deglitch
+
+**Type:** Boolean\
+**Default:** `False`
+
+Removes small speckles from the thresholded image.
+
+Only useful for very noisy images. It adds processing time.
 
 ***
 
@@ -118,34 +174,32 @@ Higher values may improve pose accuracy. They increase processing time.
 ### Crop X
 
 **Type:** Range\
-**Default:** `[-1, 1]`
+**Default:** `[-1, 1]`\
+**Range:** `-1` to `1`
 
-Limits the horizontal image area that the detector processes.
+Limits the horizontal area the detector processes.
 
-The range is normalized:
+- `-1` is the left edge of the image.
+- `1` is the right edge.
 
-* `-1` is the left edge.
-* `1` is the right edge.
+For example, `[-0.5, 0.5]` processes only the center half of the image. Cropping is one of the most effective ways to reduce latency when tags only appear in a known part of the frame.
 
-For example, `[-0.5, 0.5]` processes the center half of the image.
-
-Crop the image when tags only appear in a known region. Cropping can substantially reduce latency.
+The camera matrix is adjusted automatically for the crop.
 
 ***
 
 ### Crop Y
 
 **Type:** Range\
-**Default:** `[-1, 1]`
+**Default:** `[-1, 1]`\
+**Range:** `-1` to `1`
 
-Limits the vertical image area that the detector processes.
+Limits the vertical area the detector processes.
 
-The range is normalized:
+- `-1` is the top edge.
+- `1` is the bottom edge.
 
-* `-1` is the top edge.
-* `1` is the bottom edge.
-
-Use this with **Crop X** to limit detection to the expected tag area.
+Use it together with **Crop X** to focus on the region where tags appear.
 
 ***
 
@@ -156,9 +210,9 @@ Use this with **Crop X** to limit detection to the expected tag area.
 **Type:** Boolean\
 **Default:** `False`
 
-Constrains the estimated camera pose to the field ground plane.
+Constrains the estimated camera pose to the field ground plane by forcing its Z position to `0` and keeping only the yaw rotation.
 
-This can reduce noise for a robot that remains on a flat field. Do not enable it when the camera changes height or pitch significantly.
+This can reduce noise for a flat-field robot, but it makes the estimate wrong whenever the camera changes height or pitch. Do not enable it if the camera is tilted or mounted on a moving mechanism.
 
 ***
 
@@ -167,14 +221,13 @@ This can reduce noise for a robot that remains on a flat field. Do not enable it
 **Type:** Boolean\
 **Default:** `True`
 
-Publishes the estimated camera pose in field coordinates.
+Estimates and publishes the camera pose in field coordinates.
 
-This requires:
+This is the main output of the pipeline and is required for robot localization. Keep it enabled.
 
-* A configured field AprilTag layout.
-* Valid AprilTag detections.
-
-Use this output with robot-localization systems, such as WPILib pose estimators.
+{% hint style="warning" %}
+The result serializer currently reads the camera pose unconditionally. Setting this to `False` while tags are visible can cause a serialization error. This setting is reserved for future use.
+{% endhint %}
 
 ***
 
@@ -183,9 +236,11 @@ Use this output with robot-localization systems, such as WPILib pose estimators.
 **Type:** Boolean\
 **Default:** `False`
 
-Publishes the full 3D pose of each detected AprilTag.
+Reserved for publishing each tag's full 3D pose.
 
-Each pose includes position, rotation, and camera distance. Enable this for debugging or applications that use individual tag poses. Disable it when only camera field pose is needed.
+{% hint style="info" %}
+This setting is defined but not currently used by the result serializer.
+{% endhint %}
 
 ***
 
@@ -194,35 +249,50 @@ Each pose includes position, rotation, and camera distance. Enable this for debu
 **Type:** Enum\
 **Default:** `kPoseOnly`
 
-Controls pipeline logging and debug output.
+Reserved for controlling how much debug data is published per tag.
 
-{% hint style="info" icon="thumbs-up" %}
-Use `kPoseOnly` during normal competition operation. Use higher levels when debugging detection or calibration.
+{% hint style="info" %}
+This setting is defined but not currently used by the result serializer.
 {% endhint %}
 
-Higher verbosity can increase logging overhead.
+## Performance tuning
 
-***
+### If detection is too slow
 
-## Performance Tuning
-
-### Reducing Latency
-
-If AprilTag detection is too slow, make these changes in order:
-
-1. Crop the image with **Crop X** and **Crop Y**.
-2. Increase **Quad Decimate**.
-3. Reduce camera resolution.
-4. Increase **Number of Threads**.
+1. Set **Crop X** and **Crop Y** to the region where tags appear.
+2. Increase **Quad Decimate** to `1.5` or `2.0`.
+3. Lower the camera resolution.
+4. Increase **Number of Threads** to `2`.
 5. Disable **Refine Edges**.
 
-### Improving Accuracy
+### If tags are missed
 
-If pose estimates are inaccurate, check these items:
+1. Set **Quad Decimate** back to `1.0`.
+2. Increase camera resolution or move the camera closer.
+3. Check focus and exposure.
+4. Raise **Max Line Fit MSE**.
+5. Lower **Min White Black Diff**.
+6. Lower **Min Cluster Pixels**.
 
-1. Verify camera calibration at the selected resolution.
-2. Measure the physical tag size and verify **Tag Size**.
+### If pose is inaccurate or jittery
+
+1. Confirm the camera is calibrated at the active resolution.
+2. Measure **Tag Size** with calipers.
 3. Set **Quad Decimate** to `1.0`.
 4. Enable **Refine Edges**.
-5. Increase **Iteration Count** if latency allows.
-6. Ensure each tag is flat and securely mounted.
+5. Lock camera exposure and focus.
+6. Make sure the field map poses are correct.
+
+### If there are false detections
+
+1. Raise **Min White Black Diff**.
+2. Lower **Max Line Fit MSE**.
+3. Confirm you are using the correct **Tag Family**.
+4. Crop out areas with reflections or screens.
+5. Improve lighting to reduce glare.
+
+## Next steps
+
+- [AprilTag Pipeline](README.md)
+- [Camera Calibration](../../../getting-started/quick-start/camera-calibration.md)
+- [How Synapse Works](../../../getting-started/how-synapse-works.md)

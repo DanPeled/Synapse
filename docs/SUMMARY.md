@@ -14,10 +14,12 @@
   * [Deploying on Custom Hardware](getting-started/hardware-selection/deploying-on-custom-hardware.md)
   * [Performance Matrix](getting-started/hardware-selection/performance-matrix.md)
 * [Installing Software](getting-started/installing-software.md)
+* [How Synapse Works](getting-started/how-synapse-works.md)
 
 ## Usage
 
 * [Project Management](usage/project-management/README.md)
+  * [Synapse Manager](usage/project-management/synapse-manager.md)
   * [Setting up CI for a Synapse Project using GitHub Actions](usage/project-management/setting-up-ci-for-a-synapse-project-using-github-actions.md)
 * [Built In Pipelines](usage/built-in-pipelines/README.md)
   * [Apriltag Pipeline](usage/built-in-pipelines/apriltag-pipeline/README.md)
@@ -28,6 +30,7 @@
   * [Camera Page](usage/built-in-pipelines-1/camera-page.md)
   * [Settings Page](usage/built-in-pipelines-1/settings-page.md)
 * [Working without a robot](usage/working-without-a-robot.md)
+* [Simulation](usage/simulation.md)
 * [Custom Pipelines](usage/custom-pipelines/README.md)
   * [Settings API](usage/custom-pipelines/settings-api.md)
   * [Sending Results](usage/custom-pipelines/sending-results.md)
@@ -38,6 +41,7 @@
 * [SynapseLib : Robot Code Interface](robot-interfacing/synapse-bridge/README.md)
   * [Installing SynapseLib](robot-interfacing/synapse-bridge/installing-synapse-bridge.md)
   * [Getting Target Data](robot-interfacing/synapse-bridge/getting-target-data.md)
+  * [Robot Pose](robot-interfacing/synapse-bridge/robot-pose.md)
   * [Runtime Camera Settings](robot-interfacing/synapse-bridge/runtime-camera-settings.md)
   * [Custom Pipeline Data](robot-interfacing/synapse-bridge/custom-pipeline-data.md)
 

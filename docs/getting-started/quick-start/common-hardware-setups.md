@@ -1,66 +1,110 @@
 ---
+description: Proven coprocessor, camera, storage, and power combinations for Synapse.
 icon: gears
 ---
 
 # Common Hardware Setups
 
+This page lists hardware that is commonly used with Synapse. It is not a compatibility guarantee. If you use something else, check [Deploying on Custom Hardware](../hardware-selection/deploying-on-custom-hardware.md).
+
 ## Coprocessors
 
-* Orange Pi 5
-  * 2x 2.0USB Ports, 1x 3.0USB port, Up to 2.4Ghz out of the box
-  * Type-C power supply 5V @ 4A
-  * Can be powered via the GPIO pins
-  * 4GB/8GB/16GB of RAM
-* Rasberry Pi 5&#x20;
-  * 2x 2.0USB Ports, 2x 3.0USB ports, Up to 2.4Ghz out of the box
-  * Type-C power supply 5V @ 5A
-  * Can be powered via the GPIO pins
-  * PoE+ support (requires separate PoE+ HAT)
-  * Up to 16GB of RAM
+### Orange Pi 5
+
+- 2× USB 2.0 ports, 1× USB 3.0 port.
+- Up to 2.4 GHz CPU.
+- 4 GB, 8 GB, or 16 GB of RAM.
+- Powered by USB-C at 5V/4A, or through the GPIO header.
+- NPU available for custom models.
+
+### Raspberry Pi 5
+
+- 2× USB 2.0 ports, 2× USB 3.0 ports.
+- Up to 2.4 GHz CPU.
+- Up to 16 GB of RAM.
+- Powered by USB-C at 5V/5A, or through the GPIO header.
+- PoE+ with a separate PoE+ HAT.
 
 {% hint style="info" %}
-This project will work on any Linux-Compatible device as a coprocessor in order to have full advantage of all the capabilities of the system, but not all coprocessor options have been tested so far.
-
-See [installing-software.md](../installing-software.md "mention") for manual installation steps
-{% endhint %}
-
-## SD Cards
-
-* 8GB Or larger micro SD card&#x20;
-
-Industrial grade SD cards from major manufacturers are recommended for robotics applications. For example: Sandisk SDSDQAF3-016G-I.
-
-{% hint style="info" %}
-Will mostly depend on the OS of your choosing, the provided images will require atleast 3GB of storage
+Synapse works on any Linux-compatible device that meets the requirements in [Deploying on Custom Hardware](../hardware-selection/deploying-on-custom-hardware.md). The two boards above are simply common choices.
 {% endhint %}
 
 ## Cameras
 
-* AprilTag Detection
-  * OV9281&#x20;
-    * Has a physical focus tuner
-    * Monochromatic (Only Black and White)
-* Color Detection
-  * OV9728
-    * Has a physical focus tuner
+### Recommended: global-shutter USB camera
 
-Feel free to get started with any color webcam you have sitting around.
+Examples: Arducam OV9281, OV2311, or similar mono/color global-shutter modules.
 
-{% hint style="info" %}
-Any generic USB camera will be compatible with Synapse out of the box.
+- Best AprilTag accuracy while the robot moves.
+- Usually appears as `/dev/video*`.
+- Choose a lens that gives roughly 70°–90° horizontal field of view.
+
+### Common: rolling-shutter USB webcam
+
+Examples: Logitech C920, C270, or similar.
+
+- Cheap and easy to find.
+- Fine for color detection and slow-moving AprilTag use.
+- Can produce motion skew and missed detections at high robot speeds.
+
+### CSI cameras
+
+Raspberry Pi and Orange Pi camera modules connect through CSI instead of USB.
+
+- Lower latency and less USB bandwidth.
+- Requires the correct device-tree overlay and driver.
+- Not every CSI camera is supported by every board image.
+
+{% hint style="tip" %}
+Prefer a camera with **manual focus** and **manual exposure**. Lock both after tuning, or detection stability will change as lighting changes.
 {% endhint %}
+
+## Storage
+
+- 16 GB minimum, 32 GB or more recommended.
+- Use a reputable A1/A2 microSD card, or an NVMe SSD if the board supports it.
+- Recording video fills storage quickly. Check free space before a long practice session.
 
 ## Power
 
-* Pololu S13V30F5 Regulator
-* Redux Robotics Zinc-V Regulator
-* Belkin Boost Charger
-  * _Since its an external power supply, it is **less recommended** to be used and won't automatically power off with the robot, but it is **competition-legal** and the battery life can last a long while._
+Recommended regulators and wiring:
 
+- **Orange Pi 5** — Zinc V, Pololu S13V30F5, or a 5V/4A USB-C supply.
+- **Raspberry Pi 5** — Zinc V USB-C, or a 5V/5A USB-C supply.
 
+On a robot:
 
-See [hardware-selection](../hardware-selection/ "mention") for info on why these are recommended
+- Wire the regulator directly to the power distribution board, not through the RoboRIO's 5V rail.
+- Use locking connectors or hot glue the barrel/USB-C connector.
+- Add strain relief so vibration does not unplug the device mid-match.
 
-{% hint style="success" %}
-This section was inspired by PhotonVision's guide for common hardware setups
-{% endhint %}
+See [Wiring](wiring.md) for diagrams.
+
+## Network
+
+- A network switch is strongly recommended on the robot.
+- Use Ethernet between the coprocessor, RoboRIO, and radio when possible.
+- If you use Wi-Fi, use 5 GHz and keep the device close to the access point.
+
+## Example setups
+
+### Budget AprilTag setup
+
+- Raspberry Pi 5 (8 GB).
+- Arducam OV9281 global-shutter camera.
+- 32 GB A2 microSD.
+- 5V/5A USB-C supply or Zinc V regulator.
+
+### Multi-camera setup
+
+- Orange Pi 5 Plus or a small x86 mini PC.
+- Two USB 3.0 global-shutter cameras.
+- NVMe SSD.
+- Active cooling.
+- Gigabit network switch.
+
+## Next steps
+
+- [Wiring](wiring.md)
+- [Networking](networking.md)
+- [Selecting Hardware](../hardware-selection/selecting-hardware.md)

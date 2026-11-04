@@ -1,99 +1,286 @@
 ---
-description: Overview of the Settings API and it's built in constraints
+description: Define validated pipeline settings that become controls in the dashboard.
 icon: sliders-up
 ---
 
 # Settings API
 
-## Data Validation
+The Settings API connects Python settings classes to the dashboard, to NetworkTables, and to validation. You define a field once, and Synapse generates the control, validates every change, and stores the value.
 
-The Settings API is resposible for managing pipeline & global settings accross all the aspects of the runtime: In-Code, in the UI and in networktables.
+## Defining a settings class
 
-Each time a setting is attempted to be modified, the attempted value first goes through the Settings API in order to verify its validity.
+Subclass `PipelineSettings` and declare fields with `settingField`:
 
-{% hint style="info" %}
-Most aspects of the Settings API—such as setting validation and automatic field generation from user-defined setting classes—are abstracted away from the user but can be extended and customized as needed.
-{% endhint %}
-
-## Defining a Settings class
-
-In order for a pipeline to use some setting collection, first we need to define its settings class,
-
-e.g:&#x20;
-
-{% code title="my_pipeline.py" overflow="wrap" %}
 ```python
-# ... imports
+from synapse import Pipeline, PipelineSettings
+from synapse.core.settings_api import NumberConstraint, settingField
+
 
 class MyPipelineSettings(PipelineSettings):
-    circle_size = settingField(NumberConstraint(minValue=0, maxValue=None), default=20)
-    """Setting for the size of the circle drawn onto the screen"""
+    circle_size = settingField(
+        NumberConstraint(minValue=0, maxValue=500, step=1),
+        default=20,
+        description="Radius of the circle in pixels.",
+        category="<Circle/> Drawing",
+    )
 
-    circle_x = settingField(
-        NumberConstraint(minValue=0, maxValue=1920), default=1920 / 2
-    )
-    circle_y = settingField(
-        NumberConstraint(minValue=0, maxValue=1080), default=1080 / 2
-    )
-    """Position of the circle on screen, where (0, 0) is the top-left corner."""
 
 class MyPipeline(Pipeline[MyPipelineSettings]):
     def __init__(self, settings: MyPipelineSettings):
         super().__init__(settings)
 ```
-{% endcode %}
 
-This class holds 3 settings for our `MyPipeline` pipeline:
+`settingField` takes:
 
-* `circle_size`
-* `circle_x`
-* `circle_y`
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `constraint` | Yes | The rule that validates the value |
+| `default` | Yes | The starting value |
+| `description` | No | Tooltip text in the dashboard |
+| `category` | No | Tab the setting appears under |
 
-Each of these values holds a `Constraint` and its default value, in addition it is also possible to provide a description and a category for the settings that will be visible in the UI.&#x20;
+The attribute name becomes the setting key. In the example, `circle_size` is the key used in the dashboard, in `config/`, and in NetworkTables.
 
-{% hint style="info" %}
-This class will also hold access to the built in pipeline settings (Which are the camera settings):\
-Brightness, Exposure, Saturation, Sharpness, Gain, Orientation & Resolution.
-
-These settings will always be rendered in the UI, and will directly affect the camera properties.
+{% hint style="warning" %}
+Do not use a settings class without passing it to `Pipeline[...]`. If the generic argument is missing, Synapse falls back to the base `PipelineSettings` and your fields are not registered.
 {% endhint %}
 
-## UI Field Generation
+## Reading and writing settings
 
-The UI recieves information of the registered pipeline types & settings, and with that information is able to know how to render each of the different settings defined in the code, without any additional information.
+Inside a pipeline:
 
-This allows for automatic setting generation and validation, without any modification to the UI itself in order to support a new pipeline type.
+```python
+# Read by Setting object (recommended, type-checked)
+size = self.getSetting(MyPipelineSettings.circle_size)
 
-## Constraint Types
+# Read by key
+size = self.getSetting("circle_size")
 
-There are a few constrainted types built into Synapse:
+# Write by Setting object or key
+self.setSetting(MyPipelineSettings.circle_size, 40)
+self.setSetting("circle_size", 40)
+```
 
-### Number Constraint
+Values that fail validation are rejected. Valid values are normalized before they are stored. For example, a number is snapped to the nearest allowed step.
 
-the `NumberConstraint` describes a value that exists inside some _range_ with optional min, max and step values.\
-This Constraint will be rendered as a Slider if both min and max values where provided, and a number input field otherwise.
+## Categories and icons
 
-<figure><img src="../../.gitbook/assets/Slider.png" alt=""><figcaption></figcaption></figure>
+The `category` string groups settings into tabs. You can prefix the label with a Lucide icon name inside angle brackets:
 
-<figure><img src="../../.gitbook/assets/NumberInput.png" alt=""><figcaption></figcaption></figure>
+```python
+category="<Circle/> Drawing"
+```
 
-### Boolean Constraint
+The dashboard renders a `Drawing` tab with a circle icon. The text after `/>` is the label. If you omit the category, the setting appears in the default group.
 
-The `BooleanConstraint` describes a boolean value, and will be rendered as a toggle button, or a button if set to render as one.
+Built-in camera properties use the category `<Camera/> Camera Properties`.
 
-<figure><img src="../../.gitbook/assets/BooleanValue.png" alt=""><figcaption></figcaption></figure>
+## Constraint types
 
-### StringConstraint
+### `NumberConstraint`
 
-### EnumeratedConstraint
+A number, optionally bounded and stepped.
 
-Describes a list of options to choose from, renders as a dropdown menu.
+```python
+NumberConstraint(minValue=0, maxValue=255, step=1)
+NumberConstraint(minValue=0, maxValue=None)
+```
 
-<figure><img src="../../.gitbook/assets/ListOptions.png" alt=""><figcaption></figcaption></figure>
+| Argument | Meaning |
+| --- | --- |
+| `minValue` | Minimum allowed value, or `None` for no minimum |
+| `maxValue` | Maximum allowed value, or `None` for no maximum |
+| `step` | Increment, or `None` for any value |
 
-### ListConstraint
+When both `minValue` and `maxValue` are set, the dashboard renders a slider. Otherwise it renders a number input.
 
-### ColorConstraint
+If `step` is set and the value does not land on a step, the value is snapped to the nearest step. **The minimum is used as the step origin.** If `minValue` is `None`, step snapping is skipped.
 
-Coming soon...
+### `RangeConstraint`
 
+A pair of numbers, used for a range such as crop bounds.
+
+```python
+RangeConstraint(minValue=-1, maxValue=1, step=0.01)
+```
+
+The value must be a list or tuple of two numbers. The dashboard renders a two-handle range slider.
+
+```python
+crop_x = settingField(
+    RangeConstraint(minValue=-1, maxValue=1, step=0.01),
+    default=[-1, 1],
+    category="<Funnel/> Filtering",
+)
+```
+
+### `BooleanConstraint`
+
+A true/false value.
+
+```python
+BooleanConstraint()                    # Toggle
+BooleanConstraint(renderAsButton=True) # Button
+```
+
+`renderAsButton=True` is useful for actions such as "capture frame" where a momentary press makes more sense than a persistent switch.
+
+Validation also accepts common representations: `"true"`, `"1"`, `"yes"`, `"on"`, `"false"`, `"0"`, `"no"`, `"off"`, and numbers.
+
+### `StringConstraint`
+
+A string, optionally with length limits and a regular expression.
+
+```python
+StringConstraint(minLength=1, maxLength=32)
+StringConstraint(pattern=r"^[a-z0-9_]+$")
+```
+
+| Argument | Meaning |
+| --- | --- |
+| `minLength` | Minimum number of characters |
+| `maxLength` | Maximum number of characters |
+| `pattern` | A regular expression matched from the start of the string |
+
+The dashboard renders a text input.
+
+### `EnumeratedConstraint`
+
+A fixed list of options. The dashboard renders a dropdown.
+
+```python
+EnumeratedConstraint(["largest_area", "closest_to_center"])
+```
+
+You can also include display labels:
+
+```python
+from synapse.core.settings_api import EnumeratedConstraint, EnumeratedOption
+
+EnumeratedConstraint([
+    EnumeratedOption("Largest area", "largest_area"),
+    EnumeratedOption("Closest to center", "closest_to_center"),
+])
+```
+
+Or build the options from an `Enum`:
+
+```python
+from enum import Enum
+
+class Mode(Enum):
+    kFast = "fast"
+    kAccurate = "accurate"
+
+mode = settingField(
+    EnumeratedConstraint.fromEnum(Mode),
+    default=Mode.kFast.value,
+)
+```
+
+The stored value is the option value, not the display key.
+
+### `ListConstraint`
+
+A list value, optionally with length limits and nesting.
+
+```python
+ListConstraint(minLength=0, maxLength=10, depth=1)
+```
+
+| Argument | Meaning |
+| --- | --- |
+| `minLength` | Minimum number of items (`0` means no minimum) |
+| `maxLength` | Maximum number of items (`0` means no maximum) |
+| `depth` | Nesting depth; `2` allows a list of lists |
+
+The dashboard renders a list editor. The constraint checks the list shape, not the type of each item.
+
+### `ColorConstraint`
+
+A color value, or a pair of colors when `rangeMode=True`.
+
+```python
+ColorConstraint(formatType=ColorFormat.kHex)
+ColorConstraint(formatType=ColorFormat.kHSV, rangeMode=True)
+```
+
+| Format | Example |
+| --- | --- |
+| `ColorFormat.kHex` | `#00ff00` |
+| `ColorFormat.kRGB` | `rgb(0, 255, 0)` |
+| `ColorFormat.kHSV` | `hsv(60, 255, 255)` |
+
+Use `rangeMode=True` for thresholds where a lower and upper color define a range.
+
+### `FileConstraint`
+
+A path to an existing file.
+
+```python
+FileConstraint(fileTypes={".onnx", ".pt"})
+```
+
+| Argument | Meaning |
+| --- | --- |
+| `fileTypes` | Optional set of allowed file extensions |
+
+Validation accepts a `pathlib.Path` or a string path. A string path must exist. Relative paths are stored as absolute paths.
+
+## Supported value types
+
+Settings values can be:
+
+- Integers
+- Floats
+- Booleans
+- Strings
+- Lists of the above
+
+Bytes are supported by the settings serialization layer, but the dashboard does not provide a control for them. Use [auxiliary results](sending-results.md#auxiliary-values) for binary data.
+
+## Camera properties
+
+Every pipeline also exposes the camera's hardware settings through `CameraSettings`:
+
+| Key | Constraint | Default |
+| --- | --- | --- |
+| `brightness` | Driver range | Camera-defined |
+| `saturation` | Driver range | Camera-defined |
+| `sharpness` | Driver range | Camera-defined |
+| `gain` | Driver range | Camera-defined |
+| `orientation` | `0`, `90`, `180`, `270` | `0` |
+| `resolution` | Supported modes | `1920x1080` |
+
+The available range and supported resolutions come from the camera driver, so they differ between cameras. Additional driver properties may appear automatically. Synapse filters out noisy or internal properties such as `raw`, `backlight`, `gamma`, and `exposure_dynamic_framerate`.
+
+Read them with:
+
+```python
+from synapse.core.settings_api import CameraSettings
+
+resolution = self.getCameraSetting(CameraSettings.resolution)
+orientation = self.getCameraSetting(CameraSettings.orientation)
+```
+
+{% hint style="info" %}
+Calibration is stored per resolution. If you change `resolution`, calibrate the camera again at the new resolution.
+{% endhint %}
+
+## Where values are saved
+
+When you press **Save** in the dashboard, Synapse writes:
+
+```text
+config/camera_<index>/pipeline_settings.yml
+config/camera_<index>/camera_configs.yml
+```
+
+Deploys preserve the remote `config/` folder, so your tuned values survive a redeploy.
+
+## Next steps
+
+- [Custom Pipelines](README.md)
+- [Sending Results](sending-results.md)
+- [Accessing Global Settings](accessing-global-settings.md)
+- [Pipeline Settings (UI)](../built-in-pipelines-1/pipeline-settings.md)

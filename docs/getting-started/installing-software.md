@@ -1,61 +1,193 @@
 ---
+description: Install Synapse on your development computer and on a coprocessor.
 icon: down-to-line
 ---
 
 # Installing Software
 
-## Coprocessor Installation
+Installing Synapse has two parts:
 
-### Imaging A Device
+1. **Your development computer** — installs the `synapsefrc` package, which includes the runtime, the installer, and the web UI.
+2. **Your coprocessor** — gets a Python environment and runs the runtime as a systemd service.
 
-{% hint style="info" %}
-Currently there are no images that come preinstalled with the Synapse runtime, but it is a feature that is planned to be added in the future! Feel free to contribute to Synapse and add this feature in yourself by creating a PR on [GitHub](https://github.com/DanPeled/Synapse)
+You do not install Synapse on the RoboRIO. Robot code uses [SynapseLib](../robot-interfacing/synapse-bridge/README.md) instead.
+
+## Development computer installation
+
+### Requirements
+
+- Python 3.11–3.14.
+- `pip`.
+- Git (only needed if you install from source).
+- SSH access to the coprocessor.
+
+{% hint style="tip" %}
+Use a virtual environment so Synapse's pinned dependencies do not interfere with other Python projects.
 {% endhint %}
 
-#### Imaging Software
-
-The recommended software in order to image a device's Operating system into a storage device is [Blena Etcher](https://etcher.balena.io/)
-
-#### Suggested images:
-
-* Orange Pi 5 - [Bookworm Armbian 25.5.1](https://distrohub.kyiv.ua/armbian-dl/orangepi5/archive/Armbian_25.5.1_Orangepi5_bookworm_vendor_6.1.115_minimal.img.xz)
-* Rasberry Pi -[ Bookworm Armbian 25.5.1](https://www.armbian.com/rpi4b/) (Instructions included)
-
-### Device Install
-
-First, you will need to have a local project set-up, please read [#development-computer-installation](installing-software.md#development-computer-installation "mention") and [project-management](../usage/project-management/ "mention").
-
-Now, you will need to have the coprocessor connected to the same internet access point (with internet access) as your development computer.
-
-#### Getting Your IP Address
-
-In order to get your device's IP address, you can run the following command in the coprocessors terminal
-
 ```bash
-ip a
+python -m venv .venv
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
 ```
 
-This will show you the device's IP address below the interface subsection.
-
-Now, we need to configure our deployment device [#adding-processors](../usage/project-management/#adding-processors "mention").
-
-Finally, we can call the installation command:
+### Install the package
 
 ```bash
-<pythonexec> -m synapse_installer install <coprocessor nickname>
+python -m pip install --upgrade synapsefrc
 ```
 
-This will install all the requirement's onto the coprocessor and deploy your local project onto it.
+Verify the install:
 
-## Development Computer Installation
-
-In order to install the python library on your development machine in order to create a project and configure deployment devices, run the following command:
-
-{% code fullWidth="false" %}
 ```bash
-pip install synapsefrc
+python -m synapse_installer --help
 ```
-{% endcode %}
 
-This will be enough in order to be able to use the library on your local machine!\
-In order to create a project, read [project-management](../usage/project-management/ "mention")
+```text
+Usage: python -m synapse_installer <command> [options]
+
+Commands:
+  create       Create a new project
+  deploy       Deploy the project
+  sync         Sync files or data
+  install      Run sync then deploy
+  device       Device actions (e.g. `add`)
+```
+
+The installer is also available as the `synapse_installer` command on your `PATH`.
+
+### Install from source
+
+Use this if you are developing Synapse itself or need an unreleased change.
+
+```bash
+git clone https://github.com/DanPeled/Synapse.git
+cd Synapse
+python -m pip install -e .
+```
+
+## Coprocessor installation
+
+You do not need to copy Synapse onto the device by hand. The `sync` step installs it over SSH. The device only needs:
+
+- A 64-bit Linux distribution.
+- SSH enabled.
+- Internet access for the first install.
+- `sudo` access for the SSH user.
+
+The installer will:
+
+- Install system packages: `libopencv-dev`, `unzip`, and `isc-dhcp-client`.
+- Find a compatible Python interpreter (3.11–3.14).
+- Build Python 3.12.2 from source if no compatible interpreter exists. This takes a long time on slower devices.
+- Create a virtual environment at `~/.venv`.
+- Install the Python requirements.
+- Create a systemd service named `synapse-runtime`.
+- Enable and start the service.
+
+{% hint style="warning" %}
+Building Python from source can take 20–60 minutes on a Pi. A distribution image that already includes Python 3.11 through 3.14 avoids this.
+{% endhint %}
+
+### Imaging a device
+
+{% hint style="info" %}
+There are currently no official Synapse device images. Any minimal 64-bit Debian/Ubuntu-based Linux image with SSH should work.
+{% endhint %}
+
+Recommended imaging tool: [Balena Etcher](https://etcher.balena.io/).
+
+Suggested images:
+
+- **Orange Pi 5** — [Armbian Bookworm 25.5.1](https://distrohub.kyiv.ua/armbian-dl/orangepi5/archive/Armbian_25.5.1_Orangepi5_bookworm_vendor_6.1.115_minimal.img.xz)
+- **Raspberry Pi 5** — [Armbian for Raspberry Pi](https://www.armbian.com/rpi4b/) (instructions included on the download page)
+
+After imaging:
+
+1. Boot the device.
+2. Connect it to your network. See [Networking](quick-start/networking.md).
+3. Enable SSH if it is not enabled by default.
+4. Confirm you can connect:
+
+```bash
+ssh <username>@<device-ip>
+```
+
+### Deploy your first project
+
+On your development computer, create a project and install it:
+
+```bash
+python -m synapse_installer create
+cd <project-name>
+python -m synapse_installer install <device-nickname>
+```
+
+The installer asks for the device hostname, IP address, and SSH password, then saves them in `.synapseproject`. The nickname defaults to the hostname.
+
+Pass the nickname to `install` or `sync` so they target the right device. To target several devices, list each nickname:
+
+```bash
+python -m synapse_installer install <nickname-1> <nickname-2>
+```
+
+### Verify the runtime
+
+On the device:
+
+```bash
+sudo systemctl status synapse-runtime
+```
+
+You should see `active (running)`. To follow logs:
+
+```bash
+journalctl -u synapse-runtime -f
+```
+
+Then open the dashboard:
+
+```text
+http://<device-ip>:3000
+```
+
+## Updating Synapse
+
+Update the package on your development computer:
+
+```bash
+python -m pip install --upgrade synapsefrc
+```
+
+Then re-deploy your project:
+
+```bash
+python -m synapse_installer install <device-nickname>
+```
+
+The deploy step preserves the device's `config/` folder, so calibrated cameras and tuned settings survive an update.
+
+## Uninstalling
+
+On the device:
+
+```bash
+sudo systemctl stop synapse-runtime
+sudo systemctl disable synapse-runtime
+sudo rm /etc/systemd/system/synapse-runtime.service
+sudo systemctl daemon-reload
+rm -rf ~/Synapse ~/.venv
+```
+
+On your development computer:
+
+```bash
+python -m pip uninstall synapsefrc
+```
+
+## Next steps
+
+- [Quick Start](quick-start/README.md)
+- [Project Management](../usage/project-management/README.md)
+- [Networking](quick-start/networking.md)
+- [Troubleshooting](../additional-resources/troubleshooting.md)
