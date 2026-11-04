@@ -182,59 +182,59 @@ function createCanvasElement() {
 }
 var _cache = {};
 var _setConsoleFunction = null;
-function log(...params) {
-  const message = "THREE." + params.shift();
+function log(...params2) {
+  const message = "THREE." + params2.shift();
   if (_setConsoleFunction) {
-    _setConsoleFunction("log", message, ...params);
+    _setConsoleFunction("log", message, ...params2);
   } else {
-    console.log(message, ...params);
+    console.log(message, ...params2);
   }
 }
-function enhanceLogMessage(params) {
-  const message = params[0];
+function enhanceLogMessage(params2) {
+  const message = params2[0];
   if (typeof message === "string" && message.startsWith("TSL:")) {
-    const stackTrace = params[1];
+    const stackTrace = params2[1];
     if (stackTrace && stackTrace.isStackTrace) {
-      params[0] += " " + stackTrace.getLocation();
+      params2[0] += " " + stackTrace.getLocation();
     } else {
-      params[1] = 'Stack trace not available. Enable "THREE.Node.captureStackTrace" to capture stack traces.';
+      params2[1] = 'Stack trace not available. Enable "THREE.Node.captureStackTrace" to capture stack traces.';
     }
   }
-  return params;
+  return params2;
 }
-function warn(...params) {
-  params = enhanceLogMessage(params);
-  const message = "THREE." + params.shift();
+function warn(...params2) {
+  params2 = enhanceLogMessage(params2);
+  const message = "THREE." + params2.shift();
   if (_setConsoleFunction) {
-    _setConsoleFunction("warn", message, ...params);
+    _setConsoleFunction("warn", message, ...params2);
   } else {
-    const stackTrace = params[0];
+    const stackTrace = params2[0];
     if (stackTrace && stackTrace.isStackTrace) {
       console.warn(stackTrace.getError(message));
     } else {
-      console.warn(message, ...params);
+      console.warn(message, ...params2);
     }
   }
 }
-function error(...params) {
-  params = enhanceLogMessage(params);
-  const message = "THREE." + params.shift();
+function error(...params2) {
+  params2 = enhanceLogMessage(params2);
+  const message = "THREE." + params2.shift();
   if (_setConsoleFunction) {
-    _setConsoleFunction("error", message, ...params);
+    _setConsoleFunction("error", message, ...params2);
   } else {
-    const stackTrace = params[0];
+    const stackTrace = params2[0];
     if (stackTrace && stackTrace.isStackTrace) {
       console.error(stackTrace.getError(message));
     } else {
-      console.error(message, ...params);
+      console.error(message, ...params2);
     }
   }
 }
-function warnOnce(...params) {
-  const message = params.join(" ");
+function warnOnce(...params2) {
+  const message = params2.join(" ");
   if (message in _cache) return;
   _cache[message] = true;
-  warn(...params);
+  warn(...params2);
 }
 function probeAsync(gl2, sync, interval) {
   return new Promise(function(resolve, reject) {
@@ -18172,7 +18172,7 @@ function WebGLAnimation() {
   };
 }
 function WebGLAttributes(gl2) {
-  const buffers = /* @__PURE__ */ new WeakMap();
+  const buffers2 = /* @__PURE__ */ new WeakMap();
   function createBuffer(attribute, bufferType) {
     const array = attribute.array;
     const usage = attribute.usage;
@@ -18254,22 +18254,22 @@ function WebGLAttributes(gl2) {
   }
   function get(attribute) {
     if (attribute.isInterleavedBufferAttribute) attribute = attribute.data;
-    return buffers.get(attribute);
+    return buffers2.get(attribute);
   }
   function remove(attribute) {
     if (attribute.isInterleavedBufferAttribute) attribute = attribute.data;
-    const data = buffers.get(attribute);
+    const data = buffers2.get(attribute);
     if (data) {
       gl2.deleteBuffer(data.buffer);
-      buffers.delete(attribute);
+      buffers2.delete(attribute);
     }
   }
   function update(attribute, bufferType) {
     if (attribute.isInterleavedBufferAttribute) attribute = attribute.data;
     if (attribute.isGLBufferAttribute) {
-      const cached = buffers.get(attribute);
+      const cached = buffers2.get(attribute);
       if (!cached || cached.version < attribute.version) {
-        buffers.set(attribute, {
+        buffers2.set(attribute, {
           buffer: attribute.buffer,
           type: attribute.type,
           bytesPerElement: attribute.elementSize,
@@ -18278,9 +18278,9 @@ function WebGLAttributes(gl2) {
       }
       return;
     }
-    const data = buffers.get(attribute);
+    const data = buffers2.get(attribute);
     if (data === void 0) {
-      buffers.set(attribute, createBuffer(attribute, bufferType));
+      buffers2.set(attribute, createBuffer(attribute, bufferType));
     } else if (data.version < attribute.version) {
       if (data.size !== attribute.array.byteLength) {
         throw new Error("THREE.WebGLAttributes: The size of the buffer attribute's array buffer does not match the original size. Resizing buffer attributes is not supported.");
@@ -19924,7 +19924,7 @@ var PMREMGenerator = class {
   _allocateTargets() {
     const width = 3 * Math.max(this._cubeSize, 16 * 7);
     const height = 4 * this._cubeSize;
-    const params = {
+    const params2 = {
       magFilter: LinearFilter,
       minFilter: LinearFilter,
       generateMipmaps: false,
@@ -19933,12 +19933,12 @@ var PMREMGenerator = class {
       colorSpace: LinearSRGBColorSpace,
       depthBuffer: false
     };
-    const cubeUVRenderTarget = _createRenderTarget(width, height, params);
+    const cubeUVRenderTarget = _createRenderTarget(width, height, params2);
     if (this._pingPongRenderTarget === null || this._pingPongRenderTarget.width !== width || this._pingPongRenderTarget.height !== height) {
       if (this._pingPongRenderTarget !== null) {
         this._dispose();
       }
-      this._pingPongRenderTarget = _createRenderTarget(width, height, params);
+      this._pingPongRenderTarget = _createRenderTarget(width, height, params2);
       const { _lodMax } = this;
       ({ lodMeshes: this._lodMeshes, sizeLods: this._sizeLods, sigmas: this._sigmas } = _createPlanes(_lodMax));
       this._blurMaterial = _getBlurShader(_lodMax, width, height);
@@ -20249,8 +20249,8 @@ function _createPlanes(lodMax) {
   }
   return { lodMeshes, sizeLods, sigmas };
 }
-function _createRenderTarget(width, height, params) {
-  const cubeUVRenderTarget = new WebGLRenderTarget(width, height, params);
+function _createRenderTarget(width, height, params2) {
+  const cubeUVRenderTarget = new WebGLRenderTarget(width, height, params2);
   cubeUVRenderTarget.texture.mapping = CubeUVReflectionMapping;
   cubeUVRenderTarget.texture.name = "PMREM.cubeUv";
   cubeUVRenderTarget.scissorTest = true;
@@ -27131,7 +27131,7 @@ function WebGLMaterials(renderer2, properties) {
   };
 }
 function WebGLUniformsGroups(gl2, info, capabilities, state) {
-  let buffers = {};
+  let buffers2 = {};
   let updateList = {};
   let allocatedBindingPoints = [];
   const maxBindingPoints = gl2.getParameter(gl2.MAX_UNIFORM_BUFFER_BINDINGS);
@@ -27140,11 +27140,11 @@ function WebGLUniformsGroups(gl2, info, capabilities, state) {
     state.uniformBlockBinding(uniformsGroup, webglProgram);
   }
   function update(uniformsGroup, program) {
-    let buffer = buffers[uniformsGroup.id];
+    let buffer = buffers2[uniformsGroup.id];
     if (buffer === void 0) {
       prepareUniformsGroup(uniformsGroup);
       buffer = createBuffer(uniformsGroup);
-      buffers[uniformsGroup.id] = buffer;
+      buffers2[uniformsGroup.id] = buffer;
       uniformsGroup.addEventListener("dispose", onUniformsGroupsDispose);
     }
     const webglProgram = program.program;
@@ -27178,7 +27178,7 @@ function WebGLUniformsGroups(gl2, info, capabilities, state) {
     return 0;
   }
   function updateBufferData(uniformsGroup) {
-    const buffer = buffers[uniformsGroup.id];
+    const buffer = buffers2[uniformsGroup.id];
     const uniforms = uniformsGroup.uniforms;
     const cache = uniformsGroup.__cache;
     gl2.bindBuffer(gl2.UNIFORM_BUFFER, buffer);
@@ -27314,16 +27314,16 @@ function WebGLUniformsGroups(gl2, info, capabilities, state) {
     uniformsGroup.removeEventListener("dispose", onUniformsGroupsDispose);
     const index = allocatedBindingPoints.indexOf(uniformsGroup.__bindingPointIndex);
     allocatedBindingPoints.splice(index, 1);
-    gl2.deleteBuffer(buffers[uniformsGroup.id]);
-    delete buffers[uniformsGroup.id];
+    gl2.deleteBuffer(buffers2[uniformsGroup.id]);
+    delete buffers2[uniformsGroup.id];
     delete updateList[uniformsGroup.id];
   }
   function dispose() {
-    for (const id in buffers) {
-      gl2.deleteBuffer(buffers[id]);
+    for (const id in buffers2) {
+      gl2.deleteBuffer(buffers2[id]);
     }
     allocatedBindingPoints = [];
-    buffers = {};
+    buffers2 = {};
     updateList = {};
   }
   return {
@@ -29916,7 +29916,7 @@ var GLTFMaterialsUnlitExtension = class {
     return MeshBasicMaterial;
   }
   extendParams(materialParams, materialDef, parser) {
-    const pending = [];
+    const pending2 = [];
     materialParams.color = new Color(1, 1, 1);
     materialParams.opacity = 1;
     const metallicRoughness = materialDef.pbrMetallicRoughness;
@@ -29927,10 +29927,10 @@ var GLTFMaterialsUnlitExtension = class {
         materialParams.opacity = array[3];
       }
       if (metallicRoughness.baseColorTexture !== void 0) {
-        pending.push(parser.assignTexture(materialParams, "map", metallicRoughness.baseColorTexture, SRGBColorSpace));
+        pending2.push(parser.assignTexture(materialParams, "map", metallicRoughness.baseColorTexture, SRGBColorSpace));
       }
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsEmissiveStrengthExtension = class {
@@ -29959,27 +29959,27 @@ var GLTFMaterialsClearcoatExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     if (extension.clearcoatFactor !== void 0) {
       materialParams.clearcoat = extension.clearcoatFactor;
     }
     if (extension.clearcoatTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "clearcoatMap", extension.clearcoatTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "clearcoatMap", extension.clearcoatTexture));
     }
     if (extension.clearcoatRoughnessFactor !== void 0) {
       materialParams.clearcoatRoughness = extension.clearcoatRoughnessFactor;
     }
     if (extension.clearcoatRoughnessTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "clearcoatRoughnessMap", extension.clearcoatRoughnessTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "clearcoatRoughnessMap", extension.clearcoatRoughnessTexture));
     }
     if (extension.clearcoatNormalTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "clearcoatNormalMap", extension.clearcoatNormalTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "clearcoatNormalMap", extension.clearcoatNormalTexture));
       if (extension.clearcoatNormalTexture.scale !== void 0) {
         const scale = extension.clearcoatNormalTexture.scale;
         materialParams.clearcoatNormalScale = new Vector2(scale, scale);
       }
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsDispersionExtension = class {
@@ -30010,12 +30010,12 @@ var GLTFMaterialsIridescenceExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     if (extension.iridescenceFactor !== void 0) {
       materialParams.iridescence = extension.iridescenceFactor;
     }
     if (extension.iridescenceTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "iridescenceMap", extension.iridescenceTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "iridescenceMap", extension.iridescenceTexture));
     }
     if (extension.iridescenceIor !== void 0) {
       materialParams.iridescenceIOR = extension.iridescenceIor;
@@ -30030,9 +30030,9 @@ var GLTFMaterialsIridescenceExtension = class {
       materialParams.iridescenceThicknessRange[1] = extension.iridescenceThicknessMaximum;
     }
     if (extension.iridescenceThicknessTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "iridescenceThicknessMap", extension.iridescenceThicknessTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "iridescenceThicknessMap", extension.iridescenceThicknessTexture));
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsSheenExtension = class {
@@ -30047,7 +30047,7 @@ var GLTFMaterialsSheenExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     materialParams.sheenColor = new Color(0, 0, 0);
     materialParams.sheenRoughness = 0;
     materialParams.sheen = 1;
@@ -30059,12 +30059,12 @@ var GLTFMaterialsSheenExtension = class {
       materialParams.sheenRoughness = extension.sheenRoughnessFactor;
     }
     if (extension.sheenColorTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "sheenColorMap", extension.sheenColorTexture, SRGBColorSpace));
+      pending2.push(this.parser.assignTexture(materialParams, "sheenColorMap", extension.sheenColorTexture, SRGBColorSpace));
     }
     if (extension.sheenRoughnessTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "sheenRoughnessMap", extension.sheenRoughnessTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "sheenRoughnessMap", extension.sheenRoughnessTexture));
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsTransmissionExtension = class {
@@ -30079,14 +30079,14 @@ var GLTFMaterialsTransmissionExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     if (extension.transmissionFactor !== void 0) {
       materialParams.transmission = extension.transmissionFactor;
     }
     if (extension.transmissionTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "transmissionMap", extension.transmissionTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "transmissionMap", extension.transmissionTexture));
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsVolumeExtension = class {
@@ -30101,15 +30101,15 @@ var GLTFMaterialsVolumeExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     materialParams.thickness = extension.thicknessFactor !== void 0 ? extension.thicknessFactor : 0;
     if (extension.thicknessTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "thicknessMap", extension.thicknessTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "thicknessMap", extension.thicknessTexture));
     }
     materialParams.attenuationDistance = extension.attenuationDistance || Infinity;
     const colorArray = extension.attenuationColor || [1, 1, 1];
     materialParams.attenuationColor = new Color().setRGB(colorArray[0], colorArray[1], colorArray[2], LinearSRGBColorSpace);
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsIorExtension = class {
@@ -30140,17 +30140,17 @@ var GLTFMaterialsSpecularExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     materialParams.specularIntensity = extension.specularFactor !== void 0 ? extension.specularFactor : 1;
     if (extension.specularTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "specularIntensityMap", extension.specularTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "specularIntensityMap", extension.specularTexture));
     }
     const colorArray = extension.specularColorFactor || [1, 1, 1];
     materialParams.specularColor = new Color().setRGB(colorArray[0], colorArray[1], colorArray[2], LinearSRGBColorSpace);
     if (extension.specularColorTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "specularColorMap", extension.specularColorTexture, SRGBColorSpace));
+      pending2.push(this.parser.assignTexture(materialParams, "specularColorMap", extension.specularColorTexture, SRGBColorSpace));
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsBumpExtension = class {
@@ -30165,12 +30165,12 @@ var GLTFMaterialsBumpExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     materialParams.bumpScale = extension.bumpFactor !== void 0 ? extension.bumpFactor : 1;
     if (extension.bumpTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "bumpMap", extension.bumpTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "bumpMap", extension.bumpTexture));
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFMaterialsAnisotropyExtension = class {
@@ -30185,7 +30185,7 @@ var GLTFMaterialsAnisotropyExtension = class {
   extendMaterialParams(materialIndex, materialParams) {
     const extension = getMaterialExtension(this.parser, materialIndex, this.name);
     if (extension === null) return Promise.resolve();
-    const pending = [];
+    const pending2 = [];
     if (extension.anisotropyStrength !== void 0) {
       materialParams.anisotropy = extension.anisotropyStrength;
     }
@@ -30193,9 +30193,9 @@ var GLTFMaterialsAnisotropyExtension = class {
       materialParams.anisotropyRotation = extension.anisotropyRotation;
     }
     if (extension.anisotropyTexture !== void 0) {
-      pending.push(this.parser.assignTexture(materialParams, "anisotropyMap", extension.anisotropyTexture));
+      pending2.push(this.parser.assignTexture(materialParams, "anisotropyMap", extension.anisotropyTexture));
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
 };
 var GLTFTextureBasisUExtension = class {
@@ -30329,19 +30329,19 @@ var GLTFMeshGpuInstancing = class {
     }
     const extensionDef = nodeDef.extensions[this.name];
     const attributesDef = extensionDef.attributes;
-    const pending = [];
+    const pending2 = [];
     const attributes = {};
     for (const key in attributesDef) {
-      pending.push(this.parser.getDependency("accessor", attributesDef[key]).then((accessor) => {
+      pending2.push(this.parser.getDependency("accessor", attributesDef[key]).then((accessor) => {
         attributes[key] = accessor;
         return attributes[key];
       }));
     }
-    if (pending.length < 1) {
+    if (pending2.length < 1) {
       return null;
     }
-    pending.push(this.parser.createNodeMesh(nodeIndex));
-    return Promise.all(pending).then((results) => {
+    pending2.push(this.parser.createNodeMesh(nodeIndex));
+    return Promise.all(pending2).then((results) => {
       const nodeObject = results.pop();
       const meshes = nodeObject.isGroup ? nodeObject.children : [nodeObject];
       const count = results[0].count;
@@ -30938,12 +30938,12 @@ var GLTFParser = class {
   _invokeAll(func) {
     const extensions = Object.values(this.plugins);
     extensions.unshift(this);
-    const pending = [];
+    const pending2 = [];
     for (let i = 0; i < extensions.length; i++) {
       const result = func(extensions[i]);
-      if (result) pending.push(result);
+      if (result) pending2.push(result);
     }
-    return pending;
+    return pending2;
   }
   /**
    * Requests the specified dependency asynchronously, with caching.
@@ -31362,11 +31362,11 @@ var GLTFParser = class {
     let materialType;
     const materialParams = {};
     const materialExtensions = materialDef.extensions || {};
-    const pending = [];
+    const pending2 = [];
     if (materialExtensions[EXTENSIONS.KHR_MATERIALS_UNLIT]) {
       const kmuExtension = extensions[EXTENSIONS.KHR_MATERIALS_UNLIT];
       materialType = kmuExtension.getMaterialType();
-      pending.push(kmuExtension.extendParams(materialParams, materialDef, parser));
+      pending2.push(kmuExtension.extendParams(materialParams, materialDef, parser));
     } else {
       const metallicRoughness = materialDef.pbrMetallicRoughness || {};
       materialParams.color = new Color(1, 1, 1);
@@ -31377,18 +31377,18 @@ var GLTFParser = class {
         materialParams.opacity = array[3];
       }
       if (metallicRoughness.baseColorTexture !== void 0) {
-        pending.push(parser.assignTexture(materialParams, "map", metallicRoughness.baseColorTexture, SRGBColorSpace));
+        pending2.push(parser.assignTexture(materialParams, "map", metallicRoughness.baseColorTexture, SRGBColorSpace));
       }
       materialParams.metalness = metallicRoughness.metallicFactor !== void 0 ? metallicRoughness.metallicFactor : 1;
       materialParams.roughness = metallicRoughness.roughnessFactor !== void 0 ? metallicRoughness.roughnessFactor : 1;
       if (metallicRoughness.metallicRoughnessTexture !== void 0) {
-        pending.push(parser.assignTexture(materialParams, "metalnessMap", metallicRoughness.metallicRoughnessTexture));
-        pending.push(parser.assignTexture(materialParams, "roughnessMap", metallicRoughness.metallicRoughnessTexture));
+        pending2.push(parser.assignTexture(materialParams, "metalnessMap", metallicRoughness.metallicRoughnessTexture));
+        pending2.push(parser.assignTexture(materialParams, "roughnessMap", metallicRoughness.metallicRoughnessTexture));
       }
       materialType = this._invokeOne(function(ext) {
         return ext.getMaterialType && ext.getMaterialType(materialIndex);
       });
-      pending.push(Promise.all(this._invokeAll(function(ext) {
+      pending2.push(Promise.all(this._invokeAll(function(ext) {
         return ext.extendMaterialParams && ext.extendMaterialParams(materialIndex, materialParams);
       })));
     }
@@ -31406,7 +31406,7 @@ var GLTFParser = class {
       }
     }
     if (materialDef.normalTexture !== void 0 && materialType !== MeshBasicMaterial) {
-      pending.push(parser.assignTexture(materialParams, "normalMap", materialDef.normalTexture));
+      pending2.push(parser.assignTexture(materialParams, "normalMap", materialDef.normalTexture));
       materialParams.normalScale = new Vector2(1, 1);
       if (materialDef.normalTexture.scale !== void 0) {
         const scale = materialDef.normalTexture.scale;
@@ -31414,7 +31414,7 @@ var GLTFParser = class {
       }
     }
     if (materialDef.occlusionTexture !== void 0 && materialType !== MeshBasicMaterial) {
-      pending.push(parser.assignTexture(materialParams, "aoMap", materialDef.occlusionTexture));
+      pending2.push(parser.assignTexture(materialParams, "aoMap", materialDef.occlusionTexture));
       if (materialDef.occlusionTexture.strength !== void 0) {
         materialParams.aoMapIntensity = materialDef.occlusionTexture.strength;
       }
@@ -31424,9 +31424,9 @@ var GLTFParser = class {
       materialParams.emissive = new Color().setRGB(emissiveFactor[0], emissiveFactor[1], emissiveFactor[2], LinearSRGBColorSpace);
     }
     if (materialDef.emissiveTexture !== void 0 && materialType !== MeshBasicMaterial) {
-      pending.push(parser.assignTexture(materialParams, "emissiveMap", materialDef.emissiveTexture, SRGBColorSpace));
+      pending2.push(parser.assignTexture(materialParams, "emissiveMap", materialDef.emissiveTexture, SRGBColorSpace));
     }
-    return Promise.all(pending).then(function() {
+    return Promise.all(pending2).then(function() {
       const material = new materialType(materialParams);
       if (materialDef.name) material.name = materialDef.name;
       assignExtrasToUserData(material, materialDef);
@@ -31469,13 +31469,13 @@ var GLTFParser = class {
         return addPrimitiveAttributes(geometry, primitive, parser);
       });
     }
-    const pending = [];
+    const pending2 = [];
     for (let i = 0, il = primitives.length; i < il; i++) {
       const primitive = primitives[i];
       const cacheKey = createPrimitiveKey(primitive);
       const cached = cache[cacheKey];
       if (cached) {
-        pending.push(cached.promise);
+        pending2.push(cached.promise);
       } else {
         let geometryPromise;
         if (primitive.extensions && primitive.extensions[EXTENSIONS.KHR_DRACO_MESH_COMPRESSION]) {
@@ -31484,10 +31484,10 @@ var GLTFParser = class {
           geometryPromise = addPrimitiveAttributes(new BufferGeometry(), primitive, parser);
         }
         cache[cacheKey] = { primitive, promise: geometryPromise };
-        pending.push(geometryPromise);
+        pending2.push(geometryPromise);
       }
     }
-    return Promise.all(pending);
+    return Promise.all(pending2);
   }
   /**
    * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#meshes
@@ -31502,13 +31502,13 @@ var GLTFParser = class {
     const extensions = this.extensions;
     const meshDef = json.meshes[meshIndex];
     const primitives = meshDef.primitives;
-    const pending = [];
+    const pending2 = [];
     for (let i = 0, il = primitives.length; i < il; i++) {
       const material = primitives[i].material === void 0 ? createDefaultMaterial(this.cache) : this.getDependency("material", primitives[i].material);
-      pending.push(material);
+      pending2.push(material);
     }
-    pending.push(parser.loadGeometries(primitives));
-    return Promise.all(pending).then(function(results) {
+    pending2.push(parser.loadGeometries(primitives));
+    return Promise.all(pending2).then(function(results) {
       const materials = results.slice(0, results.length - 1);
       const geometries = results[results.length - 1];
       const meshes = [];
@@ -31576,15 +31576,15 @@ var GLTFParser = class {
   loadCamera(cameraIndex) {
     let camera2;
     const cameraDef = this.json.cameras[cameraIndex];
-    const params = cameraDef[cameraDef.type];
-    if (!params) {
+    const params2 = cameraDef[cameraDef.type];
+    if (!params2) {
       console.warn("THREE.GLTFLoader: Missing camera parameters.");
       return;
     }
     if (cameraDef.type === "perspective") {
-      camera2 = new PerspectiveCamera(MathUtils.radToDeg(params.yfov), params.aspectRatio || 1, params.znear || 1, params.zfar || 2e6);
+      camera2 = new PerspectiveCamera(MathUtils.radToDeg(params2.yfov), params2.aspectRatio || 1, params2.znear || 1, params2.zfar || 2e6);
     } else if (cameraDef.type === "orthographic") {
-      camera2 = new OrthographicCamera(-params.xmag, params.xmag, params.ymag, -params.ymag, params.znear, params.zfar);
+      camera2 = new OrthographicCamera(-params2.xmag, params2.xmag, params2.ymag, -params2.ymag, params2.znear, params2.zfar);
     }
     if (cameraDef.name) camera2.name = this.createUniqueName(cameraDef.name);
     assignExtrasToUserData(camera2, cameraDef);
@@ -31599,16 +31599,16 @@ var GLTFParser = class {
    */
   loadSkin(skinIndex) {
     const skinDef = this.json.skins[skinIndex];
-    const pending = [];
+    const pending2 = [];
     for (let i = 0, il = skinDef.joints.length; i < il; i++) {
-      pending.push(this._loadNodeShallow(skinDef.joints[i]));
+      pending2.push(this._loadNodeShallow(skinDef.joints[i]));
     }
     if (skinDef.inverseBindMatrices !== void 0) {
-      pending.push(this.getDependency("accessor", skinDef.inverseBindMatrices));
+      pending2.push(this.getDependency("accessor", skinDef.inverseBindMatrices));
     } else {
-      pending.push(null);
+      pending2.push(null);
     }
-    return Promise.all(pending).then(function(results) {
+    return Promise.all(pending2).then(function(results) {
       const inverseBindMatrices = results.pop();
       const jointNodes = results;
       const bones = [];
@@ -31772,24 +31772,24 @@ var GLTFParser = class {
     }
     const nodeDef = json.nodes[nodeIndex];
     const nodeName = nodeDef.name ? parser.createUniqueName(nodeDef.name) : "";
-    const pending = [];
+    const pending2 = [];
     const meshPromise = parser._invokeOne(function(ext) {
       return ext.createNodeMesh && ext.createNodeMesh(nodeIndex);
     });
     if (meshPromise) {
-      pending.push(meshPromise);
+      pending2.push(meshPromise);
     }
     if (nodeDef.camera !== void 0) {
-      pending.push(parser.getDependency("camera", nodeDef.camera).then(function(camera2) {
+      pending2.push(parser.getDependency("camera", nodeDef.camera).then(function(camera2) {
         return parser._getNodeRef(parser.cameraCache, nodeDef.camera, camera2);
       }));
     }
     parser._invokeAll(function(ext) {
       return ext.createNodeAttachment && ext.createNodeAttachment(nodeIndex);
     }).forEach(function(promise) {
-      pending.push(promise);
+      pending2.push(promise);
     });
-    this.nodeCache[nodeIndex] = Promise.all(pending).then(function(objects) {
+    this.nodeCache[nodeIndex] = Promise.all(pending2).then(function(objects) {
       let node;
       if (nodeDef.isBone === true) {
         node = new Bone();
@@ -31853,11 +31853,11 @@ var GLTFParser = class {
     assignExtrasToUserData(scene2, sceneDef);
     if (sceneDef.extensions) addUnknownExtensionsToUserData(extensions, scene2, sceneDef);
     const nodeIds = sceneDef.nodes || [];
-    const pending = [];
+    const pending2 = [];
     for (let i = 0, il = nodeIds.length; i < il; i++) {
-      pending.push(parser.getDependency("node", nodeIds[i]));
+      pending2.push(parser.getDependency("node", nodeIds[i]));
     }
-    return Promise.all(pending).then(function(nodes) {
+    return Promise.all(pending2).then(function(nodes) {
       for (let i = 0, il = nodes.length; i < il; i++) {
         const node = nodes[i];
         if (node.parent !== null) {
@@ -32017,7 +32017,7 @@ function computeBounds(geometry, primitiveDef, parser) {
 }
 function addPrimitiveAttributes(geometry, primitiveDef, parser) {
   const attributes = primitiveDef.attributes;
-  const pending = [];
+  const pending2 = [];
   function assignAttributeAccessor(accessorIndex, attributeName) {
     return parser.getDependency("accessor", accessorIndex).then(function(accessor) {
       geometry.setAttribute(attributeName, accessor);
@@ -32026,20 +32026,20 @@ function addPrimitiveAttributes(geometry, primitiveDef, parser) {
   for (const gltfAttributeName in attributes) {
     const threeAttributeName = ATTRIBUTES[gltfAttributeName] || gltfAttributeName.toLowerCase();
     if (threeAttributeName in geometry.attributes) continue;
-    pending.push(assignAttributeAccessor(attributes[gltfAttributeName], threeAttributeName));
+    pending2.push(assignAttributeAccessor(attributes[gltfAttributeName], threeAttributeName));
   }
   if (primitiveDef.indices !== void 0 && !geometry.index) {
     const accessor = parser.getDependency("accessor", primitiveDef.indices).then(function(accessor2) {
       geometry.setIndex(accessor2);
     });
-    pending.push(accessor);
+    pending2.push(accessor);
   }
   if (ColorManagement.workingColorSpace !== LinearSRGBColorSpace && "COLOR_0" in attributes) {
     console.warn(`THREE.GLTFLoader: Converting vertex colors from "srgb-linear" to "${ColorManagement.workingColorSpace}" not supported.`);
   }
   assignExtrasToUserData(geometry, primitiveDef);
   computeBounds(geometry, primitiveDef, parser);
-  return Promise.all(pending).then(function() {
+  return Promise.all(pending2).then(function() {
     return primitiveDef.targets !== void 0 ? addMorphTargets(geometry, primitiveDef.targets, parser) : geometry;
   });
 }
@@ -32179,13 +32179,20 @@ async function createFieldScene({
 }
 
 // backend/renderer.js
-var MAX_FPS = 30;
+var params = new URLSearchParams(location.search);
+var wsPort = params.get("ws");
+var debug = params.get("debug") === "1";
+var PBO_DEPTH = 5;
+var MAX_BUFFERED_FRAMES = 2;
 var canvas = document.createElement("canvas");
 var renderer = new WebGLRenderer({
   canvas,
-  antialias: true,
-  // Required for canvas.toDataURL() after rendering.
-  preserveDrawingBuffer: true
+  antialias: false,
+  // We read pixels in the same task as render(), so the drawing buffer does
+  // not need to be preserved (preserving it costs an extra copy per frame).
+  preserveDrawingBuffer: false,
+  alpha: false,
+  powerPreference: "high-performance"
 });
 renderer.setPixelRatio(1);
 renderer.outputColorSpace = SRGBColorSpace;
@@ -32193,23 +32200,52 @@ renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
 var gl = renderer.getContext();
 var debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-console.log(
-  "SYNAPSE_GL",
-  gl.getParameter(debugInfo?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR),
-  gl.getParameter(debugInfo?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER)
-);
+if (debug) {
+  console.log(
+    "SYNAPSE_GL",
+    gl.getParameter(debugInfo?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR),
+    gl.getParameter(debugInfo?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER)
+  );
+}
+gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
 var camera = new PerspectiveCamera(70, 1, 0.01, 1e3);
-var inFlight = /* @__PURE__ */ new Set();
-var lastRenderedSeq = /* @__PURE__ */ new Map();
 var scene = null;
-var lastFrameTime = 0;
+var running = true;
+var latestSpecs = /* @__PURE__ */ new Map();
+var cursor = 0;
+var frameCounter = 0;
+var frameBytes = 0;
+var buffers = [];
+var pbos = [];
+var fences = [];
+var pending = [];
+var droppedFrames = 0;
+var renderTime = 0;
+var copyTime = 0;
+var sendTime = 0;
+var timedFrames = 0;
+var socket = null;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+var yieldChannel = new MessageChannel();
+var yieldResolve = null;
+yieldChannel.port1.onmessage = () => {
+  const resolve = yieldResolve;
+  yieldResolve = null;
+  if (resolve) {
+    resolve();
+  }
+};
+function yieldTask() {
+  return new Promise((resolve) => {
+    yieldResolve = resolve;
+    yieldChannel.port2.postMessage(0);
+  });
+}
 async function post(path, body) {
   const headers = body ? { "Content-Type": "text/plain" } : void 0;
-  return fetch(path, {
-    method: "POST",
-    headers,
-    body
-  });
+  return fetch(path, { method: "POST", headers, body });
 }
 function applyIntrinsics(spec, width, height) {
   const intrinsics = spec.intrinsics;
@@ -32244,52 +32280,281 @@ function applyIntrinsics(spec, width, height) {
   camera.projectionMatrix.copy(projection);
   camera.projectionMatrixInverse.copy(projection).invert();
 }
-function renderCamera(spec) {
-  if (!scene || inFlight.has(spec.index)) {
+function releaseBuffers() {
+  for (let i = 0; i < pbos.length; i++) {
+    if (fences[i]) {
+      gl.deleteSync(fences[i]);
+    }
+    gl.deleteBuffer(pbos[i]);
+  }
+  buffers = [];
+  pbos = [];
+  fences = [];
+  pending = [];
+  frameBytes = 0;
+}
+function ensureBuffers(width, height) {
+  const bytes = width * height * 4;
+  if (bytes === frameBytes) {
     return;
   }
-  if ((lastRenderedSeq.get(spec.index) ?? -1) >= spec.seq) {
+  releaseBuffers();
+  frameBytes = bytes;
+  for (let i = 0; i < PBO_DEPTH; i++) {
+    const pbo = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+    pbos.push(pbo);
+    fences.push(null);
+    buffers.push(new Uint8Array(bytes));
+  }
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+}
+function publish(entry) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
-  lastRenderedSeq.set(spec.index, spec.seq);
+  if (socket.bufferedAmount > frameBytes * MAX_BUFFERED_FRAMES) {
+    droppedFrames++;
+    return;
+  }
+  try {
+    const started = performance.now();
+    socket.send(`F ${entry.index} ${entry.frameSeq}`);
+    socket.send(buffers[entry.slot]);
+    sendTime += performance.now() - started;
+  } catch {
+    running = false;
+  }
+}
+function copyReadback(entry) {
+  const started = performance.now();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[entry.slot]);
+  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, buffers[entry.slot]);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  copyTime += performance.now() - started;
+}
+function harvestReady() {
+  let i = 0;
+  while (i < pending.length) {
+    const entry = pending[i];
+    const fence = fences[entry.slot];
+    if (fence === null) {
+      pending.splice(i, 1);
+      continue;
+    }
+    const status = gl.clientWaitSync(fence, 0, 0);
+    if (status !== gl.ALREADY_SIGNALED && status !== gl.CONDITION_SATISFIED) {
+      i++;
+      continue;
+    }
+    gl.deleteSync(fence);
+    fences[entry.slot] = null;
+    copyReadback(entry);
+    pending.splice(i, 1);
+    publish(entry);
+  }
+}
+function reclaimSlot() {
+  const entry = pending.shift();
+  if (entry === void 0) {
+    return 0;
+  }
+  const fence = fences[entry.slot];
+  if (fence !== null) {
+    const status = gl.clientWaitSync(
+      fence,
+      gl.SYNC_FLUSH_COMMANDS_BIT,
+      1e9
+    );
+    if (status === gl.TIMEOUT_EXPIRED) {
+      gl.finish();
+    }
+    gl.deleteSync(fence);
+    fences[entry.slot] = null;
+  }
+  copyReadback(entry);
+  publish(entry);
+  return entry.slot;
+}
+function freeSlot() {
+  for (let i = 0; i < PBO_DEPTH; i++) {
+    if (fences[i] === null && !pending.some((entry) => entry.slot === i)) {
+      return i;
+    }
+  }
+  return reclaimSlot();
+}
+function renderSpec(spec) {
   const width = Math.max(1, Math.floor(Number(spec.width)));
   const height = Math.max(1, Math.floor(Number(spec.height)));
-  renderer.setSize(width, height, false);
+  if (width !== canvas.width || height !== canvas.height) {
+    while (pending.length > 0) {
+      reclaimSlot();
+    }
+    renderer.setSize(width, height, false);
+    ensureBuffers(width, height);
+  }
   camera.position.fromArray(spec.position);
   camera.quaternion.fromArray(spec.quaternion);
   applyIntrinsics(spec, width, height);
+  const renderStarted = performance.now();
   renderer.render(scene, camera);
-  const data = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
-  inFlight.add(spec.index);
-  post(`/api/frame/${spec.index}?seq=${spec.seq}`, data).catch((error2) => console.error("Failed to publish simulated frame", error2)).finally(() => inFlight.delete(spec.index));
+  renderTime += performance.now() - renderStarted;
+  const slot = freeSlot();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[slot]);
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  fences[slot] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  gl.flush();
+  timedFrames++;
+  pending.push({ slot, index: spec.index, frameSeq: frameCounter++ });
 }
-var stopped = false;
-async function tick() {
-  if (stopped) {
+function nextSpec() {
+  if (latestSpecs.size === 0) {
+    return null;
+  }
+  const target = cursor % latestSpecs.size;
+  cursor++;
+  let index = 0;
+  for (const spec of latestSpecs.values()) {
+    if (index++ === target) {
+      return spec;
+    }
+  }
+  return null;
+}
+var lastStatsAt = 0;
+function reportStats() {
+  if (!debug || !socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
   const now = performance.now();
-  if (scene && now - lastFrameTime >= 1e3 / MAX_FPS) {
-    lastFrameTime = now;
-    try {
-      const response = await fetch("/api/specs", { cache: "no-store" });
-      if (response.ok) {
-        const { cameras = [] } = await response.json();
-        for (const spec of cameras) {
-          renderCamera(spec);
-        }
-      }
-    } catch (error2) {
-      if (error2 instanceof TypeError) {
-        stopped = true;
-        return;
-      }
-      console.error("Failed to read simulated camera specs", error2);
+  if (now - lastStatsAt < 1e3) {
+    return;
+  }
+  lastStatsAt = now;
+  const count = Math.max(1, timedFrames);
+  const stats = {
+    frames: frameCounter,
+    dropped: droppedFrames,
+    pending: pending.length,
+    buffered: socket.bufferedAmount,
+    width: canvas.width,
+    height: canvas.height,
+    running,
+    glError: gl.getError(),
+    renderMs: renderTime / count,
+    copyMs: copyTime / count,
+    sendMs: sendTime / count,
+    statsOverFrames: timedFrames
+  };
+  renderTime = 0;
+  copyTime = 0;
+  sendTime = 0;
+  timedFrames = 0;
+  try {
+    socket.send(`S ${JSON.stringify(stats)}`);
+  } catch {
+  }
+}
+function onMessage(event) {
+  if (typeof event.data !== "string") {
+    return;
+  }
+  let message;
+  try {
+    message = JSON.parse(event.data);
+  } catch {
+    return;
+  }
+  if (message.type !== "specs") {
+    return;
+  }
+  const present = /* @__PURE__ */ new Set();
+  for (const spec of message.cameras ?? []) {
+    const index = Number(spec.index);
+    present.add(index);
+    const current = latestSpecs.get(index);
+    if (!current || Number(spec.seq) > Number(current.seq)) {
+      latestSpecs.set(index, spec);
     }
   }
-  setTimeout(tick, Math.max(1, 1e3 / MAX_FPS - (performance.now() - now)));
+  for (const index of latestSpecs.keys()) {
+    if (!present.has(index)) {
+      latestSpecs.delete(index);
+    }
+  }
+}
+function connect() {
+  if (!wsPort) {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    let resolved = false;
+    const ws = new WebSocket(`ws://127.0.0.1:${wsPort}/`);
+    ws.binaryType = "arraybuffer";
+    ws.onopen = () => {
+      resolved = true;
+      resolve(ws);
+    };
+    ws.onmessage = onMessage;
+    ws.onerror = () => {
+      post("/api/debug", "websocket error").catch(() => {
+      });
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    };
+    ws.onclose = (event) => {
+      running = false;
+      post(
+        "/api/debug",
+        `websocket closed code=${event.code} reason=${event.reason} frames=${frameCounter} pending=${pending.length}`
+      ).catch(() => {
+      });
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    };
+  });
+}
+function backpressured() {
+  return socket !== null && socket.readyState === WebSocket.OPEN && socket.bufferedAmount > frameBytes * MAX_BUFFERED_FRAMES;
+}
+async function loop() {
+  while (running) {
+    harvestReady();
+    reportStats();
+    if (backpressured()) {
+      await sleep(1);
+      continue;
+    }
+    if (socket && socket.bufferedAmount > frameBytes) {
+      await yieldTask();
+      continue;
+    }
+    if (pending.length >= 2) {
+      await yieldTask();
+      continue;
+    }
+    const spec = nextSpec();
+    if (spec) {
+      renderSpec(spec);
+    }
+    if (spec) {
+      await yieldTask();
+    } else {
+      await sleep(1);
+    }
+  }
 }
 async function main() {
+  socket = await connect();
+  if (wsPort && !socket) {
+    throw new Error("Failed to connect to the simulation renderer socket");
+  }
   const result = await createFieldScene({
     fieldUrl: "/field.glb",
     configUrl: "/apriltag-config.json",
@@ -32297,7 +32562,7 @@ async function main() {
   });
   scene = result.scene;
   await post("/api/ready");
-  tick();
+  loop();
 }
 main().catch((error2) => {
   console.error(error2);

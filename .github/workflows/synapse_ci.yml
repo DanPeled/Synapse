@@ -51,12 +51,17 @@ jobs:
             ~/.npm
             synapse_ui/node_modules
             synapse_ui/.next/cache
-          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+            synapse_sim/node_modules
+          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json', 'synapse_sim/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-20-
 
-      - name: Install Node.js dependencies
+      - name: Install UI Node.js dependencies
         working-directory: synapse_ui
+        run: npm ci
+
+      - name: Install simulator Node.js dependencies
+        working-directory: synapse_sim
         run: npm ci
 
       - name: Install Python dependencies
@@ -147,12 +152,16 @@ jobs:
             ~/.npm
             synapse_ui/node_modules
             synapse_ui/.next/cache
-          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+            synapse_sim/node_modules
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json', 'synapse_sim/package-lock.json') }}
           restore-keys: |
             ubuntu-node-20-
 
       - run: npm ci
         working-directory: synapse_ui
+
+      - run: npm ci
+        working-directory: synapse_sim
 
       - name: Create Python venv
         shell: bash
