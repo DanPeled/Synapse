@@ -8,7 +8,8 @@ layout:
     visible: true
   tableOfContents:
     visible: true
-  outline: false
+  outline:
+    visible: false
   pagination:
     visible: true
   metadata:
@@ -82,5 +83,3 @@ The source code for Synapse is available on [GitHub](https://github.com/DanPeled
 ## Contact Us
 
 To report a bug or request a feature, [open an issue on GitHub](https://github.com/DanPeled/Synapse) or join the [Discord server](https://discord.gg/zHJRV8Stj3).
-
-[^1]: FIRST Robotics Competition
