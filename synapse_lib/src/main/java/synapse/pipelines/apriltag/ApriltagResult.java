@@ -21,7 +21,8 @@ public class ApriltagResult {
   /**
    * The estimated camera pose in field space represented as an array of doubles.
    *
-   * <p>The values are ordered as {@code [x, y, z, roll, pitch, yaw]}.
+   * <p>The values are ordered as {@code [x, y, z, roll, pitch, yaw]}, or {@code null} when the
+   * runtime could not estimate a pose for the frame.
    */
   public double[] cameraEstimate_fieldSpace;
 
@@ -33,7 +34,7 @@ public class ApriltagResult {
    * better-fitting pose estimate.
    */
   @JsonProperty("reprojection_error")
-  public float reprojectionError;
+  public double reprojectionError;
 
   /**
    * Creates a new, empty {@code ApriltagResult}.
@@ -46,18 +47,22 @@ public class ApriltagResult {
   /**
    * Returns the camera's estimated pose in field space as a 3D pose.
    *
-   * @return the camera's estimated field-space 3D pose
+   * @return the camera's estimated field-space 3D pose, or {@code null} if no estimate was
+   *     published
    */
   public Pose3d cameraEstimate_fieldSpace3d() {
+    if (cameraEstimate_fieldSpace == null || cameraEstimate_fieldSpace.length < 6) {
+      return null;
+    }
     return new Pose3d(
         new Translation3d(
             cameraEstimate_fieldSpace[0],
             cameraEstimate_fieldSpace[1],
             cameraEstimate_fieldSpace[2]),
         new Rotation3d(
-            cameraEstimate_fieldSpace[3],
-            cameraEstimate_fieldSpace[4],
-            cameraEstimate_fieldSpace[5]));
+            Math.toRadians(cameraEstimate_fieldSpace[3]),
+            Math.toRadians(cameraEstimate_fieldSpace[4]),
+            Math.toRadians(cameraEstimate_fieldSpace[5])));
   }
 
   /**
@@ -72,7 +77,7 @@ public class ApriltagResult {
     if (this == o) return true;
     if (!(o instanceof ApriltagResult)) return false;
     ApriltagResult that = (ApriltagResult) o;
-    return Float.compare(reprojectionError, that.reprojectionError) == 0
+    return Double.compare(reprojectionError, that.reprojectionError) == 0
         && Arrays.equals(tags, that.tags)
         && Arrays.equals(cameraEstimate_fieldSpace, that.cameraEstimate_fieldSpace);
   }
@@ -87,7 +92,7 @@ public class ApriltagResult {
   public int hashCode() {
     int result = Arrays.hashCode(tags);
     result = 31 * result + Arrays.hashCode(cameraEstimate_fieldSpace);
-    result = 31 * result + Float.hashCode(reprojectionError);
+    result = 31 * result + Double.hashCode(reprojectionError);
     return result;
   }
 }

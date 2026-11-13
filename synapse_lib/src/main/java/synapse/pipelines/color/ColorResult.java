@@ -15,7 +15,7 @@ public class ColorResult {
    * Timestamp (in seconds) at which this result was captured or processed. This is typically
    * synchronized to the coprocessor or camera clock.
    */
-  public float timestamp;
+  public double timestamp;
 
   /** All color detections found in the frame. This may be empty if no targets were detected. */
   public ColorDetection[] detections;
@@ -45,7 +45,7 @@ public class ColorResult {
     }
 
     ColorResult other = (ColorResult) obj;
-    return Float.compare(timestamp, other.timestamp) == 0
+    return Double.compare(timestamp, other.timestamp) == 0
         && Arrays.equals(detections, other.detections)
         && Objects.equals(main_detection, other.main_detection);
   }

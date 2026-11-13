@@ -1,7 +1,6 @@
 package synapse.pipelines.color;
 
 import java.util.Arrays;
-import java.util.Objects;
 
 /**
  * Represents the result of a color detection pipeline. Contains bounding box, center coordinates,
@@ -9,13 +8,13 @@ import java.util.Objects;
  */
 public class ColorDetection {
   /** Bounding box of the detected color region as [x, y, width, height]. */
-  public float[] bbox;
+  public double[] bbox;
 
   /** Center of the detected color region as [x, y]. */
-  public float[] center;
+  public double[] center;
 
   /** Area of the detected color region in pixels squared. */
-  public float area;
+  public double area;
 
   /** Default constructor. */
   public ColorDetection() {}
@@ -27,7 +26,7 @@ public class ColorDetection {
    */
   @Override
   public int hashCode() {
-    int result = Objects.hash(area);
+    int result = Double.hashCode(area);
     result = 31 * result + Arrays.hashCode(bbox);
     result = 31 * result + Arrays.hashCode(center);
     return result;
@@ -45,7 +44,7 @@ public class ColorDetection {
     if (this == obj) return true;
     if (!(obj instanceof ColorDetection)) return false;
     ColorDetection other = (ColorDetection) obj;
-    return Float.compare(area, other.area) == 0
+    return Double.compare(area, other.area) == 0
         && Arrays.equals(bbox, other.bbox)
         && Arrays.equals(center, other.center);
   }

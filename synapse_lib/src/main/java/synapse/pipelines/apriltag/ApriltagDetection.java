@@ -25,17 +25,17 @@ public class ApriltagDetection {
    *
    * <p>Lower values indicate a more accurate detection.
    */
-  public float hamming;
+  public int hamming;
 
-  /** The estimated pose of the detected AprilTag in screen space. */
-  public float[] tagPose_screenSpace;
+  /** The center of the detected AprilTag in screen space, as {@code [x, y]} pixels. */
+  public double[] tagPose_screenSpace;
 
   /**
    * Returns the tag's horizontal position in screen space.
    *
    * @return the tag's horizontal screen-space position
    */
-  public float tx() {
+  public double tx() {
     return tagPose_screenSpace[0];
   }
 
@@ -44,7 +44,7 @@ public class ApriltagDetection {
    *
    * @return the tag's vertical screen-space position
    */
-  public float ty() {
+  public double ty() {
     return tagPose_screenSpace[1];
   }
 
@@ -68,7 +68,7 @@ public class ApriltagDetection {
     if (!(o instanceof ApriltagDetection)) return false;
     ApriltagDetection that = (ApriltagDetection) o;
     return tagID == that.tagID
-        && Float.compare(that.hamming, hamming) == 0
+        && hamming == that.hamming
         && Arrays.equals(tagPose_screenSpace, that.tagPose_screenSpace);
   }
 
