@@ -9,16 +9,16 @@ interactive ``synapse_sim`` viewer shows. Rather than re-implementing the field
 in Python, this module bundles the viewer's Three.js scene into a small page,
 serves it from a local HTTP server, and drives it from Chrome's headless mode.
 
-``SimCamera`` publishes the camera pose to the server as a *spec* and waits for
-the browser to POST back a rendered JPEG. The camera therefore stays behind the
-normal ``SynapseCamera`` interface and pipelines never learn that the frames
-were rendered instead of captured.
+``SimCamera`` publishes the camera pose to the server as a *spec* and the
+browser streams rendered frames back over a WebSocket. Frames travel as raw
+RGBA pixels rather than JPEG: the renderer already produces them, and skipping
+base64/JPEG avoids tens of milliseconds of encoding and decoding per frame.
 """
 
 from __future__ import annotations
 
 import atexit
-import base64
+import collections
 import json
 import os
 import shutil
@@ -28,10 +28,15 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Set, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
-from synapse.log import warn
+from websockets.sync.server import ServerConnection
+from websockets.sync.server import serve as serveWebsockets
+
+#: Largest frame the browser may send: 4 bytes per pixel at 1920x1080, with
+#: room to grow. ``websockets`` rejects larger messages by default.
+MAX_FRAME_BYTES = 64 * 1024 * 1024
 
 #: Directory containing the committed viewer bundle and field assets.
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
@@ -102,6 +107,15 @@ class SimulationViewer:
         self._specs: Dict[int, Dict[str, Any]] = {}
         self._frames: Dict[int, Tuple[int, bytes]] = {}
         self._nextSeq = 0
+        self._stats: Dict[str, Any] = {}
+        self._debugMessages: collections.deque[str] = collections.deque(maxlen=50)
+        self._receivedFrames = 0
+        self._receivedBytes = 0
+
+        # Bumped whenever a spec changes so the (single) sender thread can push
+        # the latest camera poses to connected browsers.
+        self._specEpoch = 0
+        self._wsClients: Set[ServerConnection] = set()
 
         self._ready = threading.Event()
         self._error: Optional[str] = None
@@ -111,6 +125,9 @@ class SimulationViewer:
         self._closed = False
         self._server: Optional[ThreadingHTTPServer] = None
         self._serverThread: Optional[threading.Thread] = None
+        self._wsServer = None
+        self._wsThread: Optional[threading.Thread] = None
+        self._senderThread: Optional[threading.Thread] = None
         self._browser: Optional[subprocess.Popen] = None
         self._browserLog = None
         self._userDataDir: Optional[tempfile.TemporaryDirectory[str]] = None
@@ -129,6 +146,7 @@ class SimulationViewer:
             value["index"] = int(index)
             value["seq"] = seq
             self._specs[int(index)] = value
+            self._specEpoch += 1
             self._condition.notify_all()
             return seq
 
@@ -136,11 +154,27 @@ class SimulationViewer:
         with self._condition:
             self._specs.pop(int(index), None)
             self._frames.pop(int(index), None)
+            self._specEpoch += 1
             self._condition.notify_all()
 
     def specs(self) -> Iterable[Dict[str, Any]]:
         with self._lock:
             return [dict(spec) for spec in self._specs.values()]
+
+    def stats(self) -> Dict[str, Any]:
+        """Returns the renderer's most recent diagnostic stats, if any."""
+        with self._lock:
+            return dict(self._stats)
+
+    def debugMessages(self) -> Iterable[str]:
+        """Returns diagnostics the renderer reported over HTTP."""
+        with self._lock:
+            return list(self._debugMessages)
+
+    def transferStats(self) -> Tuple[int, int]:
+        """Returns ``(frame count, byte count)`` received over the WebSocket."""
+        with self._lock:
+            return self._receivedFrames, self._receivedBytes
 
     def _storeFrame(self, index: int, seq: int, data: bytes) -> None:
         with self._condition:
@@ -175,6 +209,40 @@ class SimulationViewer:
                     raise TimeoutError(
                         "Timed out waiting for the simulated camera renderer"
                     )
+
+                self._condition.wait(remaining)
+
+    def takeFrame(
+        self,
+        index: int,
+        afterSeq: int = -1,
+        timeout: float = FRAME_TIMEOUT,
+    ) -> Tuple[int, bytes]:
+        """Returns the latest frame rendered after ``afterSeq``.
+
+        Cameras consume frames independently of the specs they publish, so the
+        renderer can keep working while Python is still processing the previous
+        frame. If no newer frame arrives in time, the most recent frame is
+        returned instead of dropping the camera.
+        """
+        deadline = time.monotonic() + timeout
+        with self._condition:
+            while True:
+                self._raiseIfFailed()
+                latest = self._frames.get(int(index))
+                if latest is not None and latest[0] > afterSeq:
+                    return latest
+                if latest is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        # A slightly stale frame is better than no camera.
+                        return latest
+                else:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError(
+                            "Timed out waiting for the simulated camera renderer"
+                        )
 
                 self._condition.wait(remaining)
 
@@ -222,6 +290,10 @@ class SimulationViewer:
             pass
 
         Handler.viewer = self
+        # The browser POSTs ready/error and downloads assets over HTTP; specs
+        # and rendered frames use a WebSocket so there is no per-frame polling
+        # and no base64 encoding.
+        Handler.disable_nagle_algorithm = True
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         server.daemon_threads = True
         server.viewer = self  # type: ignore[attr-defined]
@@ -235,8 +307,123 @@ class SimulationViewer:
         thread.start()
         self._serverThread = thread
 
+        wsServer = serveWebsockets(
+            self._handleWebsocket,
+            "127.0.0.1",
+            0,
+            max_size=MAX_FRAME_BYTES,
+            compression=None,
+        )
+        self._wsServer = wsServer
+        wsThread = threading.Thread(
+            target=wsServer.serve_forever,
+            name="sim-viewer-ws",
+            daemon=True,
+        )
+        wsThread.start()
+        self._wsThread = wsThread
+
+        self._senderThread = threading.Thread(
+            target=self._specSenderLoop,
+            name="sim-viewer-specs",
+            daemon=True,
+        )
+        self._senderThread.start()
+
         port = server.server_address[1]
-        self._url = f"http://127.0.0.1:{port}/index.html"
+        wsPort = wsServer.socket.getsockname()[1]
+        query = f"ws={wsPort}"
+        if os.environ.get("SYNAPSE_SIM_DEBUG"):
+            query += "&debug=1"
+        self._url = f"http://127.0.0.1:{port}/index.html?{query}"
+
+    # ------------------------------------------------------------------
+    # WebSocket transport
+    # ------------------------------------------------------------------
+
+    def _handleWebsocket(self, connection: ServerConnection) -> None:
+        """Receives raw frame uploads from the renderer."""
+        with self._condition:
+            self._wsClients.add(connection)
+            # Wake the sender so the new client gets the current specs.
+            self._specEpoch += 1
+            self._condition.notify_all()
+
+        try:
+            # The client sends "F <index> <seq>" immediately before each binary
+            # frame so the frame payload itself contains only pixels. "S <json>"
+            # messages carry optional renderer diagnostics and are ignored when
+            # diagnostics are disabled.
+            metadata: Optional[Tuple[int, int]] = None
+            for message in connection:
+                if isinstance(message, str):
+                    kind, _, rest = message.partition(" ")
+                    if kind == "F":
+                        try:
+                            indexText, seqText = rest.split()
+                            metadata = (int(indexText), int(seqText))
+                        except ValueError:
+                            metadata = None
+                    elif kind == "S":
+                        try:
+                            stats = json.loads(rest)
+                        except ValueError:
+                            continue
+                        if isinstance(stats, dict):
+                            with self._lock:
+                                self._stats = stats
+                    else:
+                        metadata = None
+                    continue
+
+                if metadata is None:
+                    continue
+                index, seq = metadata
+                metadata = None
+                with self._lock:
+                    self._receivedFrames += 1
+                    self._receivedBytes += len(message)
+                    # Frames rendered before a resolution change are the wrong
+                    # size; drop them instead of handing them to the camera.
+                    spec = self._specs.get(index)
+                    expected = (
+                        int(spec["width"]) * int(spec["height"]) * 4
+                        if spec is not None
+                        else None
+                    )
+                if expected is not None and len(message) != expected:
+                    continue
+                self._storeFrame(index, seq, message)
+        except Exception:
+            pass
+        finally:
+            with self._condition:
+                self._wsClients.discard(connection)
+                self._condition.notify_all()
+
+    def _specSenderLoop(self) -> None:
+        """Pushes the latest camera specs to every connected renderer."""
+        lastEpoch = -1
+        while True:
+            with self._condition:
+                while not self._closed and self._specEpoch == lastEpoch:
+                    self._condition.wait(0.5)
+                if self._closed:
+                    return
+                lastEpoch = self._specEpoch
+                cameras = [dict(spec) for spec in self._specs.values()]
+                clients = list(self._wsClients)
+
+            if not clients:
+                continue
+
+            payload = json.dumps({"type": "specs", "cameras": cameras})
+            for client in clients:
+                try:
+                    client.send(payload)
+                except Exception:
+                    with self._condition:
+                        self._wsClients.discard(client)
 
     def _startBrowser(self) -> None:
         chrome = findChrome()
@@ -246,7 +433,11 @@ class SimulationViewer:
                 "was found. Install one or set SYNAPSE_CHROME to its path."
             )
 
-        self._userDataDir = tempfile.TemporaryDirectory(prefix="synapse-sim-")
+        # Chrome may still be flushing its profile when the viewer shuts down;
+        # don't let a leftover file turn cleanup into an atexit traceback.
+        self._userDataDir = tempfile.TemporaryDirectory(
+            prefix="synapse-sim-", ignore_cleanup_errors=True
+        )
         self._browserLog = tempfile.TemporaryFile(mode="w+b")
 
         # Prefer the GPU-backed Vulkan backend, but allow headless CI or
@@ -254,9 +445,11 @@ class SimulationViewer:
         angleBackend = os.environ.get("SYNAPSE_SIM_ANGLE", "vulkan").strip()
         angleBackend = angleBackend or "vulkan"
 
+        debug = bool(os.environ.get("SYNAPSE_SIM_DEBUG"))
         args = [
             chrome,
             "--headless=new",
+            *(["--enable-logging=stderr", "--v=0"] if debug else []),
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-background-timer-throttling",
@@ -302,6 +495,14 @@ class SimulationViewer:
             return ""
 
     def _shutdownServer(self) -> None:
+        wsServer = self._wsServer
+        self._wsServer = None
+        if wsServer is not None:
+            try:
+                wsServer.shutdown()
+            except Exception:
+                pass
+
         server = self._server
         self._server = None
         if server is not None:
@@ -369,13 +570,9 @@ class SimulationViewer:
         self._ready.set()
 
     def _onFrame(self, index: int, seq: int, body: bytes) -> None:
-        try:
-            data = base64.b64decode(body, validate=False)
-        except Exception as error:
-            warn(f"Simulated camera sent an invalid frame: {error}")
-            return
-        if data:
-            self._storeFrame(index, seq, data)
+        """Stores a raw RGBA frame uploaded over HTTP."""
+        if body:
+            self._storeFrame(index, seq, body)
 
     def _checkBrowser(self) -> None:
         browser = self._browser
@@ -483,6 +680,13 @@ class _ViewerRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/error":
             self.viewer._onError(body.decode("utf-8", "replace"))
+            self._sendJson({"ok": True})
+            return
+
+        if path == "/api/debug":
+            message = body.decode("utf-8", "replace")[:4000]
+            with self.viewer._condition:
+                self.viewer._debugMessages.append(message)
             self._sendJson({"ok": True})
             return
 

@@ -57,6 +57,7 @@ class SimCamera(SynapseCamera):
             int(MAX_FPS),
         )
         self._lastFrameTime = 0.0
+        self._lastFrameSeq = -1
 
         self._viewer = getViewer()
         self._viewerStarted = False
@@ -209,11 +210,16 @@ class SimCamera(SynapseCamera):
 
             _, cameraPose = self.poses()
             spec = camera_spec(self._index, width, height, cameraPose)
-            seq = self._viewer.setSpec(self._index, spec)
-            jpeg = self._viewer.waitForFrame(self._index, seq)
-            frame = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
-            if frame is None:
-                raise RuntimeError("Failed to decode simulated camera frame")
+            self._viewer.setSpec(self._index, spec)
+
+            # Consume the newest frame the renderer has finished. The renderer
+            # runs independently of this thread, so a frame may correspond to
+            # a slightly older spec; that is the same as a real camera exposing
+            # one frame of latency and avoids serialising render and transfer.
+            seq, payload = self._viewer.takeFrame(self._index, self._lastFrameSeq)
+            self._lastFrameSeq = seq
+
+            frame = self._decodeFrame(payload, width, height)
         except Exception as error:
             warn(f"Simulation camera failed to render a frame: {error}")
             return 0.0, None
@@ -221,15 +227,35 @@ class SimCamera(SynapseCamera):
         if buffer is not None:
             bufferHeight, bufferWidth = buffer.shape[:2]
             if frame.shape[0] != bufferHeight or frame.shape[1] != bufferWidth:
-                frame = cv2.resize(
+                resized = cv2.resize(
                     frame,
                     (bufferWidth, bufferHeight),
                     interpolation=cv2.INTER_AREA,
                 )
-            buffer[:] = frame
+                buffer[:] = resized
+            else:
+                buffer[:] = frame
             return time.time(), buffer
 
         return time.time(), frame
+
+    @staticmethod
+    def _decodeFrame(payload: bytes, width: int, height: int) -> np.ndarray:
+        """Converts the renderer's bottom-up RGBA pixels to a BGR image."""
+        pixels = np.frombuffer(payload, dtype=np.uint8)
+        if pixels.size == width * height * 4:
+            rgba = pixels.reshape((height, width, 4))
+            # OpenGL reads rows bottom-up; flip once so the image matches the
+            # coordinate system used by real cameras and by calibration.
+            frame = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
+            cv2.flip(frame, 0, dst=frame)
+            return frame
+
+        # Older renderers uploaded JPEG; accept it for forward compatibility.
+        frame = cv2.imdecode(pixels, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise RuntimeError("Failed to decode simulated camera frame")
+        return frame
 
     def _throttle(self, fps: float) -> None:
         period = 1.0 / max(1.0, fps)

@@ -14,8 +14,10 @@ from synapse.stypes import Resolution
 #: Horizontal field of view of the simulated camera, in degrees.
 FIELD_OF_VIEW_DEGREES = 70.0
 
-#: Render rate of the simulated camera.
-MAX_FPS = 30.0
+#: Upper bound on the simulated camera's render rate. The renderer runs as
+#: fast as the GPU and transport allow; this is only a safety cap so a camera
+#: cannot spin a CPU core when nothing else limits it.
+MAX_FPS = 120.0
 
 #: Resolutions the simulated camera can produce. These mirror the options
 #: exposed by ``CameraSettings`` so any pipeline resolution can be selected.
