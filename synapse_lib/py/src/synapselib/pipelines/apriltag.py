@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 
@@ -22,23 +22,20 @@ class ApriltagDetection:
     tag_id: int
     """The unique ID of the detected AprilTag."""
 
-    hamming: float
+    hamming: int
     """The Hamming distance of the detected tag. Lower values indicate a more accurate detection."""
 
     tagPose_screenSpace: List[float]
-    """Estimated pose of the detected AprilTag in screen space."""
+    """Center of the detected tag in screen space, as ``[x, y]`` pixels."""
 
     @property
     def tx(self) -> float:
-        """
-        Returns the tag's horizontal position in screen space.
-        """
+        """Returns the tag's horizontal position in screen space."""
         return self.tagPose_screenSpace[0]
 
+    @property
     def ty(self) -> float:
-        """
-        Returns the tag's vertical position in screen space.
-        """
+        """Returns the tag's vertical position in screen space."""
         return self.tagPose_screenSpace[1]
 
     def __hash__(self) -> int:
@@ -63,35 +60,34 @@ class ApriltagResult:
     tags: List[ApriltagDetection]
     """The detected AprilTags with their associated detection data."""
 
-    cameraEstimate_fieldSpace: List[float]
-    """The estimated camera pose in field space, format (x, y, z, roll, pitch, yaw)."""
+    cameraEstimate_fieldSpace: Optional[List[float]]
+    """The estimated camera pose in field space as ``[x, y, z, roll, pitch, yaw]``.
+
+    ``None`` when the pipeline could not estimate a pose for the frame.
+    """
 
     reprojection_error: float
-    """The reprojection error of the camera pose estimate. """
+    """The reprojection error of the camera pose estimate. ``0.0`` when unavailable."""
 
     @property
-    def cameraEstimate_fieldSpace3d(self) -> Pose3d:
-        """
-        Returns the camera's estimated pose in field space as a 3D pose.
-        """
+    def cameraEstimate_fieldSpace3d(self) -> Optional[Pose3d]:
+        """Returns the camera's estimated pose in field space as a 3D pose."""
+        estimate = self.cameraEstimate_fieldSpace
+        if estimate is None:
+            return None
+        if len(estimate) < 6:
+            raise ValueError(
+                "cameraEstimate_fieldSpace must contain [x, y, z, roll, pitch, yaw]"
+            )
         return Pose3d(
-            translation=Translation3d(
-                self.cameraEstimate_fieldSpace[0],
-                self.cameraEstimate_fieldSpace[1],
-                self.cameraEstimate_fieldSpace[2],
-            ),
-            rotation=Rotation3d(
-                self.cameraEstimate_fieldSpace[3],
-                self.cameraEstimate_fieldSpace[4],
-                self.cameraEstimate_fieldSpace[5],
-            ),
+            translation=Translation3d(estimate[0], estimate[1], estimate[2]),
+            rotation=Rotation3d(estimate[3], estimate[4], estimate[5]),
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                tuple(self.tags),
-                tuple(self.cameraEstimate_fieldSpace),
-                self.reprojection_error,
-            )
+        estimate = (
+            tuple(self.cameraEstimate_fieldSpace)
+            if self.cameraEstimate_fieldSpace is not None
+            else None
         )
+        return hash((tuple(self.tags), estimate, self.reprojection_error))

@@ -5,13 +5,13 @@
 
 from __future__ import annotations
 
-from typing import Dict, Generic, Optional, Type, TypeVar, cast
+from typing import Any, Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
 from ntcore import (NetworkTable, NetworkTableEntry, NetworkTableInstance,
                     NetworkTableType)
 
-from ._deserialization import dataclass_object_hook
+from ._deserialization import from_dict
 from .pipelines.apriltag import ApriltagResult
 from .pipelines.color import ColorResult
 
@@ -238,27 +238,27 @@ class SynapseCamera:
 
     def getCaptureLatency(self) -> float:
         """
-        Returns the latest capture latency in milliseconds.
+        Returns the latest capture latency in seconds.
 
-        :return: capture latency
+        :return: capture latency in seconds, or 0.0 if it has not been published
         """
         if self.captureLatencyEntry is None:
             self.captureLatencyEntry = self.getCachedEntry(
                 self.NetworkTableTopics.kCaptureLatencyTopic, self.table
             )
-        return self.captureLatencyEntry.getDouble(-1)
+        return self.captureLatencyEntry.getDouble(0.0)
 
     def getProcessLatency(self) -> float:
         """
-        Returns the latest processing latency in milliseconds.
+        Returns the latest processing latency in seconds.
 
-        :return: processing latency
+        :return: processing latency in seconds, or 0.0 if it has not been published
         """
         if self.processLatencyEntry is None:
             self.processLatencyEntry = self.getCachedEntry(
                 self.NetworkTableTopics.kProcessLatencyTopic, self.table
             )
-        return self.processLatencyEntry.getDouble(-1)
+        return self.processLatencyEntry.getDouble(0.0)
 
     # ---------------------------------------
     # Untyped deprecated setting getter
@@ -386,13 +386,23 @@ class SynapseCamera:
             return None
 
         try:
-            result = msgpack.loads(
-                data, raw=False, object_hook=dataclass_object_hook(resultType)
-            )
-            return cast(Optional[T], result)
+            payload = cast(Dict[str, Any], msgpack.loads(data, raw=False))
+            return cast(T, from_dict(resultType, payload))
         except Exception as e:
             print(f"[SynapseCamera] Failed to decode results: {e}")
             return None
+
+    def getLatestResults(self, pipelineType: "SynapsePipelineType[T]") -> Optional[T]:
+        """
+        Read and deserialize the latest results for a pipeline from NetworkTables.
+
+        Results are published under ``<camera>/data/results`` as MessagePack.
+
+        :param pipelineType: the pipeline type whose results should be decoded
+        :return: the latest decoded results, or ``None`` when no results are available
+        """
+        data = self.getResultsEntry().getRaw(b"")
+        return self.getResults(pipelineType.getResultType(), data)
 
     # ---------------------------------------
     # Name
