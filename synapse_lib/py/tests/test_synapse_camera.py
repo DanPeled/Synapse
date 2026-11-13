@@ -4,13 +4,27 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import unittest
-from typing import Any, Dict, cast
+from dataclasses import dataclass
+from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock
 
 import msgpack
 from synapselib import SynapseCamera, SynapsePipelineType
 from synapselib.pipelines.apriltag import ApriltagDetection, ApriltagResult
 from synapselib.pipelines.color import ColorDetection, ColorResult
+from wpimath.geometry import Pose3d, Rotation2d, Translation3d
+
+
+@dataclass
+class _CustomDetection:
+    pose: Pose3d
+    rotation: Rotation2d
+    translation: Translation3d
+
+
+@dataclass
+class _CustomResult:
+    detections: List[_CustomDetection]
 
 
 class TestSynapsePipeline(unittest.TestCase):
@@ -86,9 +100,7 @@ class TestResultDecoding(unittest.TestCase):
             "reprojection_error": 1.25,
         }
 
-        result = self.camera.getResults(
-            ApriltagResult, self._pack(payload)
-        )
+        result = self.camera.getResults(ApriltagResult, self._pack(payload))
 
         self.assertIsNotNone(result)
         assert result is not None
@@ -100,7 +112,13 @@ class TestResultDecoding(unittest.TestCase):
         self.assertEqual(
             result.cameraEstimate_fieldSpace, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
         )
-        self.assertIsNotNone(result.cameraEstimate_fieldSpace3d)
+        pose = result.cameraEstimate_fieldSpace3d
+        self.assertIsNotNone(pose)
+        assert pose is not None
+        # The runtime sends roll/pitch/yaw in degrees.
+        self.assertAlmostEqual(pose.rotation().x_degrees, 4.0)
+        self.assertAlmostEqual(pose.rotation().y_degrees, 5.0)
+        self.assertAlmostEqual(pose.rotation().z_degrees, 6.0)
 
     def test_apriltag_without_pose(self):
         payload = {
@@ -109,9 +127,7 @@ class TestResultDecoding(unittest.TestCase):
             "reprojection_error": 0.0,
         }
 
-        result = self.camera.getResults(
-            ApriltagResult, self._pack(payload)
-        )
+        result = self.camera.getResults(ApriltagResult, self._pack(payload))
 
         self.assertIsNotNone(result)
         assert result is not None
@@ -126,9 +142,7 @@ class TestResultDecoding(unittest.TestCase):
             "main_detection": detection,
         }
 
-        result = self.camera.getResults(
-            ColorResult, self._pack(payload)
-        )
+        result = self.camera.getResults(ColorResult, self._pack(payload))
 
         self.assertIsNotNone(result)
         assert result is not None
@@ -139,11 +153,39 @@ class TestResultDecoding(unittest.TestCase):
     def test_color_without_main_detection(self):
         payload = {"timestamp": 1.5, "detections": [], "main_detection": None}
 
-        result = self.camera.getResults(
-            ColorResult, self._pack(payload)
-        )
+        result = self.camera.getResults(ColorResult, self._pack(payload))
 
         self.assertIsNotNone(result)
         assert result is not None
         self.assertEqual(result.detections, [])
         self.assertIsNone(result.main_detection)
+
+    def test_custom_result_with_geometry(self):
+        """Custom result types can declare WPILib geometry fields."""
+        payload = {
+            "detections": [
+                {
+                    "pose": [1, 2, 3, 4, 5, 6],
+                    "rotation": 90.0,
+                    "translation": [7, 8, 9],
+                }
+            ]
+        }
+
+        result = self.camera.getResults(_CustomResult, self._pack(payload))
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        detection = result.detections[0]
+        self.assertIsInstance(detection, _CustomDetection)
+        self.assertIsInstance(detection.pose, Pose3d)
+        self.assertAlmostEqual(detection.pose.x, 1.0)
+        self.assertAlmostEqual(detection.pose.z, 3.0)
+        self.assertAlmostEqual(detection.pose.rotation().x_degrees, 4.0)
+        self.assertAlmostEqual(detection.pose.rotation().y_degrees, 5.0)
+        self.assertAlmostEqual(detection.pose.rotation().z_degrees, 6.0)
+        self.assertIsInstance(detection.translation, Translation3d)
+        self.assertAlmostEqual(detection.translation.x, 7.0)
+        self.assertAlmostEqual(detection.translation.z, 9.0)
+        self.assertIsInstance(detection.rotation, Rotation2d)
+        self.assertAlmostEqual(detection.rotation.degrees(), 90.0)

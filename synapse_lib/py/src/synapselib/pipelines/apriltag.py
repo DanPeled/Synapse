@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -81,7 +82,13 @@ class ApriltagResult:
             )
         return Pose3d(
             translation=Translation3d(estimate[0], estimate[1], estimate[2]),
-            rotation=Rotation3d(estimate[3], estimate[4], estimate[5]),
+            # The runtime serializes roll/pitch/yaw in degrees, but the
+            # Rotation3d constructor expects radians.
+            rotation=Rotation3d(
+                math.radians(estimate[3]),
+                math.radians(estimate[4]),
+                math.radians(estimate[5]),
+            ),
         )
 
     def __hash__(self) -> int:

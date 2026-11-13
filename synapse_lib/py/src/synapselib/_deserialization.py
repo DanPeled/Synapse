@@ -5,16 +5,61 @@
 
 """Helpers for converting MessagePack-decoded mappings into result dataclasses."""
 
+from collections.abc import Callable, Sequence
 from dataclasses import MISSING, fields, is_dataclass
 from types import UnionType
 from typing import (Any, Dict, List, Type, Union, cast, get_args, get_origin,
                     get_type_hints)
+
+from wpimath.geometry import (Pose2d, Pose3d, Rotation2d, Rotation3d,
+                              Transform2d, Transform3d, Translation2d,
+                              Translation3d, Twist2d, Twist3d)
+
+
+def _asSequence(value: Any) -> Sequence[float]:
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"Expected a sequence, got {type(value)}")
+    return value
+
+
+# The runtime sends geometry as plain arrays, with angles in degrees. Register
+# converters so custom result dataclasses can declare WPILib geometry fields.
+_GEOMETRY_CONVERTERS: Dict[Any, Callable[[Any], Any]] = {
+    Translation2d: lambda value: Translation2d(*(_asSequence(value)[0:2])),
+    Translation3d: lambda value: Translation3d(*(_asSequence(value)[0:3])),
+    Rotation2d: lambda value: Rotation2d.fromDegrees(
+        value[0] if isinstance(value, (list, tuple)) else value
+    ),
+    Rotation3d: lambda value: Rotation3d.fromDegrees(*_asSequence(value)[0:3]),
+    Pose2d: lambda value: Pose2d(
+        Translation2d(*_asSequence(value)[0:2]),
+        Rotation2d.fromDegrees(_asSequence(value)[2]),
+    ),
+    Pose3d: lambda value: Pose3d(
+        Translation3d(*_asSequence(value)[0:3]),
+        Rotation3d.fromDegrees(*_asSequence(value)[3:6]),
+    ),
+    Transform2d: lambda value: Transform2d(
+        Translation2d(*_asSequence(value)[0:2]),
+        Rotation2d.fromDegrees(_asSequence(value)[2]),
+    ),
+    Transform3d: lambda value: Transform3d(
+        Translation3d(*_asSequence(value)[0:3]),
+        Rotation3d.fromDegrees(*_asSequence(value)[3:6]),
+    ),
+    Twist2d: lambda value: Twist2d(*_asSequence(value)[0:3]),
+    Twist3d: lambda value: Twist3d(*_asSequence(value)[0:6]),
+}
 
 
 def _convertValue(value: Any, annotation: Any) -> Any:
     """Recursively convert *value* to the type described by *annotation*."""
     if value is None or annotation is Any or annotation is None:
         return value
+
+    geometryConverter = _GEOMETRY_CONVERTERS.get(annotation)
+    if geometryConverter is not None:
+        return geometryConverter(value)
 
     origin = get_origin(annotation)
     args = get_args(annotation)
