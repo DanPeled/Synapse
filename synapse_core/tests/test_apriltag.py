@@ -8,9 +8,11 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 import numpy as np
+from typing_extensions import Buffer
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection, AprilTagDetector, drawTagDetectionMarker, makeCorners)
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
@@ -103,7 +105,7 @@ class TestNapaApriltagDetector(unittest.TestCase):
     def setUp(self):
         _FakeNapaDetector.instances.clear()
         module = types.ModuleType("napa_vision")
-        module.NapaDetector = _FakeNapaDetector
+        setattr(module, "NapaDetector", _FakeNapaDetector)
         self.patcher = patch.dict(sys.modules, {"napa_vision": module})
         self.patcher.start()
 
@@ -113,7 +115,9 @@ class TestNapaApriltagDetector(unittest.TestCase):
     def test_detects_and_converts_napa_results(self):
         detector = NapaApriltagDetector()
 
-        detections = detector.detect(np.zeros((100, 100), dtype=np.uint8))
+        frame = cast(Buffer, np.zeros((100, 100), dtype=np.uint8))
+
+        detections = detector.detect(frame)
 
         self.assertEqual(len(detections), 1)
         detection = detections[0]
