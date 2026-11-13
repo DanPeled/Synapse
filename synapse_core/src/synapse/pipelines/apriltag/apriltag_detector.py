@@ -6,7 +6,7 @@
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -110,6 +110,15 @@ class AprilTagDetector(ABC):
         maxLineFitMSE: float = 10.0
         deglitch: bool = False
 
+        # Detector-specific tuning. Backends that do not support a parameter
+        # ignore it. These defaults match NAPA's own defaults.
+        minTagPx: int = 32
+        maxHamming: Optional[int] = None
+        minContrast: int = 20
+        minBorderCells: int = 22
+        sharpening: float = 0.25
+        maxDetections: int = 64
+
     @abstractmethod
     def detect(self, frame: Buffer) -> List[AprilTagDetection]:
         """Detect AprilTags in a given frame.
@@ -142,6 +151,13 @@ class AprilTagDetector(ABC):
 
     @abstractmethod
     def getConfig(self) -> Config: ...
+
+    def close(self) -> None:
+        """Release any resources held by the detector.
+
+        Detectors that do not own native resources can leave this as a no-op.
+        """
+        pass
 
 
 def drawTagDetectionMarker(
