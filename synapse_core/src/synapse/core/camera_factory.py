@@ -37,7 +37,7 @@ class CameraSettingsKeys(Enum):
     kViewID = "view_id"
     kRecord = "record"
     kPipeline = "pipeline"
-    kPipelineType = "pipeline_t"
+    kPipelineType = "pipeline_type"
 
 
 _kMatrixKeys = ("camera_matrix", "cameraMatrix", "matrix", "K")

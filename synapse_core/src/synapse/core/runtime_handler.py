@@ -535,7 +535,7 @@ class RuntimeManager:
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
         getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex)).getEntry(
-            "pipeline_type"
+            CameraSettingsKeys.kPipelineType.value
         ).setString(
             self.pipelineHandler.pipelineTypeNames[cameraIndex].get(
                 pipelineIndex, "unknown"
