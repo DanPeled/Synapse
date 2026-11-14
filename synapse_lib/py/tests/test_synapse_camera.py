@@ -9,10 +9,11 @@ from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock
 
 import msgpack
+from wpimath.geometry import Pose3d, Rotation2d, Translation3d
+
 from synapselib import SynapseCamera, SynapsePipelineType
 from synapselib.pipelines.apriltag import ApriltagDetection, ApriltagResult
 from synapselib.pipelines.color import ColorDetection, ColorResult
-from wpimath.geometry import Pose3d, Rotation2d, Translation3d
 
 
 @dataclass
