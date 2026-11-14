@@ -33,6 +33,9 @@ public final class SynapseApi {
   /** The latest processing latency, in seconds. */
   public static final String PROCESS_LATENCY = "processLatency";
 
+  /** The camera view ID. */
+  public static final String VIEW_ID = "view_id";
+
   /** Camera brightness. */
   public static final String BRIGHTNESS_SETTING = "brightness";
 
@@ -44,6 +47,21 @@ public final class SynapseApi {
 
   /** Camera orientation in degrees (0, 90, 180, or 270). */
   public static final String ORIENTATION_SETTING = "orientation";
+
+  /** Camera contrast. */
+  public static final String CONTRAST_SETTING = "contrast";
+
+  /** Camera saturation. */
+  public static final String SATURATION_SETTING = "saturation";
+
+  /** Camera hue. */
+  public static final String HUE_SETTING = "hue";
+
+  /** Camera white balance temperature. */
+  public static final String WHITE_BALANCE_TEMPERATURE_SETTING = "white_balance_temperature";
+
+  /** Camera sharpness. */
+  public static final String SHARPNESS_SETTING = "sharpness";
 
   /** AprilTag detection and field-space pose estimation. */
   public static final String APRILTAG_PIPELINE = "ApriltagPipeline";

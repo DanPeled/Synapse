@@ -118,6 +118,7 @@ class SynapseCamera:
         kRecordStatusTopic = _topics.RECORD
         kPipelineTypeTopic = _topics.PIPELINE_TYPE
         kResultsTopic = _topics.RESULTS
+        kViewIDTopic = _topics.VIEW_ID
         kCaptureLatencyTopic = _topics.CAPTURE_LATENCY
         kProcessLatencyTopic = _topics.PROCESS_LATENCY
 
@@ -444,6 +445,11 @@ class Setting(Generic[T]):
     kGain: Setting[float]
     kExposure: Setting[float]
     kOrientation: Setting[int]
+    kContrast: Setting[float]
+    kSaturation: Setting[float]
+    kHue: Setting[float]
+    kWhiteBalanceTemperature: Setting[float]
+    kSharpness: Setting[float]
 
     @staticmethod
     def doubleSetting(key: str) -> "Setting[float]":
@@ -474,3 +480,10 @@ Setting.kBrightness = Setting.doubleSetting(_topics.BRIGHTNESS_SETTING)
 Setting.kGain = Setting.doubleSetting(_topics.GAIN_SETTING)
 Setting.kExposure = Setting.doubleSetting(_topics.EXPOSURE_SETTING)
 Setting.kOrientation = Setting.integerSetting(_topics.ORIENTATION_SETTING)
+Setting.kContrast = Setting.doubleSetting(_topics.CONTRAST_SETTING)
+Setting.kSaturation = Setting.doubleSetting(_topics.SATURATION_SETTING)
+Setting.kHue = Setting.doubleSetting(_topics.HUE_SETTING)
+Setting.kWhiteBalanceTemperature = Setting.doubleSetting(
+    _topics.WHITE_BALANCE_TEMPERATURE_SETTING
+)
+Setting.kSharpness = Setting.doubleSetting(_topics.SHARPNESS_SETTING)

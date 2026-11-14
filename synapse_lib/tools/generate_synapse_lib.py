@@ -3,16 +3,21 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Generate SynapseLib source files from the shared API schema.
+"""Generate SynapseLib source files from the runtime API and shared schema.
 
-The schema in ``schema/synapse_lib.json`` is the single source of truth for
-NetworkTables paths and the built-in result models. This script renders the
-matching Java and Python sources so the two clients cannot drift apart.
+NetworkTables paths, camera settings, and pipeline type strings are read from
+the ``synapse_core`` source tree with :mod:`ast`, so changing the runtime
+constants and rerunning this script updates the schema and both clients.
+
+Result models are language-neutral declarations in
+``schema/synapse_lib.json``. They stay hand-maintained because the runtime's
+wire shape is not always the same as its internal dataclasses (AprilTags map
+through ``ApriltagsJson.toDict``).
 
 Usage::
 
-    python tools/generate_synapse_lib.py            # write files
-    python tools/generate_synapse_lib.py --check    # fail if files are stale
+    python tools/generate_synapse_lib.py            # sync runtime -> schema -> clients
+    python tools/generate_synapse_lib.py --check    # fail if anything is stale
 
 Custom pipelines do not need to be part of this schema. Users can define their
 own result classes exactly like the generated ones and pass them to
@@ -22,12 +27,13 @@ own result classes exactly like the generated ones and pass them to
 from __future__ import annotations
 
 import argparse
+import ast
 import difflib
 import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 
 class SchemaError(ValueError):
@@ -292,7 +298,9 @@ class Schema:
                 pythonName = field["name"]
                 javaName = field.get("javaName", field["name"])
                 if pythonName in pythonNames:
-                    raise SchemaError(f"Duplicate Python field {modelName}.{pythonName}")
+                    raise SchemaError(
+                        f"Duplicate Python field {modelName}.{pythonName}"
+                    )
                 if javaName in javaNames:
                     raise SchemaError(f"Duplicate Java field {modelName}.{javaName}")
                 pythonNames.add(pythonName)
@@ -334,6 +342,413 @@ class Schema:
     def _require_text(label: str, value: Dict[str, Any], key: str) -> None:
         if not isinstance(value.get(key), str) or not value[key]:
             raise SchemaError(f"{label}.{key} must be a non-empty string")
+
+
+# ---------------------------------------------------------------------------
+# Runtime source extraction
+#
+# The runtime is the source of truth for NetworkTables keys and pipeline type
+# strings. Parsing the source with AST avoids importing synapse_core, which
+# pulls in OpenCV, Numba, and other heavy optional dependencies.
+# ---------------------------------------------------------------------------
+
+
+SCHEMA_COMMENT = (
+    "The topics, settings, and pipelines sections are generated from the "
+    "synapse_core runtime source. The models section is maintained by hand. "
+    "Run `python tools/generate_synapse_lib.py` after changing either."
+)
+
+DEFAULT_TOPIC_DOCS = {
+    "view_id": "The camera view ID.",
+    "pipeline": "The selected pipeline index.",
+    "record": "The camera recording state.",
+    "pipeline_type": "The selected pipeline's type string.",
+    "results": "The latest pipeline results, serialized with MessagePack.",
+    "captureLatency": "The latest capture latency, in seconds.",
+    "processLatency": "The latest processing latency, in seconds.",
+}
+
+# Runtime camera properties are numeric, but the client needs to know whether
+# to expose them as integers or doubles. Known keys keep the type from the
+# committed schema; new keys default to double unless listed here.
+DEFAULT_SETTING_TYPES = {"orientation": "int"}
+
+
+@dataclass(frozen=True)
+class RuntimePipeline:
+    """A pipeline discovered in the runtime source."""
+
+    typeString: str
+    result: str
+    doc: str
+
+
+@dataclass(frozen=True)
+class RuntimeApi:
+    """The parts of the runtime API that the clients expose."""
+
+    tables: List[Tuple[str, str]]
+    topics: List[Tuple[str, str]]
+    settings: List[Tuple[str, str]]
+    pipelines: List[RuntimePipeline]
+
+
+def _parse_python(path: Path) -> ast.Module:
+    try:
+        return ast.parse(path.read_text(), filename=str(path))
+    except OSError as error:
+        raise SchemaError(f"Could not read {path}: {error}") from error
+    except SyntaxError as error:
+        raise SchemaError(f"Could not parse {path}: {error}") from error
+
+
+def _parse_string_enum(path: Path, className: str) -> List[Tuple[str, str]]:
+    """Return ``(member, value)`` pairs for a string-valued Enum class."""
+    tree = _parse_python(path)
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != className:
+            continue
+        members: List[Tuple[str, str]] = []
+        for statement in node.body:
+            if not isinstance(statement, ast.Assign) or len(statement.targets) != 1:
+                continue
+            target = statement.targets[0]
+            value = statement.value
+            if (
+                isinstance(target, ast.Name)
+                and isinstance(value, ast.Constant)
+                and isinstance(value.value, str)
+            ):
+                members.append((target.id, value.value))
+        if not members:
+            raise SchemaError(f"{className} in {path} has no string members")
+        return members
+    raise SchemaError(f"Could not find {className} in {path}")
+
+
+def _parse_module_strings(path: Path, names: Sequence[str]) -> Dict[str, str]:
+    """Return module-level string constants with the requested names."""
+    wanted = set(names)
+    found: Dict[str, str] = {}
+    for node in _parse_python(path).body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        value = node.value
+        if (
+            isinstance(target, ast.Name)
+            and target.id in wanted
+            and isinstance(value, ast.Constant)
+            and isinstance(value.value, str)
+        ):
+            found[target.id] = value.value
+    missing = wanted - found.keys()
+    if missing:
+        raise SchemaError(f"Could not find {', '.join(sorted(missing))} in {path}")
+    return found
+
+
+def _node_name(node: ast.AST) -> Optional[str]:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _pipeline_result_name(node: ast.ClassDef) -> Optional[str]:
+    for base in node.bases:
+        if not isinstance(base, ast.Subscript) or _node_name(base.value) != "Pipeline":
+            continue
+        slice_node = base.slice
+        if isinstance(slice_node, ast.Tuple) and len(slice_node.elts) == 2:
+            return _node_name(slice_node.elts[1])
+    return None
+
+
+def _pipeline_type_name(node: ast.ClassDef) -> Optional[str]:
+    for decorator in node.decorator_list:
+        if not isinstance(decorator, ast.Call):
+            continue
+        if _node_name(decorator.func) != "pipelineName" or not decorator.args:
+            continue
+        argument = decorator.args[0]
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            return argument.value
+    return None
+
+
+def _first_doc_line(node: ast.ClassDef) -> Optional[str]:
+    doc = ast.get_docstring(node)
+    if not doc:
+        return None
+    for line in doc.splitlines():
+        line = line.strip()
+        if line:
+            return line
+    return None
+
+
+def _discover_pipelines(pipelinesRoot: Path, modelNames: set) -> List[RuntimePipeline]:
+    """Find runtime pipelines whose result type is a client model."""
+    discovered: List[RuntimePipeline] = []
+    seenResults = set()
+    for path in sorted(pipelinesRoot.rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        for node in _parse_python(path).body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            result = _pipeline_result_name(node)
+            if result is None or result not in modelNames or result in seenResults:
+                continue
+            seenResults.add(result)
+            typeString = _pipeline_type_name(node) or node.name
+            discovered.append(
+                RuntimePipeline(
+                    typeString=typeString,
+                    result=result,
+                    doc=_first_doc_line(node) or f"{typeString} pipeline.",
+                )
+            )
+    return discovered
+
+
+def parse_runtime_api(runtimeRoot: Path, modelNames: set) -> RuntimeApi:
+    """Extract client-visible API values from the runtime source tree."""
+    if not runtimeRoot.is_dir():
+        raise SchemaError(f"Runtime source directory not found: {runtimeRoot}")
+
+    coreRoot = runtimeRoot / "core"
+    cameraFactory = coreRoot / "camera_factory.py"
+    ntKeys = coreRoot / "nt_keys.py"
+    pipelineSource = coreRoot / "pipeline.py"
+
+    cameraProperties = _parse_string_enum(cameraFactory, "CameraPropKeys")
+    cameraSettings = _parse_string_enum(cameraFactory, "CameraSettingsKeys")
+    ntMembers = dict(_parse_string_enum(ntKeys, "NTKeys"))
+    pipelineConstants = _parse_module_strings(
+        pipelineSource, ("DataTableKey", "ResultsTopicKey")
+    )
+
+    tables = [
+        ("settings", ntMembers["kSettings"]),
+        ("data", pipelineConstants["DataTableKey"]),
+    ]
+
+    topics: List[Tuple[str, str]] = [(value, "root") for _, value in cameraSettings]
+    topics.append((pipelineConstants["ResultsTopicKey"], "data"))
+    for member in ("kProcessLatency", "kCaptureLatency"):
+        topics.append((ntMembers[member], "root"))
+
+    settings: List[Tuple[str, str]] = [
+        (value, DEFAULT_SETTING_TYPES.get(value, "double"))
+        for _, value in cameraProperties
+    ]
+
+    return RuntimeApi(
+        tables=tables,
+        topics=topics,
+        settings=settings,
+        pipelines=_discover_pipelines(runtimeRoot / "pipelines", modelNames),
+    )
+
+
+def _default_topic_doc(key: str) -> str:
+    return DEFAULT_TOPIC_DOCS.get(
+        key, f"The {key.replace('_', ' ')} NetworkTables entry."
+    )
+
+
+def _default_setting_doc(key: str) -> str:
+    return f"Camera {key.replace('_', ' ')}."
+
+
+def _warn_dropped(
+    section: str,
+    old: Dict[str, Any],
+    derivedKeys: set,
+    warnings: List[str],
+) -> None:
+    for name, entry in old.items():
+        if not isinstance(entry, dict):
+            continue
+        key = entry.get("key") if section != "pipelines" else entry.get("result")
+        if isinstance(key, str) and key not in derivedKeys:
+            warnings.append(
+                f"Dropped {section} {name!r}: {key!r} is not present in the runtime source"
+            )
+
+
+def _merge_topics(
+    old: Dict[str, Any],
+    derived: List[Tuple[str, str]],
+    warnings: List[str],
+) -> Dict[str, Any]:
+    derivedByKey: Dict[str, str] = {}
+    for key, table in derived:
+        derivedByKey.setdefault(key, table)
+
+    merged: Dict[str, Any] = {}
+    consumed = set()
+    # Preserve the existing order and documentation for keys that still exist.
+    for name, entry in old.items():
+        if not isinstance(entry, dict):
+            continue
+        key = entry.get("key")
+        if key not in derivedByKey or key in consumed:
+            continue
+        merged[name] = {
+            "key": key,
+            "table": derivedByKey[key],
+            "doc": entry.get("doc") or _default_topic_doc(key),
+        }
+        consumed.add(key)
+    for key, table in derived:
+        if key in consumed:
+            continue
+        merged[key] = {
+            "key": key,
+            "table": table,
+            "doc": _default_topic_doc(key),
+        }
+        consumed.add(key)
+
+    _warn_dropped("topic", old, set(derivedByKey), warnings)
+    return merged
+
+
+def _merge_settings(
+    old: Dict[str, Any],
+    derived: List[Tuple[str, str]],
+    warnings: List[str],
+) -> Dict[str, Any]:
+    derivedByKey: Dict[str, str] = {}
+    for key, settingType in derived:
+        derivedByKey.setdefault(key, settingType)
+
+    merged: Dict[str, Any] = {}
+    consumed = set()
+    for name, entry in old.items():
+        if not isinstance(entry, dict):
+            continue
+        key = entry.get("key")
+        if key not in derivedByKey or key in consumed:
+            continue
+        merged[name] = {
+            "key": key,
+            "type": entry.get("type") or derivedByKey[key],
+            "doc": entry.get("doc") or _default_setting_doc(key),
+        }
+        consumed.add(key)
+    for key, settingType in derived:
+        if key in consumed:
+            continue
+        merged[key] = {
+            "key": key,
+            "type": settingType,
+            "doc": _default_setting_doc(key),
+        }
+        consumed.add(key)
+
+    _warn_dropped("setting", old, set(derivedByKey), warnings)
+    return merged
+
+
+def _pipeline_entry_name(result: str, typeString: str) -> str:
+    if result.endswith("Result"):
+        base = result[: -len("Result")]
+    elif typeString.endswith("Pipeline"):
+        base = typeString[: -len("Pipeline")]
+    else:
+        base = typeString
+    return base[:1].lower() + base[1:]
+
+
+def _merge_pipelines(
+    old: Dict[str, Any],
+    derived: List[RuntimePipeline],
+    warnings: List[str],
+) -> Dict[str, Any]:
+    derivedByResult: Dict[str, RuntimePipeline] = {}
+    for pipeline in derived:
+        derivedByResult.setdefault(pipeline.result, pipeline)
+
+    merged: Dict[str, Any] = {}
+    consumed = set()
+    for name, entry in old.items():
+        if not isinstance(entry, dict):
+            continue
+        result = entry.get("result")
+        if result not in derivedByResult or result in consumed:
+            continue
+        pipeline = derivedByResult[result]
+        merged[name] = {
+            "typeString": pipeline.typeString,
+            "result": pipeline.result,
+            "doc": entry.get("doc") or pipeline.doc,
+        }
+        consumed.add(result)
+    for pipeline in derived:
+        if pipeline.result in consumed:
+            continue
+        merged[_pipeline_entry_name(pipeline.result, pipeline.typeString)] = {
+            "typeString": pipeline.typeString,
+            "result": pipeline.result,
+            "doc": pipeline.doc,
+        }
+        consumed.add(pipeline.result)
+
+    derivedResults = {pipeline.result for pipeline in derived}
+    for name, entry in old.items():
+        if not isinstance(entry, dict):
+            continue
+        result = entry.get("result")
+        if isinstance(result, str) and result not in derivedResults:
+            warnings.append(
+                f"Dropped pipeline {name!r}: {result!r} has no runtime pipeline"
+            )
+    return merged
+
+
+def merge_runtime_schema(
+    raw: Dict[str, Any],
+    runtime: RuntimeApi,
+) -> Tuple[Dict[str, Any], List[str]]:
+    """Merge runtime-derived API values into the committed schema."""
+    warnings: List[str] = []
+
+    merged: Dict[str, Any] = {
+        "$comment": SCHEMA_COMMENT,
+        "version": raw.get("version", 1),
+        "tables": {name: key for name, key in runtime.tables},
+        "topics": _merge_topics(
+            require_mapping(raw.get("topics", {}), "topics"),
+            runtime.topics,
+            warnings,
+        ),
+        "settings": _merge_settings(
+            require_mapping(raw.get("settings", {}), "settings"),
+            runtime.settings,
+            warnings,
+        ),
+        "pipelines": _merge_pipelines(
+            require_mapping(raw.get("pipelines", {}), "pipelines"),
+            runtime.pipelines,
+            warnings,
+        ),
+        "models": raw.get("models", []),
+    }
+    for key, value in raw.items():
+        if key not in merged:
+            merged[key] = value
+
+    return merged, warnings
+
+
+def render_schema(schema: Dict[str, Any]) -> str:
+    return json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +830,7 @@ def _render_python_class(model: Dict[str, Any]) -> List[str]:
     if doc:
         lines.append(f'    """{doc}"""\n')
     else:
-        lines.append("    \"\"\"\"\"\"\n")
+        lines.append('    """"""\n')
     if not model["fields"]:
         lines.append("    pass\n")
     for field in model["fields"]:
@@ -488,7 +903,10 @@ JAVA_LINE_LIMIT = 100
 
 def render_java_model(model: Dict[str, Any]) -> str:
     imports: set = set()
-    if any(field.get("javaName", field["name"]) != field["name"] for field in model["fields"]):
+    if any(
+        field.get("javaName", field["name"]) != field["name"]
+        for field in model["fields"]
+    ):
         imports.add("com.fasterxml.jackson.annotation.JsonProperty")
     for helper in model.get("helpers", []):
         imports.update(JAVA_HELPERS[helper]["imports"])
@@ -587,9 +1005,7 @@ def _render_java_equals(model: Dict[str, Any]) -> str:
     if not model["fields"]:
         lines.append("    return true;\n")
     else:
-        conditions = [
-            _java_equality_expression(field) for field in model["fields"]
-        ]
+        conditions = [_java_equality_expression(field) for field in model["fields"]]
         singleLine = f"    return {' && '.join(conditions)};\n"
         if len(singleLine.rstrip("\n")) <= JAVA_LINE_LIMIT:
             lines.append(singleLine)
@@ -657,7 +1073,7 @@ def render_python_topics(schema: Schema) -> str:
     lines.append("\n")
     for pipelineName, pipeline in schema.pipelines.items():
         lines.append(
-            f'{_constant_name(pipelineName)}_PIPELINE: Final[str] = '
+            f"{_constant_name(pipelineName)}_PIPELINE: Final[str] = "
             f'"{pipeline["typeString"]}"\n'
         )
     return "".join(lines)
@@ -689,18 +1105,20 @@ def render_java_topics(schema: Schema) -> str:
     for settingName, setting in schema.settings.items():
         entries.append(
             _java_doc_block(setting.get("doc", settingName), "  ")
-            + f'  public static final String {_constant_name(settingName)}_SETTING = '
+            + f"  public static final String {_constant_name(settingName)}_SETTING = "
             + f'"{setting["key"]}";\n'
         )
     for pipelineName, pipeline in schema.pipelines.items():
         entries.append(
             _java_doc_block(pipeline.get("doc", pipelineName), "  ")
-            + f'  public static final String {_constant_name(pipelineName)}_PIPELINE = '
+            + f"  public static final String {_constant_name(pipelineName)}_PIPELINE = "
             + f'"{pipeline["typeString"]}";\n'
         )
 
     lines = [JAVA_TOPICS_HEADER, "\npackage synapse.generated;\n\n"]
-    lines.append("/** NetworkTables paths and pipeline type strings used by SynapseLib. */\n")
+    lines.append(
+        "/** NetworkTables paths and pipeline type strings used by SynapseLib. */\n"
+    )
     lines.append("public final class SynapseApi {\n")
     lines.append("\n".join(entries))
     lines.append("\n  private SynapseApi() {}\n}\n")
@@ -719,8 +1137,12 @@ def output_files(schema: Schema, root: Path) -> Dict[Path, str]:
     javaRoot = libRoot / "src" / "main" / "java"
 
     files: Dict[Path, str] = {
-        pyRoot / "synapselib" / "_generated" / "topics.py": render_python_topics(schema),
-        javaRoot / "synapse" / "generated" / "SynapseApi.java": render_java_topics(schema),
+        pyRoot / "synapselib" / "_generated" / "topics.py": render_python_topics(
+            schema
+        ),
+        javaRoot / "synapse" / "generated" / "SynapseApi.java": render_java_topics(
+            schema
+        ),
     }
 
     modelsByModule: Dict[str, List[Dict[str, Any]]] = {}
@@ -781,18 +1203,61 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=None,
         help="path to the schema (defaults to schema/synapse_lib.json)",
     )
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        default=None,
+        help=(
+            "path to the synapse runtime package "
+            "(defaults to ../synapse_core/src/synapse)"
+        ),
+    )
+    parser.add_argument(
+        "--no-runtime",
+        action="store_true",
+        help="do not read the runtime source; use the committed schema as-is",
+    )
     args = parser.parse_args(argv)
 
     libRoot = Path(__file__).resolve().parent.parent
     schemaPath = args.schema or libRoot / "schema" / "synapse_lib.json"
+    runtimeRoot = args.runtime_root or (
+        libRoot.parent / "synapse_core" / "src" / "synapse"
+    )
+
     try:
         raw = json.loads(schemaPath.read_text())
-        schema = Schema(raw)
+        Schema(raw)
+
+        merged = raw
+        if not args.no_runtime:
+            if runtimeRoot.is_dir():
+                modelNames = {
+                    model["name"]
+                    for model in raw.get("models", [])
+                    if isinstance(model, dict) and isinstance(model.get("name"), str)
+                }
+                runtime = parse_runtime_api(runtimeRoot, modelNames)
+                merged, warnings = merge_runtime_schema(raw, runtime)
+                for warning in warnings:
+                    print(f"warning: {warning}", file=sys.stderr)
+            elif args.runtime_root is not None:
+                raise SchemaError(f"Runtime source directory not found: {runtimeRoot}")
+            else:
+                print(
+                    f"warning: runtime source not found at {runtimeRoot}; "
+                    "using the committed schema",
+                    file=sys.stderr,
+                )
+
+        schema = Schema(merged)
     except (OSError, json.JSONDecodeError, SchemaError) as error:
         print(f"Failed to load schema: {error}", file=sys.stderr)
         return 2
 
-    return write_or_check(output_files(schema, libRoot), args.check)
+    files = output_files(schema, libRoot)
+    files[schemaPath] = render_schema(merged)
+    return write_or_check(files, args.check)
 
 
 if __name__ == "__main__":

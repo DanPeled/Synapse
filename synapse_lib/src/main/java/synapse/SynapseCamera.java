@@ -592,6 +592,22 @@ public class SynapseCamera implements AutoCloseable {
 
     /** Predefined setting for camera orientation, in degrees (0, 90, 180, 270) */
     public static final Setting<Long> kOrientation = integerSetting(SynapseApi.ORIENTATION_SETTING);
+
+    /** Predefined setting for camera contrast */
+    public static final Setting<Double> kContrast = doubleSetting(SynapseApi.CONTRAST_SETTING);
+
+    /** Predefined setting for camera saturation */
+    public static final Setting<Double> kSaturation = doubleSetting(SynapseApi.SATURATION_SETTING);
+
+    /** Predefined setting for camera hue */
+    public static final Setting<Double> kHue = doubleSetting(SynapseApi.HUE_SETTING);
+
+    /** Predefined setting for camera white balance temperature */
+    public static final Setting<Double> kWhiteBalanceTemperature =
+        doubleSetting(SynapseApi.WHITE_BALANCE_TEMPERATURE_SETTING);
+
+    /** Predefined setting for camera sharpness */
+    public static final Setting<Double> kSharpness = doubleSetting(SynapseApi.SHARPNESS_SETTING);
   }
 
   /** Standardized NetworkTables topic keys for pipelines, results, recording, and latency. */
@@ -605,6 +621,9 @@ public class SynapseCamera implements AutoCloseable {
 
     /** Topic for the pipeline type string */
     public static final String kPipelineTypeTopic = SynapseApi.PIPELINE_TYPE;
+
+    /** Topic for the camera view ID */
+    public static final String kViewIDTopic = SynapseApi.VIEW_ID;
 
     /** Topic for results data */
     public static final String kResultsTopic = SynapseApi.RESULTS;
