@@ -12,15 +12,15 @@ class TestApriltagClasses(unittest.TestCase):
     def test_detection_equality_and_hash(self):
         d1 = ApriltagDetection(
             1,
-            0.0,
+            0,
             [0, 0],
         )
-        d2 = ApriltagDetection(1, 0.0, [0, 0])
+        d2 = ApriltagDetection(1, 0, [0, 0])
         self.assertEqual(d1, d2)
         self.assertEqual(hash(d1), hash(d2))
 
     def test_result_equality_and_hash(self):
-        detection = ApriltagDetection(1, 0.0, [0, 0])
+        detection = ApriltagDetection(1, 0, [0, 0])
         r1 = ApriltagResult(
             tags=[detection],
             cameraEstimate_fieldSpace=[0, 0, 0, 0, 0, 0],
@@ -33,6 +33,20 @@ class TestApriltagClasses(unittest.TestCase):
         )
         self.assertEqual(r1, r2)
         self.assertEqual(hash(r1), hash(r2))
+
+    def test_result_without_camera_estimate(self):
+        result = ApriltagResult(
+            tags=[], cameraEstimate_fieldSpace=None, reprojection_error=0.0
+        )
+        self.assertIsNone(result.cameraEstimate_fieldSpace3d)
+        self.assertIsInstance(hash(result), int)
+
+    def test_camera_estimate_requires_six_values(self):
+        result = ApriltagResult(
+            tags=[], cameraEstimate_fieldSpace=[0, 0, 0], reprojection_error=0.0
+        )
+        with self.assertRaises(ValueError):
+            _ = result.cameraEstimate_fieldSpace3d
 
 
 if __name__ == "__main__":

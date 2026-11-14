@@ -16,12 +16,21 @@ import cv2
 import numpy as np
 import synapse.__version__ as versionFile
 import synapse.log as log
-from ntcore import (Event, EventFlags, NetworkTable, NetworkTableEntry,
-                    NetworkTableInstance, NetworkTableType, StringPublisher,
-                    ValueEventData)
-from synapse_net.generated.messages.v1 import (CameraPerformanceProto,
-                                               HardwareMetricsProto,
-                                               MessageTypeProto)
+from ntcore import (
+    Event,
+    EventFlags,
+    NetworkTable,
+    NetworkTableEntry,
+    NetworkTableInstance,
+    NetworkTableType,
+    StringPublisher,
+    ValueEventData,
+)
+from synapse_net.generated.messages.v1 import (
+    CameraPerformanceProto,
+    HardwareMetricsProto,
+    MessageTypeProto,
+)
 from synapse_net.nt_client import NtClient, RemoteConnectionIP
 from synapse_net.socketServer import WebSocketServer, createMessage
 from wpimath.units import seconds, secondsToMilliseconds
@@ -31,13 +40,17 @@ from ..callback import Callback
 from ..stypes import CameraID, CameraName, DataValue, Frame, PipelineID
 from ..util import Publisher, getIP, getPublisher
 from .camera.camera_handle import CameraHandle
-from .camera_factory import (CameraSettingsKeys, getCameraSettingEntry,
-                             getCameraTable)
+from .camera_factory import CameraSettingsKeys, getCameraSettingEntry, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .nt_keys import NTKeys
-from .pipeline import (FrameResult, Pipeline, PipelineProcessFrameResult,
-                       PipelineSettings, getPipelineTypename)
+from .pipeline import (
+    FrameResult,
+    Pipeline,
+    PipelineProcessFrameResult,
+    PipelineSettings,
+    getPipelineTypename,
+)
 from .pipeline_handler import PipelineHandler
 from .settings_api import CameraSettings
 
@@ -535,7 +548,7 @@ class RuntimeManager:
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
         getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex)).getEntry(
-            "pipeline_type"
+            CameraSettingsKeys.kPipelineType.value
         ).setString(
             self.pipelineHandler.pipelineTypeNames[cameraIndex].get(
                 pipelineIndex, "unknown"

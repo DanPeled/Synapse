@@ -18,10 +18,13 @@ from synapse.bcolors import MarkupColors
 from synapse_net.stdout_streamer import SystemdServiceLogStreamer
 
 from .lockfile import createDirectoryZIP, createPackageZIP
-from .setup_service import (SERVICE_NAME, restartService,
-                            setupServiceOnConnectedClient)
-from .util import (NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE,
-                   DeployDeviceConfig, IsValidIP)
+from .setup_service import SERVICE_NAME, restartService, setupServiceOnConnectedClient
+from .util import (
+    NOT_IN_SYNAPSE_PROJECT_ERR,
+    SYNAPSE_PROJECT_FILE,
+    DeployDeviceConfig,
+    IsValidIP,
+)
 
 BUILD_DIR = "build"
 

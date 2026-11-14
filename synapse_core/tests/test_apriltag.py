@@ -13,7 +13,11 @@ from unittest.mock import patch
 
 import numpy as np
 from synapse.pipelines.apriltag.apriltag_detector import (
-    AprilTagDetection, AprilTagDetector, drawTagDetectionMarker, makeCorners)
+    AprilTagDetection,
+    AprilTagDetector,
+    drawTagDetectionMarker,
+    makeCorners,
+)
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
 from typing_extensions import Buffer

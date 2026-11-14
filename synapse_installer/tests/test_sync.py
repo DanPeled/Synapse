@@ -5,6 +5,7 @@
 from typing import Dict, List, Tuple
 
 import pytest
+
 # import the module under test
 import synapse_installer.sync as sync_mod
 

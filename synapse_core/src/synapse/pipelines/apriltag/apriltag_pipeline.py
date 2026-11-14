@@ -10,17 +10,31 @@ from typing import Any, Dict, Final, List, Optional, Set, Tuple, cast
 
 import cv2
 import numpy as np
-from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
-                                   Setting, SettingsValue, SynapseCamera,
-                                   pipelineResult)
-from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, RangeConstraint,
-                                       SettingsMap, settingField)
+from synapse.core.pipeline import (
+    FrameResult,
+    Pipeline,
+    PipelineSettings,
+    Setting,
+    SettingsValue,
+    SynapseCamera,
+    pipelineResult,
+)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    EnumeratedConstraint,
+    NumberConstraint,
+    RangeConstraint,
+    SettingsMap,
+    settingField,
+)
 from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
-    AprilTagDetection, AprilTagDetector, CameraPoseEstimate,
-    drawTagDetectionMarker)
+    AprilTagDetection,
+    AprilTagDetector,
+    CameraPoseEstimate,
+    drawTagDetectionMarker,
+)
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
 from synapse.pipelines.apriltag.pnp_pose_estimator import PnPPoseEstimator

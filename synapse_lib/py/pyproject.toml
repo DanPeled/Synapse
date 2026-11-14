@@ -1,3 +1,8 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.isort]
+# Keep isort's output byte-compatible with `ruff format`.
+profile = "black"
+known_first_party = ["synapselib"]

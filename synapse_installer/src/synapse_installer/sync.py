@@ -13,12 +13,14 @@ from rich import print as fprint
 from synapse import __version__ as synapseVersion
 from synapse import log
 from synapse_installer.deploy import addDeviceConfig
-from synapse_installer.util import (NOT_IN_SYNAPSE_PROJECT_ERR,
-                                    SYNAPSE_PROJECT_FILE, getDistRequirements,
-                                    getUserRequirements)
+from synapse_installer.util import (
+    NOT_IN_SYNAPSE_PROJECT_ERR,
+    SYNAPSE_PROJECT_FILE,
+    getDistRequirements,
+    getUserRequirements,
+)
 
-from .command_executor import (CommandExecutor, LocalCommandExecutor,
-                               SSHCommandExecutor)
+from .command_executor import CommandExecutor, LocalCommandExecutor, SSHCommandExecutor
 
 PackageManager = str
 CheckInstalledCmd = str

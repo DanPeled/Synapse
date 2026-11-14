@@ -4,9 +4,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import cv2
-from synapse.core.pipeline import (CameraSettings, Pipeline, PipelineResult,
-                                   PipelineSettings, SynapseCamera,
-                                   pipelineName)
+from synapse.core.pipeline import (
+    CameraSettings,
+    Pipeline,
+    PipelineResult,
+    PipelineSettings,
+    SynapseCamera,
+    pipelineName,
+)
 from synapse.core.settings_api import NumberConstraint, settingField
 from synapse.stypes import CameraID, Frame
 

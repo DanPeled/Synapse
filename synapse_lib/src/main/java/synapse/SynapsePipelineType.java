@@ -1,6 +1,7 @@
 package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import synapse.generated.SynapseApi;
 import synapse.pipelines.apriltag.ApriltagResult;
 import synapse.pipelines.color.ColorResult;
 
@@ -17,14 +18,15 @@ public class SynapsePipelineType<T> {
    * data.
    */
   public static final SynapsePipelineType<ApriltagResult> kApriltag =
-      new SynapsePipelineType<>(new TypeReference<ApriltagResult>() {}, "ApriltagPipeline");
+      new SynapsePipelineType<>(
+          new TypeReference<ApriltagResult>() {}, SynapseApi.APRILTAG_PIPELINE);
 
   /**
    * The color detection pipeline. This pipeline detects colored regions in the camera feed and
    * stores the result using the {@link ColorResult} class.
    */
   public static final SynapsePipelineType<ColorResult> kColor =
-      new SynapsePipelineType<>(new TypeReference<ColorResult>() {}, "ColorPipeline");
+      new SynapsePipelineType<>(new TypeReference<ColorResult>() {}, SynapseApi.COLOR_PIPELINE);
 
   /** The TypeReference representing the result type for this pipeline. */
   private final TypeReference<T> typeRef;

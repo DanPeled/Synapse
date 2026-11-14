@@ -9,9 +9,11 @@ import types
 from unittest.mock import MagicMock
 
 import pytest
-from synapse_installer.command_executor import (CommandExecutor,
-                                                LocalCommandExecutor,
-                                                SSHCommandExecutor)
+from synapse_installer.command_executor import (
+    CommandExecutor,
+    LocalCommandExecutor,
+    SSHCommandExecutor,
+)
 
 # ---------------------------
 # helpers

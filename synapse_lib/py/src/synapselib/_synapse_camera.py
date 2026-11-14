@@ -5,13 +5,18 @@
 
 from __future__ import annotations
 
-from typing import Dict, Generic, Optional, Type, TypeVar, cast
+from typing import Any, Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
-from ntcore import (NetworkTable, NetworkTableEntry, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    NetworkTable,
+    NetworkTableEntry,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 
-from ._deserialization import dataclass_object_hook
+from ._deserialization import from_dict
+from ._generated import topics as _topics
 from .pipelines.apriltag import ApriltagResult
 from .pipelines.color import ColorResult
 
@@ -58,8 +63,10 @@ class SynapsePipelineType(Generic[TPipelineResult]):
 
 
 # Define the static pipelines
-SynapsePipelineType.kApriltag = SynapsePipelineType(ApriltagResult, "ApriltagPipeline")
-SynapsePipelineType.kColor = SynapsePipelineType(ColorResult, "ColorPipeline")
+SynapsePipelineType.kApriltag = SynapsePipelineType(
+    ApriltagResult, _topics.APRILTAG_PIPELINE
+)
+SynapsePipelineType.kColor = SynapsePipelineType(ColorResult, _topics.COLOR_PIPELINE)
 
 
 class SynapseCamera:
@@ -107,12 +114,13 @@ class SynapseCamera:
         Standardized NetworkTables topic keys for pipelines, results, recording, and latency.
         """
 
-        kPipelineTopic = "pipeline"
-        kRecordStatusTopic = "record"
-        kPipelineTypeTopic = "pipeline_type"
-        kResultsTopic = "results"
-        kCaptureLatencyTopic = "captureLatency"
-        kProcessLatencyTopic = "processLatency"
+        kPipelineTopic = _topics.PIPELINE
+        kRecordStatusTopic = _topics.RECORD
+        kPipelineTypeTopic = _topics.PIPELINE_TYPE
+        kResultsTopic = _topics.RESULTS
+        kViewIDTopic = _topics.VIEW_ID
+        kCaptureLatencyTopic = _topics.CAPTURE_LATENCY
+        kProcessLatencyTopic = _topics.PROCESS_LATENCY
 
     # ---------------------------------------
     # Subtables
@@ -126,7 +134,7 @@ class SynapseCamera:
         """
         assert self.table is not None
         if self.settingsTable is None:
-            self.settingsTable = self.table.getSubTable("settings")
+            self.settingsTable = self.table.getSubTable(_topics.SETTINGS_TABLE)
         return self.settingsTable
 
     def getDataTable(self) -> NetworkTable:
@@ -137,7 +145,7 @@ class SynapseCamera:
         """
         assert self.table is not None
         if self.dataTable is None:
-            self.dataTable = self.table.getSubTable("data")
+            self.dataTable = self.table.getSubTable(_topics.DATA_TABLE)
         return self.dataTable
 
     # ---------------------------------------
@@ -238,27 +246,27 @@ class SynapseCamera:
 
     def getCaptureLatency(self) -> float:
         """
-        Returns the latest capture latency in milliseconds.
+        Returns the latest capture latency in seconds.
 
-        :return: capture latency
+        :return: capture latency in seconds, or 0.0 if it has not been published
         """
         if self.captureLatencyEntry is None:
             self.captureLatencyEntry = self.getCachedEntry(
                 self.NetworkTableTopics.kCaptureLatencyTopic, self.table
             )
-        return self.captureLatencyEntry.getDouble(-1)
+        return self.captureLatencyEntry.getDouble(0.0)
 
     def getProcessLatency(self) -> float:
         """
-        Returns the latest processing latency in milliseconds.
+        Returns the latest processing latency in seconds.
 
-        :return: processing latency
+        :return: processing latency in seconds, or 0.0 if it has not been published
         """
         if self.processLatencyEntry is None:
             self.processLatencyEntry = self.getCachedEntry(
                 self.NetworkTableTopics.kProcessLatencyTopic, self.table
             )
-        return self.processLatencyEntry.getDouble(-1)
+        return self.processLatencyEntry.getDouble(0.0)
 
     # ---------------------------------------
     # Untyped deprecated setting getter
@@ -386,13 +394,23 @@ class SynapseCamera:
             return None
 
         try:
-            result = msgpack.loads(
-                data, raw=False, object_hook=dataclass_object_hook(resultType)
-            )
-            return cast(Optional[T], result)
+            payload = cast(Dict[str, Any], msgpack.loads(data, raw=False))
+            return cast(T, from_dict(resultType, payload))
         except Exception as e:
             print(f"[SynapseCamera] Failed to decode results: {e}")
             return None
+
+    def getLatestResults(self, pipelineType: "SynapsePipelineType[T]") -> Optional[T]:
+        """
+        Read and deserialize the latest results for a pipeline from NetworkTables.
+
+        Results are published under ``<camera>/data/results`` as MessagePack.
+
+        :param pipelineType: the pipeline type whose results should be decoded
+        :return: the latest decoded results, or ``None`` when no results are available
+        """
+        data = self.getResultsEntry().getRaw(b"")
+        return self.getResults(pipelineType.getResultType(), data)
 
     # ---------------------------------------
     # Name
@@ -427,6 +445,11 @@ class Setting(Generic[T]):
     kGain: Setting[float]
     kExposure: Setting[float]
     kOrientation: Setting[int]
+    kContrast: Setting[float]
+    kSaturation: Setting[float]
+    kHue: Setting[float]
+    kWhiteBalanceTemperature: Setting[float]
+    kSharpness: Setting[float]
 
     @staticmethod
     def doubleSetting(key: str) -> "Setting[float]":
@@ -453,7 +476,14 @@ class Setting(Generic[T]):
         return Setting(key, bool, NetworkTableType.kBoolean)
 
 
-Setting.kBrightness = Setting.doubleSetting("brightness")
-Setting.kGain = Setting.doubleSetting("gain")
-Setting.kExposure = Setting.doubleSetting("exposure")
-Setting.kOrientation = Setting.integerSetting("orientation")
+Setting.kBrightness = Setting.doubleSetting(_topics.BRIGHTNESS_SETTING)
+Setting.kGain = Setting.doubleSetting(_topics.GAIN_SETTING)
+Setting.kExposure = Setting.doubleSetting(_topics.EXPOSURE_SETTING)
+Setting.kOrientation = Setting.integerSetting(_topics.ORIENTATION_SETTING)
+Setting.kContrast = Setting.doubleSetting(_topics.CONTRAST_SETTING)
+Setting.kSaturation = Setting.doubleSetting(_topics.SATURATION_SETTING)
+Setting.kHue = Setting.doubleSetting(_topics.HUE_SETTING)
+Setting.kWhiteBalanceTemperature = Setting.doubleSetting(
+    _topics.WHITE_BALANCE_TEMPERATURE_SETTING
+)
+Setting.kSharpness = Setting.doubleSetting(_topics.SHARPNESS_SETTING)

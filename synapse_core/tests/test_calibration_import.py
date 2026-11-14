@@ -12,8 +12,11 @@ from unittest.mock import MagicMock, patch
 from synapse.core.camera_factory import CalibrationData, CameraConfig
 from synapse.core.config import Config
 from synapse.core.synapse import Synapse
-from synapse_net.generated.messages.v1 import (ImportCalibrationMessageProto,
-                                               MessageProto, MessageTypeProto)
+from synapse_net.generated.messages.v1 import (
+    ImportCalibrationMessageProto,
+    MessageProto,
+    MessageTypeProto,
+)
 
 CALIBDB_JSON = {
     "avg_reprojection_error": 0.42,

@@ -1,41 +1,38 @@
+// SPDX-FileCopyrightText: 2025 Dan Peled
+// SPDX-FileCopyrightText: 2026 Dan Peled
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Generated from schema/synapse_lib.json. Do not edit by hand.
+// Run `python tools/generate_synapse_lib.py` to regenerate.
+
 package synapse.pipelines.apriltag;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Arrays;
-import java.util.Objects;
 
-/**
- * Represents a single detected AprilTag along with its associated metadata and pose estimate.
- *
- * <p>This class contains the tag's ID, detection accuracy metrics, and the tag's estimated pose in
- * screen space. It is typically produced by an AprilTag detection pipeline.
- */
+/** Represents a single detected AprilTag, including its screen-space position. */
 public class ApriltagDetection {
 
-  /**
-   * The unique ID of the detected AprilTag.
-   *
-   * <p>Serialized/deserialized as {@code "tag_id"} in JSON.
-   */
+  /** The unique ID of the detected AprilTag. */
   @JsonProperty("tag_id")
   public int tagID;
 
-  /**
-   * The Hamming distance of the detected tag, representing the number of bit errors.
-   *
-   * <p>Lower values indicate a more accurate detection.
-   */
-  public float hamming;
+  /** The Hamming distance of the detection. Lower values are more accurate. */
+  public int hamming;
 
-  /** The estimated pose of the detected AprilTag in screen space. */
-  public float[] tagPose_screenSpace;
+  /** The center of the tag in screen space, as [x, y] pixels. */
+  public double[] tagPose_screenSpace;
+
+  /** Default constructor. */
+  public ApriltagDetection() {}
 
   /**
    * Returns the tag's horizontal position in screen space.
    *
    * @return the tag's horizontal screen-space position
    */
-  public float tx() {
+  public double tx() {
     return tagPose_screenSpace[0];
   }
 
@@ -44,41 +41,25 @@ public class ApriltagDetection {
    *
    * @return the tag's vertical screen-space position
    */
-  public float ty() {
+  public double ty() {
     return tagPose_screenSpace[1];
   }
 
-  /**
-   * Creates a new, empty {@code ApriltagDetection}.
-   *
-   * <p>This constructor is primarily used for JSON deserialization by Jackson and for general
-   * instantiation when no initial values are provided.
-   */
-  public ApriltagDetection() {}
-
-  /**
-   * Compares this {@code ApriltagDetection} with another object for equality.
-   *
-   * @param o the object to compare with this instance
-   * @return {@code true} if the objects are equal, {@code false} otherwise
-   */
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (!(o instanceof ApriltagDetection)) return false;
     ApriltagDetection that = (ApriltagDetection) o;
     return tagID == that.tagID
-        && Float.compare(that.hamming, hamming) == 0
+        && hamming == that.hamming
         && Arrays.equals(tagPose_screenSpace, that.tagPose_screenSpace);
   }
 
-  /**
-   * Computes a hash code for this {@code ApriltagDetection}.
-   *
-   * @return a hash code value for this object
-   */
   @Override
   public int hashCode() {
-    return Objects.hash(tagID, hamming, Arrays.hashCode(tagPose_screenSpace));
+    int result = tagID;
+    result = 31 * result + hamming;
+    result = 31 * result + Arrays.hashCode(tagPose_screenSpace);
+    return result;
   }
 }

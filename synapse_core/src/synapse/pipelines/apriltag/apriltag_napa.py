@@ -9,8 +9,12 @@ from typing import List, Optional, cast
 import numpy as np
 from typing_extensions import Buffer
 
-from .apriltag_detector import (AprilTagDetection, AprilTagDetector,
-                                Homography, makeCorners)
+from .apriltag_detector import (
+    AprilTagDetection,
+    AprilTagDetector,
+    Homography,
+    makeCorners,
+)
 
 
 class NapaApriltagDetector(AprilTagDetector):

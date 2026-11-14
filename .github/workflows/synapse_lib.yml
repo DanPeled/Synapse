@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - "synapse_lib/src/**"
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
       - "synapse_lib/*.gradle"
   pull_request:
     paths:
       - "synapse_lib/src/**"
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
       - "synapse_lib/*.gradle"
 
 permissions:

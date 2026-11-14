@@ -10,8 +10,12 @@ from unittest import mock
 
 import pytest
 import yaml
-from synapse_installer.deploy import (_connectAndDeploy, addDeviceConfig,
-                                      deploy, loadDeviceData)
+from synapse_installer.deploy import (
+    _connectAndDeploy,
+    addDeviceConfig,
+    deploy,
+    loadDeviceData,
+)
 from synapse_installer.util import IsValidIP
 
 
