@@ -11,8 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 from synapse.core.config import Config
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
-from synapse.core.pipeline_handler import (Pipeline, PipelineHandler,
-                                           PipelineSettings)
+from synapse.core.pipeline_handler import Pipeline, PipelineHandler, PipelineSettings
 
 
 class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):

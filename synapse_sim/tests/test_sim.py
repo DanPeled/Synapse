@@ -20,12 +20,15 @@ from synapse.core.global_settings import GlobalSettings
 from synapse.pipelines.apriltag.apriltag_robotpy import RobotpyApriltagDetector
 from synapse_net.nt_client import NtClient
 from synapse_sim.camera import SimCamera
-from synapse_sim.model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE,
-                               FIELD_OF_VIEW_DEGREES, SUPPORTED_RESOLUTIONS,
-                               cameraMatrix)
+from synapse_sim.model import (
+    DEFAULT_CAMERA_OFFSET,
+    DEFAULT_ROBOT_POSE,
+    FIELD_OF_VIEW_DEGREES,
+    SUPPORTED_RESOLUTIONS,
+    cameraMatrix,
+)
 from synapse_sim.setup import installSimulation
-from synapse_sim.three import (L_METERS, W_METERS, camera_spec,
-                               wpi_camera_to_three)
+from synapse_sim.three import L_METERS, W_METERS, camera_spec, wpi_camera_to_three
 from synapse_sim.viewer import SimulationViewer, findChrome
 from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 

@@ -10,14 +10,25 @@ import numpy as np
 from cv2.aruco import Dictionary
 from synapse import Pipeline, PipelineSettings
 from synapse.core.camera_factory import CalibrationData
-from synapse.core.pipeline import (CameraSettings, FrameResult, PipelineResult,
-                                   systemPipeline)
-from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, settingField)
+from synapse.core.pipeline import (
+    CameraSettings,
+    FrameResult,
+    PipelineResult,
+    systemPipeline,
+)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    EnumeratedConstraint,
+    NumberConstraint,
+    settingField,
+)
 from synapse.core.synapse import Synapse
-from synapse_net.generated.messages.v1 import (CalibrationDataProto,
-                                               MessageProto, MessageTypeProto,
-                                               RemovePipelineMessageProto)
+from synapse_net.generated.messages.v1 import (
+    CalibrationDataProto,
+    MessageProto,
+    MessageTypeProto,
+    RemovePipelineMessageProto,
+)
 
 
 class CalibrationResult(NamedTuple):

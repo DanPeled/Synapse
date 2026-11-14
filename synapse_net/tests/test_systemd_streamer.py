@@ -5,9 +5,11 @@
 from unittest.mock import MagicMock
 
 import pytest
-from synapse_net.stdout_streamer import (JournalctlNotAvailableError,
-                                         SshConnectionError,
-                                         SystemdServiceLogStreamer)
+from synapse_net.stdout_streamer import (
+    JournalctlNotAvailableError,
+    SshConnectionError,
+    SystemdServiceLogStreamer,
+)
 
 
 @pytest.fixture

@@ -6,8 +6,7 @@
 from unittest import mock
 
 import pytest
-from synapse_installer.setup_service import (SERVICE_NAME, isServiceSetup,
-                                             restartService)
+from synapse_installer.setup_service import SERVICE_NAME, isServiceSetup, restartService
 
 
 @pytest.fixture

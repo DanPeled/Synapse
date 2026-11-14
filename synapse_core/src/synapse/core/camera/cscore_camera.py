@@ -5,8 +5,15 @@
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-from cscore import (CameraServer, CvSink, UsbCamera, VideoCamera, VideoMode,
-                    VideoProperty, VideoSource)
+from cscore import (
+    CameraServer,
+    CvSink,
+    UsbCamera,
+    VideoCamera,
+    VideoMode,
+    VideoProperty,
+    VideoSource,
+)
 
 from ...stypes import CameraID, PropertyMetaDict, Resolution, Size
 from .synapse_camera import SynapseCamera

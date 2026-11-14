@@ -3,10 +3,16 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
-                                       ColorFormat, ConstraintTypeProto,
-                                       EnumeratedConstraint, ListConstraint,
-                                       NumberConstraint, StringConstraint)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ColorConstraint,
+    ColorFormat,
+    ConstraintTypeProto,
+    EnumeratedConstraint,
+    ListConstraint,
+    NumberConstraint,
+    StringConstraint,
+)
 
 
 # ------------------ NumberConstraint ------------------

@@ -9,9 +9,14 @@ from typing import List, Optional
 import cv2
 import numpy as np
 from synapse.core.pipeline import Pipeline, PipelineResult
-from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, PipelineSettings,
-                                       RangeConstraint, settingField)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    EnumeratedConstraint,
+    NumberConstraint,
+    PipelineSettings,
+    RangeConstraint,
+    settingField,
+)
 from synapse.stypes import Frame
 
 

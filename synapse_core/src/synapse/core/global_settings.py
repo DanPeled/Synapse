@@ -11,8 +11,7 @@ from synapse.log import warn
 from ..stypes import CameraID
 from .camera_factory import CameraConfig
 from .config import Config
-from .settings_api import (Setting, SettingsCollection, SettingsMap,
-                           SettingsValue)
+from .settings_api import Setting, SettingsCollection, SettingsMap, SettingsValue
 
 
 class GlobalSettingsMeta(type):

@@ -24,8 +24,12 @@ from synapse.stypes import CameraID, Frame, PropertyMetaDict, Size
 from synapse_net.nt_client import NtClient
 from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
 
-from .model import (DEFAULT_CAMERA_OFFSET, DEFAULT_ROBOT_POSE, MAX_FPS,
-                    SUPPORTED_RESOLUTIONS)
+from .model import (
+    DEFAULT_CAMERA_OFFSET,
+    DEFAULT_ROBOT_POSE,
+    MAX_FPS,
+    SUPPORTED_RESOLUTIONS,
+)
 from .three import camera_spec
 from .viewer import STARTUP_TIMEOUT, getViewer
 
