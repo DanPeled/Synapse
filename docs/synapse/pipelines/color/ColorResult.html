@@ -78,10 +78,7 @@ loadScripts(document, 'script');</script>
 <hr>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">ColorResult</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
-<div class="block">Represents the result of a color detection pipeline run.
-
- <p>This object contains all detected color targets for a single frame, along with a designated
- primary detection (if one exists) and the timestamp at which the frame was processed.</div>
+<div class="block">Represents the result of a color detection pipeline run.</div>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -97,17 +94,17 @@ loadScripts(document, 'script');</script>
 <div class="col-first even-row-color"><code><a href="ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a>[]</code></div>
 <div class="col-second even-row-color"><code><a href="#detections" class="member-name-link">detections</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">All color detections found in the frame.</div>
+<div class="block">All detected color regions.</div>
 </div>
 <div class="col-first odd-row-color"><code><a href="ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#main_detection" class="member-name-link">main_detection</a></code></div>
 <div class="col-last odd-row-color">
-<div class="block">The primary or best color detection for this frame.</div>
+<div class="block">The primary detection, or null when no regions were detected.</div>
 </div>
-<div class="col-first even-row-color"><code>float</code></div>
+<div class="col-first even-row-color"><code>double</code></div>
 <div class="col-second even-row-color"><code><a href="#timestamp" class="member-name-link">timestamp</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">Timestamp (in seconds) at which this result was captured or processed.</div>
+<div class="block">The timestamp in seconds when the frame was processed.</div>
 </div>
 </div>
 </section>
@@ -121,7 +118,9 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E()" class="member-name-link">ColorResult</a>()</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Default constructor.</div>
+</div>
 </div>
 </section>
 </li>
@@ -137,15 +136,11 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-second">Method</div>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>boolean</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#equals(java.lang.Object)" class="member-name-link">equals</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&nbsp;obj)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Compares this <a href="ColorResult.html" title="class in synapse.pipelines.color"><code>ColorResult</code></a> to another object for equality.</div>
-</div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#equals(java.lang.Object)" class="member-name-link">equals</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&nbsp;o)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>int</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#hashCode()" class="member-name-link">hashCode</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Computes a hash code for this <a href="ColorResult.html" title="class in synapse.pipelines.color"><code>ColorResult</code></a>.</div>
-</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 </div>
 </div>
 </div>
@@ -166,24 +161,22 @@ loadScripts(document, 'script');</script>
 <li>
 <section class="detail" id="timestamp">
 <h3>timestamp</h3>
-<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">float</span>&nbsp;<span class="element-name">timestamp</span></div>
-<div class="block">Timestamp (in seconds) at which this result was captured or processed. This is typically
- synchronized to the coprocessor or camera clock.</div>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">timestamp</span></div>
+<div class="block">The timestamp in seconds when the frame was processed.</div>
 </section>
 </li>
 <li>
 <section class="detail" id="detections">
 <h3>detections</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a>[]</span>&nbsp;<span class="element-name">detections</span></div>
-<div class="block">All color detections found in the frame. This may be empty if no targets were detected.</div>
+<div class="block">All detected color regions.</div>
 </section>
 </li>
 <li>
 <section class="detail" id="main_detection">
 <h3>main_detection</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="ColorDetection.html" title="class in synapse.pipelines.color">ColorDetection</a></span>&nbsp;<span class="element-name">main_detection</span></div>
-<div class="block">The primary or best color detection for this frame. This is usually selected based on criteria
- such as size, confidence, or proximity, and may be <code>null</code> if no detections are present.</div>
+<div class="block">The primary detection, or null when no regions were detected.</div>
 </section>
 </li>
 </ul>
@@ -198,6 +191,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="&lt;init&gt;()">
 <h3>ColorResult</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">ColorResult</span>()</div>
+<div class="block">Default constructor.</div>
 </section>
 </li>
 </ul>
@@ -211,18 +205,10 @@ loadScripts(document, 'script');</script>
 <li>
 <section class="detail" id="equals(java.lang.Object)">
 <h3>equals</h3>
-<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">boolean</span>&nbsp;<span class="element-name">equals</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&nbsp;obj)</span></div>
-<div class="block">Compares this <a href="ColorResult.html" title="class in synapse.pipelines.color"><code>ColorResult</code></a> to another object for equality.
-
- <p>Two <code>ColorResult</code> instances are considered equal if they have the same timestamp,
- identical detection arrays (by contents), and equal primary detections.</div>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">boolean</span>&nbsp;<span class="element-name">equals</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>&nbsp;o)</span></div>
 <dl class="notes">
 <dt>Overrides:</dt>
 <dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html#equals(java.lang.Object)" title="class or interface in java.lang" class="external-link">equals</a></code>&nbsp;in class&nbsp;<code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></code></dd>
-<dt>Parameters:</dt>
-<dd><code>obj</code> - the object to compare against</dd>
-<dt>Returns:</dt>
-<dd><code>true</code> if the objects are equal, <code>false</code> otherwise</dd>
 </dl>
 </section>
 </li>
@@ -230,15 +216,9 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="hashCode()">
 <h3>hashCode</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">int</span>&nbsp;<span class="element-name">hashCode</span>()</div>
-<div class="block">Computes a hash code for this <a href="ColorResult.html" title="class in synapse.pipelines.color"><code>ColorResult</code></a>.
-
- <p>The hash code is derived from the timestamp, detection array contents, and primary
- detection, and is consistent with <a href="#equals(java.lang.Object)"><code>equals(Object)</code></a>.</div>
 <dl class="notes">
 <dt>Overrides:</dt>
 <dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html#hashCode()" title="class or interface in java.lang" class="external-link">hashCode</a></code>&nbsp;in class&nbsp;<code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></code></dd>
-<dt>Returns:</dt>
-<dd>a hash code value for this object</dd>
 </dl>
 </section>
 </li>

@@ -94,7 +94,7 @@ loadScripts(document, 'script');</script>
 <div class="col-first even-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color"><code><a href="#kCaptureLatencyTopic" class="member-name-link">kCaptureLatencyTopic</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">Topic for camera capture latency (ms)</div>
+<div class="block">Topic for camera capture latency (seconds)</div>
 </div>
 <div class="col-first odd-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#kPipelineTopic" class="member-name-link">kPipelineTopic</a></code></div>
@@ -109,7 +109,7 @@ loadScripts(document, 'script');</script>
 <div class="col-first odd-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#kProcessLatencyTopic" class="member-name-link">kProcessLatencyTopic</a></code></div>
 <div class="col-last odd-row-color">
-<div class="block">Topic for camera processing latency (ms)</div>
+<div class="block">Topic for camera processing latency (seconds)</div>
 </div>
 <div class="col-first even-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color"><code><a href="#kRecordStatusTopic" class="member-name-link">kRecordStatusTopic</a></code></div>
@@ -120,6 +120,11 @@ loadScripts(document, 'script');</script>
 <div class="col-second odd-row-color"><code><a href="#kResultsTopic" class="member-name-link">kResultsTopic</a></code></div>
 <div class="col-last odd-row-color">
 <div class="block">Topic for results data</div>
+</div>
+<div class="col-first even-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
+<div class="col-second even-row-color"><code><a href="#kViewIDTopic" class="member-name-link">kViewIDTopic</a></code></div>
+<div class="col-last even-row-color">
+<div class="block">Topic for the camera view ID</div>
 </div>
 </div>
 </section>
@@ -205,6 +210,21 @@ loadScripts(document, 'script');</script>
 </section>
 </li>
 <li>
+<section class="detail" id="kViewIDTopic">
+<h3>kViewIDTopic</h3>
+<div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">kViewIDTopic</span></div>
+<div class="block">Topic for the camera view ID</div>
+<dl class="notes">
+<dt>See Also:</dt>
+<dd>
+<ul class="see-list">
+<li><a href="../constant-values.html#synapse.SynapseCamera.NetworkTableTopics.kViewIDTopic">Constant Field Values</a></li>
+</ul>
+</dd>
+</dl>
+</section>
+</li>
+<li>
 <section class="detail" id="kResultsTopic">
 <h3>kResultsTopic</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">kResultsTopic</span></div>
@@ -223,7 +243,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="kCaptureLatencyTopic">
 <h3>kCaptureLatencyTopic</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">kCaptureLatencyTopic</span></div>
-<div class="block">Topic for camera capture latency (ms)</div>
+<div class="block">Topic for camera capture latency (seconds)</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>
@@ -238,7 +258,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="kProcessLatencyTopic">
 <h3>kProcessLatencyTopic</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">kProcessLatencyTopic</span></div>
-<div class="block">Topic for camera processing latency (ms)</div>
+<div class="block">Topic for camera processing latency (seconds)</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>

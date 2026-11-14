@@ -127,7 +127,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <div class="col-first odd-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#m_captureLatencySubscriber" class="member-name-link">m_captureLatencySubscriber</a></code></div>
 <div class="col-last odd-row-color">
-<div class="block">Entry for tracking the latency of frame capture (in milliseconds)</div>
+<div class="block">Entry for tracking the latency of frame capture (in seconds)</div>
 </div>
 <div class="col-first even-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTable.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTable</a></code></div>
 <div class="col-second even-row-color"><code><a href="#m_dataTable" class="member-name-link">m_dataTable</a></code></div>
@@ -152,7 +152,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <div class="col-first even-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></code></div>
 <div class="col-second even-row-color"><code><a href="#m_processLatencySubscriber" class="member-name-link">m_processLatencySubscriber</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">Entry for tracking the latency of frame processing (in milliseconds)</div>
+<div class="block">Entry for tracking the latency of frame processing (in seconds)</div>
 </div>
 <div class="col-first odd-row-color"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTableEntry.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTableEntry</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#m_recordStateEntry" class="member-name-link">m_recordStateEntry</a></code></div>
@@ -183,7 +183,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <div class="col-first even-row-color"><code>protected static final com.fasterxml.jackson.databind.ObjectMapper</code></div>
 <div class="col-second even-row-color"><code><a href="#s_ObjectMapper" class="member-name-link">s_ObjectMapper</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">ObjectMapper configured for MessagePack serialization/deserialization</div>
+<div class="block">ObjectMapper configured for MessagePack serialization/deserialization.</div>
 </div>
 <div class="col-first odd-row-color"><code>final <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#synapseTableName" class="member-name-link">synapseTableName</a></code></div>
@@ -252,7 +252,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>double</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getCaptureLatency()" class="member-name-link">getCaptureLatency</a>()</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Returns the latest capture latency in milliseconds.</div>
+<div class="block">Returns the latest capture latency in seconds.</div>
 </div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/NetworkTable.html" title="class or interface in edu.wpi.first.networktables" class="external-link">NetworkTable</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getDataTable()" class="member-name-link">getDataTable</a>()</code></div>
@@ -272,7 +272,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>double</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getProcessLatency()" class="member-name-link">getProcessLatency</a>()</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Returns the latest processing latency in milliseconds.</div>
+<div class="block">Returns the latest processing latency in seconds.</div>
 </div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>boolean</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getRecordingStatus()" class="member-name-link">getRecordingStatus</a>()</code></div>
@@ -432,21 +432,23 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <section class="detail" id="m_captureLatencySubscriber">
 <h3>m_captureLatencySubscriber</h3>
 <div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></span>&nbsp;<span class="element-name">m_captureLatencySubscriber</span></div>
-<div class="block">Entry for tracking the latency of frame capture (in milliseconds)</div>
+<div class="block">Entry for tracking the latency of frame capture (in seconds)</div>
 </section>
 </li>
 <li>
 <section class="detail" id="m_processLatencySubscriber">
 <h3>m_processLatencySubscriber</h3>
 <div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/networktables/FloatSubscriber.html" title="class or interface in edu.wpi.first.networktables" class="external-link">FloatSubscriber</a></span>&nbsp;<span class="element-name">m_processLatencySubscriber</span></div>
-<div class="block">Entry for tracking the latency of frame processing (in milliseconds)</div>
+<div class="block">Entry for tracking the latency of frame processing (in seconds)</div>
 </section>
 </li>
 <li>
 <section class="detail" id="s_ObjectMapper">
 <h3>s_ObjectMapper</h3>
 <div class="member-signature"><span class="modifiers">protected static final</span>&nbsp;<span class="return-type">com.fasterxml.jackson.databind.ObjectMapper</span>&nbsp;<span class="element-name">s_ObjectMapper</span></div>
-<div class="block">ObjectMapper configured for MessagePack serialization/deserialization</div>
+<div class="block">ObjectMapper configured for MessagePack serialization/deserialization.
+
+ <p>The WPILib geometry module lets custom result classes declare <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Pose3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link"><code>Pose3d</code></a>, <a href="https://github.wpilib.org/allwpilib/docs/release/java/edu/wpi/first/math/geometry/Transform3d.html" title="class or interface in edu.wpi.first.math.geometry" class="external-link"><code>Transform3d</code></a>, and other geometry fields. Synapse sends those as plain arrays.</div>
 </section>
 </li>
 <li>
@@ -655,10 +657,10 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <section class="detail" id="getCaptureLatency()">
 <h3>getCaptureLatency</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">getCaptureLatency</span>()</div>
-<div class="block">Returns the latest capture latency in milliseconds.</div>
+<div class="block">Returns the latest capture latency in seconds.</div>
 <dl class="notes">
 <dt>Returns:</dt>
-<dd>capture latency</dd>
+<dd>capture latency in seconds, or 0 if it has not been published</dd>
 </dl>
 </section>
 </li>
@@ -666,10 +668,10 @@ implements <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base
 <section class="detail" id="getProcessLatency()">
 <h3>getProcessLatency</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">getProcessLatency</span>()</div>
-<div class="block">Returns the latest processing latency in milliseconds.</div>
+<div class="block">Returns the latest processing latency in seconds.</div>
 <dl class="notes">
 <dt>Returns:</dt>
-<dd>processing latency</dd>
+<dd>processing latency in seconds, or 0 if it has not been published</dd>
 </dl>
 </section>
 </li>

@@ -91,23 +91,25 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">GeometryDeserializer&lt;T&gt;</span>
 <span class="extends-implements">extends com.fasterxml.jackson.databind.deser.std.StdDeserializer&lt;T&gt;</span></div>
 <div class="block">Generic deserializer for WPILib geometry classes such as Translation2d, Rotation2d, Pose2d,
- Transform2d, and their 3D counterparts.
+ Transform2d, Twist2d, and their 3D counterparts.
 
- <p>This deserializer expects a JSON object with:
+ <p>Synapse serializes geometry as plain arrays, for example:
 
- <ul>
-   <li><code>"type"</code>: the simple class name of the geometry type (e.g., "Translation2d")
-   <li><code>"value"</code>: an array of numeric components used to construct the geometry object
- </ul>
+ <pre>
+ [1.0, 2.0]
+ </pre>
 
- <p>Example JSON:
+ <p>For backwards compatibility, the older tagged representation is also accepted:
 
  <pre>
  {
    "type": "Translation2d",
    "value": [1.0, 2.0]
  }
- </pre></div>
+ </pre>
+
+ <p>Angles are serialized in degrees, while WPILib's Java constructors take radians, so rotation
+ components are converted here.</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>
@@ -167,7 +169,7 @@ loadScripts(document, 'script');</script>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#deserialize(com.fasterxml.jackson.core.JsonParser,com.fasterxml.jackson.databind.DeserializationContext)" class="member-name-link">deserialize</a><wbr>(com.fasterxml.jackson.core.JsonParser&nbsp;p,
  com.fasterxml.jackson.databind.DeserializationContext&nbsp;ctxt)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Deserializes a JSON object into the target WPILib geometry type.</div>
+<div class="block">Deserializes a JSON array (or legacy tagged object) into the target WPILib geometry type.</div>
 </div>
 </div>
 </div>
@@ -217,10 +219,7 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="GeometryDeserializer.html" title="type parameter in GeometryDeserializer">T</a></span>&nbsp;<span class="element-name">deserialize</span><wbr><span class="parameters">(com.fasterxml.jackson.core.JsonParser&nbsp;p,
  com.fasterxml.jackson.databind.DeserializationContext&nbsp;ctxt)</span>
               throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/io/IOException.html" title="class or interface in java.io" class="external-link">IOException</a></span></div>
-<div class="block">Deserializes a JSON object into the target WPILib geometry type.
-
- <p>The JSON must contain both a <code>"type"</code> field matching the class name of the target
- geometry type and a <code>"value"</code> array of numeric components.</div>
+<div class="block">Deserializes a JSON array (or legacy tagged object) into the target WPILib geometry type.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code>deserialize</code>&nbsp;in class&nbsp;<code>com.fasterxml.jackson.databind.JsonDeserializer&lt;<a href="GeometryDeserializer.html" title="type parameter in GeometryDeserializer">T</a>&gt;</code></dd>
@@ -231,7 +230,8 @@ loadScripts(document, 'script');</script>
 <dd>an instance of the target geometry type populated with values from JSON</dd>
 <dt>Throws:</dt>
 <dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/io/IOException.html" title="class or interface in java.io" class="external-link">IOException</a></code> - if there is a problem reading from the parser</dd>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/IllegalArgumentException.html" title="class or interface in java.lang" class="external-link">IllegalArgumentException</a></code> - if the JSON type does not match the target class</dd>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/IllegalArgumentException.html" title="class or interface in java.lang" class="external-link">IllegalArgumentException</a></code> - if the JSON type does not match the target class or the
+     payload has the wrong shape</dd>
 </dl>
 </section>
 </li>
