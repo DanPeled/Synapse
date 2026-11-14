@@ -1,0 +1,37 @@
+name: SynapseLib Generated Sources
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
+      - "synapse_lib/py/src/**"
+      - "synapse_lib/src/main/java/**"
+      - ".github/workflows/synapse_lib_generated.yml"
+  pull_request:
+    paths:
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
+      - "synapse_lib/py/src/**"
+      - "synapse_lib/src/main/java/**"
+      - ".github/workflows/synapse_lib_generated.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12.3"
+
+      - name: Verify generated sources are up to date
+        run: python3 synapse_lib/tools/generate_synapse_lib.py --check

@@ -6,9 +6,13 @@ on:
       - main
     paths:
       - "synapse_lib/py/**"
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
   pull_request:
     paths:
       - "synapse_lib/py/**"
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
 
 jobs:
   build:
