@@ -8,10 +8,15 @@ from __future__ import annotations
 from typing import Any, Dict, Generic, Optional, Type, TypeVar, cast
 
 import msgpack
-from ntcore import (NetworkTable, NetworkTableEntry, NetworkTableInstance,
-                    NetworkTableType)
+from ntcore import (
+    NetworkTable,
+    NetworkTableEntry,
+    NetworkTableInstance,
+    NetworkTableType,
+)
 
 from ._deserialization import from_dict
+from ._generated import topics as _topics
 from .pipelines.apriltag import ApriltagResult
 from .pipelines.color import ColorResult
 
@@ -58,8 +63,10 @@ class SynapsePipelineType(Generic[TPipelineResult]):
 
 
 # Define the static pipelines
-SynapsePipelineType.kApriltag = SynapsePipelineType(ApriltagResult, "ApriltagPipeline")
-SynapsePipelineType.kColor = SynapsePipelineType(ColorResult, "ColorPipeline")
+SynapsePipelineType.kApriltag = SynapsePipelineType(
+    ApriltagResult, _topics.APRILTAG_PIPELINE
+)
+SynapsePipelineType.kColor = SynapsePipelineType(ColorResult, _topics.COLOR_PIPELINE)
 
 
 class SynapseCamera:
@@ -107,12 +114,12 @@ class SynapseCamera:
         Standardized NetworkTables topic keys for pipelines, results, recording, and latency.
         """
 
-        kPipelineTopic = "pipeline"
-        kRecordStatusTopic = "record"
-        kPipelineTypeTopic = "pipeline_type"
-        kResultsTopic = "results"
-        kCaptureLatencyTopic = "captureLatency"
-        kProcessLatencyTopic = "processLatency"
+        kPipelineTopic = _topics.PIPELINE
+        kRecordStatusTopic = _topics.RECORD
+        kPipelineTypeTopic = _topics.PIPELINE_TYPE
+        kResultsTopic = _topics.RESULTS
+        kCaptureLatencyTopic = _topics.CAPTURE_LATENCY
+        kProcessLatencyTopic = _topics.PROCESS_LATENCY
 
     # ---------------------------------------
     # Subtables
@@ -126,7 +133,7 @@ class SynapseCamera:
         """
         assert self.table is not None
         if self.settingsTable is None:
-            self.settingsTable = self.table.getSubTable("settings")
+            self.settingsTable = self.table.getSubTable(_topics.SETTINGS_TABLE)
         return self.settingsTable
 
     def getDataTable(self) -> NetworkTable:
@@ -137,7 +144,7 @@ class SynapseCamera:
         """
         assert self.table is not None
         if self.dataTable is None:
-            self.dataTable = self.table.getSubTable("data")
+            self.dataTable = self.table.getSubTable(_topics.DATA_TABLE)
         return self.dataTable
 
     # ---------------------------------------
@@ -463,7 +470,7 @@ class Setting(Generic[T]):
         return Setting(key, bool, NetworkTableType.kBoolean)
 
 
-Setting.kBrightness = Setting.doubleSetting("brightness")
-Setting.kGain = Setting.doubleSetting("gain")
-Setting.kExposure = Setting.doubleSetting("exposure")
-Setting.kOrientation = Setting.integerSetting("orientation")
+Setting.kBrightness = Setting.doubleSetting(_topics.BRIGHTNESS_SETTING)
+Setting.kGain = Setting.doubleSetting(_topics.GAIN_SETTING)
+Setting.kExposure = Setting.doubleSetting(_topics.EXPOSURE_SETTING)
+Setting.kOrientation = Setting.integerSetting(_topics.ORIENTATION_SETTING)

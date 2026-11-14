@@ -2,32 +2,42 @@
 # SPDX-FileCopyrightText: 2026 Dan Peled
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Generated from schema/synapse_lib.json. Do not edit by hand.
+# Run `python tools/generate_synapse_lib.py` to regenerate.
+
+from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from wpimath.geometry import Pose3d, Rotation3d, Translation3d
 
 
+def _hashable(value: Any) -> Any:
+    if isinstance(value, (list, tuple)):
+        return tuple(_hashable(item) for item in value)
+    if isinstance(value, dict):
+        return tuple(sorted((_hashable(k), _hashable(v)) for k, v in value.items()))
+    return value
+
+
 @dataclass(frozen=True)
 class ApriltagDetection:
-    """
-    Represents a single detected AprilTag along with its associated metadata and pose estimates.
-
-    This class contains the tag's ID, detection accuracy metrics, and the estimated
-    poses of the camera and tag in multiple coordinate systems. It is typically
-    produced by an AprilTag detection pipeline.
-    """
+    """Represents a single detected AprilTag, including its screen-space position."""
 
     tag_id: int
     """The unique ID of the detected AprilTag."""
 
     hamming: int
-    """The Hamming distance of the detected tag. Lower values indicate a more accurate detection."""
+    """The Hamming distance of the detection. Lower values are more accurate."""
 
     tagPose_screenSpace: List[float]
-    """Center of the detected tag in screen space, as ``[x, y]`` pixels."""
+    """The center of the tag in screen space, as [x, y] pixels."""
+
+    def __hash__(self) -> int:
+        return hash((self.tag_id, self.hamming, _hashable(self.tagPose_screenSpace)))
 
     @property
     def tx(self) -> float:
@@ -39,36 +49,28 @@ class ApriltagDetection:
         """Returns the tag's vertical position in screen space."""
         return self.tagPose_screenSpace[1]
 
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.tag_id,
-                self.hamming,
-                tuple(self.tagPose_screenSpace),
-            )
-        )
-
 
 @dataclass(frozen=True)
 class ApriltagResult:
-    """
-    Represents the result of detecting AprilTags in a single frame or input source.
-
-    This class contains the list of detected tags and an estimate of the camera's
-    pose in field space. It is typically produced by an AprilTag pipeline.
-    """
+    """Represents the result of detecting AprilTags in a single frame."""
 
     tags: List[ApriltagDetection]
-    """The detected AprilTags with their associated detection data."""
+    """The detected AprilTags."""
 
     cameraEstimate_fieldSpace: Optional[List[float]]
-    """The estimated camera pose in field space as ``[x, y, z, roll, pitch, yaw]``.
-
-    ``None`` when the pipeline could not estimate a pose for the frame.
-    """
+    """The camera pose as [x, y, z, roll, pitch, yaw] in degrees, or null when unavailable."""
 
     reprojection_error: float
-    """The reprojection error of the camera pose estimate. ``0.0`` when unavailable."""
+    """The reprojection error of the camera pose estimate. 0.0 when unavailable."""
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                _hashable(self.tags),
+                _hashable(self.cameraEstimate_fieldSpace),
+                self.reprojection_error,
+            )
+        )
 
     @property
     def cameraEstimate_fieldSpace3d(self) -> Optional[Pose3d]:
@@ -90,11 +92,3 @@ class ApriltagResult:
                 math.radians(estimate[5]),
             ),
         )
-
-    def __hash__(self) -> int:
-        estimate = (
-            tuple(self.cameraEstimate_fieldSpace)
-            if self.cameraEstimate_fieldSpace is not None
-            else None
-        )
-        return hash((tuple(self.tags), estimate, self.reprojection_error))

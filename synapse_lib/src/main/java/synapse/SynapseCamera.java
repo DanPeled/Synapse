@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
+import synapse.generated.SynapseApi;
 import synapse.util.deserializers.WPILibGeometryModule;
 
 /**
@@ -103,8 +104,8 @@ public class SynapseCamera implements AutoCloseable {
       m_table =
           NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
 
-      m_settingsTable = m_table.getSubTable("settings");
-      m_dataTable = m_table.getSubTable("data");
+      m_settingsTable = m_table.getSubTable(SynapseApi.SETTINGS_TABLE);
+      m_dataTable = m_table.getSubTable(SynapseApi.DATA_TABLE);
 
       m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
       m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
@@ -581,38 +582,38 @@ public class SynapseCamera implements AutoCloseable {
     }
 
     /** Predefined setting for camera brightness */
-    public static final Setting<Double> kBrightness = doubleSetting("brightness");
+    public static final Setting<Double> kBrightness = doubleSetting(SynapseApi.BRIGHTNESS_SETTING);
 
     /** Predefined setting for camera gain */
-    public static final Setting<Double> kGain = doubleSetting("gain");
+    public static final Setting<Double> kGain = doubleSetting(SynapseApi.GAIN_SETTING);
 
     /** Predefined setting for camera exposure */
-    public static final Setting<Double> kExposure = doubleSetting("exposure");
+    public static final Setting<Double> kExposure = doubleSetting(SynapseApi.EXPOSURE_SETTING);
 
     /** Predefined setting for camera orientation, in degrees (0, 90, 180, 270) */
-    public static final Setting<Long> kOrientation = integerSetting("orientation");
+    public static final Setting<Long> kOrientation = integerSetting(SynapseApi.ORIENTATION_SETTING);
   }
 
   /** Standardized NetworkTables topic keys for pipelines, results, recording, and latency. */
   public static final class NetworkTableTopics {
 
     /** Topic for the current pipeline ID */
-    public static final String kPipelineTopic = "pipeline";
+    public static final String kPipelineTopic = SynapseApi.PIPELINE;
 
     /** Topic for recording state */
-    public static final String kRecordStatusTopic = "record";
+    public static final String kRecordStatusTopic = SynapseApi.RECORD;
 
     /** Topic for the pipeline type string */
-    public static final String kPipelineTypeTopic = "pipeline_type";
+    public static final String kPipelineTypeTopic = SynapseApi.PIPELINE_TYPE;
 
     /** Topic for results data */
-    public static final String kResultsTopic = "results";
+    public static final String kResultsTopic = SynapseApi.RESULTS;
 
-    /** Topic for camera capture latency (ms) */
-    public static final String kCaptureLatencyTopic = "captureLatency";
+    /** Topic for camera capture latency (seconds) */
+    public static final String kCaptureLatencyTopic = SynapseApi.CAPTURE_LATENCY;
 
-    /** Topic for camera processing latency (ms) */
-    public static final String kProcessLatencyTopic = "processLatency";
+    /** Topic for camera processing latency (seconds) */
+    public static final String kProcessLatencyTopic = SynapseApi.PROCESS_LATENCY;
 
     /** Prevent instantiation */
     protected NetworkTableTopics() {}

@@ -8,12 +8,30 @@
 from collections.abc import Callable, Sequence
 from dataclasses import MISSING, fields, is_dataclass
 from types import UnionType
-from typing import (Any, Dict, List, Type, Union, cast, get_args, get_origin,
-                    get_type_hints)
+from typing import (
+    Any,
+    Dict,
+    List,
+    Type,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
-from wpimath.geometry import (Pose2d, Pose3d, Rotation2d, Rotation3d,
-                              Transform2d, Transform3d, Translation2d,
-                              Translation3d, Twist2d, Twist3d)
+from wpimath.geometry import (
+    Pose2d,
+    Pose3d,
+    Rotation2d,
+    Rotation3d,
+    Transform2d,
+    Transform3d,
+    Translation2d,
+    Translation3d,
+    Twist2d,
+    Twist3d,
+)
 
 
 def _asSequence(value: Any) -> Sequence[float]:

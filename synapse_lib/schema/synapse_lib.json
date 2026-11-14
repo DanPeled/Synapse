@@ -1,0 +1,172 @@
+{
+  "$comment": "Single source of truth for SynapseLib's NetworkTables API and built-in result models. Run `python tools/generate_synapse_lib.py` after editing.",
+  "version": 1,
+  "tables": {
+    "settings": "settings",
+    "data": "data"
+  },
+  "topics": {
+    "pipeline": {
+      "key": "pipeline",
+      "table": "root",
+      "doc": "The selected pipeline index."
+    },
+    "record": {
+      "key": "record",
+      "table": "root",
+      "doc": "The camera recording state."
+    },
+    "pipelineType": {
+      "key": "pipeline_type",
+      "table": "root",
+      "doc": "The selected pipeline's type string."
+    },
+    "results": {
+      "key": "results",
+      "table": "data",
+      "doc": "The latest pipeline results, serialized with MessagePack."
+    },
+    "captureLatency": {
+      "key": "captureLatency",
+      "table": "root",
+      "doc": "The latest capture latency, in seconds."
+    },
+    "processLatency": {
+      "key": "processLatency",
+      "table": "root",
+      "doc": "The latest processing latency, in seconds."
+    }
+  },
+  "settings": {
+    "brightness": {
+      "key": "brightness",
+      "type": "double",
+      "doc": "Camera brightness."
+    },
+    "gain": {
+      "key": "gain",
+      "type": "double",
+      "doc": "Camera gain."
+    },
+    "exposure": {
+      "key": "exposure",
+      "type": "double",
+      "doc": "Camera exposure."
+    },
+    "orientation": {
+      "key": "orientation",
+      "type": "int",
+      "doc": "Camera orientation in degrees (0, 90, 180, or 270)."
+    }
+  },
+  "pipelines": {
+    "apriltag": {
+      "typeString": "ApriltagPipeline",
+      "result": "ApriltagResult",
+      "doc": "AprilTag detection and field-space pose estimation."
+    },
+    "color": {
+      "typeString": "ColorPipeline",
+      "result": "ColorResult",
+      "doc": "Color-region detection."
+    }
+  },
+  "models": [
+    {
+      "name": "ApriltagDetection",
+      "pythonModule": "synapselib.pipelines.apriltag",
+      "javaPackage": "synapse.pipelines.apriltag",
+      "doc": "Represents a single detected AprilTag, including its screen-space position.",
+      "helpers": ["apriltagScreenX", "apriltagScreenY"],
+      "fields": [
+        {
+          "name": "tag_id",
+          "javaName": "tagID",
+          "type": "int",
+          "doc": "The unique ID of the detected AprilTag."
+        },
+        {
+          "name": "hamming",
+          "type": "int",
+          "doc": "The Hamming distance of the detection. Lower values are more accurate."
+        },
+        {
+          "name": "tagPose_screenSpace",
+          "type": "list<double>",
+          "doc": "The center of the tag in screen space, as [x, y] pixels."
+        }
+      ]
+    },
+    {
+      "name": "ApriltagResult",
+      "pythonModule": "synapselib.pipelines.apriltag",
+      "javaPackage": "synapse.pipelines.apriltag",
+      "doc": "Represents the result of detecting AprilTags in a single frame.",
+      "helpers": ["apriltagCameraPose3d"],
+      "fields": [
+        {
+          "name": "tags",
+          "type": "list<record:ApriltagDetection>",
+          "doc": "The detected AprilTags."
+        },
+        {
+          "name": "cameraEstimate_fieldSpace",
+          "type": "optional<list<double>>",
+          "doc": "The camera pose as [x, y, z, roll, pitch, yaw] in degrees, or null when unavailable."
+        },
+        {
+          "name": "reprojection_error",
+          "javaName": "reprojectionError",
+          "type": "double",
+          "doc": "The reprojection error of the camera pose estimate. 0.0 when unavailable."
+        }
+      ]
+    },
+    {
+      "name": "ColorDetection",
+      "pythonModule": "synapselib.pipelines.color",
+      "javaPackage": "synapse.pipelines.color",
+      "doc": "Represents a detected color region.",
+      "fields": [
+        {
+          "name": "bbox",
+          "type": "list<double>",
+          "doc": "The bounding box as [x, y, width, height]."
+        },
+        {
+          "name": "center",
+          "type": "list<double>",
+          "doc": "The center of the region as [x, y]."
+        },
+        {
+          "name": "area",
+          "type": "double",
+          "doc": "The area of the region in pixels squared."
+        }
+      ]
+    },
+    {
+      "name": "ColorResult",
+      "pythonModule": "synapselib.pipelines.color",
+      "javaPackage": "synapse.pipelines.color",
+      "doc": "Represents the result of a color detection pipeline run.",
+      "fields": [
+        {
+          "name": "timestamp",
+          "type": "double",
+          "doc": "The timestamp in seconds when the frame was processed."
+        },
+        {
+          "name": "detections",
+          "type": "list<record:ColorDetection>",
+          "doc": "All detected color regions."
+        },
+        {
+          "name": "main_detection",
+          "type": "optional<record:ColorDetection>",
+          "doc": "The primary detection, or null when no regions were detected."
+        }
+      ]
+    }
+  ]
+}
