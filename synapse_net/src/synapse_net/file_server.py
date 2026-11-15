@@ -6,14 +6,15 @@
 from __future__ import annotations
 
 import http.server
+import json
 import shutil
 import socketserver
 import tempfile
 import threading
 import zipfile
 from pathlib import Path
-from typing import Optional
-from urllib.parse import parse_qs, urlparse
+from typing import Any, Optional
+from urllib.parse import parse_qs, unquote, urlparse
 
 from synapse.log import info
 
@@ -39,6 +40,73 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(200)
         self.end_headers()
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/list":
+            self._handle_list(parsed)
+        else:
+            super().do_GET()
+
+    def _send_json(self, data: Any, status: int = 200) -> None:
+        body = json.dumps(data).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _handle_list(self, parsed) -> None:
+        params = parse_qs(parsed.query)
+        requested = params.get("path", [""])[0]
+
+        target = self._resolve_safe_path(requested)
+        if target is None:
+            self.send_error(403, "Invalid path")
+            return
+
+        if not target.exists():
+            self.send_error(404, "Path does not exist")
+            return
+        if not target.is_dir():
+            self.send_error(400, "Path is not a directory")
+            return
+
+        entries = []
+        try:
+            children = sorted(
+                target.iterdir(),
+                key=lambda child: (not child.is_dir(), child.name.lower()),
+            )
+            for child in children:
+                if child.is_symlink():
+                    continue
+                try:
+                    isDir = child.is_dir()
+                    size = 0 if isDir else child.stat().st_size
+                except OSError:
+                    continue
+                entries.append(
+                    {
+                        "name": child.name,
+                        "path": child.relative_to(self.files_dir).as_posix(),
+                        "is_dir": isDir,
+                        "size": size,
+                    }
+                )
+        except OSError as e:
+            self.send_error(500, f"Unable to list directory: {e}")
+            return
+
+        relativePath = (
+            "" if target == self.files_dir else target.relative_to(self.files_dir)
+        )
+        self._send_json(
+            {
+                "path": relativePath.as_posix() if relativePath else "",
+                "entries": entries,
+            }
+        )
 
     def _resolve_safe_path(self, path: str) -> Optional[Path]:
         resolved = (self.files_dir / path.lstrip("/")).resolve()
@@ -70,7 +138,8 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
         return None
 
     def do_PUT(self) -> None:
-        target = self._resolve_safe_path(self.path)
+        parsed = urlparse(self.path)
+        target = self._resolve_safe_path(unquote(parsed.path))
         if target is None:
             self.send_error(403)
             return

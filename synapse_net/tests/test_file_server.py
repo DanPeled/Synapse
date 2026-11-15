@@ -192,6 +192,72 @@ def test_zip_path_traversal(server):
 
 
 # -------------------------
+# Directory listing
+# -------------------------
+def test_list_root(server):
+    (server.files_dir / "b.txt").write_bytes(b"bee")
+    (server.files_dir / "a_dir").mkdir()
+    (server.files_dir / "a_dir" / "nested.txt").write_bytes(b"nested")
+
+    resp = requests.get(server_url(server) + "/list")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == ""
+    assert [entry["name"] for entry in data["entries"]] == ["a_dir", "b.txt"]
+
+    dirEntry = data["entries"][0]
+    assert dirEntry == {
+        "name": "a_dir",
+        "path": "a_dir",
+        "is_dir": True,
+        "size": 0,
+    }
+
+    fileEntry = data["entries"][1]
+    assert fileEntry == {
+        "name": "b.txt",
+        "path": "b.txt",
+        "is_dir": False,
+        "size": 3,
+    }
+
+
+def test_list_subdirectory(server):
+    nested = server.files_dir / "config" / "calibrations"
+    nested.mkdir(parents=True)
+    (nested / "camera.json").write_text("{}")
+
+    resp = requests.get(server_url(server) + "/list?path=config%2Fcalibrations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "config/calibrations"
+    assert data["entries"] == [
+        {
+            "name": "camera.json",
+            "path": "config/calibrations/camera.json",
+            "is_dir": False,
+            "size": 2,
+        }
+    ]
+
+
+def test_list_missing_directory(server):
+    resp = requests.get(server_url(server) + "/list?path=does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_list_file_is_not_directory(server):
+    (server.files_dir / "file.txt").write_bytes(b"data")
+    resp = requests.get(server_url(server) + "/list?path=file.txt")
+    assert resp.status_code == 400
+
+
+def test_list_path_traversal(server):
+    resp = requests.get(server_url(server) + "/list?path=..%2F..")
+    assert resp.status_code == 403
+
+
+# -------------------------
 # PUT atomic write
 # -------------------------
 def test_put_atomic_write(server):
@@ -206,3 +272,13 @@ def test_put_atomic_write(server):
     resp = requests.put(url, data=b"new content")
     assert resp.status_code == 200
     assert saved_file.read_bytes() == b"new content"
+
+
+def test_put_percent_encoded_filename(server):
+    url = server_url(server) + "/file%20with%20space.txt"
+    resp = requests.put(url, data=b"spaced")
+    assert resp.status_code == 200
+
+    saved_file = server.files_dir / "file with space.txt"
+    assert saved_file.exists()
+    assert saved_file.read_bytes() == b"spaced"
