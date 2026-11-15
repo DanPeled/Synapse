@@ -51,3 +51,16 @@ pipeline_configs:
       resolution: 1920x1080
       saturation: 50
       sharpness: 50
+  2:
+    name: Targets
+    type: TargetOverlayPipeline
+    settings:
+      target_file: config/targets.json
+      draw_labels: true
+      marker_thickness: 2
+      brightness: 50
+      gain: 50
+      orientation: 0
+      resolution: 1920x1080
+      saturation: 50
+      sharpness: 50
