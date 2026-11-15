@@ -30,7 +30,7 @@ class PipelineHandler:
 
     kPipelineTypeKey: Final[str] = "type"
     kPipelineNameKey: Final[str] = "name"
-    kPipelinesArrayKey: Final[str] = "pipelines"
+    kPipelinesArrayKey: Final[str] = "pipeline_configs"
     kCameraConfigKey: Final[str] = "camera_configs"
     kPipelineFilesQuery: Final[str] = "**/*_pipeline.py"
     kInvalidPipelineIndex: Final[int] = -1
