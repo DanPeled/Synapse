@@ -6,6 +6,45 @@ export const FILE_SERVER_URL = (deviceInfo: DeviceInfoProto) => {
   return `http://${deviceInfo.ip}:${FILE_SERVER_PORT}`;
 };
 
+export interface FileEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+}
+
+function normalizeRelativePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+export function joinFilePath(basePath: string, name: string): string {
+  const base = normalizeRelativePath(basePath);
+  const child = normalizeRelativePath(name);
+  return base ? `${base}/${child}` : child;
+}
+
+export function parentFilePath(path: string): string {
+  const normalized = normalizeRelativePath(path);
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+export async function listFiles(
+  device: DeviceInfoProto,
+  path = "",
+): Promise<FileEntry[]> {
+  const normalized = normalizeRelativePath(path);
+  const query = normalized ? `?path=${encodeURIComponent(normalized)}` : "";
+
+  const res = await fetch(`${FILE_SERVER_URL(device)}/list${query}`);
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  const data = (await res.json()) as { path: string; entries: FileEntry[] };
+  return data.entries;
+}
+
 async function fetchFolder(
   baseUrl: string,
   folderPath = "",
@@ -61,7 +100,12 @@ export async function uploadFileReplace(
   file: File,
   targetPath: string,
 ) {
-  const res = await fetch(`${FILE_SERVER_URL(device)}/${targetPath}`, {
+  const encodedPath = targetPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  const res = await fetch(`${FILE_SERVER_URL(device)}/${encodedPath}`, {
     method: "PUT",
     body: file,
   });
