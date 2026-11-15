@@ -69,6 +69,42 @@ class TestPipelineHandler(unittest.TestCase):
         self.assertNotIn(1, self.loader.pipelineSettings)
         self.assertNotIn(2, self.loader.pipelineSettings)
 
+    def test_load_pipeline_settings_loads_declared_pipelines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            configPath = Path(directory) / "config" / "settings.yml"
+            configPath.parent.mkdir()
+            configPath.write_text("network: {}\n")
+
+            cameraDirectory = configPath.parent / "camera_1"
+            cameraDirectory.mkdir()
+            (cameraDirectory / "pipeline_settings.yml").write_text(
+                "pipeline_configs:\n"
+                "  4:\n"
+                "    name: Loaded Pipeline\n"
+                "    type: DummyPipeline\n"
+                "    settings:\n"
+                "      some_value: 3\n"
+            )
+
+            configs = {1: MagicMock(defaultPipeline=4)}
+            fakeConfig = MagicMock()
+            fakeConfig.path = configPath
+
+            self.loader.pipelineTypesViaName["DummyPipeline"] = DummyPipeline
+
+            with (
+                patch.object(Config, "getInstance", return_value=fakeConfig),
+                patch.object(
+                    GlobalSettings, "getCameraConfigMap", return_value=configs
+                ),
+            ):
+                self.loader.loadPipelineSettings()
+
+        self.assertEqual(self.loader.pipelineTypeNames[1][4], "DummyPipeline")
+        self.assertEqual(self.loader.pipelineNames[1][4], "Loaded Pipeline")
+        settings = self.loader.pipelineSettings[1][4]
+        self.assertEqual(settings.getSetting("some_value"), 3)
+
     @patch("synapse.core.pipeline_handler.importlib.util.spec_from_file_location")
     @patch("synapse.core.pipeline_handler.importlib.util.module_from_spec")
     def test_load_pipelines_loads_enabled_classes(

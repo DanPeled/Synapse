@@ -3,15 +3,21 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from pathlib import Path
+
 from synapse.core.settings_api import (
     BooleanConstraint,
     ColorConstraint,
     ColorFormat,
     ConstraintTypeProto,
     EnumeratedConstraint,
+    FileConstraint,
     ListConstraint,
     NumberConstraint,
+    PipelineSettings,
     StringConstraint,
+    settingField,
+    settingValueToProto,
 )
 
 
@@ -281,3 +287,147 @@ def test_boolean_constraint_invalid():
     c = BooleanConstraint()
     result = c.validate("maybe")
     assert not result.isValid
+
+
+# ------------------ FileConstraint ------------------
+def _useFileRoot(monkeypatch, root: Path) -> None:
+    monkeypatch.setattr(
+        "synapse.core.settings_api._getSettingsRoot", lambda: root.resolve()
+    )
+
+
+def test_file_constraint_valid_relative_path(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "file.json").write_text("{}")
+
+    c = FileConstraint(path="config", fileTypes=["json"])
+    result = c.validate("config/file.json")
+
+    assert result.isValid
+    assert result.normalizedValue == "config/file.json"
+
+
+def test_file_constraint_normalizes_absolute_path(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    target = tmp_path / "config" / "file.json"
+    target.parent.mkdir()
+    target.write_text("{}")
+
+    c = FileConstraint(fileTypes={".JSON"})
+    result = c.validate(target)
+
+    assert result.isValid
+    assert result.normalizedValue == "config/file.json"
+
+
+def test_file_constraint_allows_empty_and_none_values(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    c = FileConstraint()
+
+    empty_result = c.validate("")
+    assert empty_result.isValid
+    assert empty_result.normalizedValue == ""
+
+    none_result = c.validate(None)
+    assert none_result.isValid
+    assert none_result.normalizedValue == ""
+
+
+def test_file_constraint_rejects_missing_file(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    c = FileConstraint()
+    result = c.validate("config/missing.json")
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "does not exist" in result.errorMessage
+
+
+def test_file_constraint_rejects_directory(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    (tmp_path / "config").mkdir()
+    c = FileConstraint()
+    result = c.validate("config")
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "file" in result.errorMessage
+
+
+def test_file_constraint_rejects_outside_project_root(tmp_path: Path, monkeypatch):
+    root = tmp_path / "project"
+    root.mkdir()
+    _useFileRoot(monkeypatch, root)
+    outside = tmp_path / "outside.json"
+    outside.write_text("{}")
+
+    c = FileConstraint()
+    result = c.validate(outside)
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "project" in result.errorMessage
+
+
+def test_file_constraint_rejects_wrong_file_type(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    (tmp_path / "file.txt").write_text("data")
+
+    c = FileConstraint(fileTypes=["json"])
+    result = c.validate("file.txt")
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert ".json" in result.errorMessage
+
+
+def test_file_constraint_serialization(tmp_path: Path, monkeypatch):
+    c = FileConstraint(path="config/files", fileTypes=["json", ".yaml"])
+
+    data = c.toDict()
+    assert data["type"] == ConstraintTypeProto.FILE
+    assert data["path"] == "config/files"
+    assert data["file_types"] == [".json", ".yaml"]
+
+    restored = FileConstraint.fromDict(data)
+    assert restored.path == c.path
+    assert restored.fileTypes == c.fileTypes
+
+    proto = c.configToProto()
+    assert proto.file is not None
+    assert proto.file.path == "config/files"
+    assert proto.file.file_types == [".json", ".yaml"]
+
+
+def test_setting_value_to_proto_path(tmp_path: Path):
+    proto = settingValueToProto(tmp_path / "config" / "file.json")
+    assert proto.string_value == (tmp_path / "config" / "file.json").as_posix()
+
+
+# ------------------ Loading settings ------------------
+class _LoadedSettings(PipelineSettings):
+    x = settingField(NumberConstraint(0, 10), default=5)
+    file = settingField(FileConstraint(fileTypes=["json"]), default="")
+
+
+def test_loaded_settings_values_are_applied(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    target = tmp_path / "config" / "file.json"
+    target.parent.mkdir()
+    target.write_text("{}")
+
+    settings = _LoadedSettings({"x": 8, "file": "config/file.json"})
+
+    assert settings.getSetting("x") == 8.0
+    assert settings.getSetting("file") == "config/file.json"
+
+
+def test_invalid_loaded_setting_keeps_default(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+
+    settings = _LoadedSettings({"x": 99, "file": "config/missing.json"})
+
+    assert settings.getSetting("x") == 5
+    assert settings.getSetting("file") == ""

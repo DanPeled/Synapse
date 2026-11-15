@@ -12,6 +12,7 @@ from typing import (
     Any,
     Dict,
     Generic,
+    Iterable,
     List,
     Optional,
     Set,
@@ -608,30 +609,119 @@ class StringConstraint(Constraint[str]):
         )
 
 
-class FileConstraint(Constraint[Optional[Path]]):
-    def __init__(self, fileTypes: Optional[Set[str]] = None):
-        super().__init__(ConstraintTypeProto.FILE)
-        self.fileTypes: Optional[Set[str]] = fileTypes
+def _getSettingsRoot() -> Path:
+    """Return the project root directory used to resolve file setting paths."""
+    try:
+        from .config import Config
 
-    def validate(self, value: SettingsValue) -> ValidationResult[Optional[Path]]:
+        return Config.getInstance().path.parent.parent.resolve()
+    except (AttributeError, TypeError, OSError):
+        return Path.cwd().resolve()
+
+
+def _normalizeFileTypes(fileTypes: Optional[Iterable[str]]) -> Optional[Set[str]]:
+    if not fileTypes:
+        return None
+
+    normalized: Set[str] = set()
+    for fileType in fileTypes:
+        cleaned = str(fileType).strip().lower()
+        if not cleaned:
+            continue
+        if not cleaned.startswith("."):
+            cleaned = f".{cleaned}"
+        normalized.add(cleaned)
+
+    return normalized or None
+
+
+class FileConstraint(Constraint[Optional[str]]):
+    """Constraint for settings whose value is a file on the processor.
+
+    The value is stored as a path relative to the Synapse project root, which is
+    also the root served by the file server. This makes the stored value usable
+    by both the runtime and the UI without leaking absolute paths from the
+    processor.
+
+    Args:
+        path (Union[str, Path]): Directory, relative to the project root, that
+            the UI should use as the starting point for browsing and uploading
+            files.
+        fileTypes (Optional[Iterable[str]]): Allowed file extensions. Both
+            ``json`` and ``.json`` are accepted and normalized to the latter.
+    """
+
+    def __init__(
+        self,
+        path: Union[str, Path] = "",
+        fileTypes: Optional[Iterable[str]] = None,
+    ):
+        super().__init__(ConstraintTypeProto.FILE)
+        self.path = str(path or "").replace("\\", "/").strip("/")
+        self.fileTypes = _normalizeFileTypes(fileTypes)
+
+    def _validateFileType(self, candidate: Path) -> Optional[str]:
+        if not self.fileTypes:
+            return None
+        if candidate.suffix.lower() not in self.fileTypes:
+            allowed = ", ".join(sorted(self.fileTypes))
+            return f"File type must be one of: {allowed}"
+        return None
+
+    def validate(self, value: SettingsValue) -> ValidationResult[Optional[str]]:
+        if value is None:
+            return ValidationResult(True, None, "")
+
         if isinstance(value, Path):
-            return ValidationResult(True, None, value.absolute())
+            valueStr = value.as_posix()
         elif isinstance(value, str):
-            if Path(value).exists():
-                return ValidationResult(True, None, Path(value))
-            return ValidationResult(False, "Path must exist")
-        return ValidationResult(False, "Path must be either Path or str")
+            valueStr = value.strip()
+        else:
+            return ValidationResult(False, "Path must be either a string or Path")
+
+        if not valueStr:
+            return ValidationResult(True, None, "")
+
+        root = _getSettingsRoot()
+        candidate = Path(valueStr).expanduser()
+        if not candidate.is_absolute():
+            candidate = root / candidate
+
+        try:
+            candidate = candidate.resolve()
+        except OSError as e:
+            return ValidationResult(False, f"Invalid path: {e}")
+
+        if not candidate.is_relative_to(root):
+            return ValidationResult(False, "File must be inside the project directory")
+        if not candidate.exists():
+            return ValidationResult(False, "File does not exist")
+        if not candidate.is_file():
+            return ValidationResult(False, "Path must point to a file")
+
+        typeError = self._validateFileType(candidate)
+        if typeError is not None:
+            return ValidationResult(False, typeError)
+
+        return ValidationResult(True, None, candidate.relative_to(root).as_posix())
 
     def toDict(self) -> Dict[str, Any]:
-        return {"type": self.constraintType.value, "file_types": self.fileTypes or None}
+        return {
+            "type": self.constraintType.value,
+            "path": self.path,
+            "file_types": sorted(self.fileTypes) if self.fileTypes else None,
+        }
 
     @classmethod
     def fromDict(cls, data: Dict[str, Any]) -> "FileConstraint":
-        return FileConstraint(data.get("file_types", None))
+        return cls(data.get("path", ""), data.get("file_types"))
 
     def configToProto(self) -> ConstraintConfigProto:
         return ConstraintConfigProto(
-            file=FileConstraintProto(file_types=list(self.fileTypes or []))
+            file=FileConstraintProto(
+                path=self.path,
+                file_types=sorted(self.fileTypes) if self.fileTypes else [],
+            )
         )
 
 
@@ -755,7 +845,9 @@ class SettingsAPI:
 
         result = self.settings[key].validate(value)
         if result.isValid:
-            self.values[key] = result.normalizedValue or value
+            self.values[key] = (
+                result.normalizedValue if result.normalizedValue is not None else value
+            )
 
         return result
 
@@ -923,6 +1015,16 @@ class SettingsCollection:
         for field, value in settingsMap.items():
             if field not in prexistingKeys:
                 self.generateSetting(field, value)
+                continue
+
+            result = self._settingsApi.setValue(field, value)
+            if not result.isValid:
+                setting = self._settingsApi.settings[field]
+                err(
+                    f"Error loading {MarkupColors.bold(field)}"
+                    + f"\n\t\t{result.errorMessage}"
+                    + f"\n\tSetting {field} as default: {setting.defaultValue}"
+                )
 
     def sendSettings(self, nt_table: NetworkTable):
         """
@@ -1122,6 +1224,8 @@ def setEntryValue(entry: NetworkTableEntry, value):
         entry.setFloat(value)
     elif isinstance(value, bool):
         entry.setBoolean(value)
+    elif isinstance(value, Path):
+        entry.setString(value.as_posix())
     elif isinstance(value, str):
         entry.setString(value)
     elif isinstance(value, list):
@@ -1267,7 +1371,9 @@ def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
 def settingValueToProto(val: SettingsValue) -> SettingValueProto:
     proto = SettingValueProto()
 
-    if isinstance(val, int):
+    if isinstance(val, Path):
+        proto.string_value = val.as_posix()
+    elif isinstance(val, int):
         proto.int_value = val
     elif isinstance(val, str):
         proto.string_value = val

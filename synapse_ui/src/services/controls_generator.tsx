@@ -15,7 +15,7 @@ import assert from "assert";
 import { hasSettingValue } from "./backend/backendContext";
 import { PipelineProto } from "@/generated/messages/v1/pipeline";
 import { PipelineID } from "./backend/dataStractures";
-import { FileDropzone } from "@/widgets/file_upload";
+import { FileSettingControl } from "@/widgets/fileSetting";
 import { RangeSlider } from "@/widgets/range";
 
 export function generateControlFromSettingMeta({
@@ -295,17 +295,23 @@ export function GenerateControl({
         );
       }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_FILE: {
-      // TODO: Future feature
-      // return (
-      //   <LabeledControl label={settingName}>
-      //     <FileDropzone
-      //       onChangeAction={(f) => {}}
-      //       value={[File(val)]}
-      //       className="pl-10"
-      //       maxFiles={1}
-      //     />
-      //   </LabeledControl>
-      // );
+      const fileConstraint = setting.constraint.constraint?.file;
+      return (
+        <LabeledControl label={settingName}>
+          <FileSettingControl
+            value={typeof val === "string" ? val : ""}
+            onChange={(path) => setValue(settingValueToProto(path))}
+            basePath={fileConstraint?.path ?? ""}
+            fileTypes={fileConstraint?.fileTypes ?? []}
+            disabled={locked}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+            disabled={locked}
+          />
+        </LabeledControl>
+      );
     }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED: {
       const options =
