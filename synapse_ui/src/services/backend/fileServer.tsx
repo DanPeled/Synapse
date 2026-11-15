@@ -13,6 +13,33 @@ export interface FileEntry {
   size: number;
 }
 
+export interface FilePreview {
+  path: string;
+  name: string;
+  size: number;
+  isText: boolean;
+  content: string | null;
+  truncated: boolean;
+  maxBytes: number;
+}
+
+interface FileEntryResponse {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+}
+
+interface FilePreviewResponse {
+  path: string;
+  name: string;
+  size: number;
+  is_text: boolean;
+  content: string | null;
+  truncated: boolean;
+  max_bytes: number;
+}
+
 function normalizeRelativePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
 }
@@ -41,8 +68,40 @@ export async function listFiles(
     throw new Error(await res.text());
   }
 
-  const data = (await res.json()) as { path: string; entries: FileEntry[] };
-  return data.entries;
+  const data = (await res.json()) as {
+    path: string;
+    entries: FileEntryResponse[];
+  };
+  return data.entries.map((entry) => ({
+    name: entry.name,
+    path: entry.path,
+    isDir: entry.is_dir,
+    size: entry.size,
+  }));
+}
+
+export async function readFile(
+  device: DeviceInfoProto,
+  path: string,
+): Promise<FilePreview> {
+  const normalized = normalizeRelativePath(path);
+  const query = `?path=${encodeURIComponent(normalized)}`;
+
+  const res = await fetch(`${FILE_SERVER_URL(device)}/read${query}`);
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  const data = (await res.json()) as FilePreviewResponse;
+  return {
+    path: data.path,
+    name: data.name,
+    size: data.size,
+    isText: data.is_text,
+    content: data.content,
+    truncated: data.truncated,
+    maxBytes: data.max_bytes,
+  };
 }
 
 async function fetchFolder(

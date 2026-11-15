@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 import pytest
 import requests
-from synapse_net.file_server import FileServer
+from synapse_net.file_server import PREVIEW_MAX_BYTES, FileServer
 
 
 @pytest.fixture
@@ -282,3 +282,80 @@ def test_put_percent_encoded_filename(server):
     saved_file = server.files_dir / "file with space.txt"
     assert saved_file.exists()
     assert saved_file.read_bytes() == b"spaced"
+
+
+# -------------------------
+# File preview
+# -------------------------
+def test_read_text_file(server):
+    target = server.files_dir / "config" / "targets.json"
+    target.parent.mkdir()
+    target.write_text('{"targets": []}')
+
+    resp = requests.get(server_url(server) + "/read?path=config%2Ftargets.json")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "config/targets.json"
+    assert data["name"] == "targets.json"
+    assert data["size"] == len('{"targets": []}')
+    assert data["is_text"] is True
+    assert data["content"] == '{"targets": []}'
+    assert data["truncated"] is False
+    assert data["max_bytes"] == PREVIEW_MAX_BYTES
+
+
+def test_read_binary_file(server):
+    target = server.files_dir / "image.png"
+    target.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00binary")
+
+    resp = requests.get(server_url(server) + "/read?path=image.png")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_text"] is False
+    assert data["content"] is None
+    assert data["truncated"] is False
+
+
+def test_read_invalid_utf8_file(server):
+    target = server.files_dir / "invalid.bin"
+    target.write_bytes(b"\xff\xfe\xfd")
+
+    resp = requests.get(server_url(server) + "/read?path=invalid.bin")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_text"] is False
+    assert data["content"] is None
+
+
+def test_read_truncates_large_file(server):
+    target = server.files_dir / "large.txt"
+    target.write_bytes(b"a" * (PREVIEW_MAX_BYTES + 100))
+
+    resp = requests.get(server_url(server) + "/read?path=large.txt")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_text"] is True
+    assert data["truncated"] is True
+    assert len(data["content"]) == PREVIEW_MAX_BYTES
+    assert data["size"] == PREVIEW_MAX_BYTES + 100
+
+
+def test_read_missing_path(server):
+    resp = requests.get(server_url(server) + "/read")
+    assert resp.status_code == 400
+
+
+def test_read_missing_file(server):
+    resp = requests.get(server_url(server) + "/read?path=missing.txt")
+    assert resp.status_code == 404
+
+
+def test_read_directory_is_not_file(server):
+    (server.files_dir / "config").mkdir()
+    resp = requests.get(server_url(server) + "/read?path=config")
+    assert resp.status_code == 400
+
+
+def test_read_path_traversal(server):
+    resp = requests.get(server_url(server) + "/read?path=..%2F..%2Fetc%2Fpasswd")
+    assert resp.status_code == 403

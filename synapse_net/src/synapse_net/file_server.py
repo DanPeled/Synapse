@@ -18,6 +18,40 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from synapse.log import info
 
+PREVIEW_MAX_BYTES = 256 * 1024
+_TEXT_SAMPLE_BYTES = 8192
+
+
+def _decode_text_preview(data: bytes, truncated: bool) -> Optional[str]:
+    """Return the file content as text when it looks like a text file."""
+    sample = data[:_TEXT_SAMPLE_BYTES]
+    if b"\x00" in sample:
+        return None
+
+    text: Optional[str] = None
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        if truncated:
+            # A multi-byte character may be split at the read boundary.
+            for cut in range(1, 4):
+                try:
+                    text = data[:-cut].decode("utf-8-sig")
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+    if text is None:
+        return None
+
+    controlChars = sum(
+        1 for char in text if ord(char) < 32 and char not in "\n\r\t\f\b"
+    )
+    if text and controlChars / len(text) > 0.1:
+        return None
+
+    return text
+
 
 class FileServerHandler(http.server.SimpleHTTPRequestHandler):
     """
@@ -45,6 +79,8 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/list":
             self._handle_list(parsed)
+        elif parsed.path == "/read":
+            self._handle_read(parsed)
         else:
             super().do_GET()
 
@@ -105,6 +141,50 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
             {
                 "path": relativePath.as_posix() if relativePath else "",
                 "entries": entries,
+            }
+        )
+
+    def _handle_read(self, parsed) -> None:
+        params = parse_qs(parsed.query)
+        requested = params.get("path", [""])[0]
+
+        if not requested:
+            self.send_error(400, "Missing path")
+            return
+
+        target = self._resolve_safe_path(requested)
+        if target is None:
+            self.send_error(403, "Invalid path")
+            return
+
+        if not target.exists():
+            self.send_error(404, "Path does not exist")
+            return
+        if not target.is_file():
+            self.send_error(400, "Path is not a file")
+            return
+
+        try:
+            size = target.stat().st_size
+            with target.open("rb") as file:
+                data = file.read(PREVIEW_MAX_BYTES + 1)
+        except OSError as e:
+            self.send_error(500, f"Unable to read file: {e}")
+            return
+
+        truncated = len(data) > PREVIEW_MAX_BYTES
+        data = data[:PREVIEW_MAX_BYTES]
+        content = _decode_text_preview(data, truncated)
+
+        self._send_json(
+            {
+                "path": target.relative_to(self.files_dir).as_posix(),
+                "name": target.name,
+                "size": size,
+                "is_text": content is not None,
+                "content": content,
+                "truncated": truncated,
+                "max_bytes": PREVIEW_MAX_BYTES,
             }
         )
 

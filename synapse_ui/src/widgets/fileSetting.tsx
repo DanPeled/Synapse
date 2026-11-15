@@ -5,20 +5,25 @@ import { Input } from "@/components/ui/input";
 import { useBackendContext } from "@/services/backend/backendContext";
 import {
   FileEntry,
+  FilePreview,
   joinFilePath,
   listFiles,
   parentFilePath,
+  readFile,
   uploadFileReplace,
 } from "@/services/backend/fileServer";
+import { borderColor, teamColor } from "@/services/style";
 import { useFilePicker } from "@/services/useFilePicker";
 import { AlertDialog } from "@/widgets/alertDialog";
 import {
   ChevronUp,
+  Eye,
   File as FileIcon,
   Folder,
   FolderOpen,
   Home,
   Loader2,
+  RefreshCw,
   Upload,
   X,
 } from "lucide-react";
@@ -33,6 +38,10 @@ interface FileSettingControlProps {
   fileTypes?: string[];
   disabled?: boolean;
 }
+
+const buttonClass =
+  "cursor-pointer rounded-md border bg-zinc-800 hover:bg-zinc-700";
+const buttonStyle = { borderColor, color: teamColor };
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
@@ -49,6 +58,24 @@ function matchesFileType(name: string, fileTypes: string[]): boolean {
   if (fileTypes.length === 0) return true;
   const lowerName = name.toLowerCase();
   return fileTypes.some((fileType) => lowerName.endsWith(fileType));
+}
+
+function fileNameFromPath(path: string): string {
+  const normalized = normalizePath(path);
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? normalized : normalized.slice(index + 1);
+}
+
+function formatPreviewContent(preview: FilePreview): string {
+  const content = preview.content ?? "";
+  if (preview.name.toLowerCase().endsWith(".json")) {
+    try {
+      return JSON.stringify(JSON.parse(content), null, 2);
+    } catch {
+      return content;
+    }
+  }
+  return content;
 }
 
 export function FileSettingControl({
@@ -71,6 +98,12 @@ export function FileSettingControl({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewPath, setPreviewPath] = useState("");
+  const [preview, setPreview] = useState<FilePreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const loadDirectory = useCallback(
     async (path: string) => {
@@ -111,6 +144,35 @@ export function FileSettingControl({
     [deviceinfo],
   );
 
+  const loadPreview = useCallback(
+    async (path: string) => {
+      if (!path) return;
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        setPreview(await readFile(deviceinfo, path));
+      } catch (e) {
+        setPreview(null);
+        setPreviewError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [deviceinfo],
+  );
+
+  const openPreview = useCallback((path: string) => {
+    if (!path) return;
+    setPreviewPath(path);
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewOpen(true);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+  }, []);
+
   const acceptExtension = normalizedFileTypes.join(",") || undefined;
 
   const openBrowser = useCallback(() => {
@@ -142,6 +204,12 @@ export function FileSettingControl({
     }
   }, [browserOpen, currentPath, loadDirectory]);
 
+  useEffect(() => {
+    if (previewOpen) {
+      loadPreview(previewPath);
+    }
+  }, [previewOpen, previewPath, loadPreview]);
+
   const chooseFile = useCallback(
     (entry: FileEntry) => {
       onChange(entry.path);
@@ -163,13 +231,15 @@ export function FileSettingControl({
           value={value}
           readOnly
           placeholder="No file selected"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 border-zinc-700 bg-zinc-800 font-mono text-sm"
           disabled={disabled}
         />
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className={buttonClass}
+          style={buttonStyle}
           onClick={openBrowser}
           disabled={disabled}
         >
@@ -180,6 +250,8 @@ export function FileSettingControl({
           type="button"
           variant="outline"
           size="sm"
+          className={buttonClass}
+          style={buttonStyle}
           onClick={quickUploadPicker.open}
           disabled={disabled || uploading}
         >
@@ -187,16 +259,33 @@ export function FileSettingControl({
           Upload
         </Button>
         {value ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onChange("")}
-            disabled={disabled}
-            aria-label="Clear selected file"
-          >
-            <X />
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={buttonClass}
+              style={buttonStyle}
+              onClick={() => openPreview(value)}
+              disabled={disabled}
+              aria-label="Preview selected file"
+            >
+              <Eye />
+              View
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={buttonClass}
+              style={buttonStyle}
+              onClick={() => onChange("")}
+              disabled={disabled}
+              aria-label="Clear selected file"
+            >
+              <X />
+            </Button>
+          </>
         ) : null}
         {quickUploadPicker.input}
       </Row>
@@ -218,6 +307,8 @@ export function FileSettingControl({
               type="button"
               variant="outline"
               size="sm"
+              className={buttonClass}
+              style={buttonStyle}
               onClick={closeBrowser}
             >
               Cancel
@@ -229,6 +320,8 @@ export function FileSettingControl({
               type="button"
               variant="outline"
               size="sm"
+              className={buttonClass}
+              style={buttonStyle}
               disabled={!canGoUp || loading}
               onClick={() => setCurrentPath(parentFilePath(currentPath))}
               aria-label="Go to parent directory"
@@ -240,6 +333,8 @@ export function FileSettingControl({
               type="button"
               variant="outline"
               size="sm"
+              className={buttonClass}
+              style={buttonStyle}
               disabled={loading}
               onClick={() => setCurrentPath(normalizedBasePath)}
             >
@@ -250,6 +345,8 @@ export function FileSettingControl({
               type="button"
               variant="outline"
               size="sm"
+              className={buttonClass}
+              style={buttonStyle}
               disabled={uploading}
               onClick={dialogUploadPicker.open}
             >
@@ -274,10 +371,13 @@ export function FileSettingControl({
             ) : (
               <ul className="divide-y divide-zinc-800">
                 {visibleEntries.map((entry) => (
-                  <li key={entry.path}>
+                  <li
+                    key={entry.path}
+                    className="flex items-center transition-colors hover:bg-zinc-800"
+                  >
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-800"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm"
                       onClick={() => {
                         if (entry.isDir) {
                           setCurrentPath(entry.path);
@@ -300,11 +400,101 @@ export function FileSettingControl({
                         </span>
                       ) : null}
                     </button>
+                    {!entry.isDir ? (
+                      <button
+                        type="button"
+                        className="mr-2 cursor-pointer rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-white"
+                        onClick={() => openPreview(entry.path)}
+                        aria-label={`Preview ${entry.name}`}
+                        title="Preview"
+                      >
+                        <Eye className="size-4" />
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
           </div>
+        </Column>
+      </AlertDialog>
+
+      <AlertDialog
+        visible={previewOpen}
+        onClose={closePreview}
+        className="w-full max-w-3xl"
+      >
+        <Column gap="gap-3">
+          <Row className="items-center justify-between" gap="gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-lg font-semibold">
+                {preview?.name ?? fileNameFromPath(previewPath)}
+              </div>
+              <div className="text-xs text-zinc-400 break-all">
+                {previewPath}
+              </div>
+            </div>
+            <Row className="shrink-0 items-center" gap="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={buttonClass}
+                style={buttonStyle}
+                onClick={() => loadPreview(previewPath)}
+                disabled={previewLoading}
+              >
+                <RefreshCw className={previewLoading ? "animate-spin" : ""} />
+                Reload
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={buttonClass}
+                style={buttonStyle}
+                onClick={closePreview}
+              >
+                Close
+              </Button>
+            </Row>
+          </Row>
+
+          <div className="flex min-h-48 max-h-[60vh] flex-col overflow-hidden rounded-md border border-zinc-700 bg-zinc-950">
+            {previewLoading ? (
+              <div className="flex flex-1 items-center justify-center gap-2 p-6 text-zinc-400">
+                <Loader2 className="animate-spin" />
+                Loading file...
+              </div>
+            ) : previewError ? (
+              <div className="flex-1 overflow-auto whitespace-pre-wrap p-4 text-sm text-red-400">
+                {previewError}
+              </div>
+            ) : !preview ? null : !preview.isText ? (
+              <div className="flex flex-1 items-center justify-center p-6 text-sm text-zinc-400">
+                This file is not text, so it can&apos;t be previewed.
+              </div>
+            ) : preview.content === "" ? (
+              <div className="flex flex-1 items-center justify-center p-6 text-sm text-zinc-400">
+                This file is empty.
+              </div>
+            ) : (
+              <pre className="flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre">
+                {formatPreviewContent(preview)}
+              </pre>
+            )}
+          </div>
+
+          {preview ? (
+            <div className="text-xs text-zinc-500">
+              {formatFileSize(preview.size)}
+              {preview.truncated
+                ? ` — preview limited to the first ${formatFileSize(
+                    preview.maxBytes,
+                  )}`
+                : ""}
+            </div>
+          ) : null}
         </Column>
       </AlertDialog>
     </div>
