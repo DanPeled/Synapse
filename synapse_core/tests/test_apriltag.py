@@ -19,6 +19,7 @@ from synapse.pipelines.apriltag.apriltag_detector import (
     makeCorners,
 )
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
+from synapse.pipelines.apriltag.apriltag_pipeline import filterTagsByIds
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
 from typing_extensions import Buffer
 
@@ -174,6 +175,40 @@ class TestNapaApriltagDetector(unittest.TestCase):
 
         self.assertTrue(oldDetector.closed)
         self.assertEqual(_FakeNapaDetector.instances[-1].kwargs["family"], "tag16h5")
+
+
+class TestFilterTagsByIds(unittest.TestCase):
+    @staticmethod
+    def makeDetection(tagID: int) -> AprilTagDetection:
+        return AprilTagDetection(
+            tagID=tagID,
+            homography=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+            hamming=0,
+            corners=makeCorners(0, 0, 1, 0, 1, 1, 0, 1),
+            center=(0, 0),
+        )
+
+    def test_empty_filter_accepts_every_tag(self):
+        tags = [self.makeDetection(1), self.makeDetection(2)]
+
+        self.assertEqual(filterTagsByIds(tags, []), tags)
+        self.assertEqual(filterTagsByIds(tags, None), tags)
+
+    def test_filter_keeps_only_requested_ids(self):
+        tags = [
+            self.makeDetection(1),
+            self.makeDetection(2),
+            self.makeDetection(3),
+        ]
+
+        filtered = filterTagsByIds(tags, [2, 3])
+
+        self.assertEqual([tag.tagID for tag in filtered], [2, 3])
+
+    def test_filter_with_no_matches_returns_empty_list(self):
+        tags = [self.makeDetection(1)]
+
+        self.assertEqual(filterTagsByIds(tags, [7]), [])
 
 
 if __name__ == "__main__":

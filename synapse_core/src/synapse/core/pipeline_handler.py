@@ -6,7 +6,7 @@
 import importlib.util
 import traceback
 from pathlib import Path
-from typing import Dict, Final, Optional, Type, TypeVar
+from typing import Dict, Final, Optional, Set, Type, TypeVar
 
 import synapse.log as log
 import yaml
@@ -93,8 +93,30 @@ class PipelineHandler:
                 self.cameraPipelineSettings[cameraid] = {}
 
             for pipelineid, pipedata in (config.get("pipeline_configs") or {}).items():
+                settingsData = pipedata[NTKeys.kSettings.value] or {}
+                pipelineType = self.pipelineTypesViaName.get(
+                    pipedata[self.kPipelineTypeKey]
+                )
+
+                # Pipeline settings are also stored in this file. Keep them out
+                # of the camera settings collection, which would otherwise
+                # create duplicate settings with inferred constraints.
+                declaredPipelineSettings: Set[str] = set()
+                if pipelineType is not None:
+                    if pipelineType not in self._cachedSettingsType:
+                        self._cachedSettingsType[pipelineType] = (
+                            resolveGenericArgument(pipelineType) or PipelineSettings
+                        )
+                    declaredPipelineSettings = set(
+                        self._cachedSettingsType[pipelineType]().getAPI().settings
+                    )
+
                 self.cameraPipelineSettings[cameraid][pipelineid] = CameraSettings(
-                    pipedata["settings"]
+                    {
+                        key: value
+                        for key, value in settingsData.items()
+                        if key not in declaredPipelineSettings
+                    }
                 )
 
     def loadPipelineInstances(self):

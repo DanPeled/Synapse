@@ -26,7 +26,7 @@ export enum ConstraintTypeProto {
   CONSTRAINT_TYPE_PROTO_UNSPECIFIED = 0,
   /** CONSTRAINT_TYPE_PROTO_NUMBER - Numeric range constraint */
   CONSTRAINT_TYPE_PROTO_NUMBER = 1,
-  /** CONSTRAINT_TYPE_PROTO_LIST - Constraint requiring value to be one of a predefined list */
+  /** CONSTRAINT_TYPE_PROTO_LIST - Constraint for a list of values */
   CONSTRAINT_TYPE_PROTO_LIST = 2,
   /** CONSTRAINT_TYPE_PROTO_STRING - String-based constraint */
   CONSTRAINT_TYPE_PROTO_STRING = 3,
@@ -116,7 +116,7 @@ export interface ConstraintConfigProto {
   color?: ColorConstraintProto | undefined;
   /** Constraint based on string properties (e.g., regex, length) */
   string?: StringConstraintProto | undefined;
-  /** Constraint for a value list */
+  /** Constraint based on a list of values */
   list?: ListConstraintProto | undefined;
   /** Boolean constraint */
   boolean?: BooleanConstraintProto | undefined;

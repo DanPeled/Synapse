@@ -27,7 +27,7 @@ message ConstraintConfigProto {
     // Constraint based on string properties (e.g., regex, length)
     StringConstraintProto string = 4;
 
-    // Constraint for a value list
+    // Constraint based on a list of values
     ListConstraintProto list = 5;
 
     // Boolean constraint
@@ -48,7 +48,7 @@ enum ConstraintTypeProto {
   // Numeric range constraint
   CONSTRAINT_TYPE_PROTO_NUMBER = 1;
 
-  // Constraint requiring value to be one of a predefined list
+  // Constraint for a list of values
   CONSTRAINT_TYPE_PROTO_LIST = 2;
 
   // String-based constraint

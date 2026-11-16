@@ -12,6 +12,7 @@ from synapse.core.config import Config
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
 from synapse.core.pipeline_handler import Pipeline, PipelineHandler, PipelineSettings
+from synapse.core.settings_api import ListConstraint, settingField
 
 
 class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):
@@ -27,6 +28,20 @@ class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):
 class DummySettings(PipelineSettings):
     def __init__(self, config_map=None):
         self.config_map = config_map or {}
+
+
+class ListSettings(PipelineSettings):
+    ids = settingField(ListConstraint(itemType=int), default=[])
+
+
+class ListPipeline(Pipeline[ListSettings, PipelineResult]):
+    __is_enabled__ = True
+
+    def __init__(self, settings: ListSettings):
+        super().__init__(settings)
+
+    def processFrame(self, img, timestamp: float) -> FrameResult:
+        pass
 
 
 class TestPipelineHandler(unittest.TestCase):
@@ -104,6 +119,46 @@ class TestPipelineHandler(unittest.TestCase):
         self.assertEqual(self.loader.pipelineNames[1][4], "Loaded Pipeline")
         settings = self.loader.pipelineSettings[1][4]
         self.assertEqual(settings.getSetting("some_value"), 3)
+
+    def test_camera_settings_exclude_declared_pipeline_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            configPath = Path(directory) / "config" / "settings.yml"
+            configPath.parent.mkdir()
+            configPath.write_text("network: {}\n")
+
+            cameraDirectory = configPath.parent / "camera_1"
+            cameraDirectory.mkdir()
+            (cameraDirectory / "pipeline_settings.yml").write_text(
+                "pipeline_configs:\n"
+                "  4:\n"
+                "    name: List Pipeline\n"
+                "    type: ListPipeline\n"
+                "    settings:\n"
+                "      ids: []\n"
+                "      brightness: 50\n"
+            )
+
+            configs = {1: MagicMock(defaultPipeline=4)}
+            fakeConfig = MagicMock()
+            fakeConfig.path = configPath
+
+            self.loader.pipelineTypesViaName["ListPipeline"] = ListPipeline
+
+            with (
+                patch.object(Config, "getInstance", return_value=fakeConfig),
+                patch.object(
+                    GlobalSettings, "getCameraConfigMap", return_value=configs
+                ),
+            ):
+                self.loader.loadPipelineSettings()
+                self.loader.loadPipelineCameraSettings()
+
+        cameraSettings = self.loader.cameraPipelineSettings[1][4]
+        self.assertNotIn("ids", cameraSettings.getAPI().settings)
+        self.assertEqual(cameraSettings.getSetting("brightness"), 50)
+
+        for key, setting in cameraSettings.getAPI().settings.items():
+            setting.valueToProto(cameraSettings.getAPI().getValue(key))
 
     @patch("synapse.core.pipeline_handler.importlib.util.spec_from_file_location")
     @patch("synapse.core.pipeline_handler.importlib.util.module_from_spec")

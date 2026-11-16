@@ -6,6 +6,11 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import {
+  ValueTypeProto,
+  valueTypeProtoFromJSON,
+  valueTypeProtoToJSON,
+} from "./value_type";
 
 export const protobufPackage = "settings.v1";
 
@@ -31,6 +36,13 @@ export interface SettingValueProto {
   floatArrayValue: number[];
   /** Repeated bytes values (array) */
   bytesArrayValue: Uint8Array[];
+  /**
+   * Type of the array stored in this value. Set for every array value,
+   * including empty arrays, which otherwise have no presence on the wire.
+   * UNSPECIFIED means this value is not an array (or was sent by an older
+   * client that did not set this field).
+   */
+  arrayType: ValueTypeProto;
 }
 
 function createBaseSettingValueProto(): SettingValueProto {
@@ -45,6 +57,7 @@ function createBaseSettingValueProto(): SettingValueProto {
     boolArrayValue: [],
     floatArrayValue: [],
     bytesArrayValue: [],
+    arrayType: 0,
   };
 }
 
@@ -88,6 +101,9 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
     writer.join();
     for (const v of message.bytesArrayValue) {
       writer.uint32(82).bytes(v!);
+    }
+    if (message.arrayType !== 0) {
+      writer.uint32(88).int32(message.arrayType);
     }
     return writer;
   },
@@ -210,6 +226,14 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
           message.bytesArrayValue.push(reader.bytes());
           continue;
         }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.arrayType = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -251,6 +275,9 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
       bytesArrayValue: globalThis.Array.isArray(object?.bytesArrayValue)
         ? object.bytesArrayValue.map((e: any) => bytesFromBase64(e))
         : [],
+      arrayType: isSet(object.arrayType)
+        ? valueTypeProtoFromJSON(object.arrayType)
+        : 0,
     };
   },
 
@@ -288,6 +315,9 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
         base64FromBytes(e),
       );
     }
+    if (message.arrayType !== 0) {
+      obj.arrayType = valueTypeProtoToJSON(message.arrayType);
+    }
     return obj;
   },
 
@@ -310,6 +340,7 @@ export const SettingValueProto: MessageFns<SettingValueProto> = {
     message.boolArrayValue = object.boolArrayValue?.map((e) => e) || [];
     message.floatArrayValue = object.floatArrayValue?.map((e) => e) || [];
     message.bytesArrayValue = object.bytesArrayValue?.map((e) => e) || [];
+    message.arrayType = object.arrayType ?? 0;
     return message;
   },
 };

@@ -42,6 +42,7 @@ from synapse_net.generated.settings.v1 import (
     SettingMetaProto,
     SettingValueProto,
     StringConstraintProto,
+    ValueTypeProto,
 )
 
 from ..bcolors import MarkupColors
@@ -457,11 +458,122 @@ class ColorConstraint(Constraint[Union[tuple, list]]):
         )
 
 
+def _valueTypeFromPython(value: Any) -> ValueTypeProto:
+    """Return the protobuf value type that matches a Python value."""
+    if isinstance(value, bool):
+        return ValueTypeProto.BOOL
+    if isinstance(value, int):
+        return ValueTypeProto.INT
+    if isinstance(value, float):
+        return ValueTypeProto.FLOAT
+    if isinstance(value, str):
+        return ValueTypeProto.STRING
+    if isinstance(value, bytes):
+        return ValueTypeProto.BYTES
+    if isinstance(value, list):
+        return ValueTypeProto.LIST
+    return ValueTypeProto.UNSPECIFIED
+
+
+def _valueTypeFromPythonType(valueType: Any) -> ValueTypeProto:
+    """Normalize a Python type (or ValueTypeProto) to a ValueTypeProto."""
+    if valueType is None:
+        return ValueTypeProto.UNSPECIFIED
+    if isinstance(valueType, ValueTypeProto):
+        return valueType
+
+    mapping = {
+        bool: ValueTypeProto.BOOL,
+        int: ValueTypeProto.INT,
+        float: ValueTypeProto.FLOAT,
+        str: ValueTypeProto.STRING,
+        bytes: ValueTypeProto.BYTES,
+        list: ValueTypeProto.LIST,
+    }
+    if valueType not in mapping:
+        raise TypeError(
+            "List item type must be one of "
+            f"{', '.join(t.__name__ for t in mapping)} or a ValueTypeProto"
+        )
+    return mapping[valueType]
+
+
+def _inferListItemType(value: SettingsValue) -> ValueTypeProto:
+    """Infer the leaf item type of a (possibly nested) list value."""
+    candidate = value
+    while isinstance(candidate, list):
+        if not candidate:
+            return ValueTypeProto.UNSPECIFIED
+        candidate = candidate[0]
+    return _valueTypeFromPython(candidate)
+
+
+def _validateTypedItem(
+    item: SettingsValue,
+    itemType: ValueTypeProto,
+    index: int,
+) -> ValidationResult:
+    """Validate and normalize a single list item against a value type."""
+    if itemType == ValueTypeProto.UNSPECIFIED:
+        return ValidationResult(True, None, item)
+
+    if itemType == ValueTypeProto.INT:
+        if isinstance(item, bool):
+            return ValidationResult(False, f"Item at index {index} must be an int")
+        if isinstance(item, int):
+            return ValidationResult(True, None, item)
+        if isinstance(item, float) and item.is_integer():
+            return ValidationResult(True, None, int(item))
+        return ValidationResult(False, f"Item at index {index} must be an int")
+
+    if itemType == ValueTypeProto.FLOAT:
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            return ValidationResult(False, f"Item at index {index} must be a float")
+        return ValidationResult(True, None, float(item))
+
+    if itemType == ValueTypeProto.STRING:
+        if not isinstance(item, str):
+            return ValidationResult(False, f"Item at index {index} must be a string")
+        return ValidationResult(True, None, item)
+
+    if itemType == ValueTypeProto.BOOL:
+        if isinstance(item, bool):
+            return ValidationResult(True, None, item)
+        if isinstance(item, (int, float)) and item in (0, 1):
+            return ValidationResult(True, None, bool(item))
+        if isinstance(item, str):
+            lowered = item.strip().lower()
+            if lowered in ("true", "1", "yes", "on"):
+                return ValidationResult(True, None, True)
+            if lowered in ("false", "0", "no", "off"):
+                return ValidationResult(True, None, False)
+        return ValidationResult(False, f"Item at index {index} must be a bool")
+
+    if itemType == ValueTypeProto.BYTES:
+        if not isinstance(item, bytes):
+            return ValidationResult(False, f"Item at index {index} must be bytes")
+        return ValidationResult(True, None, item)
+
+    if itemType == ValueTypeProto.LIST:
+        if not isinstance(item, list):
+            return ValidationResult(False, f"Item at index {index} must be a list")
+        return ValidationResult(True, None, item)
+
+    return ValidationResult(False, f"Unsupported list item type: {itemType}")
+
+
 class ListConstraint(Constraint[List]):
-    """Constraint for list values with optional item constraints and nested depth"""
+    """Constraint for homogeneous list values with an optional item type.
+
+    Lists may contain integers, floats, strings, booleans, bytes, or other
+    lists (controlled by ``depth``). Setting ``itemType`` restricts and
+    normalizes the leaf values, while leaving it unspecified preserves the
+    previous behavior of accepting any item type.
+    """
 
     def __init__(
         self,
+        itemType: Any = None,
         minLength: int = 0,
         maxLength: int = 0,
         depth: int = 1,
@@ -470,17 +582,18 @@ class ListConstraint(Constraint[List]):
         Initialize a ListConstraint instance.
 
         Args:
-            itemConstraint (Optional[Constraint]): A constraint that each item in the list must satisfy.
-                If None, no per-item constraint is applied.
-            minLength (Optional[int]): The minimum number of items allowed in the list.
-                If None, no minimum constraint is applied.
-            maxLength (Optional[int]): The maximum number of items allowed in the list.
-                If None, no maximum constraint is applied.
-            depth (int): The allowed level of list nesting. For example, a depth of 2 means a 2D list.
-                Defaults to 1.
+            itemType (Optional[Union[type, ValueTypeProto]]): The Python type
+                (``int``, ``float``, ``str``, ``bool``, ``bytes``, ``list``)
+                or ``ValueTypeProto`` that every leaf item must match. If
+                None, items are not type-checked.
+            minLength (int): The minimum number of items allowed in the list.
+            maxLength (int): The maximum number of items allowed in the list.
+            depth (int): The allowed level of list nesting. A depth of 2 means
+                a list of lists.
 
         """
         super().__init__(ConstraintTypeProto.LIST)
+        self.itemType = _valueTypeFromPythonType(itemType)
         self.minLength = minLength
         self.maxLength = maxLength
         self.depth = depth
@@ -506,7 +619,7 @@ class ListConstraint(Constraint[List]):
                 if depth > 1:
                     result = _validate_list(item, depth - 1)
                 else:
-                    result = ValidationResult(True, None, item)
+                    result = _validateTypedItem(item, self.itemType, i)
 
                 if not result.isValid:
                     return ValidationResult(
@@ -525,6 +638,7 @@ class ListConstraint(Constraint[List]):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
+            "itemType": self.itemType.value,
             "minLength": self.minLength,
             "maxLength": self.maxLength,
             "depth": self.depth,
@@ -535,6 +649,8 @@ class ListConstraint(Constraint[List]):
             list=ListConstraintProto(
                 min_length=self.minLength,
                 max_length=self.maxLength,
+                item_type=self.itemType,
+                depth=self.depth,
             )
         )
 
@@ -794,6 +910,15 @@ class Setting(Generic[TConstraintType, TSettingValueType]):
     def validate(self, value: SettingsValue) -> ValidationResult:
         return self.constraint.validate(value)
 
+    def valueToProto(self, value: SettingsValue) -> SettingValueProto:
+        """Serialize a value, using the constraint to describe empty lists."""
+        itemType = (
+            self.constraint.itemType
+            if isinstance(self.constraint, ListConstraint)
+            else ValueTypeProto.UNSPECIFIED
+        )
+        return settingValueToProto(value, itemType=itemType)
+
     def toDict(self) -> Dict[str, Any]:
         return {
             "key": self.key,
@@ -957,7 +1082,10 @@ class SettingsCollection:
                     return 1
                 return 1 + max(getListDepth(item) for item in value)
 
-            constraint = ListConstraint(depth=getListDepth(value))
+            constraint = ListConstraint(
+                itemType=_inferListItemType(value),
+                depth=getListDepth(value),
+            )
         if constraint is not None:
             self._settingsApi.addSetting(
                 Setting(key=field, constraint=constraint, defaultValue=value)
@@ -1351,6 +1479,34 @@ class PipelineSettings(SettingsCollection):
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
     scalar_field = which_one_of(proto, "scalar_value")
+    arrayType = proto.array_type
+
+    # array_type is set for every array, including empty ones. Older clients do
+    # not send it, so fall back to detecting non-empty arrays below.
+    if arrayType != ValueTypeProto.UNSPECIFIED:
+        if arrayType == ValueTypeProto.INT:
+            return list(proto.int_array_value)
+        if arrayType == ValueTypeProto.FLOAT:
+            return list(proto.float_array_value)
+        if arrayType == ValueTypeProto.STRING:
+            return list(proto.string_array_value)
+        if arrayType == ValueTypeProto.BOOL:
+            return list(proto.bool_array_value)
+        if arrayType == ValueTypeProto.BYTES:
+            return list(proto.bytes_array_value)
+        if arrayType == ValueTypeProto.LIST:
+            # LIST is used as a marker for an empty list whose item type is
+            # unknown. Non-empty nested lists are not representable.
+            if (
+                len(proto.int_array_value) > 0
+                or len(proto.string_array_value) > 0
+                or len(proto.bool_array_value) > 0
+                or len(proto.float_array_value) > 0
+                or len(proto.bytes_array_value) > 0
+            ):
+                raise ValueError("Nested lists are not supported")
+            return []
+        raise ValueError(f"Unsupported array type: {arrayType}")
 
     if len(proto.int_array_value) > 0:
         return list(proto.int_array_value)
@@ -1368,34 +1524,85 @@ def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
     raise ValueError("No value set in SettingValueProto")
 
 
-def settingValueToProto(val: SettingsValue) -> SettingValueProto:
+def _inferProtoArrayType(val: List[Any]) -> ValueTypeProto:
+    if not val:
+        return ValueTypeProto.UNSPECIFIED
+    if all(isinstance(v, bool) for v in val):
+        return ValueTypeProto.BOOL
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in val):
+        return ValueTypeProto.INT
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in val):
+        return ValueTypeProto.FLOAT
+    if all(isinstance(v, str) for v in val):
+        return ValueTypeProto.STRING
+    if all(isinstance(v, bytes) for v in val):
+        return ValueTypeProto.BYTES
+    if all(isinstance(v, list) for v in val):
+        return ValueTypeProto.LIST
+    raise TypeError("Unsupported list element type")
+
+
+def settingValueToProto(
+    val: SettingsValue,
+    itemType: ValueTypeProto = ValueTypeProto.UNSPECIFIED,
+) -> SettingValueProto:
     proto = SettingValueProto()
 
     if isinstance(val, Path):
         proto.string_value = val.as_posix()
+    elif isinstance(val, bool):
+        proto.bool_value = val
     elif isinstance(val, int):
         proto.int_value = val
     elif isinstance(val, str):
         proto.string_value = val
-    elif isinstance(val, bool):
-        proto.bool_value = val
     elif isinstance(val, float):
         proto.float_value = val
     elif isinstance(val, bytes):
         proto.bytes_value = val
     elif isinstance(val, list):
-        if all(isinstance(v, int) for v in val):
+        # The constraint's item type is authoritative; otherwise infer it.
+        resolvedType = itemType
+        if resolvedType == ValueTypeProto.UNSPECIFIED:
+            resolvedType = _inferProtoArrayType(val)
+
+        if resolvedType == ValueTypeProto.UNSPECIFIED:
+            # An empty list with no known item type still needs a marker so it
+            # does not look like an unset value on the wire.
+            resolvedType = ValueTypeProto.LIST
+
+        if resolvedType == ValueTypeProto.INT:
+            if not all(isinstance(v, int) and not isinstance(v, bool) for v in val):
+                raise TypeError("List contains non-integer values")
             proto.int_array_value = val
-        elif all(isinstance(v, str) for v in val):
+        elif resolvedType == ValueTypeProto.FLOAT:
+            if not all(
+                isinstance(v, (int, float)) and not isinstance(v, bool) for v in val
+            ):
+                raise TypeError("List contains non-numeric values")
+            proto.float_array_value = [float(v) for v in val]
+        elif resolvedType == ValueTypeProto.STRING:
+            if not all(isinstance(v, str) for v in val):
+                raise TypeError("List contains non-string values")
             proto.string_array_value = val
-        elif all(isinstance(v, bool) for v in val):
+        elif resolvedType == ValueTypeProto.BOOL:
+            if not all(isinstance(v, bool) for v in val):
+                raise TypeError("List contains non-boolean values")
             proto.bool_array_value = val
-        elif all(isinstance(v, float) for v in val):
-            proto.float_array_value = val
-        elif all(isinstance(v, bytes) for v in val):
+        elif resolvedType == ValueTypeProto.BYTES:
+            if not all(isinstance(v, bytes) for v in val):
+                raise TypeError("List contains non-bytes values")
             proto.bytes_array_value = val
+        elif resolvedType == ValueTypeProto.LIST:
+            if val:
+                raise TypeError(
+                    "Nested lists are not supported by SettingValueProto; "
+                    "use a flat list or encode the value as a string"
+                )
         else:
-            raise TypeError("Unsupported list element type")
+            raise TypeError(f"Unsupported list item type: {resolvedType}")
+
+        proto.array_type = resolvedType
     else:
         raise TypeError(f"Unsupported type: {type(val)}")
 
@@ -1414,7 +1621,7 @@ def settingToProto(setting: Setting, defaultCategory: str) -> SettingMetaProto:
         description=setting.description or "",
         category=setting.category or defaultCategory,
         constraint=constraintToProto(setting.constraint),
-        default=settingValueToProto(setting.defaultValue),
+        default=setting.valueToProto(setting.defaultValue),
     )
 
 
