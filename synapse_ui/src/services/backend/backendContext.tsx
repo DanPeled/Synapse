@@ -33,6 +33,7 @@ import {
 } from "@/generated/messages/v1/device";
 import { AlertTypeProto } from "@/generated/messages/v1/alert";
 import { SettingValueProto } from "@/generated/settings/v1/value";
+import { ValueTypeProto } from "@/generated/settings/v1/value_type";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -41,6 +42,8 @@ export function hasSettingValue(val: SettingValueProto): boolean {
     val.boolValue !== undefined ||
     val.floatValue !== undefined ||
     val.bytesValue !== undefined ||
+    (val.arrayType !== undefined &&
+      val.arrayType !== ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED) ||
     (val.intArrayValue && val.intArrayValue.length > 0) ||
     (val.stringArrayValue && val.stringArrayValue.length > 0) ||
     (val.boolArrayValue && val.boolArrayValue.length > 0) ||

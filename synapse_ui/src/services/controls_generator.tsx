@@ -17,6 +17,8 @@ import { PipelineProto } from "@/generated/messages/v1/pipeline";
 import { PipelineID } from "./backend/dataStractures";
 import { FileSettingControl } from "@/widgets/fileSetting";
 import { RangeSlider } from "@/widgets/range";
+import { ListSettingControl } from "@/widgets/listSetting";
+import { ValueTypeProto } from "@/generated/settings/v1/value_type";
 
 export function generateControlFromSettingMeta({
   setting,
@@ -96,12 +98,26 @@ export function toNumber(val: unknown | undefined): number | undefined {
 export function protoToSettingValue(proto: SettingValueProto): unknown {
   if (proto === undefined) return undefined;
 
+  switch (proto.arrayType) {
+    case ValueTypeProto.VALUE_TYPE_PROTO_INT:
+      return proto.intArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_STRING:
+      return proto.stringArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_BOOL:
+      return proto.boolArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_FLOAT:
+      return proto.floatArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_BYTES:
+      return proto.bytesArrayValue;
+  }
+
   if (proto.intValue !== undefined) return proto.intValue;
   if (proto.stringValue !== undefined) return proto.stringValue;
   if (proto.boolValue !== undefined) return proto.boolValue;
   if (proto.floatValue !== undefined) return proto.floatValue;
   if (proto.bytesValue !== undefined && proto.bytesValue.length > 0)
     return proto.bytesValue;
+  // Fall back to arrays from older senders that do not set arrayType.
   if (proto.intArrayValue.length > 0) return proto.intArrayValue;
   if (proto.stringArrayValue.length > 0) return proto.stringArrayValue;
   if (proto.boolArrayValue.length > 0) return proto.boolArrayValue;
@@ -135,33 +151,67 @@ function ResetToDefaultButton({
   ) : null;
 }
 
-export function settingValueToProto(val: unknown): SettingValueProto {
+export function settingValueToProto(
+  val: unknown,
+  itemType: ValueTypeProto = ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED,
+): SettingValueProto {
   const proto = SettingValueProto.create();
 
-  if (typeof val === "number" && Number.isInteger(val)) {
+  if (typeof val === "boolean") {
+    proto.boolValue = val;
+  } else if (typeof val === "number" && Number.isInteger(val)) {
     proto.intValue = val;
   } else if (typeof val === "number") {
     proto.floatValue = val;
   } else if (typeof val === "string") {
     proto.stringValue = val;
-  } else if (typeof val === "boolean") {
-    proto.boolValue = val;
   } else if (val instanceof Uint8Array) {
     proto.bytesValue = val;
   } else if (Array.isArray(val)) {
-    if (val.every((v) => typeof v === "number" && Number.isInteger(v))) {
-      proto.intArrayValue = val as number[];
-    } else if (val.every((v) => typeof v === "number")) {
-      proto.floatArrayValue = val as number[];
-    } else if (val.every((v) => typeof v === "string")) {
-      proto.stringArrayValue = val as string[];
-    } else if (val.every((v) => typeof v === "boolean")) {
-      proto.boolArrayValue = val as boolean[];
-    } else if (val.every((v) => v instanceof Uint8Array)) {
-      proto.bytesArrayValue = val as Uint8Array[];
-    } else {
-      throw new TypeError("Unsupported array element type");
+    let resolvedType = itemType;
+    if (resolvedType === ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED) {
+      if (val.every((v) => typeof v === "boolean")) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_BOOL;
+      } else if (
+        val.every((v) => typeof v === "number" && Number.isInteger(v))
+      ) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_INT;
+      } else if (val.every((v) => typeof v === "number")) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_FLOAT;
+      } else if (val.every((v) => typeof v === "string")) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_STRING;
+      } else if (val.every((v) => v instanceof Uint8Array)) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_BYTES;
+      } else if (val.length > 0) {
+        throw new TypeError("Unsupported array element type");
+      }
     }
+
+    switch (resolvedType) {
+      case ValueTypeProto.VALUE_TYPE_PROTO_INT:
+        proto.intArrayValue = val as number[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_FLOAT:
+        proto.floatArrayValue = val as number[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_STRING:
+        proto.stringArrayValue = val as string[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_BOOL:
+        proto.boolArrayValue = val as boolean[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_BYTES:
+        proto.bytesArrayValue = val as Uint8Array[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED:
+        // An empty array with no item type has no wire representation.
+        return proto;
+      default:
+        throw new TypeError("Unsupported array element type");
+    }
+
+    // arrayType marks the value as an array so empty lists survive the wire.
+    proto.arrayType = resolvedType;
   } else {
     throw new TypeError("Unsupported setting value type");
   }
@@ -356,6 +406,33 @@ export function GenerateControl({
             options={sortedOptions as DropdownOption<string>[]}
             value={val}
             onValueChange={(val) => setValue(settingValueToProto(val))}
+            disabled={locked}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+            disabled={locked}
+          />
+        </LabeledControl>
+      );
+    }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST: {
+      const listConstraint = setting.constraint.constraint?.list;
+      const depth = listConstraint?.depth ?? 1;
+      if (depth > 1) {
+        // Nested list values cannot be represented by SettingValueProto yet.
+        return null;
+      }
+      const itemType =
+        listConstraint?.itemType ?? ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED;
+      return (
+        <LabeledControl label={settingName}>
+          <ListSettingControl
+            value={Array.isArray(val) ? val : []}
+            itemType={itemType}
+            onChange={(values) =>
+              setValue(settingValueToProto(values, itemType))
+            }
             disabled={locked}
           />
           <ResetToDefaultButton
