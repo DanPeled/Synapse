@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package settings.v1;
+
+// Primitive value types that can be stored in a setting value or list.
+enum ValueTypeProto {
+  // No value type specified
+  VALUE_TYPE_PROTO_UNSPECIFIED = 0;
+
+  // Integer value
+  VALUE_TYPE_PROTO_INT = 1;
+
+  // Floating point value
+  VALUE_TYPE_PROTO_FLOAT = 2;
+
+  // String value
+  VALUE_TYPE_PROTO_STRING = 3;
+
+  // Boolean value
+  VALUE_TYPE_PROTO_BOOL = 4;
+
+  // Raw bytes value
+  VALUE_TYPE_PROTO_BYTES = 5;
+
+  // Nested list value
+  VALUE_TYPE_PROTO_LIST = 6;
+}

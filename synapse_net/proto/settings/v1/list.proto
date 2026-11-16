@@ -2,11 +2,20 @@ syntax = "proto3";
 
 package settings.v1;
 
-// Constraint defining allowed length boundaries for a list setting
+import "settings/v1/value_type.proto";
+
+// Constraint defining the accepted contents and length boundaries of a list
+// setting.
 message ListConstraintProto {
   // Minimum number of elements required in the list (inclusive)
   int32 min_length = 2;
 
   // Maximum number of elements allowed in the list (inclusive)
   int32 max_length = 3;
+
+  // Type of every item in the list. UNSPECIFIED accepts any non-nested value.
+  ValueTypeProto item_type = 4;
+
+  // Allowed level of list nesting. A depth of 1 means a flat list.
+  int32 depth = 5;
 }
