@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
@@ -87,6 +88,56 @@ class TestRuntimeManager(unittest.TestCase):
             assign_defaults.assert_called_once()
             setup_nt.assert_called_once()
             start_metrics.assert_called_once()
+
+    def test_request_stop_clears_running_event(self):
+        self.handler.running.set()
+
+        self.handler.requestStop()
+
+        self.assertFalse(self.handler.running.is_set())
+
+    def test_cleanup_stops_workers_and_releases_resources(self):
+        self.handler.running.set()
+
+        stopping = threading.Event()
+
+        def worker():
+            self.handler.running.wait()
+            stopping.set()
+
+        cameraThread = threading.Thread(target=worker, daemon=True)
+        cameraThread.start()
+        self.handler.cameraManagementThreads[0] = cameraThread
+
+        metricsThread = threading.Thread(target=worker, daemon=True)
+        metricsThread.start()
+        self.handler.metricsThread = metricsThread
+
+        pipeline = MagicMock()
+        self.handler.pipelineHandler.pipelineInstanceBindings[0] = {0: pipeline}
+        self.handler._ntListeners = [10, 11]
+
+        with patch("synapse.core.runtime_handler.NetworkTableInstance") as nt:
+            self.handler.cleanup()
+
+        self.assertFalse(self.handler.running.is_set())
+        self.assertTrue(stopping.is_set())
+        self.assertFalse(cameraThread.is_alive())
+        self.assertFalse(metricsThread.is_alive())
+        self.assertIsNone(self.handler.metricsThread)
+        self.assertEqual(self.handler.cameraManagementThreads, {})
+        self.assertEqual(self.handler._ntListeners, [])
+        nt.getDefault.return_value.removeListener.assert_any_call(10)
+        nt.getDefault.return_value.removeListener.assert_any_call(11)
+        pipeline.invalidateCachedEntries.assert_called_once()
+        self.mock_camera_handler.cleanup.assert_called_once()
+        self.assertFalse(self.handler.isSetup)
+
+    def test_cleanup_is_idempotent(self):
+        self.handler.cleanup()
+        self.handler.cleanup()
+
+        self.mock_camera_handler.cleanup.assert_called_once()
 
 
 class TestHandleFramePublishing(unittest.TestCase):

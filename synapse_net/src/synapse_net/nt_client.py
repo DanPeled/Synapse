@@ -102,3 +102,5 @@ class NtClient:
             self.server.stopServer()
             NetworkTableInstance.destroy(self.server)
             self.server = None
+        if NtClient.INSTANCE is self:
+            NtClient.INSTANCE = None

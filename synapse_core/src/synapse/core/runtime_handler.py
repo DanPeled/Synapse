@@ -10,7 +10,7 @@ import traceback
 from asyncio import Queue
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Final, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
@@ -43,6 +43,7 @@ from .camera.camera_handle import CameraHandle
 from .camera_factory import CameraSettingsKeys, getCameraSettingEntry, getCameraTable
 from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
+from .lifecycle import joinThread
 from .nt_keys import NTKeys
 from .pipeline import (
     FrameResult,
@@ -108,9 +109,13 @@ class RuntimeManager:
         self._lastLatencyReportTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
+        self._ntListeners: List[int] = []
 
         self.running = threading.Event()
         self.running.set()
+
+        self._cleanupLock = threading.Lock()
+        self._cleanedUp = False
 
         self.isSetup: bool = False
         self.lastLatencyReportTime: float = time.time()
@@ -118,7 +123,7 @@ class RuntimeManager:
 
         self.DEFAULT_STEP = "step_0"
 
-        self.metricsThread: Optional[threading.Thread]
+        self.metricsThread: Optional[threading.Thread] = None
 
         self.networkSettings: NetworkConfig = NetworkConfig(
             name="Synapse",
@@ -166,7 +171,7 @@ class RuntimeManager:
         - Initializes camera configurations.
         - Assigns default pipelines to each camera.
         - Starts metrics collection and monitoring.
-        - Registers cleanup routine on exit.
+        - Starts the main runtime loop.
 
         Args:
             directory (Path): Path to directory containing pipelines and configurations.
@@ -285,10 +290,7 @@ class RuntimeManager:
                 except Exception:
                     pass
 
-                try:
-                    time.sleep(1.0)
-                except Exception:
-                    continue
+                self.running.wait(1.0)
 
         self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
         log.info("Startig metrics thread")
@@ -363,7 +365,7 @@ class RuntimeManager:
                 entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
 
                 if NtClient.INSTANCE is not None:
-                    NetworkTableInstance.getDefault().addListener(
+                    self._addNtListener(
                         entry, EventFlags.kValueRemote, updateSettingListener
                     )
 
@@ -677,8 +679,9 @@ class RuntimeManager:
             )
         )
 
-        while self.running.is_set():
-            time.sleep(0.01)
+        # Block until shutdown is requested instead of polling every frame.
+        self.running.wait()
+        log.info("Synapse runtime stopped.")
 
     def handleResults(
         self, result: PipelineProcessFrameResult, cameraIndex: CameraID
@@ -707,9 +710,7 @@ class RuntimeManager:
                 assert isinstance(event.data, ValueEventData)
                 self.cameraViewIDs[cameraIndex] = event.data.value.getString()
 
-            NetworkTableInstance.getDefault().addListener(
-                entry, EventFlags.kValueRemote, onViewIDChanged
-            )
+            self._addNtListener(entry, EventFlags.kValueRemote, onViewIDChanged)
 
         if result is None:
             return
@@ -772,7 +773,7 @@ class RuntimeManager:
                     pipelineIndex=pipelineIndex, cameraIndex=cameraIndex
                 )
 
-            NetworkTableInstance.getDefault().addListener(
+            self._addNtListener(
                 entry, EventFlags.kValueRemote, updateNTPipelineListener
             )
 
@@ -911,19 +912,68 @@ class RuntimeManager:
                 )
                 f.write(y)
 
+    def requestStop(self) -> None:
+        """Ask all runtime worker loops to stop."""
+        self.running.clear()
+
     def cleanup(self) -> None:
+        """Stop worker threads and release cameras, publishers, and listeners.
+
+        Shutdown is ordered as the inverse of startup: workers stop before the
+        resources they use are closed. This method is idempotent.
         """
-        Releases all cameras and closes OpenCV windows.
-        """
-        cv2.destroyAllWindows()
+        with self._cleanupLock:
+            if self._cleanedUp:
+                return
+            self._cleanedUp = True
+
+        log.info("Shutting down runtime...")
+        self.requestStop()
+
+        for cameraIndex, thread in self.cameraManagementThreads.items():
+            joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0)
+        self.cameraManagementThreads.clear()
+
+        joinThread(self.metricsThread, "Metrics", timeout=2.0)
+        self.metricsThread = None
+
+        self._removeNtListeners()
+
+        for publisher in self.propPubs.values():
+            try:
+                publisher.close()
+            except Exception:
+                pass
+        self.propPubs.clear()
+
+        for pipelines in self.pipelineHandler.pipelineInstanceBindings.values():
+            for pipeline in pipelines.values():
+                pipeline.invalidateCachedEntries()
 
         self.cameraHandler.cleanup()
-        self.running.clear()
-        for thread in self.cameraManagementThreads.values():
-            thread.join()
-        if self.metricsThread:
-            self.metricsThread.join()
-        log.info("Cleaned up all resources.")
+        self.isSetup = False
+        log.info("Runtime resources released.")
+
+    def _addNtListener(
+        self,
+        entry: NetworkTableEntry,
+        flags: int,
+        callback: Any,
+    ) -> None:
+        """Track a NetworkTables listener so it can be removed on shutdown."""
+        self._ntListeners.append(
+            NetworkTableInstance.getDefault().addListener(entry, flags, callback)
+        )
+
+    def _removeNtListeners(self) -> None:
+        """Remove every NetworkTables listener registered by the runtime."""
+        instance = NetworkTableInstance.getDefault()
+        for listener in self._ntListeners:
+            try:
+                instance.removeListener(listener)
+            except Exception:
+                pass
+        self._ntListeners.clear()
 
     def setupCallbacks(self):
         def onRemovePipeline(
@@ -974,9 +1024,7 @@ class RuntimeManager:
             )
             assert recordEntry is not None
 
-            NetworkTableInstance.getDefault().addListener(
-                recordEntry, EventFlags.kValueRemote, listener
-            )
+            self._addNtListener(recordEntry, EventFlags.kValueRemote, listener)
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.pipelineHandler.onRemovePipeline.add(onRemovePipeline)  # pyright: ignore

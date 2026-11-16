@@ -32,6 +32,7 @@ from .camera.no_signal import NoSignalCamera, generateNoSignalFrame
 from .camera.synapse_camera import SynapseCamera
 from .camera_factory import CameraConfig, CameraFactory, getCameraTableName
 from .global_settings import GlobalSettings
+from .lifecycle import joinThread
 
 
 class CameraHandler:
@@ -547,16 +548,33 @@ class CameraHandler:
         return updated_settings
 
     def cleanup(self) -> None:
-        """
-        Releases all video writers and closes all active camera connections.
-        """
+        """Stop the camera scanner and release cameras, streams, and recordings."""
         self.stopCameraScanEvent.set()
-        if hasattr(self, "cameraScanningThread"):
-            self.cameraScanningThread.join()
+        joinThread(
+            getattr(self, "cameraScanningThread", None),
+            "Camera scanner",
+            timeout=2.0,
+        )
 
         for record in self.recordingOutputs.values():
-            record.release()
+            try:
+                record.release()
+            except Exception:
+                pass
+        self.recordingOutputs.clear()
+        self.recordingResolutions.clear()
+        self.recordingStatus.clear()
+        self.recordFileNames.clear()
+
+        for cameraIndex, handle in self.cameraHandles.items():
+            try:
+                # Stop the frame grabber before releasing the camera connection.
+                handle.close()
+                handle.camera.close()
+            except Exception as error:
+                log.err(f"Failed to close camera #{cameraIndex}: {error}")
+        self.cameraHandles.clear()
+        self.streamOutputs.clear()
+        self.streamSizes.clear()
         self._streamFrameBuffers.clear()
         self._recordFrameBuffers.clear()
-        for camera in self.cameraHandles.values():
-            camera.close()
