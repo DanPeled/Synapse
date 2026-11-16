@@ -6,7 +6,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Any, Dict, Final, List, Optional, Set, Tuple, cast
+from typing import Any, Dict, Final, Iterable, List, Optional, Set, Tuple, cast
 
 import cv2
 import numpy as np
@@ -22,6 +22,7 @@ from synapse.core.pipeline import (
 from synapse.core.settings_api import (
     BooleanConstraint,
     EnumeratedConstraint,
+    ListConstraint,
     NumberConstraint,
     RangeConstraint,
     SettingsMap,
@@ -81,6 +82,22 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
         )
 
     return ignored
+
+
+def filterTagsByIds(
+    tags: List[AprilTagDetection],
+    tagIds: Optional[Iterable[int]],
+) -> List[AprilTagDetection]:
+    """Return only tags whose IDs are in tagIds.
+
+    An empty or None tagIds collection means no filtering, so every tag is
+    accepted. This keeps the default configuration backwards compatible.
+    """
+    if not tagIds:
+        return tags
+
+    allowedIds = set(tagIds)
+    return [tag for tag in tags if tag.tagID in allowedIds]
 
 
 class ApriltagPipelineSettings(PipelineSettings):
@@ -198,6 +215,14 @@ class ApriltagPipelineSettings(PipelineSettings):
     crop_y = settingField(
         RangeConstraint(minValue=-1, maxValue=1, step=0.01),
         default=[-1, 1],
+        category="<Funnel/> Filtering",
+    )
+    tag_filter = settingField(
+        ListConstraint(itemType=int),
+        default=[],
+        description=(
+            "Only report detections for these tag IDs. Leave empty to target every tag."
+        ),
         category="<Funnel/> Filtering",
     )
 
@@ -430,6 +455,10 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         cropped = self.__toGrayscale(cropped_color)
 
         tags = self.apriltagDetector.detect(cast(Buffer, cropped))
+        tags = filterTagsByIds(
+            tags,
+            self.getSetting(self.settings.tag_filter),
+        )
 
         if not tags:
             if self.__hadResults:
