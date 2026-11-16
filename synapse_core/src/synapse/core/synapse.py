@@ -62,6 +62,7 @@ from .camera.camera_handle import CameraHandle
 from .camera_factory import CalibrationData
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
+from .lifecycle import ShutdownStack, joinThread
 from .pipeline import Pipeline, pipelineToProto
 from .runtime_handler import RuntimeManager
 from .settings_api import (
@@ -92,9 +93,12 @@ class Synapse:
         self.networkingManager = NetworkingManager()
         self.ntClient: NtClient = NtClient()
         self.fileServer: Optional[FileServer] = None
+        self.websocket: WebSocketServer
+        self.websocketThread: threading.Thread
         self.managerResponder: Optional[UDPDeviceResponder] = None
         self.managerResponderProcess: Optional[Process] = None
         self.__sendSettingsInNT: Final[bool] = sendSettingsInNT
+        self._shutdownStack = ShutdownStack()
 
     def init(
         self,
@@ -140,9 +144,11 @@ class Synapse:
         self.setupRuntimeCallbacks()
 
         self.setupWebsocket()
+        self._shutdownStack.register("websocket", self._stopWebsocket)
 
         self.fileServer = FileServer(configPath.parent.parent)
         self.fileServer.start()
+        self._shutdownStack.register("file server", self._stopFileServer)
 
         if configPath.exists():
             ...
@@ -193,9 +199,12 @@ class Synapse:
             )
 
             self.managerResponderProcess.start()
+            self._shutdownStack.register("device responder", self._stopManagerResponder)
 
+            self._shutdownStack.register("network tables", self._stopNetworkTables)
             nt_good = self.__init_networktables(config.network)
             if nt_good:
+                self._shutdownStack.register("runtime", self._stopRuntime)
                 if self.__isSim:
                     from synapse_sim.setup import installSimulation
 
@@ -451,34 +460,76 @@ class Synapse:
 
         info("WebSocket server started on ws://localhost:8765")
 
-    def cleanup(self):
-        if self.managerResponderProcess is not None:
-            if self.managerResponderProcess.is_alive():
-                self.managerResponderProcess.terminate()
-                self.managerResponderProcess.join(timeout=5)
+    def shutdown(self) -> None:
+        """Stop the runtime and release all resources exactly once."""
+        self._shutdownStack.shutdown()
 
+    def cleanup(self) -> None:
+        """Backward-compatible alias for :meth:`shutdown`."""
+        self.shutdown()
+
+    def close(self) -> None:
+        """Backward-compatible alias for :meth:`shutdown`."""
+        self.shutdown()
+
+    def _stopRuntime(self) -> None:
+        runtimeHandler = getattr(self, "runtimeHandler", None)
+        if runtimeHandler is not None:
+            runtimeHandler.cleanup()
+
+    def _stopNetworkTables(self) -> None:
         if NtClient.INSTANCE is not None:
             NtClient.INSTANCE.cleanup()
 
-        if self.websocket.loop is not None:
-            future = asyncio.run_coroutine_threadsafe(
-                self.websocket.close(), self.websocket.loop
-            )
-            try:
-                future.result(timeout=5)
-            except Exception as e:
-                err(f"Error while closing websocket: {e}")
+    def _stopManagerResponder(self) -> None:
+        process = self.managerResponderProcess
+        if process is None:
+            return
 
-            self.websocket.loop.call_soon_threadsafe(self.websocket.loop.stop)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+            if process.is_alive():
+                process.kill()
+                process.join(timeout=1)
+        self.managerResponderProcess = None
 
+    def _stopFileServer(self) -> None:
         if self.fileServer is not None:
             self.fileServer.stop()
+            self.fileServer = None
 
-        # Only join if not current thread
-        if self.websocketThread is not threading.current_thread():
-            self.websocketThread.join(timeout=5)
+    def _stopWebsocket(self) -> None:
+        websocket = getattr(self, "websocket", None)
+        loop = websocket.loop if websocket is not None else None
+        websocketThread = getattr(self, "websocketThread", None)
 
-        self.runtimeHandler.cleanup()
+        if websocket is not None and loop is not None and loop.is_running():
+            if threading.current_thread() is websocketThread:
+                # Shutdown was requested from the websocket thread (for
+                # example a restart message). Blocking on the loop from here
+                # would deadlock, so close the server on the loop and let the
+                # thread stop itself.
+                async def closeAndStop() -> None:
+                    try:
+                        await websocket.close()
+                    finally:
+                        loop.stop()
+
+                asyncio.run_coroutine_threadsafe(closeAndStop(), loop)
+                WebSocketServer.kInstance = None
+                return
+
+            future = asyncio.run_coroutine_threadsafe(websocket.close(), loop)
+            try:
+                future.result(timeout=5)
+            except Exception as error:
+                err(f"Error while closing websocket: {error}")
+            finally:
+                loop.call_soon_threadsafe(loop.stop)
+
+        joinThread(websocketThread, "WebSocket", timeout=5)
+        WebSocketServer.kInstance = None
 
     def setupRuntimeCallbacks(self):
         def onAddPipeline(id: PipelineID, inst: Pipeline, cameraid: CameraID) -> None:
@@ -906,14 +957,15 @@ class Synapse:
         )
         self.runtimeHandler.save()
 
-    def close(self):
-        self.runtimeHandler.running.clear()
-        self.cleanup()
-
     @staticmethod
     def createAndRunRuntime(root: Path, sendSettingsInNT: bool = False) -> None:
+        """Create and run a Synapse runtime, always shutting it down on exit."""
         handler = RuntimeManager(root)
-        s = Synapse(sendSettingsInNT)
-        if s.init(handler, root / "config" / "settings.yml"):
-            s.run()
-        s.close()
+        synapse = Synapse(sendSettingsInNT)
+        try:
+            if synapse.init(handler, root / "config" / "settings.yml"):
+                synapse.run()
+        except KeyboardInterrupt:
+            info("Synapse interrupted. Shutting down...")
+        finally:
+            synapse.shutdown()
