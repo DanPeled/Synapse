@@ -1494,6 +1494,18 @@ def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
             return list(proto.bool_array_value)
         if arrayType == ValueTypeProto.BYTES:
             return list(proto.bytes_array_value)
+        if arrayType == ValueTypeProto.LIST:
+            # LIST is used as a marker for an empty list whose item type is
+            # unknown. Non-empty nested lists are not representable.
+            if (
+                len(proto.int_array_value) > 0
+                or len(proto.string_array_value) > 0
+                or len(proto.bool_array_value) > 0
+                or len(proto.float_array_value) > 0
+                or len(proto.bytes_array_value) > 0
+            ):
+                raise ValueError("Nested lists are not supported")
+            return []
         raise ValueError(f"Unsupported array type: {arrayType}")
 
     if len(proto.int_array_value) > 0:
@@ -1554,6 +1566,11 @@ def settingValueToProto(
         if resolvedType == ValueTypeProto.UNSPECIFIED:
             resolvedType = _inferProtoArrayType(val)
 
+        if resolvedType == ValueTypeProto.UNSPECIFIED:
+            # An empty list with no known item type still needs a marker so it
+            # does not look like an unset value on the wire.
+            resolvedType = ValueTypeProto.LIST
+
         if resolvedType == ValueTypeProto.INT:
             if not all(isinstance(v, int) and not isinstance(v, bool) for v in val):
                 raise TypeError("List contains non-integer values")
@@ -1576,11 +1593,14 @@ def settingValueToProto(
             if not all(isinstance(v, bytes) for v in val):
                 raise TypeError("List contains non-bytes values")
             proto.bytes_array_value = val
+        elif resolvedType == ValueTypeProto.LIST:
+            if val:
+                raise TypeError(
+                    "Nested lists are not supported by SettingValueProto; "
+                    "use a flat list or encode the value as a string"
+                )
         else:
-            raise TypeError(
-                "Nested lists are not supported by SettingValueProto; "
-                "use a flat list or encode the value as a string"
-            )
+            raise TypeError(f"Unsupported list item type: {resolvedType}")
 
         proto.array_type = resolvedType
     else:

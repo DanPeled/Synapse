@@ -109,6 +109,9 @@ export function protoToSettingValue(proto: SettingValueProto): unknown {
       return proto.floatArrayValue;
     case ValueTypeProto.VALUE_TYPE_PROTO_BYTES:
       return proto.bytesArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_LIST:
+      // LIST marks an empty list whose item type is unknown.
+      return [];
   }
 
   if (proto.intValue !== undefined) return proto.intValue;
@@ -184,6 +187,10 @@ export function settingValueToProto(
         resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_BYTES;
       } else if (val.length > 0) {
         throw new TypeError("Unsupported array element type");
+      } else {
+        // An empty array with no item type still needs a marker so it does
+        // not look like an unset value on the wire.
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_LIST;
       }
     }
 
@@ -203,9 +210,11 @@ export function settingValueToProto(
       case ValueTypeProto.VALUE_TYPE_PROTO_BYTES:
         proto.bytesArrayValue = val as Uint8Array[];
         break;
-      case ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED:
-        // An empty array with no item type has no wire representation.
-        return proto;
+      case ValueTypeProto.VALUE_TYPE_PROTO_LIST:
+        if (val.length > 0) {
+          throw new TypeError("Nested arrays are not supported");
+        }
+        break;
       default:
         throw new TypeError("Unsupported array element type");
     }

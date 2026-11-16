@@ -316,6 +316,21 @@ def test_setting_value_to_proto_typed_empty_list():
     assert protoToSettingValue(proto) == []
 
 
+def test_setting_value_to_proto_empty_untyped_list():
+    proto = settingValueToProto([])
+    assert proto.array_type == ValueTypeProto.LIST
+    assert protoToSettingValue(proto) == []
+
+
+def test_setting_value_to_proto_rejects_nested_lists():
+    try:
+        settingValueToProto([[1, 2], [3, 4]])
+    except TypeError as error:
+        assert "Nested lists" in str(error)
+    else:
+        raise AssertionError("Nested lists should not be serializable")
+
+
 def test_setting_value_to_proto_infers_list_type():
     proto = settingValueToProto([1, 2, 3])
     assert proto.array_type == ValueTypeProto.INT
