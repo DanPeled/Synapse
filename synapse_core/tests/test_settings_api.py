@@ -16,7 +16,10 @@ from synapse.core.settings_api import (
     NumberConstraint,
     PipelineSettings,
     StringConstraint,
+    ValueTypeProto,
+    protoToSettingValue,
     settingField,
+    settingToProto,
     settingValueToProto,
 )
 
@@ -207,7 +210,7 @@ def test_list_constraint_too_long():
     assert not result.isValid
 
 
-def test_list_constraint_with_itemConstraint():
+def test_list_constraint_untyped_accepts_any_values():
     c = ListConstraint()
     result = c.validate([5, 8])
     assert result.isValid
@@ -239,6 +242,108 @@ def test_list_constraint_invalid_nested_depth_3_structure():
     assert not result.isValid
     assert result.errorMessage is not None
     assert "depth" in result.errorMessage
+
+
+def test_list_constraint_int_items():
+    c = ListConstraint(itemType=int)
+    result = c.validate([1, 2, 3])
+    assert result.isValid
+    assert result.normalizedValue == [1, 2, 3]
+
+
+def test_list_constraint_int_items_rejects_other_types():
+    c = ListConstraint(itemType=int)
+    for value in ([1, "2"], [1, 2.5], [True]):
+        result = c.validate(value)
+        assert not result.isValid
+
+
+def test_list_constraint_int_items_normalizes_integral_floats():
+    c = ListConstraint(itemType=int)
+    result = c.validate([1.0, 2.0])
+    assert result.isValid
+    assert result.normalizedValue == [1, 2]
+    assert result.normalizedValue is not None
+    assert all(isinstance(value, int) for value in result.normalizedValue)
+
+
+def test_list_constraint_float_items():
+    c = ListConstraint(itemType=float)
+    result = c.validate([1, 2.5])
+    assert result.isValid
+    assert result.normalizedValue == [1.0, 2.5]
+
+
+def test_list_constraint_string_items():
+    c = ListConstraint(itemType=str)
+    result = c.validate(["alpha", "beta"])
+    assert result.isValid
+    assert not c.validate(["alpha", 2]).isValid
+
+
+def test_list_constraint_bool_items():
+    c = ListConstraint(itemType=bool)
+    result = c.validate([True, "false", 0, "on"])
+    assert result.isValid
+    assert result.normalizedValue == [True, False, False, True]
+
+
+def test_list_constraint_typed_nested_depth():
+    c = ListConstraint(itemType=int, depth=2)
+    assert c.validate([[1, 2], [3]]).isValid
+    assert not c.validate([[1, "two"]]).isValid
+
+
+def test_list_constraint_serialization():
+    c = ListConstraint(itemType=int, minLength=1, maxLength=5, depth=2)
+
+    data = c.toDict()
+    assert data["type"] == ConstraintTypeProto.LIST
+    assert data["itemType"] == ValueTypeProto.INT.value
+    assert data["depth"] == 2
+
+    proto = c.configToProto()
+    assert proto.list is not None
+    assert proto.list.item_type == ValueTypeProto.INT
+    assert proto.list.depth == 2
+
+
+def test_setting_value_to_proto_typed_empty_list():
+    proto = settingValueToProto([], itemType=ValueTypeProto.INT)
+    assert proto.array_type == ValueTypeProto.INT
+    assert list(proto.int_array_value) == []
+
+    assert protoToSettingValue(proto) == []
+
+
+def test_setting_value_to_proto_infers_list_type():
+    proto = settingValueToProto([1, 2, 3])
+    assert proto.array_type == ValueTypeProto.INT
+
+    boolProto = settingValueToProto([True, False])
+    assert boolProto.array_type == ValueTypeProto.BOOL
+    assert list(boolProto.bool_array_value) == [True, False]
+
+    floatProto = settingValueToProto([1, 2.5])
+    assert floatProto.array_type == ValueTypeProto.FLOAT
+    assert list(floatProto.float_array_value) == [1.0, 2.5]
+
+
+def test_proto_to_setting_value_supports_legacy_arrays():
+    legacy = settingValueToProto([1, 2, 3])
+    legacy.array_type = ValueTypeProto.UNSPECIFIED
+    assert protoToSettingValue(legacy) == [1, 2, 3]
+
+
+class _ListSettings(PipelineSettings):
+    ids = settingField(ListConstraint(itemType=int), default=[])
+
+
+def test_setting_to_proto_preserves_empty_typed_list():
+    meta = settingToProto(_ListSettings.ids, "<Test/> Test")
+    assert meta.default is not None
+    assert meta.default.array_type == ValueTypeProto.INT
+    assert protoToSettingValue(meta.default) == []
 
 
 # ------------------ StringConstraint ------------------

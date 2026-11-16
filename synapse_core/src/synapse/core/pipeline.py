@@ -352,8 +352,8 @@ def disabled(cls):
 def pipelineToProto(inst: Pipeline, index: int, cameraId: CameraID) -> PipelineProto:
     api: SettingsAPI = inst.settings.getAPI()
     settingsValues = {
-        key: settingValueToProto(api.getValue(key))
-        for key in api.getSettingsSchema().keys()
+        key: setting.valueToProto(api.getValue(key))
+        for key, setting in api.settings.items()
     }
 
     cameraSettings = inst.getCameraSettings()
@@ -361,8 +361,8 @@ def pipelineToProto(inst: Pipeline, index: int, cameraId: CameraID) -> PipelineP
         cameraAPI = cameraSettings.getAPI()
         settingsValues.update(
             {
-                key: settingValueToProto(cameraAPI.getValue(key))
-                for key in cameraAPI.getSettingsSchema().keys()
+                key: setting.valueToProto(cameraAPI.getValue(key))
+                for key, setting in cameraAPI.settings.items()
             }
         )
 
