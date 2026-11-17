@@ -91,6 +91,10 @@ setup(
         synapseNetDep("websockets"),
     ],
     extras_require={
+        "yolo": [
+            "torch>=2.1",
+            "ultralytics>=8.0.200",
+        ],
         "dev": [
             "wheel",
             "setuptools",
@@ -103,7 +107,7 @@ setup(
             "build",
             "reuse",
             "requests",
-        ]
+        ],
     },
     include_package_data=True,
     package_data={
