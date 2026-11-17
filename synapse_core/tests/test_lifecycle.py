@@ -21,6 +21,18 @@ def test_shutdown_runs_callbacks_in_reverse_order():
     assert calls == ["third", "second", "first"]
 
 
+def test_shutdown_logs_each_resource():
+    stack = ShutdownStack()
+    stack.register("camera handler", lambda: None)
+    stack.register("pipeline handler", lambda: None)
+
+    with patch("synapse.core.lifecycle.log.info") as info:
+        stack.shutdown()
+
+    info.assert_any_call("Shutting down pipeline handler...")
+    info.assert_any_call("Shutting down camera handler...")
+
+
 def test_shutdown_is_idempotent():
     stack = ShutdownStack()
     callback = MagicMock()

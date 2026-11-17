@@ -5,6 +5,7 @@
 """Helpers for shutting runtime resources down in a predictable order."""
 
 import threading
+import time
 from typing import Callable, List, Optional, Tuple
 
 import synapse.log as log
@@ -47,10 +48,16 @@ class ShutdownStack:
             self._callbacks.clear()
 
         for name, callback in callbacks:
+            log.info(f"Shutting down {name}...")
+            start = time.perf_counter()
             try:
                 callback()
             except Exception as error:
-                log.err(f"Failed to shut down {name}: {error}")
+                elapsed = time.perf_counter() - start
+                log.err(f"Failed to shut down {name} after {elapsed:.2f}s: {error}")
+            else:
+                elapsed = time.perf_counter() - start
+                log.info(f"Finished shutting down {name} ({elapsed:.2f}s)")
 
 
 def joinThread(

@@ -125,11 +125,16 @@ class TestRuntimeManager(unittest.TestCase):
         metricsThread.start()
         self.handler.metricsThread = metricsThread
 
-        pipeline = MagicMock()
-        self.handler.pipelineHandler.pipelineInstanceBindings[0] = {0: pipeline}
+        publisher = MagicMock()
+        versionPublisher = MagicMock()
+        self.handler.propPubs[(0, "setting")] = publisher
+        self.handler.versionPublisher = versionPublisher
         self.handler._ntListeners = [10, 11]
 
-        with patch("synapse.core.runtime_handler.NetworkTableInstance") as nt:
+        with (
+            patch("synapse.core.runtime_handler.NetworkTableInstance") as nt,
+            patch.object(self.handler.pipelineHandler, "cleanup") as pipelineCleanup,
+        ):
             self.handler.cleanup()
 
         self.assertFalse(self.handler.running.is_set())
@@ -139,9 +144,13 @@ class TestRuntimeManager(unittest.TestCase):
         self.assertIsNone(self.handler.metricsThread)
         self.assertEqual(self.handler.cameraManagementThreads, {})
         self.assertEqual(self.handler._ntListeners, [])
+        self.assertEqual(self.handler.propPubs, {})
+        self.assertIsNone(self.handler.versionPublisher)
         nt.getDefault.return_value.removeListener.assert_any_call(10)
         nt.getDefault.return_value.removeListener.assert_any_call(11)
-        pipeline.invalidateCachedEntries.assert_called_once()
+        publisher.close.assert_called_once()
+        versionPublisher.close.assert_called_once()
+        pipelineCleanup.assert_called_once()
         self.mock_camera_handler.cleanup.assert_called_once()
         self.assertFalse(self.handler.isSetup)
 

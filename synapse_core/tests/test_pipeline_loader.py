@@ -51,6 +51,39 @@ class TestPipelineHandler(unittest.TestCase):
         # Ensure camera 0 is initialized since tests expect it
         self.loader.onAddCamera(0, "cam0", MagicMock())
 
+    def test_cleanup_closes_unique_pipelines_and_clears_bindings(self):
+        shared = MagicMock()
+        shared.name = "Shared"
+        second = MagicMock()
+        second.name = "Second"
+        self.loader.pipelineInstanceBindings = {
+            0: {0: shared, 1: second},
+            1: {0: shared},
+        }
+
+        self.loader.cleanup()
+
+        shared.close.assert_called_once()
+        second.close.assert_called_once()
+        self.assertEqual(self.loader.pipelineInstanceBindings, {})
+
+    def test_cleanup_continues_after_pipeline_close_error(self):
+        failing = MagicMock()
+        failing.name = "Failing"
+        failing.close.side_effect = RuntimeError("boom")
+        healthy = MagicMock()
+        healthy.name = "Healthy"
+        self.loader.pipelineInstanceBindings = {
+            0: {0: failing, 1: healthy},
+        }
+
+        with patch("synapse.core.pipeline_handler.log.err") as error:
+            self.loader.cleanup()
+
+        healthy.close.assert_called_once()
+        error.assert_called_once()
+        self.assertEqual(self.loader.pipelineInstanceBindings, {})
+
     def test_load_pipeline_settings_skips_missing_and_empty_files(self):
         with tempfile.TemporaryDirectory() as directory:
             configPath = Path(directory) / "config" / "settings.yml"

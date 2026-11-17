@@ -549,32 +549,50 @@ class CameraHandler:
 
     def cleanup(self) -> None:
         """Stop the camera scanner and release cameras, streams, and recordings."""
+        log.info("Stopping camera scanner...")
         self.stopCameraScanEvent.set()
-        joinThread(
+        if joinThread(
             getattr(self, "cameraScanningThread", None),
             "Camera scanner",
             timeout=2.0,
-        )
+        ):
+            log.info("Camera scanner stopped.")
 
-        for record in self.recordingOutputs.values():
+        recordingCount = len(self.recordingOutputs)
+        if recordingCount:
+            log.info(f"Releasing {recordingCount} recording(s)...")
+        for cameraIndex, record in self.recordingOutputs.items():
             try:
                 record.release()
-            except Exception:
-                pass
+                log.info(f"Released recording for camera #{cameraIndex}.")
+            except Exception as error:
+                log.err(
+                    f"Failed to release recording for camera #{cameraIndex}: {error}"
+                )
         self.recordingOutputs.clear()
         self.recordingResolutions.clear()
         self.recordingStatus.clear()
         self.recordFileNames.clear()
 
+        cameraCount = len(self.cameraHandles)
+        if cameraCount:
+            log.info(f"Closing {cameraCount} camera(s)...")
         for cameraIndex, handle in self.cameraHandles.items():
+            name = getattr(handle, "name", str(cameraIndex))
             try:
                 # Stop the frame grabber before releasing the camera connection.
                 handle.close()
                 handle.camera.close()
+                log.info(f"Closed camera #{cameraIndex} ({name}).")
             except Exception as error:
-                log.err(f"Failed to close camera #{cameraIndex}: {error}")
+                log.err(f"Failed to close camera #{cameraIndex} ({name}): {error}")
         self.cameraHandles.clear()
+
+        streamCount = len(self.streamOutputs)
+        if streamCount:
+            log.info(f"Clearing {streamCount} stream output(s)...")
         self.streamOutputs.clear()
         self.streamSizes.clear()
         self._streamFrameBuffers.clear()
         self._recordFrameBuffers.clear()
+        log.info("Camera resources released.")

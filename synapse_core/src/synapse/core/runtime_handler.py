@@ -931,29 +931,49 @@ class RuntimeManager:
                 return
             self._cleanedUp = True
 
-        log.info("Shutting down runtime...")
+        log.info("Releasing runtime workers and resources...")
         self.requestStop()
 
+        cameraThreadCount = len(self.cameraManagementThreads)
+        if cameraThreadCount:
+            log.info(f"Stopping {cameraThreadCount} camera worker thread(s)...")
         for cameraIndex, thread in self.cameraManagementThreads.items():
-            joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0)
+            if joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0):
+                log.info(f"Camera worker #{cameraIndex} stopped.")
         self.cameraManagementThreads.clear()
 
-        joinThread(self.metricsThread, "Metrics", timeout=2.0)
+        if self.metricsThread is not None:
+            log.info("Stopping metrics thread...")
+            if joinThread(self.metricsThread, "Metrics", timeout=2.0):
+                log.info("Metrics thread stopped.")
         self.metricsThread = None
 
+        listenerCount = len(self._ntListeners)
+        if listenerCount:
+            log.info(f"Removing {listenerCount} NetworkTables listener(s)...")
         self._removeNtListeners()
 
-        for publisher in self.propPubs.values():
+        publisherCount = len(self.propPubs) + (
+            1 if self.versionPublisher is not None else 0
+        )
+        if publisherCount:
+            log.info(f"Closing {publisherCount} NetworkTables publisher(s)...")
+        for key, publisher in self.propPubs.items():
             try:
                 publisher.close()
-            except Exception:
-                pass
+            except Exception as error:
+                log.err(f"Failed to close publisher {key}: {error}")
         self.propPubs.clear()
+        if self.versionPublisher is not None:
+            try:
+                self.versionPublisher.close()
+            except Exception as error:
+                log.err(f"Failed to close version publisher: {error}")
+            self.versionPublisher = None
 
-        for pipelines in self.pipelineHandler.pipelineInstanceBindings.values():
-            for pipeline in pipelines.values():
-                pipeline.invalidateCachedEntries()
+        self.pipelineHandler.cleanup()
 
+        log.info("Releasing camera resources...")
         self.cameraHandler.cleanup()
         self.isSetup = False
         log.info("Runtime resources released.")
@@ -975,8 +995,8 @@ class RuntimeManager:
         for listener in self._ntListeners:
             try:
                 instance.removeListener(listener)
-            except Exception:
-                pass
+            except Exception as error:
+                log.err(f"Failed to remove NetworkTables listener {listener}: {error}")
         self._ntListeners.clear()
 
     def setupCallbacks(self):
