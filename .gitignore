@@ -1,4 +1,12 @@
 **/__pycache__/*
-*/__pycache__/*
 **/127.0.0.1
 **/logs/
+**/.calibration_import/
+build/
+*.egg-info/
+dist/
+.uistart
+*.avi
+synapse_lib/vendordep/docs/**
+.venv/
+venv/

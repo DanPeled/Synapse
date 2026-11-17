@@ -1,0 +1,600 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+import os
+import threading
+import time
+import traceback
+from datetime import datetime
+from itertools import chain
+from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
+
+import cscore as cs
+import cv2
+import numpy as np
+import synapse.log as log
+from ntcore import NetworkTableInstance
+from synapse_net.nt_client import NtClient
+
+from ..callback import Callback
+from ..stypes import (
+    CameraID,
+    CameraName,
+    CameraUID,
+    Frame,
+    RecordingFilename,
+    RecordingStatus,
+    Resolution,
+)
+from .camera.camera_handle import CameraHandle
+from .camera.no_signal import NoSignalCamera, generateNoSignalFrame
+from .camera.synapse_camera import SynapseCamera
+from .camera_factory import CameraConfig, CameraFactory, getCameraTableName
+from .global_settings import GlobalSettings
+from .lifecycle import joinThread
+
+
+class CameraHandler:
+    """
+    Handles the lifecycle and operations of multiple cameras, including initialization,
+    streaming, recording, and configuration based on global settings.
+    """
+
+    DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
+    """Default resolution (width, height) used when no specific stream size is configured."""
+
+    def __init__(self) -> None:
+        """
+        Initializes empty dictionaries to hold camera instances, output streams,
+        stream sizes, recording outputs, and camera configuration bindings.
+        """
+        self.cameraHandles: Dict[CameraID, CameraHandle] = {}
+        self.usbCameraInfos: Dict[CameraUID, cs.UsbCameraInfo] = {}
+        self.streamOutputs: Dict[CameraID, cs.CvSource] = {}
+        self.streamSizes: Dict[CameraID, Resolution] = {}
+
+        self.recordFileNames: Dict[CameraID, RecordingFilename] = {}
+        self.recordingOutputs: Dict[CameraID, cv2.VideoWriter] = {}
+        self.recordingResolutions: Dict[CameraID, Resolution] = {}
+        self.recordingStatus: Dict[CameraID, RecordingStatus] = {}
+        self.onRecordingStatusChanged: Callback[
+            CameraID, RecordingStatus, RecordingFilename
+        ] = Callback()
+
+        self.cameraConfigBindings: Dict[CameraID, CameraConfig] = {}
+        self.onAddCamera: Callback[CameraID, CameraName, CameraHandle] = Callback()
+        self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
+        self.cameraUIDs: List[CameraUID] = []
+        self.requestedCameraUIDs: Dict[CameraUID, CameraID] = {}
+        self.cameraType: Type[SynapseCamera] = CameraFactory.kDefault
+
+        self.lastPublishTime: Dict[CameraID, float] = {}
+        self.publishInterval: float = 1.0 / 30.0
+
+        # Reusable resize destinations, keyed by camera. Streaming resizes every
+        # captured frame, so allocating a new output image per frame shows up in
+        # profiles; these buffers let `cv2.resize` write in place instead.
+        self._streamFrameBuffers: Dict[CameraID, np.ndarray] = {}
+        self._recordFrameBuffers: Dict[CameraID, np.ndarray] = {}
+
+        self.cameraScanningThread: threading.Thread
+
+        self.stopCameraScanEvent = threading.Event()
+
+    def setRecordingStatus(
+        self, cameraIndex: CameraID, status: RecordingStatus
+    ) -> None:
+        if cameraIndex not in self.cameraHandles:
+            log.warn(
+                f"Attempted to set recording status on undefined camera #{cameraIndex}\n"
+                "This status call will take affect once the camera has been added"
+            )
+        self.recordingStatus[cameraIndex] = status
+        self.onRecordingStatusChanged.call(
+            cameraIndex,
+            status,
+            self.recordFileNames.get(cameraIndex, "Unknown filename"),
+        )
+
+    def setCameraType(self, cameraType: Type[SynapseCamera]) -> None:
+        """Selects the camera implementation used to create configured cameras."""
+        self.cameraType = cameraType
+
+    def setup(self) -> None:
+        """
+        Sets up the camera system by creating cameras, generating output streams,
+        and initializing recording outputs.
+        """
+        os.makedirs("records", exist_ok=True)
+        self.createCameras()
+
+        if self.cameraType is not CameraFactory.kDefault:
+            # Non-USB backends produce their cameras from configuration only.
+            return
+
+        def cameraScanAction():
+            while not self.stopCameraScanEvent.wait(10):
+                self.scanCameras()
+
+        self.cameraScanningThread = threading.Thread(
+            target=cameraScanAction, daemon=True
+        )
+        self.cameraScanningThread.start()
+
+    def createCameras(self) -> None:
+        """
+        Retrieves camera configuration from global settings and attempts to add
+        each configured camera to the handler.
+        """
+        self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
+
+        if self.cameraType is not CameraFactory.kDefault:
+            # Non-USB backends create one camera per configured index; the
+            # camera index is the identity, so no USB-style UID matching.
+            for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
+                self.addCamera(cameraIndex, cameraConfig, cameraIndex)
+            return
+
+        self.usbCameraInfos = {
+            f"{info.name}_{info.productId}": info
+            for info in cs.UsbCamera.enumerateUsbCameras()
+        }
+
+        for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
+            if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraUIDs:
+                info: Optional[cs.UsbCameraInfo] = self.usbCameraInfos.get(
+                    cameraConfig.id, None
+                )
+                if info is not None:
+                    if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
+                        continue
+                    else:
+                        self.cameraUIDs.append(cameraConfig.id)
+                else:
+                    self.requestedCameraUIDs[cameraConfig.id] = cameraIndex
+
+                    self.addCameraData(
+                        cameraIndex,
+                        cameraConfig,
+                        CameraHandle(
+                            NoSignalCamera(),
+                            cameraConfig.name,
+                            cameraIndex,
+                        ),
+                    )
+
+                    log.warn(
+                        f"No camera found for product id: {cameraConfig.id} (index: {cameraIndex}), camera will be skipped and added later"
+                    )
+                    continue
+
+        self.scanCameras()
+
+    def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
+        if cameraID in self.cameraConfigBindings:
+            self.cameraConfigBindings[cameraID].name = newName
+            self.cameraHandles[cameraID].name = newName
+            log.info(f"Camera #{cameraID} renamed to {newName}")
+            self.onRenameCamera.call(cameraID, newName)
+        else:
+            log.err(
+                f"Attempted to rename camera with ID {cameraID} but that camera does not exist!"
+            )
+
+    def scanCameras(self) -> None:
+        self.usbCameraInfos = {
+            f"{info.name}_{info.productId}": info
+            for info in cs.UsbCamera.enumerateUsbCameras()
+        }
+
+        found: List[int] = []
+
+        for info in self.usbCameraInfos.values():
+            id = f"{info.name}_{info.productId}"
+            if info.productId not in found and id not in self.cameraUIDs:
+                found.append(info.productId)
+                newIndex = 0
+
+                if len(self.requestedCameraUIDs.keys()) > 0:
+                    if id in self.requestedCameraUIDs.keys():
+                        newIndex = self.requestedCameraUIDs.pop(id)
+                    else:
+                        newIndex = (
+                            max(
+                                chain(
+                                    self.requestedCameraUIDs.values(),
+                                    self.cameraHandles.keys(),
+                                )
+                            )
+                            + 1
+                        )
+                else:
+                    m = max(self.cameraHandles.keys(), default=-1)
+                    newIndex = m + 1
+
+                cameraIndex = newIndex
+                cameraConfig = CameraConfig(
+                    name=info.name,
+                    id=id,
+                    defaultPipeline=0,
+                    calibration={},
+                    streamRes=self.DEFAULT_STREAM_SIZE,
+                )
+
+                if cameraConfig.id not in self.cameraUIDs:
+                    log.info(
+                        f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
+                    )
+                    GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
+                    if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
+                        continue
+                    else:
+                        self.cameraUIDs.append(cameraConfig.id)
+
+    def getCameraHandle(self, cameraIndex: CameraID) -> Optional[CameraHandle]:
+        """
+        Retrieves a specific camera instance by its index.
+
+        Args:
+            cameraIndex (CameraID): Index of the camera to retrieve.
+
+        Returns:
+            Optional[CameraHandle]: The camera instance if it exists, otherwise None.
+        """
+        return self.cameraHandles.get(cameraIndex, None)
+
+    def getStreamRes(self, cameraIndex: CameraID) -> Tuple[int, int]:
+        """
+        Retrieves the streaming resolution for the given camera index.
+
+        If the camera configuration is available via `GlobalSettings.getCameraConfig(i)`,
+        returns its configured stream resolution and updates `self.streamSizes`.
+        Otherwise, returns a default resolution.
+
+        Args:
+            cameraIndex (CameraID): The index of the camera.
+
+        Returns:
+            Tuple[int, int]: The width and height of the stream resolution.
+        """
+        cameraConfig: Optional[CameraConfig] = GlobalSettings.getCameraConfig(
+            cameraIndex
+        )
+
+        if cameraConfig is not None:
+            streamRes = cameraConfig.streamRes
+            self.streamSizes[cameraIndex] = streamRes
+            return (streamRes[0], streamRes[1])
+
+        return self.DEFAULT_STREAM_SIZE
+
+    def createStreamOutput(self, cameraIndex: CameraID) -> cs.CvSource:
+        """
+        Initializes and returns video output streams for all configured cameras.
+
+        For each camera index in `self.cameras`, retrieves its desired streaming resolution
+        from the global camera configuration (if available), falls back to the default resolution
+        otherwise, and creates a new video stream via `cs.CameraServer.putVideo`.
+
+        Also updates `self.streamSizes` with the resolved stream resolution for each camera.
+
+        Returns:
+            dict[CameraID, cs.CameraServer.VideoOutput]: A dictionary mapping camera indices
+            to their corresponding video output objects.
+        """
+        assert cameraIndex in self.cameraHandles
+
+        return cs.CameraServer.putVideo(
+            name=f"{NtClient.NT_TABLE}/{getCameraTableName(self.cameraHandles[cameraIndex])}",
+            width=self.getStreamRes(cameraIndex)[0],
+            height=self.getStreamRes(cameraIndex)[1],
+        )
+
+    def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
+        """
+        Retrieves the video output stream for a specific camera.
+
+        Args:
+            cameraIndex (CameraID): The camera index.
+
+        Returns:
+            cs.CvSource: The associated video output stream.
+        """
+        return self.streamOutputs[cameraIndex]
+
+    def getRecordOutput(self, cameraIndex: CameraID) -> cv2.VideoWriter:
+        """
+        Retrieves the recording output writer for a specific camera.
+
+        Args:
+            cameraIndex (CameraID): The camera index.
+
+        Returns:
+            cv2.VideoWriter: The associated video writer.
+        """
+
+        if cameraIndex not in self.cameraHandles:
+            raise KeyError(f"Camera {cameraIndex} not found")
+
+        if cameraIndex in self.recordingOutputs:
+            return self.recordingOutputs[cameraIndex]
+        fourcc = cv2.VideoWriter.fourcc(*"mp4v")  # efficient MP4 codec
+
+        try:
+            resolution = self.cameraHandles[cameraIndex].camera.getResolution()
+        except Exception:
+            resolution = self.streamSizes.get(cameraIndex, (640, 480))
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        try:
+            nt_table_name = NtClient.NT_TABLE
+        except Exception:
+            nt_table_name = "Synapse"
+        filename = f"records/{nt_table_name}_camera{cameraIndex}_{timestamp}.mp4"
+
+        self.recordingOutputs[cameraIndex] = cv2.VideoWriter(
+            filename=filename,
+            fourcc=fourcc,
+            fps=30.0,
+            frameSize=resolution,
+        )
+        self.recordingResolutions[cameraIndex] = resolution
+
+        try:
+            log.info(
+                f"Started recording camera {self.cameraHandles[cameraIndex].name} to {filename}",
+                shouldAlert=True,
+            )
+        except Exception:
+            pass
+        self.recordFileNames[cameraIndex] = filename
+
+        return self.recordingOutputs[cameraIndex]
+
+    def _resizeFrame(
+        self,
+        frame: Frame,
+        size: Resolution,
+        buffers: Dict[CameraID, np.ndarray],
+        cameraIndex: CameraID,
+    ) -> Frame:
+        """
+        Resizes `frame` to `size`, reusing a per-camera destination buffer.
+
+        Frames are already allocated by the camera handle buffer pool, so an
+        extra allocation (and copy) for every published frame is avoidable.
+        When the frame is already at the requested size no work is done at all.
+
+        Args:
+            frame (Frame): Source frame.
+            size (Resolution): Target (width, height).
+            buffers (Dict[CameraID, np.ndarray]): Destination cache to use.
+            cameraIndex (CameraID): Camera the frame belongs to.
+
+        Returns:
+            Frame: The resized frame (or `frame` itself if no resize is needed).
+        """
+        width, height = int(size[0]), int(size[1])
+
+        if frame.shape[1] == width and frame.shape[0] == height:
+            return frame
+
+        destination = buffers.get(cameraIndex)
+        if (
+            destination is None
+            or destination.shape[0] != height
+            or destination.shape[1] != width
+            or destination.dtype != frame.dtype
+        ):
+            destination = np.empty((height, width) + frame.shape[2:], dtype=frame.dtype)
+            buffers[cameraIndex] = destination
+
+        return cv2.resize(
+            frame,
+            (width, height),
+            dst=destination,
+            interpolation=cv2.INTER_AREA,
+        )
+
+    def publishFrame(self, frame: Frame, handle: CameraHandle) -> None:
+        """
+        Publishes a frame to the output stream and optionally writes it to the recording output
+        if recording is enabled.
+
+        Args:
+            frame (Frame): The image frame to publish.
+            camera (CameraHandle): The camera that produced the frame.
+        """
+        assert frame is not None
+
+        now = time.perf_counter()
+        cameraIndex = handle.cameraIndex
+
+        lastTime = self.lastPublishTime.get(cameraIndex, 0.0)
+
+        if now - lastTime < self.publishInterval:
+            return
+
+        self.lastPublishTime[cameraIndex] = now
+
+        streamSize = self.streamSizes.get(cameraIndex)
+        if streamSize is None:
+            streamSize = self.getStreamRes(cameraIndex)
+        resized_frame = self._resizeFrame(
+            frame, streamSize, self._streamFrameBuffers, cameraIndex
+        )
+
+        self.getOutput(cameraIndex).putFrame(resized_frame)
+
+        if self.recordingStatus.get(cameraIndex, False):
+            videoWriter = self.getRecordOutput(cameraIndex)
+            recordRes = self.recordingResolutions.get(cameraIndex)
+            if recordRes is None:
+                recordRes = self.cameraHandles[cameraIndex].camera.getResolution()
+                self.recordingResolutions[cameraIndex] = recordRes
+            videoWriter.write(
+                self._resizeFrame(
+                    frame, recordRes, self._recordFrameBuffers, cameraIndex
+                )
+            )
+
+        elif cameraIndex in self.recordingOutputs:
+            log.info(
+                f"Written Camera {handle.name} recording to {self.recordFileNames[cameraIndex]}",
+                shouldAlert=True,
+            )
+            videoWriter = self.recordingOutputs.pop(cameraIndex)
+            videoWriter.release()
+            self._recordFrameBuffers.pop(cameraIndex, None)
+
+    def addCamera(
+        self,
+        cameraIndex: CameraID,
+        cameraConfig: CameraConfig,
+        path: Union[str, int],
+    ) -> bool:
+        """
+        Adds a camera to the handler using the configured camera backend.
+
+        Args:
+            cameraIndex (CameraID): Camera index to add.
+            cameraConfig (CameraConfig): Configuration for the camera.
+            path (Union[str, int]): Backend-specific camera path/device.
+
+        Returns:
+            bool: True if the camera was successfully added, False otherwise.
+        """
+
+        try:
+            camera = CameraFactory.create(
+                cameraType=self.cameraType,
+                cameraIndex=cameraIndex,
+                path=path,
+            )
+            handle = CameraHandle(camera, cameraConfig.name, cameraIndex)
+            handle.setIndex(cameraIndex)
+        except Exception as e:
+            log.err(
+                f"Failed to start camera capture ({type(e).__name__}): {e}\n"
+                f"{traceback.format_exc()}"
+            )
+            return False
+
+        self.addCameraData(cameraIndex, cameraConfig, handle)
+
+        return True
+
+    def addCameraData(
+        self,
+        cameraIndex: CameraID,
+        cameraConfig: CameraConfig,
+        handle: CameraHandle,
+    ):
+        self.cameraHandles[cameraIndex] = handle
+
+        handle.setIndex(cameraIndex)
+
+        self.streamOutputs[cameraIndex] = self.createStreamOutput(cameraIndex)
+
+        frame = generateNoSignalFrame(handle.name, handle.cameraIndex)
+
+        if frame is not None:
+            self.streamOutputs[cameraIndex].putFrame(
+                frame
+            )  # NOTE: stream only appears after a frame has been posted, probably
+
+        stream = (
+            NetworkTableInstance.getDefault()
+            .getTable("CameraPublisher")
+            .getSubTable(NtClient.NT_TABLE)
+            .getSubTable(cameraConfig.name)
+            .getStringArray("streams", ["", ""])[1]
+            .replace("mjpg:", "")
+        )
+
+        handle.stream = stream
+
+        self.setRecordingStatus(cameraIndex, False)
+
+        self.onAddCamera.call(cameraIndex, cameraConfig.name, handle)
+
+        log.info(
+            f"Camera (name={cameraConfig.name}, id={cameraConfig.id}, id={cameraIndex}) added successfully."
+        )
+
+    def setCameraProps(
+        self, settings: Dict[str, Any], handle: CameraHandle
+    ) -> Dict[str, Any]:
+        """
+        Applies the specified settings to a camera and sets its video mode.
+
+        Args:
+            settings (Dict[str, Any]): Dictionary of property names and values to apply.
+            camera (CameraHandle): The camera to configure.
+
+            Returns:
+            Dict[str, Any]: Dictionary of updated settings (currently unused).
+        """
+        updated_settings = {}
+        for settingName in settings.keys():
+            setting_value = settings.get(settingName)
+            if setting_value is not None:
+                handle.setProperty(
+                    prop=settingName,
+                    value=setting_value,
+                )
+
+        return updated_settings
+
+    def cleanup(self) -> None:
+        """Stop the camera scanner and release cameras, streams, and recordings."""
+        log.info("Stopping camera scanner...")
+        self.stopCameraScanEvent.set()
+        if joinThread(
+            getattr(self, "cameraScanningThread", None),
+            "Camera scanner",
+            timeout=2.0,
+        ):
+            log.info("Camera scanner stopped.")
+
+        recordingCount = len(self.recordingOutputs)
+        if recordingCount:
+            log.info(f"Releasing {recordingCount} recording(s)...")
+        for cameraIndex, record in self.recordingOutputs.items():
+            try:
+                record.release()
+            except Exception as error:
+                log.err(
+                    f"Failed to release recording for camera #{cameraIndex}: {error}"
+                )
+        self.recordingOutputs.clear()
+        self.recordingResolutions.clear()
+        self.recordingStatus.clear()
+        self.recordFileNames.clear()
+        if recordingCount:
+            log.info("Recordings released.")
+
+        cameraCount = len(self.cameraHandles)
+        if cameraCount:
+            log.info(f"Closing {cameraCount} camera(s)...")
+        for cameraIndex, handle in self.cameraHandles.items():
+            name = getattr(handle, "name", str(cameraIndex))
+            try:
+                # Stop the frame grabber before releasing the camera connection.
+                handle.close()
+                handle.camera.close()
+            except Exception as error:
+                log.err(f"Failed to close camera #{cameraIndex} ({name}): {error}")
+        self.cameraHandles.clear()
+        if cameraCount:
+            log.info("Cameras closed.")
+
+        streamCount = len(self.streamOutputs)
+        if streamCount:
+            log.info(f"Clearing {streamCount} stream output(s)...")
+        self.streamOutputs.clear()
+        self.streamSizes.clear()
+        self._streamFrameBuffers.clear()
+        self._recordFrameBuffers.clear()
+        log.info("Camera resources released.")

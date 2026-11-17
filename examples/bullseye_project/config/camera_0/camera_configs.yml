@@ -1,0 +1,9 @@
+camera_configs:
+  name: Integrated Camera
+  id: Integrated Camera_47033
+  transform:
+    - [0.0, 0.0, 0.0]
+    - [0.0, 0.0, 0.0]
+  default_pipeline: 0
+  stream_res: [320, 240]
+  calibration: {}

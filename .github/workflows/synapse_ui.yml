@@ -1,0 +1,100 @@
+name: Synapse UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "synapse_ui/**"
+  pull_request:
+    paths:
+      - "synapse_ui/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: synapse_ui
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+          restore-keys: |
+            ubuntu-node-20-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: synapse_ui
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  format:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: synapse_ui
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20.9.0"
+
+      - name: Cache npm + Next.js
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            synapse_ui/node_modules
+            synapse_ui/.next/cache
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prettier check
+        run: npx prettier --check .
+
+      - name: Run lint
+        run: npm run lint

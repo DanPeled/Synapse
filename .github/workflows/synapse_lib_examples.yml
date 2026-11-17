@@ -1,0 +1,72 @@
+name: SynapseLib Examples
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/**"
+  pull_request:
+    paths:
+      - "examples/**"
+
+jobs:
+  build_robot_example:
+    name: Build Robot - ${{ matrix.example }}
+    runs-on: ubuntu-22.04
+    container: wpilib/roborio-cross-ubuntu:2025-22.04
+    strategy:
+      matrix:
+        example: [aimAtTarget]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add repository to git safe directories
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Set up Java (with Gradle cache)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        working-directory: examples
+        run: chmod +x gradlew
+
+      - name: Build with example
+        working-directory: examples
+        run: ./gradlew build -x spotlessCheck -Pexample=${{ matrix.example }}
+
+      - name: Spotless Check
+        working-directory: examples
+        run: ./gradlew spotlessCheck
+
+  build_synapse:
+    name: "Build Synapse Processor - ${{ matrix.example }}"
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        example: [synapseproject, bullseye_project]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          cache: pip
+          python-version: "3.12"
+
+      - name: Install SynapseFRC from repo
+        run: pip install .
+
+      - name: Install tools
+        run: pip install pyright ruff==0.15.20
+
+      - name: Type-check Synapse project
+        working-directory: examples/${{ matrix.example }}
+        run: pyright .
+
+      - name: Ruff Lint Synapse project
+        working-directory: examples/${{ matrix.example }}
+        run: ruff check .

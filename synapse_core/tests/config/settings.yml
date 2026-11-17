@@ -1,0 +1,58 @@
+network:
+  name: Vision-Py
+  team_number: 9738 
+  hostname: 10.97.38.14
+  user: orangepi
+  password: orangepi
+
+global:
+  camera_configs:
+    0:
+      default_pipeline: 0
+      name: Monochrome
+      path: /dev/video0
+      matrix:
+        - [   940.7360710926395, 0, 615.5884770322365]
+        - [  0, 939.9932393907364, 328.53938300868]
+        - [  0. ,        0.      ,     1.        ]
+      distCoeffs:  
+      - [ 0.054834081023049625,
+        -0.15994111706817074,
+        -0.0017587106009926158,
+        -0.0014671022483263552,
+        0.049742166267499596
+          ]
+      measured_res: [1280, 720]
+      stream_res: [320, 180]
+      transform:
+        - [0.24637, -0.23285, 0.28899] # translation
+        - [-1.86, 4, 24.95] # rotation
+
+pipelines:
+  0: 
+    type: ApriltagPipeline
+    settings:
+      target_tag: 7
+      brightness: 100
+      exposure: 20
+      width: 1280
+      height: 720
+      stick_to_ground: true
+      fieldpose: true
+      saturation: 10
+      num_threads: 4
+      black_level_offset: 0.0
+      orientation: 180
+      verbosity: 1
+      tag_size: 0.1651 
+  1:
+    type: ColorPipeline
+    settings:
+      brightness: 100
+      exposure: 20
+      width: 1920
+      height: 1080
+      minSize: 0.001
+      lower: [1, 2, 3]
+      upper: [4, 5, 6]
+      color_space: RGB

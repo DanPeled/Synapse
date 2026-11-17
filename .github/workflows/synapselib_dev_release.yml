@@ -1,0 +1,15 @@
+name: SynapseLib Dev Auto CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "synapse_lib/src/**"
+
+jobs:
+  dev:
+    uses: ./.github/workflows/synapse_lib_release.yml
+    with:
+      releaseVersion: dev
+      forceDev: true

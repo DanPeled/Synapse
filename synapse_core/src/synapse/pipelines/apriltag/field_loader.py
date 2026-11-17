@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2025 Dan Peled
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, Optional
+
+from wpimath.geometry import Pose3d, Quaternion, Rotation3d, Translation3d
+
+TagId = int
+
+
+class ApriltagFieldJson:
+    def __init__(self, jsonDict: Dict[TagId, Pose3d], length: float, width: float):
+        self.fieldMap = jsonDict
+        self.length = length
+        self.width = width
+
+    @staticmethod
+    def loadField(filePath: str | Path) -> "ApriltagFieldJson":
+        with open(filePath, "r") as file:
+            jsonDict: dict = json.load(file)
+            return ApriltagFieldJson.loadFieldJson(jsonDict)
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def loadFieldCached(filePath: str | Path) -> "ApriltagFieldJson":
+        """Loads a field map once, reusing it for every pipeline instance."""
+        return ApriltagFieldJson.loadField(filePath)
+
+    @staticmethod
+    def loadFieldJson(data: dict) -> "ApriltagFieldJson":
+        tagsDict: Dict[TagId, Pose3d] = {}
+        for tag in data.get("tags", {}):
+            poseDict = tag["pose"]
+            rotation = poseDict["rotation"]["quaternion"]
+            translation = poseDict["translation"]
+            tagsDict[tag["ID"]] = Pose3d(
+                translation=Translation3d(
+                    translation["x"], translation["y"], translation["z"]
+                ),
+                rotation=Rotation3d(
+                    Quaternion(
+                        w=rotation["W"],
+                        x=rotation["X"],
+                        y=rotation["Y"],
+                        z=rotation["Z"],
+                    )
+                ),
+            )
+        length = data["field"]["length"]
+        width = data["field"]["width"]
+        return ApriltagFieldJson(tagsDict, length, width)
+
+    def getTagPose(self, id: TagId) -> Optional[Pose3d]:
+        if id in self.fieldMap.keys():
+            return self.fieldMap[id]
+        else:
+            return None

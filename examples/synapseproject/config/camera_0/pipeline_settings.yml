@@ -1,0 +1,83 @@
+pipeline_configs:
+  0:
+    name: FieldPose
+    type: ApriltagPipeline
+    settings:
+      critical_angle: 45
+      crop_x: [-1, 1]
+      crop_y: [-1, 1]
+      tag_filter: []
+      deglitch: false
+      max_line_fit_mse: 10
+      max_num_maxima: 10
+      min_cluster_pixels: 300
+      min_white_black_diff: 5
+      num_threads: 1
+      publish_camera_field_pose: true
+      publish_tag_pose_3d: false
+      quad_decimate: 1.0
+      quad_sigma: 0.0
+      refine_edges: false
+      stick_to_ground: false
+      tag_family: tag36h11
+      tag_size: 0.1651
+      verbosity: 0
+      brightness: 50
+      gain: 50
+      orientation: 0
+      resolution: 1920x1080
+      saturation: 50
+      sharpness: 50
+      contrast: 32
+      hue: 50
+      white_balance_automatic: 1
+      power_line_frequency: 1
+      white_balance_temperature: 4600
+      auto_exposure: 3
+      exposure_time_absolute: 12
+  1:
+    name: Cheese
+    type: ColorPipeline
+    settings:
+      h: [0, 120]
+      min_area: 500
+      morph_kernel: 5
+      publish_all_detections: true
+      result_strategy: largest_area
+      s: [0, 100]
+      v: [100, 255]
+      brightness: 50
+      gain: 50
+      orientation: 0
+      resolution: 1920x1080
+      saturation: 50
+      sharpness: 50
+  2:
+    name: Targets
+    type: TargetOverlayPipeline
+    settings:
+      target_file: config/targets.json
+      draw_labels: true
+      marker_thickness: 2
+      brightness: 50
+      gain: 50
+      orientation: 0
+      resolution: 1920x1080
+      saturation: 50
+      sharpness: 50
+  # The object-detection pipeline requires the optional neural dependencies:
+  #   pip install "synapsefrc[yolo]"
+  # It accepts any Ultralytics-compatible model. Uncomment to add it as
+  # pipeline #3:
+  # 3:
+  #   name: Object Detection
+  #   type: YOLOPipeline
+  #   settings:
+  #     model_file: config/models/coralAlgae-640-640-yolov8s.pt
+  #     object_dimensions_file: config/models/object_dimensions.example.json
+  #     default_object_width: 0.3
+  #     default_object_height: 0.3
+  #     confidence_threshold: 0.3
+  #     iou_threshold: 0.45
+  #     draw_detections: true
+  #     camera_z: 1.0

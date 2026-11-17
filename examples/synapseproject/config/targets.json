@@ -1,0 +1,25 @@
+{
+  "targets": [
+    {
+      "name": "Red Speaker",
+      "x": 0.25,
+      "y": 0.5,
+      "radius": 28,
+      "color": [40, 40, 220]
+    },
+    {
+      "name": "Blue Speaker",
+      "x": 0.75,
+      "y": 0.5,
+      "radius": 28,
+      "color": [220, 80, 40]
+    },
+    {
+      "name": "Amp",
+      "x": 0.5,
+      "y": 0.25,
+      "radius": 20,
+      "color": [40, 200, 40]
+    }
+  ]
+}
