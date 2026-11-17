@@ -76,8 +76,6 @@ setup(
         wpilibDep("wpilib"),
         wpilibDep("pyntcore"),
         visionProcessingDep("opencv_python==4.8.0.74"),
-        visionProcessingDep("torch==2.1.2"),
-        visionProcessingDep(" ultralytics==8.0.200"),
         visionProcessingDep("opencv_contrib_python==4.8.0.74"),
         visionProcessingDep("napa-vision==0.5.1"),
         deviceAccessDep("PyYAML"),
@@ -93,6 +91,10 @@ setup(
         synapseNetDep("websockets"),
     ],
     extras_require={
+        "yolo": [
+            "torch>=2.1",
+            "ultralytics>=8.0.200",
+        ],
         "dev": [
             "wheel",
             "setuptools",
@@ -105,7 +107,7 @@ setup(
             "build",
             "reuse",
             "requests",
-        ]
+        ],
     },
     include_package_data=True,
     package_data={

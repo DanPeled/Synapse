@@ -2,72 +2,91 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Estimate field-space positions for 2D neural-network detections."""
+
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-from synapse.core.camera_factory import Resolution
-from synapse.pipelines.neural.constants import (OBJECT_DIMENSIONS, CameraFrame,
-                                                NeuralDetection,
-                                                PositionEstimate)
+from synapse.pipelines.neural.constants import (
+    OBJECT_DIMENSIONS,
+    CameraFrame,
+    NeuralDetection,
+    PositionEstimate,
+)
+from synapse.stypes import Resolution
 
 
-# ---------- Config Dataclass ----------
 @dataclass
 class PositionEstimatorConfig:
+    """Calibration and filtering values used by :class:`PositionEstimator`."""
+
     cameraMatrix: np.ndarray
     distCoeffs: np.ndarray
-    calibResolution: Resolution  # (width, height)
+    calibResolution: Resolution
     minDistance: float
     maxDistance: float
     minBboxArea: float
+    maxReprojectionError: float = 50.0
 
 
-# ---------- Main Estimator ----------
 class PositionEstimator:
+    """Convert a detection bounding box into a position relative to the camera.
+
+    The estimator solves a planar PnP problem using the known approximate size
+    of the detected object. It then rotates the resulting camera-space vector
+    into field space using the configured camera pose.
+    """
+
     def __init__(self, config: PositionEstimatorConfig):
         self.config = config
-        self._baseCameraMatrix = config.cameraMatrix.copy()
-        self._cameraMatrix = config.cameraMatrix.copy()
+        self._baseCameraMatrix = np.array(config.cameraMatrix, dtype=np.float64)
+        self._cameraMatrix = self._baseCameraMatrix.copy()
         self._currentResolution: Optional[Resolution] = None
+        self.updateForResolution(config.calibResolution)
 
     def setConfig(self, config: PositionEstimatorConfig) -> None:
         self.config = config
-        self._baseCameraMatrix = config.cameraMatrix.copy()
-        self._cameraMatrix = config.cameraMatrix.copy()
+        self._baseCameraMatrix = np.array(config.cameraMatrix, dtype=np.float64)
+        self._cameraMatrix = self._baseCameraMatrix.copy()
         self._currentResolution = None
+        self.updateForResolution(config.calibResolution)
 
-    # ---------- Resolution Handling ----------
     def updateForResolution(self, resolution: Resolution) -> None:
-        if resolution == self._currentResolution:
+        """Scale the calibration matrix to the resolution of the current frame."""
+        width, height = int(resolution[0]), int(resolution[1])
+        if width <= 0 or height <= 0:
+            return
+        if self._currentResolution == (width, height):
             return
 
-        width, height = resolution
-        calibW, calibH = self.config.calibResolution
+        calibWidth, calibHeight = self.config.calibResolution
+        if calibWidth <= 0 or calibHeight <= 0:
+            return
 
-        scaleX = width / calibW
-        scaleY = height / calibH
+        scaleX = width / calibWidth
+        scaleY = height / calibHeight
 
-        self._cameraMatrix = self._baseCameraMatrix.copy()
-        self._cameraMatrix[0, 0] *= scaleX
-        self._cameraMatrix[1, 1] *= scaleY
-        self._cameraMatrix[0, 2] *= scaleX
-        self._cameraMatrix[1, 2] *= scaleY
+        matrix = self._baseCameraMatrix.copy()
+        matrix[0, 0] *= scaleX
+        matrix[1, 1] *= scaleY
+        matrix[0, 2] *= scaleX
+        matrix[1, 2] *= scaleY
 
-        self._currentResolution = resolution
+        self._cameraMatrix = matrix
+        self._currentResolution = (width, height)
 
-    # ---------- Geometry Helpers ----------
     @staticmethod
     def _objectPoints(dimensions: Dict[str, float]) -> np.ndarray:
-        halfW = dimensions["width"] / 2
-        halfH = dimensions["height"] / 2
+        halfWidth = dimensions["width"] / 2
+        halfHeight = dimensions["height"] / 2
         return np.array(
             [
-                [-halfW, -halfH, 0],
-                [halfW, -halfH, 0],
-                [halfW, halfH, 0],
-                [-halfW, halfH, 0],
+                [-halfWidth, -halfHeight, 0],
+                [halfWidth, -halfHeight, 0],
+                [halfWidth, halfHeight, 0],
+                [-halfWidth, halfHeight, 0],
             ],
             dtype=np.float32,
         )
@@ -75,90 +94,152 @@ class PositionEstimator:
     @staticmethod
     def _imagePoints(bbox: Tuple[float, float, float, float]) -> np.ndarray:
         x1, y1, x2, y2 = bbox
-        return np.array([[x1, y2], [x2, y2], [x2, y1], [x1, y1]], dtype=np.float32)
+        return np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
 
     @staticmethod
     def _bboxArea(bbox: Tuple[float, float, float, float]) -> float:
         x1, y1, x2, y2 = bbox
         return max(0.0, (x2 - x1) * (y2 - y1))
 
-    # ---------- Core Math ----------
-    def _solvePnP(self, objectPoints, imagePoints):
+    def _solvePnP(
+        self, objectPoints: np.ndarray, imagePoints: np.ndarray
+    ) -> Tuple[bool, np.ndarray, np.ndarray]:
         return cv2.solvePnP(
             objectPoints,
             imagePoints,
             self._cameraMatrix,
             self.config.distCoeffs,
-            flags=cv2.SOLVEPNP_IPPE_SQUARE,
+            flags=cv2.SOLVEPNP_IPPE,
         )
 
-    def _reprojectionError(self, objectPoints, imagePoints, rvec, tvec) -> float:
+    def _reprojectionError(
+        self,
+        objectPoints: np.ndarray,
+        imagePoints: np.ndarray,
+        rvec: np.ndarray,
+        tvec: np.ndarray,
+    ) -> float:
         projected, _ = cv2.projectPoints(
             objectPoints, rvec, tvec, self._cameraMatrix, self.config.distCoeffs
         )
         projected = projected.reshape(-1, 2)
         return float(np.mean(np.linalg.norm(projected - imagePoints, axis=1)))
 
-    # ---------- Coordinate Transforms ----------
     @staticmethod
+    def _rotationMatrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
+        cosRoll, sinRoll = np.cos(roll), np.sin(roll)
+        cosPitch, sinPitch = np.cos(pitch), np.sin(pitch)
+        cosYaw, sinYaw = np.cos(yaw), np.sin(yaw)
+
+        rotationX = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, cosRoll, -sinRoll],
+                [0.0, sinRoll, cosRoll],
+            ],
+            dtype=np.float64,
+        )
+        rotationY = np.array(
+            [
+                [cosPitch, 0.0, sinPitch],
+                [0.0, 1.0, 0.0],
+                [-sinPitch, 0.0, cosPitch],
+            ],
+            dtype=np.float64,
+        )
+        rotationZ = np.array(
+            [
+                [cosYaw, -sinYaw, 0.0],
+                [sinYaw, cosYaw, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+
+        return rotationZ @ rotationY @ rotationX
+
+    @classmethod
     def _cameraToField(
-        tvec, cameraPose: Dict[str, float]
+        cls, tvec: np.ndarray, cameraPose: Dict[str, float]
     ) -> Tuple[float, float, float, CameraFrame]:
-        camX, camY, camZ = tvec.flatten()
+        camX, camY, camZ = (float(value) for value in tvec.flatten())
 
-        yaw = cameraPose["yaw"]
-        pitch = cameraPose["pitch"]
-
-        cosP, sinP = np.cos(pitch), np.sin(pitch)
-        camY_Pitched = camY * cosP - camZ * sinP
-        camZ_Pitched = camY * sinP + camZ * cosP
-
-        cosY, sinY = np.cos(yaw), np.sin(yaw)
-        fieldX = camZ_Pitched * cosY + camX * sinY
-        fieldY = camZ_Pitched * sinY - camX * cosY
-        fieldZ = cameraPose["z"] - camY_Pitched
-
+        # OpenCV camera axes are x-right, y-down, z-forward. Robot/field axes
+        # are x-forward, y-left, z-up.
         cameraFrame = CameraFrame(camX, camY, camZ)
-        return fieldX, fieldY, fieldZ, cameraFrame
+        body = np.array([camZ, -camX, -camY], dtype=np.float64)
 
-    # ---------- Quality Scoring ----------
-    def _qualityScore(self, confidence, bboxArea, distance, reprojectionError) -> float:
-        sizeScore = min(bboxArea / 50_000, 1.0)
-        distanceScore = max(0.0, 1.0 - distance / self.config.maxDistance)
-        reprojScore = max(0.0, 1.0 - reprojectionError / 50.0)
+        rotation = cls._rotationMatrix(
+            cameraPose.get("roll", 0.0),
+            cameraPose.get("pitch", 0.0),
+            cameraPose.get("yaw", 0.0),
+        )
+        position = np.array(
+            [
+                cameraPose.get("x", 0.0),
+                cameraPose.get("y", 0.0),
+                cameraPose.get("z", 0.0),
+            ],
+            dtype=np.float64,
+        )
+
+        field = position + rotation @ body
+        return (
+            float(field[0]),
+            float(field[1]),
+            float(field[2]),
+            cameraFrame,
+        )
+
+    def _qualityScore(
+        self,
+        confidence: float,
+        bboxArea: float,
+        distance: float,
+        reprojectionError: float,
+    ) -> float:
+        sizeScore = min(bboxArea / 50_000.0, 1.0)
+        distanceScore = max(0.0, 1.0 - distance / max(self.config.maxDistance, 1e-6))
+        reprojScore = max(
+            0.0,
+            1.0 - reprojectionError / max(self.config.maxReprojectionError, 1e-6),
+        )
 
         return (
             confidence * 0.4 + reprojScore * 0.3 + sizeScore * 0.2 + distanceScore * 0.1
         )
 
-    # ---------- Public API ----------
     def estimate3DPosition(
         self,
         detection: NeuralDetection,
         cameraPose: Dict[str, float],
-        frameShape: Optional[np.ndarray] = None,
+        frameShape: Optional[Tuple[int, ...]] = None,
     ) -> Optional[PositionEstimate]:
-        """Estimate 3D position from detection."""
-        if frameShape is not None:
-            height, width = frameShape[:2]
-            self.updateForResolution((width, height))
+        """Estimate the detection's position, or return ``None`` if it is invalid."""
+        if frameShape is not None and len(frameShape) >= 2:
+            self.updateForResolution((int(frameShape[1]), int(frameShape[0])))
 
         bboxArea = self._bboxArea(detection.bbox)
         if bboxArea < self.config.minBboxArea:
             return None
 
-        objDims = OBJECT_DIMENSIONS.get(detection.className)
-        if objDims is None:
+        objectDimensions = OBJECT_DIMENSIONS.get(detection.className)
+        if objectDimensions is None:
             return None
 
-        objPts = self._objectPoints(objDims)
-        imgPts = self._imagePoints(detection.bbox)
+        objectPoints = self._objectPoints(objectDimensions)
+        imagePoints = self._imagePoints(detection.bbox)
 
-        success, rvec, tvec = self._solvePnP(objPts, imgPts)
+        success, rvec, tvec = self._solvePnP(objectPoints, imagePoints)
         if not success:
             return None
 
-        reprojError = self._reprojectionError(objPts, imgPts, rvec, tvec)
+        reprojectionError = self._reprojectionError(
+            objectPoints, imagePoints, rvec, tvec
+        )
+        if reprojectionError > self.config.maxReprojectionError:
+            return None
+
         distance = float(np.linalg.norm(tvec))
         if not (self.config.minDistance <= distance <= self.config.maxDistance):
             return None
@@ -171,9 +252,9 @@ class PositionEstimator:
             fieldZ=fieldZ,
             distance=distance,
             qualityScore=self._qualityScore(
-                detection.confidence, bboxArea, distance, reprojError
+                detection.confidence, bboxArea, distance, reprojectionError
             ),
-            reprojectionError=reprojError,
+            reprojectionError=reprojectionError,
             bboxArea=bboxArea,
             cameraFrame=cameraFrame,
         )

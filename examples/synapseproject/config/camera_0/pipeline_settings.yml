@@ -65,3 +65,15 @@ pipeline_configs:
       resolution: 1920x1080
       saturation: 50
       sharpness: 50
+  # The YOLO pipeline requires the optional neural dependencies:
+  #   pip install "synapsefrc[yolo]"
+  # Uncomment to add it as pipeline #3:
+  # 3:
+  #   name: YOLO
+  #   type: YOLOPipeline
+  #   settings:
+  #     model_file: config/models/coralAlgae-640-640-yolov8s.pt
+  #     confidence_threshold: 0.3
+  #     iou_threshold: 0.45
+  #     draw_detections: true
+  #     camera_z: 1.0
