@@ -111,8 +111,11 @@ class RuntimeManager:
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
         self._ntListeners: List[int] = []
 
+        # ``running`` is set while the runtime should keep going. ``stopped`` is
+        # the inverse, so worker loops can block until shutdown is requested.
         self.running = threading.Event()
         self.running.set()
+        self.stopped = threading.Event()
 
         self._cleanupLock = threading.Lock()
         self._cleanedUp = False
@@ -290,7 +293,7 @@ class RuntimeManager:
                 except Exception:
                     pass
 
-                self.running.wait(1.0)
+                self.stopped.wait(1.0)
 
         self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
         log.info("Startig metrics thread")
@@ -680,7 +683,7 @@ class RuntimeManager:
         )
 
         # Block until shutdown is requested instead of polling every frame.
-        self.running.wait()
+        self.stopped.wait()
         log.info("Synapse runtime stopped.")
 
     def handleResults(
@@ -915,6 +918,7 @@ class RuntimeManager:
     def requestStop(self) -> None:
         """Ask all runtime worker loops to stop."""
         self.running.clear()
+        self.stopped.set()
 
     def cleanup(self) -> None:
         """Stop worker threads and release cameras, publishers, and listeners.

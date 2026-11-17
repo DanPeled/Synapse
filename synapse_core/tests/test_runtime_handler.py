@@ -95,6 +95,18 @@ class TestRuntimeManager(unittest.TestCase):
         self.handler.requestStop()
 
         self.assertFalse(self.handler.running.is_set())
+        self.assertTrue(self.handler.stopped.is_set())
+
+    def test_run_blocks_until_stop_requested(self):
+        thread = threading.Thread(target=self.handler.run, daemon=True)
+        thread.start()
+
+        thread.join(0.1)
+        self.assertTrue(thread.is_alive())
+
+        self.handler.requestStop()
+        thread.join(1.0)
+        self.assertFalse(thread.is_alive())
 
     def test_cleanup_stops_workers_and_releases_resources(self):
         self.handler.running.set()
@@ -102,7 +114,7 @@ class TestRuntimeManager(unittest.TestCase):
         stopping = threading.Event()
 
         def worker():
-            self.handler.running.wait()
+            self.handler.stopped.wait()
             stopping.set()
 
         cameraThread = threading.Thread(target=worker, daemon=True)
