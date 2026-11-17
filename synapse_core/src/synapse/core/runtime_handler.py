@@ -938,9 +938,10 @@ class RuntimeManager:
         if cameraThreadCount:
             log.info(f"Stopping {cameraThreadCount} camera worker thread(s)...")
         for cameraIndex, thread in self.cameraManagementThreads.items():
-            if joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0):
-                log.info(f"Camera worker #{cameraIndex} stopped.")
+            joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0)
         self.cameraManagementThreads.clear()
+        if cameraThreadCount:
+            log.info("Camera workers stopped.")
 
         if self.metricsThread is not None:
             log.info("Stopping metrics thread...")

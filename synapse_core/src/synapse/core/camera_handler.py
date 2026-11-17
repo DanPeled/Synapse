@@ -564,7 +564,6 @@ class CameraHandler:
         for cameraIndex, record in self.recordingOutputs.items():
             try:
                 record.release()
-                log.info(f"Released recording for camera #{cameraIndex}.")
             except Exception as error:
                 log.err(
                     f"Failed to release recording for camera #{cameraIndex}: {error}"
@@ -573,6 +572,8 @@ class CameraHandler:
         self.recordingResolutions.clear()
         self.recordingStatus.clear()
         self.recordFileNames.clear()
+        if recordingCount:
+            log.info("Recordings released.")
 
         cameraCount = len(self.cameraHandles)
         if cameraCount:
@@ -583,10 +584,11 @@ class CameraHandler:
                 # Stop the frame grabber before releasing the camera connection.
                 handle.close()
                 handle.camera.close()
-                log.info(f"Closed camera #{cameraIndex} ({name}).")
             except Exception as error:
                 log.err(f"Failed to close camera #{cameraIndex} ({name}): {error}")
         self.cameraHandles.clear()
+        if cameraCount:
+            log.info("Cameras closed.")
 
         streamCount = len(self.streamOutputs)
         if streamCount:
