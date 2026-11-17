@@ -2,18 +2,30 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import json
 import math
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 import pytest
 from synapse.core.settings_api import FileConstraint
-from synapse.pipelines.neural.constants import NeuralDetection
+from synapse.pipelines.neural.constants import (
+    DEFAULT_OBJECT_HEIGHT,
+    DEFAULT_OBJECT_WIDTH,
+    NeuralDetection,
+)
 from synapse.pipelines.neural.position_estimator import (
     PositionEstimator,
     PositionEstimatorConfig,
+    parseObjectDimensions,
 )
-from synapse.pipelines.neural.yolo_pipeline import DEFAULT_MODEL_PATH, YOLOSettings
+from synapse.pipelines.neural.yolo_pipeline import (
+    DEFAULT_MODEL_PATH,
+    YOLOPipeline,
+    YOLOSettings,
+)
 
 
 def _config(**overrides: Any) -> PositionEstimatorConfig:
@@ -27,6 +39,9 @@ def _config(**overrides: Any) -> PositionEstimatorConfig:
         "maxDistance": 50.0,
         "minBboxArea": 10.0,
         "maxReprojectionError": 50.0,
+        "objectDimensions": {},
+        "defaultObjectWidth": DEFAULT_OBJECT_WIDTH,
+        "defaultObjectHeight": DEFAULT_OBJECT_HEIGHT,
     }
     values.update(overrides)
     return PositionEstimatorConfig(**values)
@@ -115,10 +130,36 @@ def test_estimate_scales_calibration_to_frame_resolution():
     assert result.distance == pytest.approx(3.0, rel=0.1)
 
 
-def test_estimate_rejects_unknown_class():
+def test_estimate_uses_default_size_for_unknown_class():
     estimator = PositionEstimator(_config())
 
-    assert estimator.estimate3DPosition(_detection("not-a-real-class"), _pose()) is None
+    result = estimator.estimate3DPosition(_detection("not-a-real-class"), _pose())
+
+    assert result is not None
+    assert result.objectWidth == pytest.approx(DEFAULT_OBJECT_WIDTH)
+    assert result.objectHeight == pytest.approx(DEFAULT_OBJECT_HEIGHT)
+
+
+def test_estimate_uses_class_specific_dimensions():
+    estimator = PositionEstimator(_config(objectDimensions={"person": (0.45, 1.70)}))
+
+    result = estimator.estimate3DPosition(_detection("person"), _pose())
+
+    assert result is not None
+    assert result.objectWidth == pytest.approx(0.45)
+    assert result.objectHeight == pytest.approx(1.70)
+
+
+def test_estimate_uses_configured_default_dimensions():
+    estimator = PositionEstimator(
+        _config(defaultObjectWidth=0.5, defaultObjectHeight=0.25)
+    )
+
+    result = estimator.estimate3DPosition(_detection("unknown"), _pose())
+
+    assert result is not None
+    assert result.objectWidth == pytest.approx(0.5)
+    assert result.objectHeight == pytest.approx(0.25)
 
 
 def test_estimate_rejects_small_bbox():
@@ -139,6 +180,36 @@ def test_estimate_rejects_high_reprojection_error():
     assert estimator.estimate3DPosition(_detection(), _pose()) is None
 
 
+def test_parse_object_dimensions_accepts_dict_and_list_entries():
+    parsed = parseObjectDimensions(
+        {
+            "person": {"width": 0.45, "height": 1.70},
+            "sports ball": [0.22, 0.22],
+        }
+    )
+
+    assert parsed == {"person": (0.45, 1.70), "sports ball": (0.22, 0.22)}
+
+
+def test_parse_object_dimensions_skips_invalid_entries():
+    parsed = parseObjectDimensions(
+        {
+            "ok": [0.3, 0.3],
+            "missing": {"width": 0.3},
+            "negative": [-1.0, 0.3],
+            "text": "not a size",
+            "nan": [float("nan"), 0.3],
+        }
+    )
+
+    assert parsed == {"ok": (0.3, 0.3)}
+
+
+def test_parse_object_dimensions_rejects_non_object():
+    with pytest.raises(ValueError):
+        parseObjectDimensions([1, 2, 3])
+
+
 def test_yolo_settings_expose_model_file_setting():
     settings = YOLOSettings()
     setting = settings.getAPI().getSetting("model_file")
@@ -147,3 +218,73 @@ def test_yolo_settings_expose_model_file_setting():
     assert isinstance(setting.constraint, FileConstraint)
     assert setting.defaultValue == DEFAULT_MODEL_PATH
     assert setting.constraint.fileTypes == {".pt", ".onnx", ".engine"}
+
+
+def test_yolo_settings_expose_generic_object_size_settings():
+    settings = YOLOSettings()
+    api = settings.getAPI()
+
+    dimensions = api.getSetting("object_dimensions_file")
+    width = api.getSetting("default_object_width")
+    height = api.getSetting("default_object_height")
+
+    assert dimensions is not None
+    assert isinstance(dimensions.constraint, FileConstraint)
+    assert dimensions.defaultValue == ""
+    assert dimensions.constraint.fileTypes == {".json"}
+    assert width is not None
+    assert width.defaultValue == DEFAULT_OBJECT_WIDTH
+    assert height is not None
+    assert height.defaultValue == DEFAULT_OBJECT_HEIGHT
+
+
+def test_pipeline_loads_object_dimensions_file(tmp_path, monkeypatch):
+    (tmp_path / "dimensions.json").write_text(
+        json.dumps({"person": {"width": 0.45, "height": 1.70}})
+    )
+    monkeypatch.setattr("synapse.core.settings_api._getSettingsRoot", lambda: tmp_path)
+    monkeypatch.setattr(
+        "synapse.pipelines.neural.yolo_pipeline._projectRoot", lambda: tmp_path
+    )
+
+    settings = YOLOSettings()
+    result = settings.getAPI().setValue("object_dimensions_file", "dimensions.json")
+    assert result.isValid
+
+    pipeline = YOLOPipeline(settings)
+
+    assert pipeline._objectDimensions == {"person": (0.45, 1.70)}
+
+
+def test_create_model_prefers_yolo_loader():
+    class FakeYOLO:
+        def __init__(self, path: str):
+            self.path = path
+
+    class FakeRTDETR:
+        def __init__(self, path: str):
+            raise AssertionError("RTDETR should not be used")
+
+    module = SimpleNamespace(YOLO=FakeYOLO, RTDETR=FakeRTDETR)
+
+    model = YOLOPipeline._createModel(module, Path("model.pt"))
+
+    assert isinstance(model, FakeYOLO)
+    assert model.path == "model.pt"
+
+
+def test_create_model_falls_back_to_rtdetr_loader():
+    class FakeYOLO:
+        def __init__(self, path: str):
+            raise RuntimeError("unsupported model")
+
+    class FakeRTDETR:
+        def __init__(self, path: str):
+            self.path = path
+
+    module = SimpleNamespace(YOLO=FakeYOLO, RTDETR=FakeRTDETR)
+
+    model = YOLOPipeline._createModel(module, Path("model.pt"))
+
+    assert isinstance(model, FakeRTDETR)
+    assert model.path == "model.pt"

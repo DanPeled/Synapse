@@ -4,18 +4,63 @@
 
 """Estimate field-space positions for 2D neural-network detections."""
 
-from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+import math
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
 from synapse.pipelines.neural.constants import (
-    OBJECT_DIMENSIONS,
+    DEFAULT_OBJECT_HEIGHT,
+    DEFAULT_OBJECT_WIDTH,
     CameraFrame,
     NeuralDetection,
+    ObjectSize,
     PositionEstimate,
 )
 from synapse.stypes import Resolution
+
+
+def parseObjectDimensions(data: Any) -> Dict[str, ObjectSize]:
+    """Normalize a JSON object-dimensions document.
+
+    The expected shape is a mapping from class name to either
+    ``{"width": 0.3, "height": 0.3}`` or ``[0.3, 0.3]``. Invalid entries are
+    skipped so one bad class does not discard the whole file.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("object dimensions must be a JSON object")
+
+    dimensions: Dict[str, ObjectSize] = {}
+    for className, value in data.items():
+        if not isinstance(className, str) or not className.strip():
+            continue
+
+        if isinstance(value, dict):
+            width = value.get("width")
+            height = value.get("height")
+        elif isinstance(value, (list, tuple)) and len(value) == 2:
+            width, height = value
+        else:
+            continue
+
+        if width is None or height is None:
+            continue
+
+        try:
+            width = float(width)
+            height = float(height)
+        except (TypeError, ValueError):
+            continue
+
+        if not (math.isfinite(width) and math.isfinite(height)):
+            continue
+        if width <= 0.0 or height <= 0.0:
+            continue
+
+        dimensions[className] = (width, height)
+
+    return dimensions
 
 
 @dataclass
@@ -29,13 +74,17 @@ class PositionEstimatorConfig:
     maxDistance: float
     minBboxArea: float
     maxReprojectionError: float = 50.0
+    objectDimensions: Dict[str, ObjectSize] = field(default_factory=dict)
+    defaultObjectWidth: float = DEFAULT_OBJECT_WIDTH
+    defaultObjectHeight: float = DEFAULT_OBJECT_HEIGHT
 
 
 class PositionEstimator:
     """Convert a detection bounding box into a position relative to the camera.
 
-    The estimator solves a planar PnP problem using the known approximate size
-    of the detected object. It then rotates the resulting camera-space vector
+    The estimator solves a planar PnP problem using a configured approximate
+    size for the detected object's class. Classes without an explicit size use
+    the configured default. The resulting camera-space vector is then rotated
     into field space using the configured camera pose.
     """
 
@@ -78,9 +127,9 @@ class PositionEstimator:
         self._currentResolution = (width, height)
 
     @staticmethod
-    def _objectPoints(dimensions: Dict[str, float]) -> np.ndarray:
-        halfWidth = dimensions["width"] / 2
-        halfHeight = dimensions["height"] / 2
+    def _objectPoints(width: float, height: float) -> np.ndarray:
+        halfWidth = width / 2
+        halfHeight = height / 2
         return np.array(
             [
                 [-halfWidth, -halfHeight, 0],
@@ -223,11 +272,14 @@ class PositionEstimator:
         if bboxArea < self.config.minBboxArea:
             return None
 
-        objectDimensions = OBJECT_DIMENSIONS.get(detection.className)
-        if objectDimensions is None:
+        width, height = self.config.objectDimensions.get(
+            detection.className,
+            (self.config.defaultObjectWidth, self.config.defaultObjectHeight),
+        )
+        if width <= 0.0 or height <= 0.0:
             return None
 
-        objectPoints = self._objectPoints(objectDimensions)
+        objectPoints = self._objectPoints(width, height)
         imagePoints = self._imagePoints(detection.bbox)
 
         success, rvec, tvec = self._solvePnP(objectPoints, imagePoints)
@@ -257,4 +309,6 @@ class PositionEstimator:
             reprojectionError=reprojectionError,
             bboxArea=bboxArea,
             cameraFrame=cameraFrame,
+            objectWidth=width,
+            objectHeight=height,
         )

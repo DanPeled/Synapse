@@ -65,14 +65,18 @@ pipeline_configs:
       resolution: 1920x1080
       saturation: 50
       sharpness: 50
-  # The YOLO pipeline requires the optional neural dependencies:
+  # The object-detection pipeline requires the optional neural dependencies:
   #   pip install "synapsefrc[yolo]"
-  # Uncomment to add it as pipeline #3:
+  # It accepts any Ultralytics-compatible model. Uncomment to add it as
+  # pipeline #3:
   # 3:
-  #   name: YOLO
+  #   name: Object Detection
   #   type: YOLOPipeline
   #   settings:
   #     model_file: config/models/coralAlgae-640-640-yolov8s.pt
+  #     object_dimensions_file: config/models/object_dimensions.example.json
+  #     default_object_width: 0.3
+  #     default_object_height: 0.3
   #     confidence_threshold: 0.3
   #     iou_threshold: 0.45
   #     draw_detections: true

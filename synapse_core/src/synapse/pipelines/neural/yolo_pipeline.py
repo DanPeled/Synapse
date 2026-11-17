@@ -4,6 +4,10 @@
 
 """YOLO object-detection pipeline.
 
+The pipeline works with any Ultralytics-compatible detection model. Class names
+come from the model itself, so nothing in the pipeline is tied to a specific
+model or class set.
+
 The pipeline is optional because PyTorch and Ultralytics are large
 dependencies. Install them with::
 
@@ -15,10 +19,24 @@ on the processor. Models are loaded when the pipeline starts and reloaded when
 the setting changes. If the model is missing or cannot be loaded, the pipeline
 keeps publishing results with an explanatory ``error`` instead of interrupting
 the camera stream.
+
+Position estimation needs an approximate physical size for each class. The
+``default_object_width`` and ``default_object_height`` settings cover classes
+without a specific entry. To improve accuracy, select an
+``object_dimensions_file`` containing a JSON object keyed by class name::
+
+    {
+      "coral": {"width": 0.30, "height": 0.30},
+      "person": {"width": 0.45, "height": 1.70},
+      "sports ball": [0.22, 0.22]
+    }
+
+Invalid entries are ignored and reported in the log.
 """
 
 import importlib
 import importlib.util
+import json
 import math
 import time
 from pathlib import Path
@@ -38,13 +56,22 @@ from synapse.core.settings_api import (
     SettingsValue,
     settingField,
 )
-from synapse.pipelines.neural.constants import NeuralDetection, NeuralResult
+from synapse.pipelines.neural.constants import (
+    DEFAULT_OBJECT_HEIGHT,
+    DEFAULT_OBJECT_WIDTH,
+    NeuralDetection,
+    NeuralResult,
+    ObjectSize,
+)
 from synapse.pipelines.neural.position_estimator import (
     PositionEstimator,
     PositionEstimatorConfig,
+    parseObjectDimensions,
 )
 from synapse.stypes import CameraID, Frame, Resolution
 
+# Bundled example model. Any Ultralytics-compatible model can be selected
+# through the model_file setting instead.
 DEFAULT_MODEL_PATH = "config/models/coralAlgae-640-640-yolov8s.pt"
 
 
@@ -70,7 +97,7 @@ class YOLOSettings(PipelineSettings):
     model_file = settingField(
         FileConstraint(path="config/models", fileTypes=["pt", "onnx", "engine"]),
         default=DEFAULT_MODEL_PATH,
-        description="YOLO model file (.pt, .onnx, or .engine)",
+        description="Object detection model file (.pt, .onnx, or .engine)",
         category="Model",
     )
     confidence_threshold = settingField(
@@ -84,6 +111,28 @@ class YOLOSettings(PipelineSettings):
         default=0.45,
         description="Non-maximum suppression IoU threshold",
         category="Model",
+    )
+
+    object_dimensions_file = settingField(
+        FileConstraint(path="config/models", fileTypes=["json"]),
+        default="",
+        description=(
+            "Optional JSON file mapping class names to object sizes in meters. "
+            "Classes without an entry use the default size below."
+        ),
+        category="Object Size",
+    )
+    default_object_width = settingField(
+        NumberConstraint(0.0, None, 0.01),
+        default=DEFAULT_OBJECT_WIDTH,
+        description="Assumed object width (meters) for classes without an entry",
+        category="Object Size",
+    )
+    default_object_height = settingField(
+        NumberConstraint(0.0, None, 0.01),
+        default=DEFAULT_OBJECT_HEIGHT,
+        description="Assumed object height (meters) for classes without an entry",
+        category="Object Size",
     )
 
     min_bbox_area = settingField(
@@ -163,7 +212,7 @@ class YOLOSettings(PipelineSettings):
 
 
 class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
-    """Object detection and approximate 3D localization using YOLO.
+    """Object detection and approximate 3D localization for any Ultralytics model.
 
     Developed in partnership with Team #4744 Ninjas.
     """
@@ -180,9 +229,13 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         self._loadedModelValue: Optional[str] = None
         self._device = "cpu"
 
+        self._objectDimensions: Dict[str, ObjectSize] = {}
+        self._loadedDimensionsValue: Optional[str] = None
+
         self._cameraMatrix = np.eye(3, dtype=np.float64)
         self._distCoeffs = np.zeros(5, dtype=np.float64)
         self._calibResolution: Resolution = (640, 480)
+        self._loadObjectDimensions()
         self.poseEstimator = PositionEstimator(self._poseEstimatorConfig())
 
         self._loadModel()
@@ -197,6 +250,13 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
             minBboxArea=float(self.getSetting(self.settings.min_bbox_area)),
             maxReprojectionError=float(
                 self.getSetting(self.settings.max_reprojection_error)
+            ),
+            objectDimensions=dict(self._objectDimensions),
+            defaultObjectWidth=float(
+                self.getSetting(self.settings.default_object_width)
+            ),
+            defaultObjectHeight=float(
+                self.getSetting(self.settings.default_object_height)
             ),
         )
 
@@ -231,8 +291,9 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         value = self.getSetting(self.settings.model_file)
         return value.strip() if isinstance(value, str) else ""
 
-    def _modelPath(self) -> Optional[Path]:
-        value = self._currentModelValue()
+    @staticmethod
+    def _resolveProjectPath(value: str) -> Optional[Path]:
+        value = value.strip()
         if not value:
             return None
 
@@ -240,6 +301,64 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         if not path.is_absolute():
             path = _projectRoot() / path
         return path
+
+    def _modelPath(self) -> Optional[Path]:
+        return self._resolveProjectPath(self._currentModelValue())
+
+    def _currentDimensionsValue(self) -> str:
+        value = self.getSetting(self.settings.object_dimensions_file)
+        return value.strip() if isinstance(value, str) else ""
+
+    def _dimensionsPath(self) -> Optional[Path]:
+        return self._resolveProjectPath(self._currentDimensionsValue())
+
+    def _loadObjectDimensions(self) -> None:
+        self._loadedDimensionsValue = self._currentDimensionsValue()
+        self._objectDimensions = {}
+
+        path = self._dimensionsPath()
+        if path is None:
+            return
+
+        if not path.is_file():
+            log.err(f"Object dimensions file not found: {path}")
+            return
+
+        try:
+            with open(path, encoding="utf-8") as file:
+                data = json.load(file)
+            dimensions = parseObjectDimensions(data)
+        except (OSError, ValueError) as error:
+            log.err(f"Failed to load object dimensions from '{path.name}': {error}")
+            return
+
+        if isinstance(data, dict) and len(dimensions) != len(data):
+            log.warn(
+                f"Ignored {len(data) - len(dimensions)} invalid object "
+                f"dimension entries in '{path.name}'"
+            )
+
+        self._objectDimensions = dimensions
+        log.info(
+            f"Loaded object dimensions for {len(dimensions)} class(es) "
+            f"from '{path.name}'"
+        )
+
+    @staticmethod
+    def _createModel(ultralyticsModule: Any, path: Path) -> Any:
+        """Load a model through Ultralytics, including non-YOLO detectors."""
+        modelClass = getattr(ultralyticsModule, "YOLO")
+        try:
+            return modelClass(str(path))
+        except Exception as yoloError:
+            rtdetrClass = getattr(ultralyticsModule, "RTDETR", None)
+            if rtdetrClass is None:
+                raise
+            log.warn(
+                f"YOLO loader failed for '{path.name}' ({yoloError}); "
+                "retrying with RTDETR"
+            )
+            return rtdetrClass(str(path))
 
     def _loadModel(self) -> None:
         self.model = None
@@ -249,31 +368,32 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         path = self._modelPath()
         if path is None:
             self._modelError = "No model file selected"
-            log.warn("YOLO model file is not set")
+            log.warn("Object detection model file is not set")
             return
 
         if not path.is_file():
             self._modelError = f"Model file not found: {path.name}"
-            log.err(f"YOLO model file not found: {path}")
+            log.err(f"Object detection model file not found: {path}")
             return
 
         try:
             torchModule: Any = importlib.import_module("torch")
             ultralyticsModule: Any = importlib.import_module("ultralytics")
-            yoloClass = getattr(ultralyticsModule, "YOLO")
-        except (ImportError, AttributeError) as error:
+        except ImportError as error:
             self._modelError = f"Missing optional dependency: {error}"
             log.err(
-                "YOLO dependencies are not installed. "
+                "Object detection dependencies are not installed. "
                 'Install them with: pip install "synapsefrc[yolo]"'
             )
             return
 
         try:
             self._device = "cuda:0" if torchModule.cuda.is_available() else "cpu"
-            log.info(f"Loading YOLO model '{path.name}' on {self._device}...")
+            log.info(
+                f"Loading object detection model '{path.name}' on {self._device}..."
+            )
             start = time.perf_counter()
-            model = yoloClass(str(path))
+            model = self._createModel(ultralyticsModule, path)
 
             names = model.names
             if not names:
@@ -284,13 +404,13 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
             self._modelError = ""
             elapsed = time.perf_counter() - start
             log.info(
-                f"YOLO model loaded in {elapsed:.2f}s "
+                f"Object detection model loaded in {elapsed:.2f}s "
                 f"({len(names)} classes) on {self._device}"
             )
         except Exception as error:
             self.model = None
             self._modelError = str(error)
-            log.err(f"Failed to load YOLO model '{path.name}': {error}")
+            log.err(f"Failed to load object detection model '{path.name}': {error}")
 
     def _className(self, classId: int) -> str:
         if self.model is None:
@@ -298,7 +418,10 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
 
         names = self.model.names
         if isinstance(names, dict):
-            return str(names.get(classId, classId))
+            name = names.get(classId)
+            if name is None:
+                name = names.get(str(classId), classId)
+            return str(name)
         if isinstance(names, (list, tuple)) and 0 <= classId < len(names):
             return str(names[classId])
         return str(classId)
@@ -334,7 +457,7 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
             self.model = None
             self._modelName = ""
             self._modelError = f"Inference failed: {error}"
-            log.err(f"YOLO inference failed: {error}")
+            log.err(f"Object detection inference failed: {error}")
             return []
 
         minArea = float(self.getSetting(self.settings.min_bbox_area))
@@ -372,7 +495,7 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
 
         if bool(self.getSetting(self.settings.debug_logging)):
             elapsed = (time.perf_counter() - start) * 1000.0
-            log.info(f"YOLO detected {len(detections)} object(s) in {elapsed:.1f}ms")
+            log.info(f"Detected {len(detections)} object(s) in {elapsed:.1f}ms")
 
         return detections
 
@@ -425,8 +548,17 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
             newValue = value.strip() if isinstance(value, str) else ""
             if newValue == self._loadedModelValue:
                 return
-            log.info("YOLO model setting changed; reloading...")
+            log.info("Model setting changed; reloading...")
             self._loadModel()
+            return
+
+        if setting.key == self.settings.object_dimensions_file.key:
+            newValue = value.strip() if isinstance(value, str) else ""
+            if newValue == self._loadedDimensionsValue:
+                return
+            log.info("Object dimensions setting changed; reloading...")
+            self._loadObjectDimensions()
+            self.poseEstimator.setConfig(self._poseEstimatorConfig())
             return
 
         if setting.key in {
@@ -434,6 +566,8 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
             self.settings.max_distance.key,
             self.settings.min_bbox_area.key,
             self.settings.max_reprojection_error.key,
+            self.settings.default_object_width.key,
+            self.settings.default_object_height.key,
         }:
             self.poseEstimator.setConfig(self._poseEstimatorConfig())
 

@@ -1,0 +1,6 @@
+{
+  "coral": {"width": 0.30, "height": 0.30},
+  "algae": {"width": 0.30, "height": 0.30},
+  "person": {"width": 0.45, "height": 1.70},
+  "sports ball": [0.22, 0.22]
+}

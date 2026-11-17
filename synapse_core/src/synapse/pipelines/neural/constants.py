@@ -3,24 +3,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from synapse.core.pipeline import PipelineResult
 
-# Approximate dimensions (in meters) for the objects the bundled model knows
-# about. Classes that are not listed here are still reported, but they do not
-# get a 3D position estimate.
-OBJECT_DIMENSIONS: Dict[str, Dict[str, float]] = {
-    "dog": {"width": 0.50, "height": 0.60, "depth": 0.80},
-    "cat": {"width": 0.30, "height": 0.25, "depth": 0.40},
-    "cone": {"width": 0.24, "height": 0.33, "depth": 0.24},
-    "cube": {"width": 0.24, "height": 0.24, "depth": 0.24},
-    "sports ball": {"width": 0.22, "height": 0.22, "depth": 0.22},
-    "person": {"width": 0.45, "height": 1.70, "depth": 0.30},
-    "algae": {"width": 0.30, "height": 0.30, "depth": 0.30},
-    "coral": {"width": 0.30, "height": 0.30, "depth": 0.30},
-    "default": {"width": 0.30, "height": 0.30, "depth": 0.30},
-}
+#: Object width/height pair in meters.
+ObjectSize = Tuple[float, float]
+
+#: Assumed size for classes without an explicit entry. This keeps position
+#: estimation usable for any model while allowing per-class sizes to be
+#: supplied through the pipeline settings.
+DEFAULT_OBJECT_WIDTH = 0.3
+DEFAULT_OBJECT_HEIGHT = 0.3
 
 
 @dataclass(frozen=True)
@@ -44,6 +38,8 @@ class PositionEstimate:
     reprojectionError: float
     bboxArea: float
     cameraFrame: CameraFrame
+    objectWidth: float
+    objectHeight: float
 
 
 @dataclass
@@ -60,7 +56,7 @@ class NeuralDetection:
 
 @dataclass
 class NeuralResult(PipelineResult):
-    """Result published by the YOLO pipeline."""
+    """Result published by the neural pipeline."""
 
     detections: List[NeuralDetection]
     model: str = ""
