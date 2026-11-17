@@ -6,7 +6,7 @@
 import importlib.util
 import traceback
 from pathlib import Path
-from typing import Dict, Final, Optional, Set, Type, TypeVar
+from typing import Dict, Final, Optional, Set, Tuple, Type, TypeVar
 
 import synapse.log as log
 import yaml
@@ -64,6 +64,31 @@ class PipelineHandler:
         self.loadPipelineSettings()
         self.loadPipelineCameraSettings()
         self.loadPipelineInstances()
+
+    def cleanup(self) -> None:
+        """Close every pipeline instance and clear the runtime bindings."""
+        instances: Dict[int, Tuple[CameraID, PipelineID, Pipeline]] = {}
+        for cameraIndex, pipelines in self.pipelineInstanceBindings.items():
+            for pipelineIndex, pipeline in pipelines.items():
+                instances.setdefault(
+                    id(pipeline), (cameraIndex, pipelineIndex, pipeline)
+                )
+
+        if instances:
+            log.info("Closing pipelines...")
+        for cameraIndex, pipelineIndex, pipeline in instances.values():
+            name = pipeline.name or type(pipeline).__name__
+            try:
+                pipeline.close()
+            except Exception as error:
+                log.err(
+                    f"Failed to close pipeline #{pipelineIndex} on camera "
+                    f"#{cameraIndex} ({name}): {error}"
+                )
+
+        self.pipelineInstanceBindings.clear()
+        if instances:
+            log.info("Pipelines released.")
 
     def onAddCamera(
         self, cameraIndex: CameraID, name: str, handle: CameraHandle

@@ -119,6 +119,14 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     def processFrame(self, img, timestamp: float) -> PipelineProcessFrameResult:
         pass
 
+    def close(self) -> None:
+        """Release resources owned by this pipeline.
+
+        Pipelines that hold native resources should override this method and
+        call ``super().close()`` after releasing them.
+        """
+        self.invalidateCachedEntries()
+
     def invalidateCachedEntries(self) -> None:
         for pub in self._ntPublishers.values():
             try:

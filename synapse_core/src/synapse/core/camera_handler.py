@@ -32,6 +32,7 @@ from .camera.no_signal import NoSignalCamera, generateNoSignalFrame
 from .camera.synapse_camera import SynapseCamera
 from .camera_factory import CameraConfig, CameraFactory, getCameraTableName
 from .global_settings import GlobalSettings
+from .lifecycle import joinThread
 
 
 class CameraHandler:
@@ -547,16 +548,53 @@ class CameraHandler:
         return updated_settings
 
     def cleanup(self) -> None:
-        """
-        Releases all video writers and closes all active camera connections.
-        """
+        """Stop the camera scanner and release cameras, streams, and recordings."""
+        log.info("Stopping camera scanner...")
         self.stopCameraScanEvent.set()
-        if hasattr(self, "cameraScanningThread"):
-            self.cameraScanningThread.join()
+        if joinThread(
+            getattr(self, "cameraScanningThread", None),
+            "Camera scanner",
+            timeout=2.0,
+        ):
+            log.info("Camera scanner stopped.")
 
-        for record in self.recordingOutputs.values():
-            record.release()
+        recordingCount = len(self.recordingOutputs)
+        if recordingCount:
+            log.info(f"Releasing {recordingCount} recording(s)...")
+        for cameraIndex, record in self.recordingOutputs.items():
+            try:
+                record.release()
+            except Exception as error:
+                log.err(
+                    f"Failed to release recording for camera #{cameraIndex}: {error}"
+                )
+        self.recordingOutputs.clear()
+        self.recordingResolutions.clear()
+        self.recordingStatus.clear()
+        self.recordFileNames.clear()
+        if recordingCount:
+            log.info("Recordings released.")
+
+        cameraCount = len(self.cameraHandles)
+        if cameraCount:
+            log.info(f"Closing {cameraCount} camera(s)...")
+        for cameraIndex, handle in self.cameraHandles.items():
+            name = getattr(handle, "name", str(cameraIndex))
+            try:
+                # Stop the frame grabber before releasing the camera connection.
+                handle.close()
+                handle.camera.close()
+            except Exception as error:
+                log.err(f"Failed to close camera #{cameraIndex} ({name}): {error}")
+        self.cameraHandles.clear()
+        if cameraCount:
+            log.info("Cameras closed.")
+
+        streamCount = len(self.streamOutputs)
+        if streamCount:
+            log.info(f"Clearing {streamCount} stream output(s)...")
+        self.streamOutputs.clear()
+        self.streamSizes.clear()
         self._streamFrameBuffers.clear()
         self._recordFrameBuffers.clear()
-        for camera in self.cameraHandles.values():
-            camera.close()
+        log.info("Camera resources released.")

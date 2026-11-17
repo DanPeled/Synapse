@@ -316,6 +316,11 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             )
         )
 
+    def close(self) -> None:
+        """Release the native AprilTag detector."""
+        self.apriltagDetector.close()
+        super().close()
+
     def setDetectorConfig(self, cameraIndex: CameraID) -> None:
         detectorConfig = self.apriltagDetector.getConfig()
 
