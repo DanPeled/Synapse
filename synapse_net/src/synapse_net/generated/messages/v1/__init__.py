@@ -210,6 +210,7 @@ class SetNetworkSettingsProto(betterproto.Message):
     network_interface: str = betterproto.string_field(3)
     network_table: str = betterproto.string_field(4)
     team_number: int = betterproto.uint32_field(5)
+    prefix_length: int = betterproto.uint32_field(6)
 
 
 @dataclass(eq=False, repr=False)

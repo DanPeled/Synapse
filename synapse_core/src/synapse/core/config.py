@@ -33,7 +33,11 @@ class NetworkConfig:
 
     Attributes:
         teamNumber (int): The team number.
+        name (str): The NetworkTables name.
         hostname (str): The hostname of the networked device.
+        ip (Optional[str]): Static IPv4 address added alongside DHCP, if any.
+        networkInterface (Optional[str]): Interface for the static address.
+        prefixLength (int): CIDR prefix length for the static address.
     """
 
     teamNumber: int
@@ -41,6 +45,7 @@ class NetworkConfig:
     hostname: str
     ip: Optional[str]
     networkInterface: Optional[str]
+    prefixLength: int
 
     @classmethod
     def fromJson(cls, data: dict) -> "NetworkConfig":
@@ -53,29 +58,42 @@ class NetworkConfig:
         Returns:
             NetworkConfig: An instance populated with values from the dictionary.
         """
+        # Older configs wrote the interface key with a typo. Keep reading it so
+        # existing devices pick up their settings after an upgrade.
+        interface = data.get("interface") or data.get("interfrace")
+
+        try:
+            prefixLength = int(data.get("prefix_length", 24))
+        except (TypeError, ValueError):
+            prefixLength = 24
+
         return NetworkConfig(
-            teamNumber=data.get("team_number", 0000),
+            teamNumber=data.get("team_number", 0),
             name=data.get("name", "Synapse"),
-            hostname=socket.gethostname(),
-            ip=data.get("ip", None),
-            networkInterface=data.get("interfrace"),
+            hostname=data.get("hostname") or socket.gethostname(),
+            ip=data.get("ip") or None,
+            networkInterface=interface or None,
+            prefixLength=prefixLength,
         )
 
     def toJson(self) -> Dict[str, Any]:
         return {
             "team_number": self.teamNumber,
             "name": self.name,
+            "hostname": self.hostname,
             "ip": self.ip,
             "interface": self.networkInterface,
+            "prefix_length": self.prefixLength,
         }
 
     def toProto(self) -> SetNetworkSettingsProto:
         return SetNetworkSettingsProto(
             hostname=self.hostname,
-            ip=self.ip or "localhost",
-            network_interface=self.networkInterface or "null",
+            ip=self.ip or "",
+            network_interface=self.networkInterface or "",
             network_table=self.name,
             team_number=self.teamNumber,
+            prefix_length=self.prefixLength,
         )
 
 

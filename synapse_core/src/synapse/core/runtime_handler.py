@@ -134,6 +134,7 @@ class RuntimeManager:
             hostname="synapse",
             ip=None,
             networkInterface=None,
+            prefixLength=24,
         )
 
         self.onSettingChanged: SettingChangedCallback = Callback()
