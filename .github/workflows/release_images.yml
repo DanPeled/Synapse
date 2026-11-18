@@ -1,0 +1,166 @@
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Build Synapse Device Images
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Comma-separated platform or target ids (default: all)"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synapse-images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  prepare:
+    name: Prepare build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate image registry
+        run: python3 synapse_imager/platforms.py validate
+
+      - name: Resolve Synapse version
+        id: version
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import pathlib
+          import re
+
+          text = pathlib.Path("synapse_core/src/synapse/__version__.py").read_text()
+          match = re.search(
+              r'SYNAPSE_VERSION\s*:\s*Final\[str\]\s*=\s*"([^"]+)"', text
+          )
+          if not match:
+              raise SystemExit("Could not find SYNAPSE_VERSION")
+          print(f"version={match.group(1)}")
+          PY
+
+      - name: Resolve build matrix
+        id: matrix
+        env:
+          TARGETS: ${{ github.event.inputs.targets || 'all' }}
+        run: |
+          matrix="$(python3 synapse_imager/platforms.py matrix --targets "${TARGETS}")"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
+  wheel:
+    name: Build release wheel
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.9.0"
+
+      - name: Install UI dependencies
+        working-directory: synapse_ui
+        run: npm ci
+
+      - name: Install simulator dependencies
+        working-directory: synapse_sim
+        run: npm ci
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          make build
+
+      - name: Verify the wheel
+        run: |
+          ls -l dist/*.whl
+          test -n "$(ls -1 dist/*.whl)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synapse-wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
+  images:
+    name: ${{ matrix.name }}
+    needs: [prepare, wheel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        if: matrix.free_disk
+        uses: jlumbroso/free-disk-space@v1.3.2
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - name: Install host build dependencies
+        if: matrix.setup != ''
+        run: bash "synapse_imager/${{ matrix.setup }}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: synapse-wheel
+          path: dist
+
+      - name: Build image
+        env:
+          SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
+          OUT_DIR: ${{ github.workspace }}/out
+        run: |
+          wheel="$(ls -1 dist/*.whl | head -n 1)"
+          SYNAPSE_WHEEL="$wheel" python3 synapse_imager/platforms.py build "${{ matrix.target }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [prepare, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          fail_on_unmatched_files: true
