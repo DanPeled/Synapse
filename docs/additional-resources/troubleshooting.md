@@ -90,25 +90,41 @@ Start from the defaults and change one setting at a time.
 - If you import settings, use a `.zip` file. The picker also accepts `.json`, but only `.zip` is handled.
 - If NetworkTables is writing the setting every loop, it can overwrite dashboard changes.
 
+## Device discovery finds nothing
+
+`device add` automatic mode and Synapse Manager send a UDP broadcast to port `45454`.
+
+1. Confirm the runtime is running on the device.
+2. Make sure your computer and the device are on the same subnet. Broadcasts do not cross routers.
+3. Allow UDP port `45454` through any firewall on the computer or device.
+4. If the device reports `127.0.0.1`, it could not determine its network address. Add it manually with its real IP.
+
 ## Deploy or install fails
 
 | Symptom | Fix |
 | --- | --- |
-| `Not in a Synapse project` | Run the command from the project root that contains `.synapseproject` |
+| `No .synapseproject file found` | Run the command from the project root that contains `.synapseproject` |
 | SSH connection refused | Check the hostname, username, password, and network |
-| Permission denied | Confirm the device user can write to the Synapse folder |
-| Files missing on device | Run `install` (which runs `sync` then `deploy`) instead of `deploy` alone |
-| Wrong device | Use `device add` to add or update the device configuration |
+| `Host key for ... is not trusted` | Run `install` from a terminal and accept the fingerprint, or add the key to `~/.ssh/known_hosts` |
+| `SSH host key ... does not match` | The device was reflashed or its IP was reused. Remove the old key with `ssh-keygen -R <device-ip>`, then run `install` again |
+| `Passwordless sudo is not configured` | Run `sync <device>`; it adds `/etc/sudoers.d/<user>-nopasswd` |
+| `Deployment archive not found` / `is empty` / `Invalid deployment archive` | The build is incomplete. Re-run `deploy` and check that `build/` is writable |
+| `project.zip is missing required file(s): main.py` | Keep `main.py` at the project root |
+| `synapse-runtime did not become active within 20s` | Check `journalctl -u synapse-runtime` on the device; the installer has already rolled back |
+| `Sync failed; skipping deployment.` | Fix the sync error first; `install` will not deploy a project whose dependencies failed |
+| Wrong device | Use `device list` to check nicknames, or `device add` to add another device |
 
 Useful commands:
 
 ```bash
 python -m synapse_installer install <device-nickname>
 python -m synapse_installer sync <device-nickname>
-python -m synapse_installer deploy
+python -m synapse_installer deploy --dry-run
 ```
 
-The nickname is the key under `deploy` in `.synapseproject`. Pass it to `sync` and `install`; `deploy` without a name targets every device.
+The nickname is the key under `deploy` in `.synapseproject`. Pass it to `sync` and `install`, or leave it out to target every configured device. `deploy` without a name asks for confirmation unless you pass `--yes`.
+
+If a deployment fails after the service was stopped, the installer restores the previous version from `~/.synapse-backup-*` and restarts it. Set `SYNAPSE_DEBUG=1` to print a full traceback.
 
 ## Simulation will not start
 

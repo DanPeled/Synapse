@@ -38,7 +38,7 @@ The app sends a UDP discovery ping to port `45454` every five seconds. Devices r
 - Runtime version
 - SSH username
 
-The table shows the **nickname** and **address** for each device.
+The table shows the **nickname** and **address** for each device. The installer's `device add` automatic option uses the same ping, so a device that appears here can also be added from the command line.
 
 {% hint style="info" %}
 If no devices appear:
@@ -77,6 +77,12 @@ Deploy runs this command inside the linked folder:
 python -m synapse_installer install <hostname>
 ```
 
+`install` runs `sync` first. If sync fails, it stops with `Sync failed; skipping deployment.` and the project is not deployed. Deploys are staged, and the previous version is restored if the new one fails to start.
+
+{% hint style="warning" %}
+Synapse Manager runs the installer without a terminal, so it cannot answer the SSH host-key prompt. The first deploy to a new device can fail with `Host key ... is not trusted`. Run `python -m synapse_installer install <hostname>` once in a terminal and accept the fingerprint, then retry from Synapse Manager.
+{% endhint %}
+
 Synapse Manager looks for a virtual environment first:
 
 - Linux/macOS: `.venv/bin/python`, then `venv/bin/python`, then `python3`.
@@ -86,6 +92,8 @@ If the installer is not available in that Python environment, deploy fails. Inst
 
 {% hint style="tip" %}
 Synapse Manager passes the **hostname** the device reports to `synapse_installer install`. The installer matches that value against the names in the `deploy` section of `.synapseproject`, so keep the device entry named after its hostname. If your entry uses a different name, deploy from a terminal with that name instead.
+
+Automatic discovery names the entry after the runtime's configured network name, which may differ from the device hostname. If Synapse Manager cannot find the entry, rename it to the hostname shown in the device info dialog.
 {% endhint %}
 
 ## When to use the CLI instead
@@ -102,6 +110,7 @@ See [Project Management](README.md) for the CLI reference.
 ## Troubleshooting
 
 - **Deploy says the installer is missing** — install `synapsefrc` in the linked project's virtual environment.
+- **Deploy says the host key is not trusted** — run `install` once from a terminal and accept the fingerprint, or add the device key to `~/.ssh/known_hosts`.
 - **Device does not appear** — check the firewall and network, then verify the runtime is running.
 - **Dashboard does not open** — confirm port `3000` is reachable and the device IP has not changed.
 - **Terminal does not open** — make sure SSH is enabled and your terminal application is installed.

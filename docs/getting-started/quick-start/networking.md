@@ -39,7 +39,7 @@ Replace `<device-ip>` with the coprocessor's IP address.
 | UI WebSocket | `ws://<device-ip>:8765` | Used by the dashboard automatically |
 | Camera streams | `http://<device-ip>:118X/?action=stream` | First camera is `1180`, then `1181`, `1182`, … |
 | SSH / deploy | `ssh <user>@<device-ip>` | Port `22` |
-| Device discovery | UDP `45454` | Used by Synapse Manager |
+| Device discovery | UDP `45454` | Used by Synapse Manager and `device add` automatic discovery |
 
 {% hint style="warning" %}
 Camera streams use **HTTP**, not HTTPS. If the stream does not load, check that you are using `http://` and the correct port.
@@ -61,7 +61,7 @@ Or from your development computer, try the hostname you configured:
 ping <hostname>.local
 ```
 
-Synapse Manager also discovers devices automatically. See [Synapse Manager](../../usage/project-management/synapse-manager.md).
+Synapse Manager and `python -m synapse_installer device add` also discover devices automatically over UDP port `45454`. Discovery uses a broadcast, so the device must be on the same subnet. See [Synapse Manager](../../usage/project-management/synapse-manager.md) and [Project Management](../../usage/project-management/README.md#add-or-remove-devices).
 
 ## Configuring the device network
 

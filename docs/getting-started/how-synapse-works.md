@@ -40,6 +40,7 @@ The runtime is responsible for:
 - Streaming camera feeds through CameraServer.
 - Publishing results and metadata to NetworkTables.
 - Saving settings when you change them in the UI.
+- Answering UDP discovery pings on port `45454`, so Synapse Manager and `device add` can find the device.
 
 Start it manually with the project's `main.py`:
 
@@ -61,7 +62,7 @@ python main.py --headless     # skip the terminal UI
 
 ### Stopping the runtime
 
-Press `Ctrl+C`, or stop the `synapse-runtime` service, to shut down cleanly. The runtime releases resources in reverse startup order: the runtime (cameras and pipelines), NetworkTables, the device responder, the file server, and finally the WebSocket server. Each step is logged, and a failure in one step does not stop the rest. Most thread joins have a timeout, but the file server's join currently has none, so a stuck file server can still delay shutdown. Python code can call `Synapse.kInstance.shutdown()` to run the same path; `close()` and `cleanup()` are aliases.
+Press `Ctrl+C`, or stop the `synapse-runtime` service, to shut down cleanly. The runtime releases resources in reverse startup order: the runtime (cameras and pipelines), NetworkTables, the UDP device responder, the file server, and finally the WebSocket server. Each step is logged, and a failure in one step does not stop the rest. Most thread joins have a timeout, but the file server's join currently has none, so a stuck file server can still delay shutdown. Python code can call `Synapse.kInstance.shutdown()` to run the same path; `close()` and `cleanup()` are aliases.
 
 ## Projects
 
@@ -84,9 +85,13 @@ my-synapse-project/
 
 When you deploy, the installer:
 
-1. Uploads your project (Python files and everything inside `deploy/`) to `~/Synapse` on the coprocessor.
-2. Preserves the existing `~/Synapse/config` folder so your tuned settings survive.
-3. Sets up or restarts the `synapse-runtime` service.
+1. Verifies the device's SSH host key and validates the packaged archives.
+2. Uploads your project (Python files and everything inside `deploy/`) and extracts it into a staging folder on the coprocessor.
+3. Stops `synapse-runtime`, preserves the existing `~/Synapse/config` folder, and swaps the new deployment into place.
+4. Sets up or restarts the `synapse-runtime` service and waits for it to become active.
+5. Restores the previous deployment and restarts it if the new one fails to start.
+
+The previous deployment is kept at `~/.synapse-backup-<timestamp>-<pid>` on the device until the next successful deploy.
 
 The `config/` folder is created by the runtime the first time it starts, not by the project creation command.
 
@@ -160,6 +165,7 @@ flowchart TB
     C <-->|NetworkTables| R
     L <-->|HTTP port 3000 / WebSocket 8765| C
     L <-->|SSH / deploy| C
+    L <-->|UDP 45454 discovery| C
 ```
 
 - The **RoboRIO** hosts the NetworkTables server during a match.

@@ -44,14 +44,21 @@ python -m synapse_installer --help
 ```
 
 ```text
-Usage: python -m synapse_installer <command> [options]
+Usage: python -m synapse_installer <command> [options] [devices...]
 
 Commands:
   create       Create a new project
-  deploy       Deploy the project
-  sync         Sync files or data
-  install      Run sync then deploy
-  device       Device actions (e.g. `add`)
+  deploy       Deploy the project to one or more devices
+  sync         Install or update Python dependencies on devices
+  install      Run sync, then deploy
+  device       Manage devices (add, list, remove)
+
+Deploy/install options:
+  -y, --yes        Don't ask for confirmation before deploying
+  -n, --dry-run    Show the deployment targets without changing anything
+      --no-logs    Don't follow the runtime logs after deploying
+
+If no device names are given, deploy and install use every configured device.
 ```
 
 The installer is also available as the `synapse_installer` command on your `PATH`.
@@ -77,6 +84,8 @@ You do not need to copy Synapse onto the device by hand. The `sync` step install
 
 The installer will:
 
+- Verify the device's SSH host key. On the first connection it shows a SHA-256 fingerprint and asks you to trust it, then saves the key in `~/.ssh/known_hosts`.
+- Configure passwordless sudo for the SSH user in `/etc/sudoers.d/<username>-nopasswd`.
 - Install system packages: `libopencv-dev`, `unzip`, and `isc-dhcp-client`.
 - Find a compatible Python interpreter (3.11–3.14).
 - Build Python 3.12.2 from source if no compatible interpreter exists. This takes a long time on slower devices.
@@ -87,6 +96,10 @@ The installer will:
 
 {% hint style="warning" %}
 Building Python from source can take 20–60 minutes on a Pi. A distribution image that already includes Python 3.11 through 3.14 avoids this.
+{% endhint %}
+
+{% hint style="info" %}
+Non-interactive runs, such as CI or a GUI launcher, reject an unknown SSH host key instead of prompting. Connect once with `ssh <user>@<device-ip>` or run `install` from a terminal to trust the key.
 {% endhint %}
 
 ### Imaging a device
@@ -123,13 +136,15 @@ cd <project-name>
 python -m synapse_installer install <device-nickname>
 ```
 
-The installer asks for the device hostname, IP address, and SSH password, then saves them in `.synapseproject`. The nickname defaults to the hostname.
+The installer asks for the device hostname, IP address, and SSH password, then saves them in `.synapseproject`. The nickname defaults to the hostname. You can enter these manually or let `device add` discover devices on the network; automatic discovery uses the name the runtime reports as the nickname.
 
 Pass the nickname to `install` or `sync` so they target the right device. To target several devices, list each nickname:
 
 ```bash
 python -m synapse_installer install <nickname-1> <nickname-2>
 ```
+
+If you leave out the names, `install` uses every configured device. Before deploying, it asks for confirmation unless you pass `--yes`. Add `--dry-run` to preview the targets, or `--no-logs` to stop after the service starts. If the sync step fails, `install` prints `Sync failed; skipping deployment.` and does not change the project on the device.
 
 ### Verify the runtime
 
@@ -165,7 +180,7 @@ Then re-deploy your project:
 python -m synapse_installer install <device-nickname>
 ```
 
-The deploy step preserves the device's `config/` folder, so calibrated cameras and tuned settings survive an update.
+The deploy step preserves the device's `config/` folder, so calibrated cameras and tuned settings survive an update. Deployments are staged and validated: if the new version fails to start, the installer restores the previous deployment and restarts it.
 
 ## Uninstalling
 

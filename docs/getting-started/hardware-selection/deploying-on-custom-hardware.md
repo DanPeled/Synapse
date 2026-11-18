@@ -42,11 +42,13 @@ If Python 3.11–3.14 is not installed, the installer builds Python 3.12.2 from 
 | `3000` | Web UI |
 | `8765` | UI WebSocket |
 | `1180` and up | Camera streams (CameraServer) |
-| `45454/udp` | Device discovery for Synapse Manager |
+| `45454/udp` | Device discovery for Synapse Manager and `device add` |
 
 ## Permissions
 
-The SSH user must be able to run `sudo`. During `sync`, the installer adds a sudoers rule that lets the SSH user run commands without a password (`NOPASSWD:ALL`).
+The SSH user must be able to run `sudo`. During `sync`, the installer writes `/etc/sudoers.d/<username>-nopasswd` (mode `440`) with a `NOPASSWD:ALL` rule, so later deploys can manage the service without a password. The username must contain only letters, digits, `_`, `.`, or `-`; sync refuses to edit sudoers for any other username.
+
+The installer also verifies the device's SSH host key. The first interactive connection shows a SHA-256 fingerprint and asks you to trust it. Non-interactive runs reject an unknown key, so connect once with `ssh` or run `install` from a terminal first.
 
 ## Camera support
 

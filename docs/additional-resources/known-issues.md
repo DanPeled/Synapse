@@ -29,19 +29,21 @@ from synapse.core import Synapse
 from synapse.core.synapse import Synapse
 ```
 
-## `sync` and `install` need an explicit device name
+## Synapse Manager cannot trust a new SSH host key
 
-**Affects:** `python -m synapse_installer sync` and `install` without a device name
+**Affects:** Deploying from Synapse Manager to a device that is not already in `~/.ssh/known_hosts`
 
-When no device name is passed, `sync` falls back to the installer process's `sys.argv` instead of the devices in `.synapseproject`. It then reports `No device named ... found` for each process argument and does not sync dependencies. `install` still runs `deploy`, so files may be uploaded without the Python environment being prepared.
+The installer verifies SSH host keys. Synapse Manager runs `synapse_installer install` without a terminal, so the installer cannot show the fingerprint prompt and rejects an unknown key.
 
-**Workaround:** Pass the device nickname (the key under `deploy` in `.synapseproject`):
+**Workaround:** Run the deploy once from a terminal, or connect with `ssh <user>@<device-ip>`, and accept the fingerprint. After the key is in `~/.ssh/known_hosts`, deploy from Synapse Manager normally.
 
-```bash
-python -m synapse_installer install orangepi
-```
+## Automatic discovery can report `127.0.0.1`
 
-`deploy` without a name still targets every configured device.
+**Affects:** `python -m synapse_installer device add` → **Automatic** on a device that cannot determine its outbound network address
+
+The runtime reports the address of the interface it would use to reach the internet. If it cannot determine one, it falls back to `127.0.0.1`. The installer accepts that value and saves it as the device IP, so deploys to that entry fail.
+
+**Workaround:** Add the device manually with its real IP address.
 
 ## Camera settings are not published to NetworkTables by default
 

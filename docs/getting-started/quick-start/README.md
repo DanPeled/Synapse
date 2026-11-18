@@ -75,14 +75,16 @@ From inside the project folder:
 python -m synapse_installer install <device-nickname>
 ```
 
-Use the device nickname you set during `create`. It defaults to the device hostname.
+Use the device nickname you set during `create`. It defaults to the device hostname, or to the name the runtime reports when you add a device automatically.
 
 `install` runs two steps:
 
 1. **Sync** — installs system packages, creates a Python virtual environment on the device, and installs Synapse.
-2. **Deploy** — copies your project to `~/Synapse` and starts the `synapse-runtime` service.
+2. **Deploy** — validates the package, copies your project to `~/Synapse`, and starts the `synapse-runtime` service.
 
-The first run can take several minutes because Python and OpenCV are installed on the device.
+If sync fails, `install` stops and does not deploy. If the new deployment fails to start, the installer restores the previous version and restarts it.
+
+The first run can take several minutes because Python and OpenCV are installed on the device. It also asks you to trust the device's SSH host key on the first connection.
 
 {% hint style="warning" %}
 The device needs internet access during the first sync. If the device cannot reach the internet, install the packages manually or use a device image that already includes them.
