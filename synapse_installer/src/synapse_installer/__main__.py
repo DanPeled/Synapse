@@ -10,14 +10,21 @@ from typing import Callable, Dict, List
 from .util import NOT_IN_SYNAPSE_PROJECT_ERR, SYNAPSE_PROJECT_FILE
 
 HELP_TEXT = """
-Usage: python -m synapse_installer <command> [options]
+Usage: python -m synapse_installer <command> [options] [devices...]
 
 Commands:
   create       Create a new project
-  deploy       Deploy the project
-  sync         Sync files or data
-  install      Run sync then deploy
-  device       Device actions (e.g. `add`)
+  deploy       Deploy the project to one or more devices
+  sync         Install or update Python dependencies on devices
+  install      Run sync, then deploy
+  device       Manage devices (add, list, remove)
+
+Deploy/install options:
+  -y, --yes        Don't ask for confirmation before deploying
+  -n, --dry-run    Show the deployment targets without changing anything
+      --no-logs    Don't follow the runtime logs after deploying
+
+If no device names are given, deploy and install use every configured device.
 """
 
 
@@ -34,13 +41,15 @@ def cmd_create(args: List[str]) -> int:
 
 def cmd_deploy(args: List[str]) -> int:
     if args and args[0] in ("-h", "--help"):
-        print("Usage: python -m synapse_installer deploy [hostnames]")
+        print(
+            "Usage: python -m synapse_installer deploy [options] [devices...]\n"
+            "Options: -y/--yes, -n/--dry-run, --no-logs"
+        )
         return 0
 
     from .deploy import setupAndRunDeploy
 
-    setupAndRunDeploy(args)
-    return 0
+    return setupAndRunDeploy(args)
 
 
 def cmd_sync(args: List[str]) -> int:
@@ -51,24 +60,40 @@ def cmd_sync(args: List[str]) -> int:
 
 def cmd_install(args: List[str]) -> int:
     if args and args[0] in ("-h", "--help"):
-        print("Usage: python -m synapse_installer install [hostnames]")
+        print(
+            "Usage: python -m synapse_installer install [options] [devices...]\n"
+            "Options: -y/--yes, -n/--dry-run, --no-logs"
+        )
         return 0
 
-    from .deploy import setupAndRunDeploy
+    from .deploy import DeploymentError, parseDeployArgs, setupAndRunDeploy
     from .sync import sync
 
-    result_sync = sync(args)
-    result_deploy = setupAndRunDeploy(args)
-    return 0 if result_sync == 0 and result_deploy == 0 else 1
+    try:
+        options = parseDeployArgs(args)
+    except DeploymentError as error:
+        print(f"Error: {error}")
+        return 1
+
+    if options.dryRun:
+        print("Dry run: skipping dependency sync.")
+        return setupAndRunDeploy(options)
+
+    resultSync = sync(options.devices)
+    if resultSync != 0:
+        print("Sync failed; skipping deployment.")
+        return 1
+
+    return setupAndRunDeploy(options)
 
 
 def cmd_device(args: List[str]) -> int:
     if not args or args[0] in ("-h", "--help"):
-        print("Usage: python -m synapse_installer device add")
+        print("Usage: python -m synapse_installer device <add|list|remove> [device]")
         return 0
 
-    config_path = Path.cwd() / SYNAPSE_PROJECT_FILE
-    if not config_path.exists():
+    configPath = Path.cwd() / SYNAPSE_PROJECT_FILE
+    if not configPath.exists():
         print(NOT_IN_SYNAPSE_PROJECT_ERR)
         return 1
 
@@ -77,8 +102,22 @@ def cmd_device(args: List[str]) -> int:
     if action == "add":
         from synapse_installer.deploy import addDeviceConfig
 
-        addDeviceConfig(config_path)
+        addDeviceConfig(configPath)
         return 0
+
+    if action == "list":
+        from synapse_installer.deploy import listDevices
+
+        return listDevices(configPath)
+
+    if action == "remove":
+        if len(args) < 2:
+            print("Usage: python -m synapse_installer device remove <device>")
+            return 1
+
+        from synapse_installer.deploy import removeDevice
+
+        return removeDevice(configPath, args[1])
 
     print(f"Unknown device action: `{action}`")
     return 1
