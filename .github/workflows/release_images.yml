@@ -1,0 +1,236 @@
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Build Synapse Device Images
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      orangepi_boards:
+        description: "Comma-separated Orange Pi boards to build"
+        required: false
+        default: "orangepi5,orangepi5-plus"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synapse-images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  prepare:
+    name: Prepare build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      orangepi_boards: ${{ steps.matrix.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Synapse version
+        id: version
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import pathlib
+          import re
+
+          text = pathlib.Path("synapse_core/src/synapse/__version__.py").read_text()
+          match = re.search(
+              r'SYNAPSE_VERSION\s*:\s*Final\[str\]\s*=\s*"([^"]+)"', text
+          )
+          if not match:
+              raise SystemExit("Could not find SYNAPSE_VERSION")
+          print(f"version={match.group(1)}")
+          PY
+
+      - name: Resolve Orange Pi board matrix
+        id: matrix
+        env:
+          BOARDS: ${{ github.event.inputs.orangepi_boards || 'orangepi5,orangepi5-plus' }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+
+          boards = [b.strip() for b in os.environ["BOARDS"].split(",") if b.strip()]
+          if not boards:
+              raise SystemExit("No Orange Pi boards selected")
+          print("boards=" + json.dumps(boards))
+          PY
+
+  wheel:
+    name: Build release wheel
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.9.0"
+
+      - name: Install UI dependencies
+        working-directory: synapse_ui
+        run: npm ci
+
+      - name: Install simulator dependencies
+        working-directory: synapse_sim
+        run: npm ci
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          make build
+
+      - name: Verify the wheel
+        run: |
+          ls -l dist/*.whl
+          test -n "$(ls -1 dist/*.whl)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synapse-wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
+  raspberrypi:
+    name: Raspberry Pi image
+    needs: [prepare, wheel]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.2
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - name: Install pi-gen dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: synapse-wheel
+          path: dist
+
+      - name: Build Raspberry Pi image
+        env:
+          SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
+          OUT_DIR: ${{ github.workspace }}/out
+          USE_DOCKER: "1"
+        run: |
+          wheel="$(ls -1 dist/*.whl | head -n 1)"
+          SYNAPSE_WHEEL="$wheel" bash synapse_imager/raspberrypi/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synapse-raspberrypi
+          path: out/*
+          if-no-files-found: error
+
+  orangepi:
+    name: Orange Pi image (${{ matrix.board }})
+    needs: [prepare, wheel]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.prepare.outputs.orangepi_boards) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.2
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: synapse-wheel
+          path: dist
+
+      - name: Build Orange Pi image
+        env:
+          BOARD: ${{ matrix.board }}
+          SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
+          OUT_DIR: ${{ github.workspace }}/out
+          PREFER_DOCKER: "yes"
+        run: |
+          wheel="$(ls -1 dist/*.whl | head -n 1)"
+          SYNAPSE_WHEEL="$wheel" bash synapse_imager/orangepi/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synapse-${{ matrix.board }}
+          path: out/*
+          if-no-files-found: error
+
+  jetson:
+    name: Jetson overlay
+    needs: [prepare, wheel]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: synapse-wheel
+          path: dist
+
+      - name: Build Jetson overlay
+        env:
+          SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
+          OUT_DIR: ${{ github.workspace }}/out
+        run: |
+          wheel="$(ls -1 dist/*.whl | head -n 1)"
+          SYNAPSE_WHEEL="$wheel" bash synapse_imager/jetson/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synapse-jetson
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [prepare, raspberrypi, orangepi, jetson]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          fail_on_unmatched_files: true
