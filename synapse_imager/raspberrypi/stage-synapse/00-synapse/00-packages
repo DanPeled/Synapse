@@ -1,0 +1,12 @@
+python3-venv
+python3-pip
+unzip
+isc-dhcp-client
+libgl1
+libglib2.0-0
+libgomp1
+libsm6
+libxext6
+libxrender1
+libopencv-dev
+v4l-utils
