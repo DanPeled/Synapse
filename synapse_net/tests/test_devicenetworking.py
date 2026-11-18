@@ -64,6 +64,35 @@ def test_physical_interface_filter() -> None:
     assert not isPhysicalInterface("")
 
 
+def test_network_manager_connection_uses_active_device() -> None:
+    with patch.object(
+        NetworkingManager,
+        "_nmcliOutput",
+        return_value="GENERAL.CONNECTION:Wired connection 1\n",
+    ):
+        assert (
+            NetworkingManager._networkManagerConnection("eth0") == "Wired connection 1"
+        )
+
+
+def test_network_manager_connection_finds_inactive_profile() -> None:
+    outputs = iter(
+        [
+            "GENERAL.CONNECTION:--\n",
+            "Wired connection 1\nsynapse-eth0\n",
+            "eth1\n",
+            "eth0\n",
+        ]
+    )
+
+    with patch.object(
+        NetworkingManager,
+        "_nmcliOutput",
+        side_effect=lambda _args: next(outputs),
+    ):
+        assert NetworkingManager._networkManagerConnection("eth0") == "synapse-eth0"
+
+
 def test_set_static_address_uses_network_manager() -> None:
     manager = NetworkingManager()
     address = StaticAddress("eth0", "10.12.34.11", 24)
@@ -188,6 +217,27 @@ def test_set_static_address_uses_netplan() -> None:
         "ethernets.enp3s0.addresses=[10.12.34.11/24]",
     ] in commands
     assert ["sudo", "-n", "netplan", "apply"] in commands
+
+
+def test_set_static_address_replaces_ip_fallback_address() -> None:
+    manager = NetworkingManager()
+    previous = StaticAddress("eth0", "10.12.34.11", 24)
+    address = StaticAddress("eth0", "10.12.34.11", 16)
+    manager._current = previous
+    manager._backend = "ip"
+
+    with (
+        patch.object(NetworkingManager, "_detectBackend", return_value="ip"),
+        patch.object(NetworkingManager, "_removeIpAddress") as remove,
+        patch.object(NetworkingManager, "_applyIpAddress") as apply,
+        patch.object(NetworkingManager, "_startWorkerLocked") as worker,
+    ):
+        assert manager.setStaticAddress(address)
+
+    remove.assert_called_once_with(previous)
+    apply.assert_called_once_with(address)
+    worker.assert_called_once_with(address)
+    assert manager._current == address
 
 
 def test_set_static_address_falls_back_to_ip_commands() -> None:

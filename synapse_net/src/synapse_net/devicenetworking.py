@@ -180,31 +180,49 @@ class NetworkingManager:
     # NetworkManager backend
     # ------------------------
 
+    @staticmethod
+    def _nmcliOutput(args: list[str]) -> Optional[str]:
+        """Run a read-only nmcli query and return its stdout, or None."""
+        try:
+            result = subprocess.run(
+                ["nmcli", *args],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            return None
+
+        if result.returncode != 0:
+            return None
+
+        return result.stdout
+
     @classmethod
     def _networkManagerConnection(cls, interface: InterfaceName) -> Optional[str]:
-        result = subprocess.run(
-            ["nmcli", "-t", "-f", "GENERAL.CONNECTION", "device", "show", interface],
-            check=False,
-            capture_output=True,
-            text=True,
+        output = cls._nmcliOutput(
+            ["-t", "-f", "GENERAL.CONNECTION", "device", "show", interface]
         )
-        if result.returncode == 0:
-            for line in result.stdout.splitlines():
+        if output:
+            for line in output.splitlines():
                 if line.startswith("GENERAL.CONNECTION:"):
                     name = line.split(":", 1)[1].strip()
                     if name and name != "--":
                         return name
 
-        result = subprocess.run(
-            ["nmcli", "-t", "-f", "NAME,DEVICE", "connection", "show", "--active"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            for line in result.stdout.splitlines():
-                name, _, device = line.rpartition(":")
-                if device == interface and name:
+        # The device may be down, in which case the active lookup returns
+        # nothing. Look for any saved profile bound to this interface so we
+        # modify it instead of creating a duplicate profile.
+        output = cls._nmcliOutput(["-t", "-f", "NAME", "connection", "show"])
+        if output:
+            for name in output.splitlines():
+                name = name.strip()
+                if not name:
+                    continue
+                profileInterface = cls._nmcliOutput(
+                    ["-g", "connection.interface-name", "connection", "show", name]
+                )
+                if profileInterface and profileInterface.strip() == interface:
                     return name
 
         return None
@@ -395,6 +413,19 @@ class NetworkingManager:
         with self._lock:
             self._stopWorkerLocked()
             backend = self._detectBackend()
+
+            # NetworkManager and netplan replace the address they manage, but
+            # `ip addr add` would fail with "File exists" when only the prefix
+            # changed, so remove the old address first on that path.
+            previous = self._current
+            if previous is not None and previous != address and self._backend == "ip":
+                try:
+                    self._removeIpAddress(previous)
+                except NetworkCommandError as e:
+                    err(f"Failed to remove previous static IP {previous.cidr}: {e}")
+
+            self._current = None
+            self._backend = None
 
             try:
                 if backend == "networkmanager":

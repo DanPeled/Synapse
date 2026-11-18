@@ -146,6 +146,8 @@ class Synapse:
         self.runtimeHandler = runtimeHandler
         self.setupRuntimeCallbacks()
 
+        self._shutdownStack.register("networking", self.networkingManager.close)
+
         self.setupWebsocket()
         self._shutdownStack.register("websocket", self._stopWebsocket)
 
