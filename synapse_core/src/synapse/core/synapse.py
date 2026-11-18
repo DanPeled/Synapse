@@ -14,8 +14,11 @@ from typing import Any, Final, List, Optional
 
 import psutil
 from synapse.__version__ import SYNAPSE_VERSION
-from synapse_installer.util import IsValidIP
-from synapse_net.devicenetworking import NetworkingManager
+from synapse_net.devicenetworking import (
+    NetworkingManager,
+    StaticAddress,
+    isPhysicalInterface,
+)
 from synapse_net.file_server import FileServer
 from synapse_net.generated.messages.v1 import (
     DeviceInfoProto,
@@ -143,6 +146,8 @@ class Synapse:
         self.runtimeHandler = runtimeHandler
         self.setupRuntimeCallbacks()
 
+        self._shutdownStack.register("networking", self.networkingManager.close)
+
         self.setupWebsocket()
         self._shutdownStack.register("websocket", self._stopWebsocket)
 
@@ -166,9 +171,19 @@ class Synapse:
                 config.network.ip is not None
                 and config.network.networkInterface is not None
             ):
-                self.networkingManager.configureStaticIp(
-                    config.network.ip, config.network.networkInterface
+                staticAddress = StaticAddress.parse(
+                    config.network.networkInterface,
+                    config.network.ip,
+                    config.network.prefixLength,
                 )
+                if staticAddress is not None:
+                    self.networkingManager.setStaticAddress(staticAddress)
+                else:
+                    err(
+                        "Ignoring invalid static IP in the config: "
+                        f"{config.network.ip}/{config.network.prefixLength} "
+                        f"on {config.network.networkInterface}"
+                    )
 
             # Load the settings from the config file
             settings: dict = config.getConfigMap()
@@ -917,31 +932,55 @@ class Synapse:
 
     def setNetworkSettings(self, networkSettings: SetNetworkSettingsProto) -> None:
         if Platform.getCurrentPlatform().isLinux():
-            network_interfaces = []
-            network_interfaces.extend(psutil.net_if_addrs().keys())
+            network_interfaces = [
+                name
+                for name in psutil.net_if_addrs().keys()
+                if isPhysicalInterface(name)
+            ]
 
-            if (
-                IsValidIP(networkSettings.ip)
-                and networkSettings.network_interface in network_interfaces
-            ):
-                self.networkingManager.configureStaticIp(
-                    networkSettings.ip, networkSettings.network_interface
-                )
-                self.runtimeHandler.networkSettings.ip = networkSettings.ip
-                self.runtimeHandler.networkSettings.networkInterface = (
-                    networkSettings.network_interface
-                )
-            elif (
-                networkSettings.ip == "NULL"
-            ):  # Don't configure static IP and remove if config exists
-                self.runtimeHandler.networkSettings.ip = None
-                self.networkingManager.removeStaticIp()
+            staticIp = (networkSettings.ip or "").strip()
+            if staticIp in ("", "NULL"):
+                # Disabling the static address must not disable DHCP.
+                if self.networkingManager.removeStaticAddress():
+                    self.runtimeHandler.networkSettings.ip = None
+                    self.runtimeHandler.networkSettings.networkInterface = None
             else:
-                err(f"Invalid IP {networkSettings.ip} provided! Will be ignored")
+                prefixLength = int(networkSettings.prefix_length) or 24
+                if networkSettings.network_interface not in network_interfaces:
+                    err(
+                        "Invalid network interface "
+                        f"{networkSettings.network_interface!r}. Choose one of: "
+                        f"{', '.join(sorted(network_interfaces))}"
+                    )
+                else:
+                    staticAddress = StaticAddress.parse(
+                        networkSettings.network_interface,
+                        staticIp,
+                        prefixLength,
+                    )
+                    if staticAddress is None:
+                        err(
+                            f"Invalid static IPv4 address {staticIp}/{prefixLength}. "
+                            "Use a host address such as 10.12.34.11/24."
+                        )
+                    elif self.networkingManager.setStaticAddress(staticAddress):
+                        self.runtimeHandler.networkSettings.ip = staticAddress.address
+                        self.runtimeHandler.networkSettings.networkInterface = (
+                            staticAddress.interface
+                        )
+                        self.runtimeHandler.networkSettings.prefixLength = (
+                            staticAddress.prefixLength
+                        )
+                    else:
+                        err(
+                            f"Could not apply static IP {staticAddress.cidr} on "
+                            f"{staticAddress.interface}"
+                        )
 
-            if networkSettings.hostname.__len__() > 0:
-                self.runtimeHandler.networkSettings.hostname = networkSettings.hostname
-                devicenetworking.setHostname(networkSettings.hostname)
+            hostname = (networkSettings.hostname or "").strip()
+            if hostname:
+                self.runtimeHandler.networkSettings.hostname = hostname
+                devicenetworking.setHostname(hostname)
             else:
                 err("Empty hostname isn't allowed!")
         else:

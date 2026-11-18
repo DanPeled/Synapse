@@ -23,6 +23,32 @@ with a real project through `python -m synapse_installer deploy`.
 The image also contains a passwordless sudo rule for the runtime user because
 the installer requires `sudo -n true` before it will deploy.
 
+## Network configuration
+
+Every image keeps DHCP enabled on its interfaces. That is what lets a
+coprocessor get internet access, DNS, and a default gateway when it is plugged
+into an internet-connected router.
+
+To make the device reachable at a predictable address on the robot network, set
+an optional static IPv4 address in the Synapse UI under **Settings > Network
+Settings**. The address is added as a secondary address; DHCP is never turned
+off, so both the router-assigned address and the static address stay usable.
+
+- The default FRC address for a team is `10.TE.AM.11`. For example, team `1234`
+  uses `10.12.34.11` and team `68` uses `10.0.68.11`.
+- The prefix length defaults to `/24` and can be edited in the UI.
+- Loopback, container, VM, and VPN interfaces such as `lo`, `docker0`, and
+  `tailscale0` are hidden because they cannot carry a robot-network address.
+- Changes apply immediately and may briefly drop the connection to the device.
+  The UI warns before applying them.
+
+The runtime persists the address in `$HOME/Synapse/config/settings.yml` and
+reapplies it on startup. On devices that use NetworkManager, the address is
+added to the active connection profile with `nmcli`. Devices without
+NetworkManager use a `netplan` drop-in, and anything else falls back to
+`ip addr` with a worker that reapplies the address if the interface is reset.
+All of these paths keep DHCP enabled.
+
 ## Platform registry
 
 `synapse_imager/platforms.ini` is the single place to add a board. Each

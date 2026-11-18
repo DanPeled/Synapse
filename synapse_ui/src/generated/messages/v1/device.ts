@@ -59,6 +59,8 @@ export interface SetNetworkSettingsProto {
   networkTable: string;
   /** The team number for network configuration */
   teamNumber: number;
+  /** CIDR prefix length for ip (1-32, default 24) */
+  prefixLength: number;
 }
 
 function createBaseDeviceInfoProto(): DeviceInfoProto {
@@ -464,6 +466,7 @@ function createBaseSetNetworkSettingsProto(): SetNetworkSettingsProto {
     networkInterface: "",
     networkTable: "",
     teamNumber: 0,
+    prefixLength: 0,
   };
 }
 
@@ -486,6 +489,9 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
     }
     if (message.teamNumber !== 0) {
       writer.uint32(40).uint32(message.teamNumber);
+    }
+    if (message.prefixLength !== 0) {
+      writer.uint32(48).uint32(message.prefixLength);
     }
     return writer;
   },
@@ -541,6 +547,14 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
           message.teamNumber = reader.uint32();
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.prefixLength = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -565,6 +579,9 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
       teamNumber: isSet(object.teamNumber)
         ? globalThis.Number(object.teamNumber)
         : 0,
+      prefixLength: isSet(object.prefixLength)
+        ? globalThis.Number(object.prefixLength)
+        : 0,
     };
   },
 
@@ -585,6 +602,9 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
     if (message.teamNumber !== 0) {
       obj.teamNumber = Math.round(message.teamNumber);
     }
+    if (message.prefixLength !== 0) {
+      obj.prefixLength = Math.round(message.prefixLength);
+    }
     return obj;
   },
 
@@ -602,6 +622,7 @@ export const SetNetworkSettingsProto: MessageFns<SetNetworkSettingsProto> = {
     message.networkInterface = object.networkInterface ?? "";
     message.networkTable = object.networkTable ?? "";
     message.teamNumber = object.teamNumber ?? 0;
+    message.prefixLength = object.prefixLength ?? 0;
     return message;
   },
 };
