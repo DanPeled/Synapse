@@ -86,9 +86,10 @@ const initialState: BackendStateSystem.State = {
   networksettings: SetNetworkSettingsProto.create({
     teamNumber: 0,
     hostname: "hostname",
-    ip: "localhost",
-    networkInterface: "interface",
+    ip: "",
+    networkInterface: "",
     networkTable: "Synapse",
+    prefixLength: 24,
   }),
 };
 
