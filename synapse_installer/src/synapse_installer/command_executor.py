@@ -6,18 +6,26 @@
 import logging
 import subprocess
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Optional, Tuple
 
 from paramiko import SSHClient
 
+from .ssh import connectSSH
+
 logger = logging.getLogger(__name__)
+
+
+class RemoteCommandError(RuntimeError):
+    """Raised when a remote command exits with a non-zero status."""
 
 
 class CommandExecutor(ABC):
     """Abstract base class for executing commands locally or remotely."""
 
     @abstractmethod
-    def execCommand(self, command: str) -> Tuple[str, str, int]:
+    def execCommand(
+        self, command: str, stdinData: Optional[str] = None
+    ) -> Tuple[str, str, int]:
         """Execute a command and return stdout, stderr, and exit code."""
         pass
 
@@ -30,7 +38,9 @@ class CommandExecutor(ABC):
 class LocalCommandExecutor(CommandExecutor):
     """Executes commands locally using system Python."""
 
-    def execCommand(self, command: str) -> Tuple[str, str, int]:
+    def execCommand(
+        self, command: str, stdinData: Optional[str] = None
+    ) -> Tuple[str, str, int]:
         logger.debug(f"Executing local command: {command}")
 
         process = subprocess.Popen(
@@ -38,8 +48,15 @@ class LocalCommandExecutor(CommandExecutor):
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE if stdinData is not None else None,
             text=True,
         )
+
+        if stdinData is not None:
+            stdout, stderr = process.communicate(stdinData)
+            print(stdout, end="")
+            print(stderr, end="")
+            return stdout, stderr, process.returncode
 
         stdout_lines, stderr_lines = [], []
 
@@ -72,29 +89,27 @@ class SSHCommandExecutor(CommandExecutor):
         self, hostname: str, username: str, password: str, timeout: int = 10
     ) -> None:
         try:
-            import paramiko
+            import paramiko  # noqa: F401
         except ImportError:
             raise ImportError("paramiko is required: pip install paramiko")
 
         self.hostname = hostname
         self.username = username
-        self.client = paramiko.SSHClient()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.client.connect(
-            hostname,
-            username=username,
-            password=password,
-            timeout=timeout,
-            look_for_keys=False,
-            allow_agent=False,
-        )
+        self.client = connectSSH(hostname, username, password, timeout=timeout)
         logger.debug(f"SSH connected to {hostname}@{username}")
 
-    def execCommand(self, command: str) -> Tuple[str, str, int]:
+    def execCommand(
+        self, command: str, stdinData: Optional[str] = None
+    ) -> Tuple[str, str, int]:
         logger.debug(f"Executing SSH command on {self.hostname}: {command}")
 
         try:
             stdin, stdout, stderr = self.client.exec_command(command)
+            if stdinData is not None:
+                stdin.write(stdinData)
+                stdin.flush()
+                stdin.channel.shutdown_write()
+
             stdout_lines, stderr_lines = [], []
 
             # Print stdout/stderr live
@@ -133,12 +148,21 @@ class SSHCommandExecutor(CommandExecutor):
 
 
 def runCommand(
-    client: SSHClient, cmd: str, ignoreErrors: bool = False
-) -> Tuple[str, str]:
-    """Run a command on the remote client and return (stdout, stderr)."""
+    client: SSHClient,
+    cmd: str,
+    ignoreErrors: bool = False,
+    check: bool = False,
+) -> Tuple[str, str, int]:
+    """Run a command on the remote client and return (stdout, stderr, exit code)."""
     stdin, stdout, stderr = client.exec_command(cmd)
-    out = stdout.read().decode()
-    err = stderr.read().decode()
-    if err and not ignoreErrors and "Created symlink" not in err:
-        print(f"Error: {err.strip()}")
-    return out, err
+    out = stdout.read().decode(errors="replace")
+    err = stderr.read().decode(errors="replace")
+    exitCode = stdout.channel.recv_exit_status()
+
+    if exitCode != 0 and not ignoreErrors:
+        message = err.strip() or out.strip() or f"exit code {exitCode}"
+        print(f"Error: {message}")
+        if check:
+            raise RemoteCommandError(message)
+
+    return out, err, exitCode
