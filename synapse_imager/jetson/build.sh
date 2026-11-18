@@ -16,6 +16,8 @@
 #   SYNAPSE_VERSION   Overlay version. Defaults to SYNAPSE_VERSION in the
 #                     source.
 #   OUT_DIR           Output directory. Defaults to <repo>/dist/images.
+#   IMAGE_NAME        Overlay name without the extension. Defaults to
+#                     synapse-jetson-overlay-<version>.
 
 set -euo pipefail
 
@@ -39,6 +41,8 @@ Environment:
                     when omitted.
   SYNAPSE_VERSION   Overlay version. Defaults to SYNAPSE_VERSION in the source.
   OUT_DIR           Output directory. Defaults to <repo>/dist/images.
+  IMAGE_NAME        Overlay name without the extension. Defaults to
+                    synapse-jetson-overlay-<version>.
 EOF
 }
 
@@ -58,6 +62,7 @@ esac
 
 OUT_DIR="${OUT_DIR:-${REPO_ROOT}/dist/images}"
 VERSION="${SYNAPSE_VERSION:-$(synapse_version "${REPO_ROOT}")}"
+IMAGE_NAME="${IMAGE_NAME:-synapse-jetson-overlay-${VERSION}}"
 WHEEL="$(ensure_synapse_wheel "${REPO_ROOT}")"
 
 STAGE="${REPO_ROOT}/.image-build/jetson-overlay"
@@ -86,7 +91,7 @@ ln -sfn /etc/systemd/system/synapse-firstboot.service \
   "${STAGE}/etc/systemd/system/multi-user.target.wants/synapse-firstboot.service"
 
 mkdir -p "${OUT_DIR}"
-destination="${OUT_DIR}/synapse-jetson-overlay-${VERSION}.tar.gz"
+destination="${OUT_DIR}/${IMAGE_NAME}.tar.gz"
 
 tar --owner=0 --group=0 --numeric-owner \
   -C "${STAGE}" -czf "${destination}" .

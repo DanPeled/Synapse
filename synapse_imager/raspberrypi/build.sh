@@ -21,6 +21,8 @@
 #   TARGET_HOSTNAME   Default hostname. Defaults to synapse.
 #   WPA_COUNTRY       Wi-Fi country code. Defaults to US.
 #   USE_DOCKER        Set to 0 to run pi-gen directly instead of in Docker.
+#   IMAGE_NAME        Output image name. Defaults to
+#                     synapse-raspberrypi-<version>-raspios-<release>-arm64.
 
 set -euo pipefail
 
@@ -50,6 +52,8 @@ Environment:
   TARGET_HOSTNAME   Default hostname. Defaults to synapse.
   WPA_COUNTRY       Wi-Fi country code. Defaults to US.
   USE_DOCKER        Set to 0 to run pi-gen directly instead of in Docker.
+  IMAGE_NAME        Output image name. Defaults to
+                    synapse-raspberrypi-<version>-raspios-<release>-arm64.
 EOF
 }
 
@@ -78,6 +82,7 @@ WPA_COUNTRY="${WPA_COUNTRY:-US}"
 USE_DOCKER="${USE_DOCKER:-1}"
 
 VERSION="${SYNAPSE_VERSION:-$(synapse_version "${REPO_ROOT}")}"
+IMAGE_NAME="${IMAGE_NAME:-synapse-raspberrypi-${VERSION}-raspios-${RELEASE}-arm64}"
 WHEEL="$(ensure_synapse_wheel "${REPO_ROOT}")"
 
 checkout_ref \
@@ -102,7 +107,7 @@ touch "${PI_GEN_DIR}/stage2/SKIP_IMAGES"
 
 CONFIG_FILE="${PI_GEN_DIR}/config.synapse"
 cat >"${CONFIG_FILE}" <<EOF
-IMG_NAME="synapse-${VERSION}-raspios-${RELEASE}-arm64"
+IMG_NAME="${IMAGE_NAME}"
 RELEASE="${RELEASE}"
 DEPLOY_COMPRESSION="xz"
 COMPRESSION_LEVEL="6"
@@ -165,7 +170,7 @@ case "${image}" in
 esac
 
 mkdir -p "${OUT_DIR}"
-destination="${OUT_DIR}/synapse-raspberrypi-${VERSION}-raspios-${RELEASE}-arm64${suffix}"
+destination="${OUT_DIR}/${IMAGE_NAME}${suffix}"
 cp "${image}" "${destination}"
 
 echo "Created ${destination}"

@@ -10,10 +10,10 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      orangepi_boards:
-        description: "Comma-separated Orange Pi boards to build"
+      targets:
+        description: "Comma-separated platform or target ids (default: all)"
         required: false
-        default: "orangepi5,orangepi5-plus"
+        default: "all"
 
 permissions:
   contents: read
@@ -31,9 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      orangepi_boards: ${{ steps.matrix.outputs.boards }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate image registry
+        run: python3 synapse_imager/platforms.py validate
 
       - name: Resolve Synapse version
         id: version
@@ -51,20 +54,13 @@ jobs:
           print(f"version={match.group(1)}")
           PY
 
-      - name: Resolve Orange Pi board matrix
+      - name: Resolve build matrix
         id: matrix
         env:
-          BOARDS: ${{ github.event.inputs.orangepi_boards || 'orangepi5,orangepi5-plus' }}
+          TARGETS: ${{ github.event.inputs.targets || 'all' }}
         run: |
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import os
-
-          boards = [b.strip() for b in os.environ["BOARDS"].split(",") if b.strip()]
-          if not boards:
-              raise SystemExit("No Orange Pi boards selected")
-          print("boards=" + json.dumps(boards))
-          PY
+          matrix="$(python3 synapse_imager/platforms.py matrix --targets "${TARGETS}")"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   wheel:
     name: Build release wheel
@@ -106,62 +102,20 @@ jobs:
           path: dist/*.whl
           if-no-files-found: error
 
-  raspberrypi:
-    name: Raspberry Pi image
+  images:
+    name: ${{ matrix.name }}
     needs: [prepare, wheel]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@v1.3.2
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          swap-storage: true
-
-      - name: Install pi-gen dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static binfmt-support
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: synapse-wheel
-          path: dist
-
-      - name: Build Raspberry Pi image
-        env:
-          SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
-          OUT_DIR: ${{ github.workspace }}/out
-          USE_DOCKER: "1"
-        run: |
-          wheel="$(ls -1 dist/*.whl | head -n 1)"
-          SYNAPSE_WHEEL="$wheel" bash synapse_imager/raspberrypi/build.sh
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: synapse-raspberrypi
-          path: out/*
-          if-no-files-found: error
-
-  orangepi:
-    name: Orange Pi image (${{ matrix.board }})
-    needs: [prepare, wheel]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJSON(needs.prepare.outputs.orangepi_boards) }}
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Free disk space
+        if: matrix.free_disk
         uses: jlumbroso/free-disk-space@v1.3.2
         with:
           tool-cache: true
@@ -171,57 +125,33 @@ jobs:
           large-packages: true
           swap-storage: true
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: synapse-wheel
-          path: dist
-
-      - name: Build Orange Pi image
-        env:
-          BOARD: ${{ matrix.board }}
-          SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
-          OUT_DIR: ${{ github.workspace }}/out
-          PREFER_DOCKER: "yes"
-        run: |
-          wheel="$(ls -1 dist/*.whl | head -n 1)"
-          SYNAPSE_WHEEL="$wheel" bash synapse_imager/orangepi/build.sh
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: synapse-${{ matrix.board }}
-          path: out/*
-          if-no-files-found: error
-
-  jetson:
-    name: Jetson overlay
-    needs: [prepare, wheel]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Install host build dependencies
+        if: matrix.setup != ''
+        run: bash "synapse_imager/${{ matrix.setup }}"
 
       - uses: actions/download-artifact@v4
         with:
           name: synapse-wheel
           path: dist
 
-      - name: Build Jetson overlay
+      - name: Build image
         env:
           SYNAPSE_VERSION: ${{ needs.prepare.outputs.version }}
           OUT_DIR: ${{ github.workspace }}/out
         run: |
           wheel="$(ls -1 dist/*.whl | head -n 1)"
-          SYNAPSE_WHEEL="$wheel" bash synapse_imager/jetson/build.sh
+          SYNAPSE_WHEEL="$wheel" python3 synapse_imager/platforms.py build "${{ matrix.target }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: synapse-jetson
+          name: ${{ matrix.artifact }}
           path: out/*
           if-no-files-found: error
 
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [prepare, raspberrypi, orangepi, jetson]
+    needs: [prepare, images]
     runs-on: ubuntu-latest
     permissions:
       contents: write

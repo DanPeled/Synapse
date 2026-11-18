@@ -22,6 +22,8 @@
 #   TARGET_PASSWORD   Runtime user password. Defaults to synapse.
 #   PREFER_DOCKER     Set to yes to run the Armbian build in Docker.
 #   COMPRESS_OUTPUTIMAGE  Armbian compression list. Defaults to sha,img,xz.
+#   IMAGE_NAME        Output image name. Defaults to
+#                     synapse-<board>-<version>-armbian-<release>.
 
 set -euo pipefail
 
@@ -52,6 +54,8 @@ Environment:
   TARGET_PASSWORD   Runtime user password. Defaults to synapse.
   PREFER_DOCKER     Set to yes to run the Armbian build in Docker.
   COMPRESS_OUTPUTIMAGE  Armbian compression list. Defaults to sha,img,xz.
+  IMAGE_NAME        Output image name. Defaults to
+                    synapse-<board>-<version>-armbian-<release>.
 EOF
 }
 
@@ -81,6 +85,7 @@ PREFER_DOCKER="${PREFER_DOCKER:-no}"
 COMPRESS_OUTPUTIMAGE="${COMPRESS_OUTPUTIMAGE:-sha,img,xz}"
 
 VERSION="${SYNAPSE_VERSION:-$(synapse_version "${REPO_ROOT}")}"
+IMAGE_NAME="${IMAGE_NAME:-synapse-${BOARD}-${VERSION}-armbian-${RELEASE}}"
 WHEEL="$(ensure_synapse_wheel "${REPO_ROOT}")"
 
 checkout_ref \
@@ -174,7 +179,7 @@ case "${image}" in
 esac
 
 mkdir -p "${OUT_DIR}"
-destination="${OUT_DIR}/synapse-${BOARD}-${VERSION}-armbian-${RELEASE}${suffix}"
+destination="${OUT_DIR}/${IMAGE_NAME}${suffix}"
 cp "${image}" "${destination}"
 
 echo "Created ${destination}"

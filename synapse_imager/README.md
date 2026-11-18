@@ -23,6 +23,104 @@ with a real project through `python -m synapse_installer deploy`.
 The image also contains a passwordless sudo rule for the runtime user because
 the installer requires `sudo -n true` before it will deploy.
 
+## Platform registry
+
+`synapse_imager/platforms.ini` is the single place to add a board. Each
+`[target.<id>]` section becomes one entry in the release workflow matrix, so
+adding a board does not require editing the workflow.
+
+List the supported platforms and targets:
+
+```bash
+bash synapse_imager/build.sh list
+```
+
+Build one target locally:
+
+```bash
+make build
+bash synapse_imager/build.sh orangepi5
+```
+
+The registry supplies defaults such as `BOARD`, `RELEASE`, and
+`PREFER_DOCKER`. Shell environment variables win, so local overrides still
+work:
+
+```bash
+BOARD=orangepi5-plus bash synapse_imager/build.sh orangepi5
+```
+
+The same commands are available through `python3`:
+
+```bash
+python3 synapse_imager/platforms.py list
+python3 synapse_imager/platforms.py matrix --pretty
+python3 synapse_imager/platforms.py build orangepi5
+python3 synapse_imager/platforms.py env orangepi5
+python3 synapse_imager/platforms.py validate
+```
+
+### Adding a board
+
+Add a target section to `platforms.ini`:
+
+```ini
+[target.orangepi5-max]
+platform = orangepi
+name = Orange Pi 5 Max
+env.BOARD = orangepi5-max
+```
+
+The board name must exist in Armbian's `config/boards/` directory. The builder
+validates it before starting a long build. The workflow picks up the new target
+on the next run.
+
+Raspberry Pi OS builds one image for every supported Pi model, so a new
+Raspberry Pi usually needs no registry change. If a board needs a different OS
+release or pi-gen ref, add a target with `env.RELEASE`, `env.PI_GEN_REF`, and a
+distinct `artifact` name.
+
+### Adding a platform
+
+1. Create `synapse_imager/<platform>/build.sh` that produces an artifact in
+   `OUT_DIR`.
+2. Optionally create `synapse_imager/<platform>/setup.sh` for host
+   dependencies. The release workflow runs it before the build.
+3. Add a platform and at least one target to `platforms.ini`:
+
+```ini
+[platform.rockpi]
+name = Rock Pi
+builder = rockpi/build.sh
+setup = rockpi/setup.sh
+artifact = synapse-rockpi
+
+[target.rockpi4]
+platform = rockpi
+name = Rock Pi 4
+env.BOARD = rockpi4
+```
+
+Platform keys:
+
+| Key | Meaning |
+| --- | --- |
+| `name` | Human-readable platform name (required) |
+| `builder` | Build script relative to `synapse_imager/` (required) |
+| `setup` | Optional host setup script relative to `synapse_imager/` |
+| `runner` | GitHub Actions runner label (default `ubuntu-24.04`) |
+| `timeout` | Job timeout in minutes (default `360`) |
+| `free_disk` | Free runner disk space first (default `true`) |
+| `artifact` | Artifact name (default `synapse-<target>`) |
+| `env.<NAME>` | Environment default for every target on the platform |
+
+Target keys are `platform`, `name`, `env.<NAME>`, and optional `runner`,
+`timeout`, `free_disk`, and `artifact` overrides.
+
+The registry is validated by `platforms.py validate`. It rejects unknown keys,
+duplicate sections, missing builders, targets without a platform, and duplicate
+artifact names.
+
 ## Release artifacts
 
 | Artifact | Boards | Notes |
@@ -58,11 +156,13 @@ Outputs are written to `dist/images/`.
 
 ```bash
 SYNAPSE_WHEEL=dist/synapsefrc-*.whl \
-  bash synapse_imager/raspberrypi/build.sh
+  bash synapse_imager/build.sh raspberrypi
 ```
 
 The builder uses pi-gen's Docker path by default. Set `USE_DOCKER=0` to run
-pi-gen directly on an arm64 host.
+pi-gen directly on an arm64 host. On a fresh host, run
+`bash synapse_imager/raspberrypi/setup.sh` to install `qemu-user-static` and
+`binfmt-support`.
 
 Useful overrides:
 
@@ -72,15 +172,14 @@ RELEASE=bookworm
 FIRST_USER_NAME=pi
 FIRST_USER_PASS=synapse
 TARGET_HOSTNAME=synapse
+IMAGE_NAME=synapse-raspberrypi-custom
 ```
 
 ### Orange Pi
 
 ```bash
-BOARD=orangepi5 \
-PREFER_DOCKER=yes \
 SYNAPSE_WHEEL=dist/synapsefrc-*.whl \
-  bash synapse_imager/orangepi/build.sh
+  bash synapse_imager/build.sh orangepi5
 ```
 
 The wrapper clones the pinned Armbian release into `.image-build/armbian`,
@@ -98,6 +197,7 @@ ARMBIAN_REF=v26.5.1
 TARGET_USER=synapse
 TARGET_PASSWORD=synapse
 PREFER_DOCKER=yes
+IMAGE_NAME=synapse-orangepi5-plus-custom
 ```
 
 Armbian builds are resource intensive (roughly 50 GB of disk and a long build
@@ -107,7 +207,7 @@ time). Run them on a machine with Docker and plenty of free space.
 
 ```bash
 SYNAPSE_WHEEL=dist/synapsefrc-*.whl \
-  bash synapse_imager/jetson/build.sh
+  bash synapse_imager/build.sh jetson
 ```
 
 The Jetson build produces an overlay tarball rather than a flashable image.
@@ -130,33 +230,23 @@ later).
 `.github/workflows/release_images.yml` runs on tags matching `v*` and on manual
 dispatch.
 
-1. `prepare` resolves the version and the Orange Pi board matrix.
+1. `prepare` validates the registry, resolves the version, and turns every
+   target in `platforms.ini` into a matrix entry.
 2. `wheel` builds the release wheel from the tagged commit.
-3. `raspberrypi`, `orangepi`, and `jetson` build their artifacts from that
-   wheel.
+3. `images` builds every matrix target on its configured runner.
 4. `release` attaches every artifact to the GitHub Release.
 
-Manual dispatch builds the images but does not publish a release. Use it to
-smoke-test a branch.
+Manual dispatch builds the selected targets but does not publish a release. Use
+it to smoke-test a branch or a new board:
+
+```text
+targets: orangepi5,orangepi5-plus
+```
+
+Use `targets: all` (the default) to build everything.
 
 The workflow uses the wheel built from the tag rather than a PyPI release, so
 images always match the source tree that produced the tag.
-
-## Adding a board
-
-For a new Orange Pi board, add its Armbian board name to the matrix in
-`.github/workflows/release_images.yml`:
-
-```yaml
-default: "orangepi5,orangepi5-plus,orangepizero3"
-```
-
-The board name must exist in Armbian's `config/boards/` directory. The builder
-validates it before starting a long build.
-
-For a new image family, add a directory under `synapse_imager/` with a
-`build.sh` that produces an artifact in `OUT_DIR`, then add a job to the
-release workflow.
 
 ## Tests
 
@@ -164,6 +254,8 @@ The image scripts are covered by `synapse_imager/tests/test_imager.py`:
 
 - every shell script is parsed with `bash -n`,
 - build scripts answer `--help`,
+- the registry validates and every target appears in the workflow matrix,
+- matrix filtering and build environment resolution work,
 - the sample project has no credentials,
 - the provisioner installs the runtime, sudoers rule, and systemd unit,
 - the release workflow has the expected trigger and jobs.

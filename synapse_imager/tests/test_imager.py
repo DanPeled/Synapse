@@ -2,7 +2,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import configparser
+import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +13,8 @@ import yaml
 
 IMAGER_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = IMAGER_DIR.parent
+PLATFORMS = IMAGER_DIR / "platforms.py"
+REGISTRY = IMAGER_DIR / "platforms.ini"
 
 
 def shellScripts() -> list[Path]:
@@ -18,6 +23,26 @@ def shellScripts() -> list[Path]:
     if exportImage.exists():
         scripts.append(exportImage)
     return scripts
+
+
+def runPlatforms(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(PLATFORMS), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def registryTargets() -> set[str]:
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = lambda optionstr: optionstr
+    parser.read(REGISTRY)
+    return {
+        section[len("target.") :]
+        for section in parser.sections()
+        if section.startswith("target.")
+    }
 
 
 @pytest.mark.parametrize("script", shellScripts(), ids=lambda path: str(path.name))
@@ -34,8 +59,10 @@ def testShellScriptsParse(script: Path) -> None:
 @pytest.mark.parametrize(
     "script",
     [
+        IMAGER_DIR / "build.sh",
         IMAGER_DIR / "common/provision.sh",
         IMAGER_DIR / "raspberrypi/build.sh",
+        IMAGER_DIR / "raspberrypi/setup.sh",
         IMAGER_DIR / "orangepi/build.sh",
         IMAGER_DIR / "jetson/build.sh",
     ],
@@ -49,7 +76,8 @@ def testBuildScriptsHaveHelp(script: Path) -> None:
         check=False,
     )
     assert result.returncode == 0
-    assert "Usage" in result.stdout or "Build" in result.stdout
+    output = result.stdout.lower()
+    assert "usage" in output or "build" in output
 
 
 def testSampleProjectIsSelfContained() -> None:
@@ -106,6 +134,85 @@ def testRaspberryPiStageUsesSharedProvisioner() -> None:
     assert "--user" in text
 
 
+def testPlatformRegistryIsValid() -> None:
+    result = runPlatforms("validate")
+
+    assert result.returncode == 0, result.stderr
+    assert "Registry OK" in result.stdout
+
+
+def testPlatformRegistryListsEveryTarget() -> None:
+    result = runPlatforms("list")
+
+    assert result.returncode == 0, result.stderr
+    for target in registryTargets():
+        assert target in result.stdout
+
+
+def testPlatformMatrixIncludesEveryRegistryTarget() -> None:
+    result = runPlatforms("matrix")
+
+    assert result.returncode == 0, result.stderr
+    matrix = json.loads(result.stdout)
+    assert {entry["target"] for entry in matrix} == registryTargets()
+
+    for entry in matrix:
+        assert entry["name"]
+        assert entry["runner"]
+        assert entry["timeout"] > 0
+        assert isinstance(entry["free_disk"], bool)
+        assert entry["artifact"]
+        assert isinstance(entry["setup"], str)
+
+
+def testPlatformMatrixFiltersByPlatform() -> None:
+    result = runPlatforms("matrix", "--targets", "orangepi")
+
+    assert result.returncode == 0, result.stderr
+    matrix = json.loads(result.stdout)
+    assert matrix
+    assert {entry["platform"] for entry in matrix} == {"orangepi"}
+
+
+def testPlatformMatrixFiltersByTarget() -> None:
+    result = runPlatforms("matrix", "--targets", "orangepi5-plus")
+
+    assert result.returncode == 0, result.stderr
+    matrix = json.loads(result.stdout)
+    assert [entry["target"] for entry in matrix] == ["orangepi5-plus"]
+
+
+def testPlatformMatrixRejectsUnknownSelection() -> None:
+    result = runPlatforms("matrix", "--targets", "not-a-board")
+
+    assert result.returncode != 0
+    assert "Unknown platform or target" in result.stderr
+
+
+def testPlatformBuildDryRunUsesRegistryDefaults() -> None:
+    result = runPlatforms("build", "orangepi5", "--dry-run")
+
+    assert result.returncode == 0, result.stderr
+    plan = json.loads(result.stdout)
+    assert plan["platform"] == "orangepi"
+    assert plan["target"] == "orangepi5"
+    assert plan["builder"] == "orangepi/build.sh"
+    assert plan["command"] == ["bash", "orangepi/build.sh"]
+    assert plan["env"]["BOARD"] == "orangepi5"
+    assert plan["env"]["PREFER_DOCKER"] == "yes"
+    assert plan["env"]["SYNAPSE_PLATFORM"] == "orangepi"
+    assert plan["env"]["SYNAPSE_TARGET"] == "orangepi5"
+
+
+def testPlatformEnvPrintsShellExports() -> None:
+    result = runPlatforms("env", "raspberrypi")
+
+    assert result.returncode == 0, result.stderr
+    assert "export RELEASE=bookworm" in result.stdout
+    assert "export SYNAPSE_PLATFORM=raspberrypi" in result.stdout
+    assert "export SYNAPSE_TARGET=raspberrypi" in result.stdout
+
+
 def testReleaseWorkflowStructure() -> None:
     workflowPath = REPO_ROOT / ".github/workflows/release_images.yml"
     workflow = yaml.safe_load(workflowPath.read_text())
@@ -114,9 +221,16 @@ def testReleaseWorkflowStructure() -> None:
     assert isinstance(triggers, dict)
     assert "push" in triggers
     assert "v*" in triggers["push"]["tags"]
+    assert "targets" in triggers["workflow_dispatch"]["inputs"]
 
     jobs = workflow["jobs"]
-    for job in ("prepare", "wheel", "raspberrypi", "orangepi", "jetson", "release"):
+    for job in ("prepare", "wheel", "images", "release"):
         assert job in jobs, f"missing job {job}"
 
+    assert "matrix" in jobs["prepare"]["outputs"]
+    assert "matrix" in jobs["images"]["strategy"]
+    assert (
+        jobs["images"]["strategy"]["matrix"]["include"]
+        == "${{ fromJSON(needs.prepare.outputs.matrix) }}"
+    )
     assert jobs["release"]["if"] == "startsWith(github.ref, 'refs/tags/')"
