@@ -3,12 +3,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Build a Jetson overlay tarball containing the Synapse runtime and sample
-# project. The overlay is meant to be applied to a JetPack/L4T rootfs before
-# flashing, or extracted on a running Jetson.
+# Build a rootfs overlay tarball containing the Synapse runtime and sample
+# project. The overlay works on Debian/Ubuntu systems with systemd and Python
+# 3.11 or newer, including Jetson JetPack/L4T devices and x86_64 mini PCs.
 #
 # A complete flashable Jetson image is not built here because the NVIDIA BSP
-# cannot be redistributed from CI.
+# cannot be redistributed from CI. x86_64 mini PCs normally ship without an OS,
+# so the overlay is applied to an existing Ubuntu installation.
 #
 # Environment:
 #   SYNAPSE_WHEEL     Release wheel to install. The newest dist/*.whl is used
@@ -16,8 +17,10 @@
 #   SYNAPSE_VERSION   Overlay version. Defaults to SYNAPSE_VERSION in the
 #                     source.
 #   OUT_DIR           Output directory. Defaults to <repo>/dist/images.
+#   OVERLAY_NAME      Overlay family used in the output name. Defaults to
+#                     SYNAPSE_TARGET, then overlay.
 #   IMAGE_NAME        Overlay name without the extension. Defaults to
-#                     synapse-jetson-overlay-<version>.
+#                     synapse-<overlay-name>-overlay-<version>.
 
 set -euo pipefail
 
@@ -32,17 +35,19 @@ usage() {
   cat <<'EOF'
 Usage: build.sh [options]
 
-Build a Jetson overlay tarball containing the Synapse runtime and sample
-project. Apply it to a JetPack/L4T rootfs before flashing, or extract it on a
-running Jetson.
+Build a rootfs overlay tarball containing the Synapse runtime and sample
+project. Apply it to a Debian/Ubuntu systemd rootfs or extract it on a running
+device.
 
 Environment:
   SYNAPSE_WHEEL     Release wheel to install. The newest dist/*.whl is used
                     when omitted.
   SYNAPSE_VERSION   Overlay version. Defaults to SYNAPSE_VERSION in the source.
   OUT_DIR           Output directory. Defaults to <repo>/dist/images.
+  OVERLAY_NAME      Overlay family used in the output name. Defaults to
+                    SYNAPSE_TARGET, then overlay.
   IMAGE_NAME        Overlay name without the extension. Defaults to
-                    synapse-jetson-overlay-<version>.
+                    synapse-<overlay-name>-overlay-<version>.
 EOF
 }
 
@@ -62,10 +67,11 @@ esac
 
 OUT_DIR="${OUT_DIR:-${REPO_ROOT}/dist/images}"
 VERSION="${SYNAPSE_VERSION:-$(synapse_version "${REPO_ROOT}")}"
-IMAGE_NAME="${IMAGE_NAME:-synapse-jetson-overlay-${VERSION}}"
+OVERLAY_NAME="${OVERLAY_NAME:-${SYNAPSE_TARGET:-overlay}}"
+IMAGE_NAME="${IMAGE_NAME:-synapse-${OVERLAY_NAME}-overlay-${VERSION}}"
 WHEEL="$(ensure_synapse_wheel "${REPO_ROOT}")"
 
-STAGE="${REPO_ROOT}/.image-build/jetson-overlay"
+STAGE="${REPO_ROOT}/.image-build/linux-overlay"
 rm -rf "${STAGE}"
 
 mkdir -p \

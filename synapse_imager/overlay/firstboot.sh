@@ -3,10 +3,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Provision the Synapse runtime on a Jetson. This script is installed as
-# /usr/local/sbin/synapse-firstboot.sh by the overlay tarball and runs once on
-# first boot. It can also be run manually after extracting the overlay onto a
-# running device.
+# Provision the Synapse runtime on a Debian/Ubuntu system. This script is
+# installed as /usr/local/sbin/synapse-firstboot.sh by the overlay tarball and
+# runs once on first boot. It can also be run manually after extracting the
+# overlay onto a running device.
 
 set -euo pipefail
 
@@ -22,8 +22,8 @@ if [[ ! -d "${STAGING}" ]]; then
   exit 1
 fi
 
-# JetPack creates its user during OEM configuration. Pick the first regular
-# user with a home directory instead of assuming a specific name.
+# JetPack and desktop installers create their user during setup. Pick the first
+# regular user with a home directory instead of assuming a specific name.
 USER_NAME="$(
   getent passwd |
     awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// { print $1; exit }'

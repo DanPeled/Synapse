@@ -63,8 +63,8 @@ def testShellScriptsParse(script: Path) -> None:
         IMAGER_DIR / "common/provision.sh",
         IMAGER_DIR / "raspberrypi/build.sh",
         IMAGER_DIR / "raspberrypi/setup.sh",
-        IMAGER_DIR / "orangepi/build.sh",
-        IMAGER_DIR / "jetson/build.sh",
+        IMAGER_DIR / "armbian/build.sh",
+        IMAGER_DIR / "overlay/build.sh",
     ],
     ids=lambda path: str(path.name),
 )
@@ -166,12 +166,12 @@ def testPlatformMatrixIncludesEveryRegistryTarget() -> None:
 
 
 def testPlatformMatrixFiltersByPlatform() -> None:
-    result = runPlatforms("matrix", "--targets", "orangepi")
+    result = runPlatforms("matrix", "--targets", "armbian")
 
     assert result.returncode == 0, result.stderr
     matrix = json.loads(result.stdout)
     assert matrix
-    assert {entry["platform"] for entry in matrix} == {"orangepi"}
+    assert {entry["platform"] for entry in matrix} == {"armbian"}
 
 
 def testPlatformMatrixFiltersByTarget() -> None:
@@ -194,14 +194,27 @@ def testPlatformBuildDryRunUsesRegistryDefaults() -> None:
 
     assert result.returncode == 0, result.stderr
     plan = json.loads(result.stdout)
-    assert plan["platform"] == "orangepi"
+    assert plan["platform"] == "armbian"
     assert plan["target"] == "orangepi5"
-    assert plan["builder"] == "orangepi/build.sh"
-    assert plan["command"] == ["bash", "orangepi/build.sh"]
+    assert plan["builder"] == "armbian/build.sh"
+    assert plan["command"] == ["bash", "armbian/build.sh"]
     assert plan["env"]["BOARD"] == "orangepi5"
     assert plan["env"]["PREFER_DOCKER"] == "yes"
-    assert plan["env"]["SYNAPSE_PLATFORM"] == "orangepi"
+    assert plan["env"]["SYNAPSE_PLATFORM"] == "armbian"
     assert plan["env"]["SYNAPSE_TARGET"] == "orangepi5"
+
+
+def testPlatformBuildDryRunSupportsX86_64Overlay() -> None:
+    result = runPlatforms("build", "x86-64", "--dry-run")
+
+    assert result.returncode == 0, result.stderr
+    plan = json.loads(result.stdout)
+    assert plan["platform"] == "overlay"
+    assert plan["target"] == "x86-64"
+    assert plan["builder"] == "overlay/build.sh"
+    assert plan["command"] == ["bash", "overlay/build.sh"]
+    assert plan["env"]["SYNAPSE_TARGET"] == "x86-64"
+    assert plan["env"]["OVERLAY_NAME"] == "x86_64"
 
 
 def testPlatformEnvPrintsShellExports() -> None:

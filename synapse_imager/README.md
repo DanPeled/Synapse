@@ -1,7 +1,7 @@
 # Synapse device images
 
-This directory builds OS images with the Synapse runtime preinstalled and a
-sample project already deployed. Images are produced by the
+This directory builds OS images and rootfs overlays with the Synapse runtime
+preinstalled and a sample project already deployed. Images are produced by the
 `Build Synapse Device Images` workflow on every `v*` tag and can also be built
 locally.
 
@@ -48,6 +48,7 @@ work:
 
 ```bash
 BOARD=orangepi5-plus bash synapse_imager/build.sh orangepi5
+OVERLAY_NAME=x86_64 bash synapse_imager/build.sh jetson
 ```
 
 The same commands are available through `python3`:
@@ -65,15 +66,16 @@ python3 synapse_imager/platforms.py validate
 Add a target section to `platforms.ini`:
 
 ```ini
-[target.orangepi5-max]
-platform = orangepi
-name = Orange Pi 5 Max
-env.BOARD = orangepi5-max
+[target.orangepi5-ultra]
+platform = armbian
+name = Orange Pi 5 Ultra
+env.BOARD = orangepi5-ultra
 ```
 
 The board name must exist in Armbian's `config/boards/` directory. The builder
 validates it before starting a long build. The workflow picks up the new target
-on the next run.
+on the next run. The same pattern covers Orange Pi, Radxa, Khadas, and Banana Pi
+boards.
 
 Raspberry Pi OS builds one image for every supported Pi model, so a new
 Raspberry Pi usually needs no registry change. If a board needs a different OS
@@ -126,15 +128,19 @@ artifact names.
 | Artifact | Boards | Notes |
 | --- | --- | --- |
 | `synapse-raspberrypi-<version>-raspios-bookworm-arm64.img.xz` | Raspberry Pi 3/4/5, Zero 2 W (64-bit) | Built with [pi-gen](https://github.com/RPi-Distro/pi-gen) |
-| `synapse-<board>-<version>-armbian-bookworm.img.xz` | Orange Pi 5, Orange Pi 5 Plus, and other Armbian boards | Built with [Armbian](https://github.com/armbian/build) |
-| `synapse-jetson-overlay-<version>.tar.gz` | Jetson (JetPack/L4T) | Rootfs overlay; see [Jetson](#jetson) |
+| `synapse-<board>-<version>-armbian-bookworm.img.xz` | Orange Pi 5 / 5 Plus / 5 Max, Radxa Rock 5B, and other Armbian boards | Built with [Armbian](https://github.com/armbian/build) |
+| `synapse-jetson-overlay-<version>.tar.gz` | Jetson (JetPack/L4T) | Rootfs overlay; see [Linux overlay](#linux-overlay-jetson-and-x86_64) |
+| `synapse-x86_64-overlay-<version>.tar.gz` | Beelink / Intel NUC and other x86_64 mini PCs | Rootfs overlay; see [Linux overlay](#linux-overlay-jetson-and-x86_64) |
 
 ### Default credentials
 
 | Image | User | Password |
 | --- | --- | --- |
 | Raspberry Pi | `pi` | `synapse` |
-| Orange Pi | `synapse` | `synapse` |
+| Armbian | `synapse` | `synapse` |
+
+Linux overlays do not create a user. They provision the first regular user on
+the existing system.
 
 Change the password before putting a device on an untrusted network. The
 installer's passwordless sudo rule is intentionally part of the image, so a
@@ -175,11 +181,18 @@ TARGET_HOSTNAME=synapse
 IMAGE_NAME=synapse-raspberrypi-custom
 ```
 
-### Orange Pi
+### Armbian single-board computers
 
 ```bash
 SYNAPSE_WHEEL=dist/synapsefrc-*.whl \
   bash synapse_imager/build.sh orangepi5
+```
+
+The same builder supports every Armbian target in the registry, including
+Orange Pi and Radxa boards:
+
+```bash
+bash synapse_imager/build.sh radxa-rock-5b
 ```
 
 The wrapper clones the pinned Armbian release into `.image-build/armbian`,
@@ -203,21 +216,25 @@ IMAGE_NAME=synapse-orangepi5-plus-custom
 Armbian builds are resource intensive (roughly 50 GB of disk and a long build
 time). Run them on a machine with Docker and plenty of free space.
 
-### Jetson
+### Linux overlay (Jetson and x86_64)
 
 ```bash
 SYNAPSE_WHEEL=dist/synapsefrc-*.whl \
   bash synapse_imager/build.sh jetson
+bash synapse_imager/build.sh x86-64
 ```
 
-The Jetson build produces an overlay tarball rather than a flashable image.
-NVIDIA's JetPack/L4T BSP cannot be redistributed from CI. Apply the overlay to
-an L4T rootfs before flashing, or extract it on a running device:
+The overlay build produces a tarball rather than a flashable image. NVIDIA's
+JetPack/L4T BSP cannot be redistributed from CI, and x86_64 mini PCs normally
+ship without an OS. Apply the overlay to a Debian/Ubuntu systemd rootfs before
+flashing, or extract it on a running device:
 
 ```bash
-sudo tar -xzf synapse-jetson-overlay-<version>.tar.gz -C /
+sudo tar -xzf synapse-<target>-overlay-<version>.tar.gz -C /
 sudo /opt/synapse-build/install.sh
 ```
+
+For a mini PC, install Ubuntu Server 24.04 first and then extract the overlay.
 
 The overlay installs a `synapse-firstboot.service` unit. On first boot it finds
 the first regular user, provisions the runtime for that user, and disables
@@ -240,10 +257,11 @@ Manual dispatch builds the selected targets but does not publish a release. Use
 it to smoke-test a branch or a new board:
 
 ```text
-targets: orangepi5,orangepi5-plus
+targets: orangepi5,radxa-rock-5b,x86-64
 ```
 
-Use `targets: all` (the default) to build everything.
+`targets` also accepts a platform id such as `armbian` or `overlay`. Use
+`targets: all` (the default) to build everything.
 
 The workflow uses the wheel built from the tag rather than a PyPI release, so
 images always match the source tree that produced the tag.

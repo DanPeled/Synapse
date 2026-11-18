@@ -3,10 +3,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Build an Armbian image for an Orange Pi with the Synapse runtime
-# preinstalled. The Armbian build framework performs the actual kernel,
-# bootloader, and rootfs work; this wrapper only supplies an overlay and the
-# customize-image.sh hook.
+# Build an Armbian image for a supported single-board computer with the
+# Synapse runtime preinstalled. The Armbian build framework performs the actual
+# kernel, bootloader, and rootfs work; this wrapper only supplies an overlay
+# and the customize-image.sh hook.
 #
 # Environment:
 #   BOARD             Armbian board name. Defaults to orangepi5.
@@ -38,7 +38,8 @@ usage() {
   cat <<'EOF'
 Usage: build.sh [options]
 
-Build an Armbian image for an Orange Pi with the Synapse runtime preinstalled.
+Build an Armbian image for a supported SBC with the Synapse runtime
+preinstalled.
 
 Environment:
   BOARD             Armbian board name. Defaults to orangepi5.
@@ -93,9 +94,7 @@ checkout_ref \
 
 if [[ ! -f "${ARMBIAN_DIR}/config/boards/${BOARD}.conf" && ! -f "${ARMBIAN_DIR}/config/boards/${BOARD}.csc" ]]; then
   echo "Unknown Armbian board: ${BOARD}" >&2
-  echo "Available Orange Pi boards:" >&2
-  find "${ARMBIAN_DIR}/config/boards" -maxdepth 1 -type f -name 'orangepi*' \
-    -printf '  %f\n' | sort >&2
+  echo "See ${ARMBIAN_DIR}/config/boards for available boards." >&2
   exit 1
 fi
 

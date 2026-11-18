@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Run the Synapse first-boot provisioning on a running Jetson.
+# Run the Synapse first-boot provisioning on a running device.
 
 set -euo pipefail
 
