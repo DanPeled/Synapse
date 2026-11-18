@@ -3,41 +3,144 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import ipaddress
 import shutil
 import subprocess
 import threading
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
-from synapse.log import err, info, warn
+from synapse.log import err, info
 
 CHECK_INTERVAL: int = 5
 
 
 InterfaceName = str
 
+# Interfaces that should never receive a user-facing static address. The list
+# covers loopback, container bridges, virtual machines, VPNs, and similar.
+VIRTUAL_INTERFACE_PREFIXES = (
+    "lo",
+    "docker",
+    "veth",
+    "br-",
+    "virbr",
+    "vmnet",
+    "tun",
+    "tap",
+    "wg",
+    "tailscale",
+    "zt",
+    "dummy",
+    "can",
+    "vcan",
+    "bond",
+    "team",
+    "ppp",
+)
+
+
+class NetworkCommandError(RuntimeError):
+    """Raised when a networking command fails."""
+
+
+def isPhysicalInterface(name: str) -> bool:
+    """Return True for interfaces that can carry a robot-network address."""
+    return bool(name) and not name.startswith(VIRTUAL_INTERFACE_PREFIXES)
+
+
+@dataclass(frozen=True)
+class StaticAddress:
+    """A secondary IPv4 address that is added while DHCP stays enabled."""
+
+    interface: InterfaceName
+    address: str
+    prefixLength: int = 24
+
+    @property
+    def cidr(self) -> str:
+        return f"{self.address}/{self.prefixLength}"
+
+    @classmethod
+    def parse(
+        cls,
+        interface: InterfaceName,
+        address: str,
+        prefixLength: int = 24,
+    ) -> Optional["StaticAddress"]:
+        interface = (interface or "").strip()
+        address = (address or "").strip()
+
+        if not isPhysicalInterface(interface):
+            return None
+
+        try:
+            ip = ipaddress.IPv4Address(address)
+            prefix = int(prefixLength)
+        except (ipaddress.AddressValueError, TypeError, ValueError):
+            return None
+
+        if not 1 <= prefix <= 32:
+            return None
+
+        if (
+            ip.is_loopback
+            or ip.is_multicast
+            or ip.is_unspecified
+            or ip.is_link_local
+            or ip.is_reserved
+        ):
+            return None
+
+        network = ipaddress.IPv4Network(f"{ip}/{prefix}", strict=False)
+        if prefix <= 30 and ip in (network.network_address, network.broadcast_address):
+            return None
+
+        return cls(interface=interface, address=str(ip), prefixLength=prefix)
+
 
 class NetworkingManager:
+    """Add a static IPv4 address without taking DHCP away from the interface.
+
+    Keeping DHCP enabled is what lets the coprocessor reach the internet when it
+    is plugged into an internet-connected router. The static address is added as
+    a secondary address so the robot network can still reach the device at a
+    predictable address.
+    """
+
     def __init__(self) -> None:
+        self._lock = threading.RLock()
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
-        self._lock = threading.Lock()
+        self._current: Optional[StaticAddress] = None
+        self._backend: Optional[str] = None
 
     # ------------------------
-    # Internal helpers
+    # Command helpers
     # ------------------------
 
     @staticmethod
-    def _runCommand(command: list[str]) -> None:
+    def _runCommand(command: list[str]) -> subprocess.CompletedProcess[str]:
         try:
-            subprocess.run(
+            return subprocess.run(
                 command,
                 check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             )
+        except FileNotFoundError as e:
+            raise NetworkCommandError(f"{command[0]} is not installed") from e
         except subprocess.CalledProcessError as e:
-            err(f"Command failed: {e}\n{e.stderr.strip()}")
+            detail = (e.stderr or e.stdout or "").strip()
+            message = f"Command failed: {' '.join(command)}"
+            if detail:
+                message = f"{message}\n{detail}"
+            raise NetworkCommandError(message) from e
+
+    @staticmethod
+    def _sudo(command: list[str]) -> list[str]:
+        return ["sudo", "-n", *command]
 
     @staticmethod
     def _interfaceIsUp(interface: InterfaceName) -> bool:
@@ -47,101 +150,306 @@ class NetworkingManager:
         except Exception:
             return False
 
+    # ------------------------
+    # Backend detection
+    # ------------------------
+
     @staticmethod
-    def _ipIsConfigured(interface: InterfaceName, staticIp: str) -> bool:
-        """Check if *exact* static IP (with mask) is present."""
+    def _networkManagerIsRunning() -> bool:
         try:
-            output = subprocess.check_output(["ip", "addr", "show", interface])
-            return staticIp.encode() in output
-        except Exception:
+            result = subprocess.run(
+                ["nmcli", "-t", "-f", "RUNNING", "general"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
             return False
 
-    @staticmethod
-    def _setStaticIp(interface: InterfaceName, staticIp: str) -> None:
-        if not NetworkingManager._ipIsConfigured(interface, staticIp):
-            NetworkingManager._runCommand(
-                ["sudo", "ip", "addr", "add", staticIp, "dev", interface]
-            )
-            info(f"Static IP {staticIp} applied on {interface}")
+        return result.stdout.strip().endswith("running")
 
-    @staticmethod
-    def _startDhcp(interface: InterfaceName) -> None:
-        # dhclient can block → fire and forget
-        subprocess.Popen(
-            ["dhclient", "-v", interface],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+    @classmethod
+    def _detectBackend(cls) -> str:
+        if shutil.which("nmcli") and cls._networkManagerIsRunning():
+            return "networkmanager"
+        if shutil.which("netplan") and Path("/etc/netplan").is_dir():
+            return "netplan"
+        return "ip"
+
+    # ------------------------
+    # NetworkManager backend
+    # ------------------------
+
+    @classmethod
+    def _networkManagerConnection(cls, interface: InterfaceName) -> Optional[str]:
+        result = subprocess.run(
+            ["nmcli", "-t", "-f", "GENERAL.CONNECTION", "device", "show", interface],
+            check=False,
+            capture_output=True,
+            text=True,
         )
-        info(f"DHCP started on {interface}")
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if line.startswith("GENERAL.CONNECTION:"):
+                    name = line.split(":", 1)[1].strip()
+                    if name and name != "--":
+                        return name
+
+        result = subprocess.run(
+            ["nmcli", "-t", "-f", "NAME,DEVICE", "connection", "show", "--active"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                name, _, device = line.rpartition(":")
+                if device == interface and name:
+                    return name
+
+        return None
+
+    @classmethod
+    def _createNetworkManagerConnection(cls, interface: InterfaceName) -> str:
+        name = f"synapse-{interface}"
+        cls._runCommand(
+            cls._sudo(
+                [
+                    "nmcli",
+                    "connection",
+                    "add",
+                    "type",
+                    "ethernet",
+                    "ifname",
+                    interface,
+                    "con-name",
+                    name,
+                    "ipv4.method",
+                    "auto",
+                ]
+            )
+        )
+        return name
+
+    @classmethod
+    def _applyNetworkManager(cls, address: StaticAddress) -> None:
+        name = cls._networkManagerConnection(address.interface)
+        if name is None:
+            name = cls._createNetworkManagerConnection(address.interface)
+
+        cls._runCommand(
+            cls._sudo(
+                [
+                    "nmcli",
+                    "connection",
+                    "modify",
+                    name,
+                    "ipv4.method",
+                    "auto",
+                    "ipv4.addresses",
+                    address.cidr,
+                ]
+            )
+        )
+        cls._runCommand(cls._sudo(["nmcli", "connection", "up", name]))
+
+    @classmethod
+    def _clearNetworkManager(cls, address: StaticAddress) -> None:
+        name = cls._networkManagerConnection(address.interface)
+        if name is None:
+            return
+
+        cls._runCommand(
+            cls._sudo(
+                [
+                    "nmcli",
+                    "connection",
+                    "modify",
+                    name,
+                    "ipv4.addresses",
+                    "",
+                ]
+            )
+        )
+        cls._runCommand(cls._sudo(["nmcli", "connection", "up", name]))
 
     # ------------------------
-    # Thread worker
+    # netplan backend
     # ------------------------
 
-    def _networkLoop(self, interface: InterfaceName, staticIp: str) -> None:
-        staticAssigned = False
-        dhcpStarted = False
+    @classmethod
+    def _applyNetplan(cls, address: StaticAddress) -> None:
+        prefix = f"ethernets.{address.interface}"
+        cls._runCommand(
+            cls._sudo(
+                [
+                    "netplan",
+                    "set",
+                    "--origin-hint",
+                    "synapse-static",
+                    f"{prefix}.dhcp4=true",
+                ]
+            )
+        )
+        cls._runCommand(
+            cls._sudo(
+                [
+                    "netplan",
+                    "set",
+                    "--origin-hint",
+                    "synapse-static",
+                    f"{prefix}.addresses=[{address.cidr}]",
+                ]
+            )
+        )
+        cls._runCommand(cls._sudo(["netplan", "apply"]))
 
-        while not self._stop_event.is_set():
+    @classmethod
+    def _clearNetplan(cls, address: StaticAddress) -> None:
+        prefix = f"ethernets.{address.interface}"
+        cls._runCommand(
+            cls._sudo(
+                [
+                    "netplan",
+                    "set",
+                    "--origin-hint",
+                    "synapse-static",
+                    f"{prefix}.addresses=NULL",
+                ]
+            )
+        )
+        cls._runCommand(cls._sudo(["netplan", "apply"]))
+
+    # ------------------------
+    # Generic ip fallback
+    # ------------------------
+
+    @staticmethod
+    def _ipAddressIsConfigured(address: StaticAddress) -> bool:
+        try:
+            result = subprocess.run(
+                ["ip", "-4", "addr", "show", "dev", address.interface],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            return False
+
+        return result.returncode == 0 and address.cidr in result.stdout
+
+    @classmethod
+    def _applyIpAddress(cls, address: StaticAddress) -> None:
+        if cls._ipAddressIsConfigured(address):
+            return
+
+        cls._runCommand(
+            cls._sudo(["ip", "addr", "add", address.cidr, "dev", address.interface])
+        )
+        cls._runCommand(cls._sudo(["ip", "link", "set", address.interface, "up"]))
+
+    @classmethod
+    def _removeIpAddress(cls, address: StaticAddress) -> None:
+        if not cls._ipAddressIsConfigured(address):
+            return
+
+        cls._runCommand(
+            cls._sudo(["ip", "addr", "del", address.cidr, "dev", address.interface])
+        )
+
+    # ------------------------
+    # Fallback worker
+    # ------------------------
+
+    def _networkLoop(self, address: StaticAddress) -> None:
+        while not self._stop_event.wait(CHECK_INTERVAL):
+            if not self._interfaceIsUp(address.interface):
+                continue
+
             try:
-                if self._interfaceIsUp(interface):
-                    if not staticAssigned:
-                        self._setStaticIp(interface, staticIp)
-                        staticAssigned = True
-
-                    if not dhcpStarted:
-                        self._startDhcp(interface)
-                        dhcpStarted = True
-                else:
-                    warn(f"{interface} is down, waiting...")
-                    staticAssigned = False
-                    dhcpStarted = False
-
-            except Exception as e:
+                self._applyIpAddress(address)
+            except NetworkCommandError as e:
                 err(f"Networking thread error: {e}")
 
-            self._stop_event.wait(CHECK_INTERVAL)
-
-    # ------------------------
-    # Public API
-    # ------------------------
-
-    def configureStaticIp(self, staticIp: str, interface: InterfaceName) -> None:
-        """Start (or restart) the background worker."""
-        with self._lock:
-            self._stopWorkerLocked()
-
-            self._stop_event.clear()
-            self._thread = threading.Thread(
-                target=self._networkLoop,
-                args=(interface, staticIp),
-                daemon=True,
-            )
-            self._thread.start()
-
-        info(f"Started static IP manager for {interface}")
-
-    def removeStaticIp(self) -> None:
-        """Stop the background worker."""
-        with self._lock:
-            self._stopWorkerLocked()
-        info("Stopped static IP manager")
-
-    def close(self) -> None:
-        """Shutdown the manager cleanly."""
-        with self._lock:
-            self._stopWorkerLocked()
-        info("NetworkingManager shut down")
-
-    # ------------------------
-    # Internal lifecycle
-    # ------------------------
+    def _startWorkerLocked(self, address: StaticAddress) -> None:
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._networkLoop,
+            args=(address,),
+            daemon=True,
+        )
+        self._thread.start()
 
     def _stopWorkerLocked(self) -> None:
         if self._thread and self._thread.is_alive():
             self._stop_event.set()
             self._thread.join(timeout=5)
         self._thread = None
+
+    # ------------------------
+    # Public API
+    # ------------------------
+
+    def setStaticAddress(self, address: StaticAddress) -> bool:
+        """Add or replace the static address while keeping DHCP enabled."""
+        with self._lock:
+            self._stopWorkerLocked()
+            backend = self._detectBackend()
+
+            try:
+                if backend == "networkmanager":
+                    self._applyNetworkManager(address)
+                elif backend == "netplan":
+                    self._applyNetplan(address)
+                else:
+                    self._applyIpAddress(address)
+                    self._startWorkerLocked(address)
+            except NetworkCommandError as e:
+                err(
+                    f"Failed to configure static IP {address.cidr} "
+                    f"on {address.interface}: {e}"
+                )
+                return False
+
+            self._backend = backend
+            self._current = address
+            info(
+                f"Static IP {address.cidr} added on {address.interface}; "
+                "DHCP remains enabled"
+            )
+            return True
+
+    def removeStaticAddress(self) -> bool:
+        """Remove the managed static address without touching DHCP."""
+        with self._lock:
+            self._stopWorkerLocked()
+
+            current = self._current
+            backend = self._backend
+            if current is None:
+                return True
+
+            try:
+                if backend == "networkmanager":
+                    self._clearNetworkManager(current)
+                elif backend == "netplan":
+                    self._clearNetplan(current)
+                else:
+                    self._removeIpAddress(current)
+            except NetworkCommandError as e:
+                err(f"Failed to remove static IP {current.cidr}: {e}")
+                return False
+
+            self._current = None
+            self._backend = None
+            info(f"Static IP {current.cidr} removed from {current.interface}")
+            return True
+
+    def close(self) -> None:
+        """Shutdown the manager cleanly."""
+        with self._lock:
+            self._stopWorkerLocked()
+        info("NetworkingManager shut down")
 
 
 # ------------------------
