@@ -25,6 +25,7 @@
   * [Apriltag Pipeline](usage/built-in-pipelines/apriltag-pipeline/README.md)
     * [ApriltagPipeline Settings](usage/built-in-pipelines/apriltag-pipeline/apriltagpipeline-settings.md)
   * [Color Detection Pipeline](usage/built-in-pipelines/color-detection-pipeline.md)
+  * [Object Detection Pipeline](usage/built-in-pipelines/object-detection-pipeline.md)
 * [UI Interaction](usage/built-in-pipelines-1/README.md)
   * [Pipeline Settings](usage/built-in-pipelines-1/pipeline-settings.md)
   * [Camera Page](usage/built-in-pipelines-1/camera-page.md)

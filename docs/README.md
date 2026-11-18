@@ -26,7 +26,7 @@ If you have never used Synapse before, start with [How Synapse Works](getting-st
 
 ## What you get
 
-<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-cover data-type="files"></th></tr></thead><tbody><tr><td><strong>Extendable</strong></td><td>Use the built-in AprilTag and color pipelines, or write your own Python pipeline</td><td><a href=".gitbook/assets/settings.png">settings.png</a></td></tr><tr><td><strong>Fast to iterate</strong></td><td>Deploy your vision project to the coprocessor like robot code, with one command</td><td><a href=".gitbook/assets/rush.png">rush.png</a></td></tr><tr><td><strong>Built-in UI</strong></td><td>Tune settings, watch camera streams, and inspect results live from a web browser</td><td><a href=".gitbook/assets/ux-design.png">ux-design.png</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-cover data-type="files"></th></tr></thead><tbody><tr><td><strong>Extendable</strong></td><td>Use the built-in AprilTag, color, and object-detection pipelines, or write your own Python pipeline</td><td><a href=".gitbook/assets/settings.png">settings.png</a></td></tr><tr><td><strong>Fast to iterate</strong></td><td>Deploy your vision project to the coprocessor like robot code, with one command</td><td><a href=".gitbook/assets/rush.png">rush.png</a></td></tr><tr><td><strong>Built-in UI</strong></td><td>Tune settings, watch camera streams, and inspect results live from a web browser</td><td><a href=".gitbook/assets/ux-design.png">ux-design.png</a></td></tr></tbody></table>
 
 ## The pieces of Synapse
 

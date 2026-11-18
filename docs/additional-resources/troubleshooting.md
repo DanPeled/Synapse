@@ -57,6 +57,8 @@ Work through this list in order:
 
 {% hint style="info" %}
 If the runtime is in `--server` mode, it hosts its own NetworkTables server. Your robot code must connect to that server, not the RoboRIO.
+
+If a connection is not established within about 10 seconds, the runtime logs a timeout warning and continues starting. Recheck the team number and network when you see that warning.
 {% endhint %}
 
 ## AprilTags are not detected
@@ -64,12 +66,12 @@ If the runtime is in `--server` mode, it hosts its own NetworkTables server. You
 | Cause | Fix |
 | --- | --- |
 | Wrong tag family | Match `tag_family` to your tags (`tag36h11` or `tag16h5`) |
-| Tag too small or far away | Move closer, increase resolution, or lower `quad_decimate` |
+| Tag too small or far away | Move closer, increase resolution, or lower `min_tag_px` |
 | Blurry or dark image | Improve lighting, focus the lens, increase exposure |
 | Crop excludes the tag | Check `crop_x` and `crop_y` |
-| Tags filtered out | Check `min_cluster_pixels`, `max_line_fit_mse`, `min_white_black_diff` |
+| Tags rejected by detection filters | Tune `min_contrast`, `min_border_cells`, `sharpening`, and `max_hamming` |
 | Wrong field map | Replace `deploy/fmap.json` with the map for your field |
-| Detection is disabled by `critical_angle` | See [Known Issues](known-issues.md) |
+| Tag ID excluded | Check `tag_filter` (an empty list accepts every tag) |
 
 Start from the defaults and change one setting at a time.
 
@@ -139,7 +141,7 @@ python -c "import sys; print(sys.executable); print(sys.version)"
 - Lower the pipeline resolution.
 - Reduce `max_fps`.
 - Disable recording when you do not need it.
-- Lower `quad_decimate` only if detection quality needs it; raising it improves speed.
+- Lower `min_tag_px` only if smaller or more distant tags need to be detected; raising it improves speed.
 - Check CPU and memory on the **Settings** page.
 - On Windows, camera performance may be worse than on Linux. See [Known Issues](known-issues.md).
 

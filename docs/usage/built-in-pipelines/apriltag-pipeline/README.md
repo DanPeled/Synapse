@@ -24,21 +24,29 @@ For every frame, `ApriltagPipeline`:
 
 1. Applies the configured crop region.
 2. Converts the image to grayscale.
-3. Runs the AprilTag detector to find tag corners and IDs.
-4. Looks up each tag's known field pose in `deploy/fmap.json`.
-5. Uses solvePnP with the camera matrix, distortion coefficients, and tag size to estimate the camera pose in field coordinates.
-6. Draws detection markers on the output frame.
-7. Publishes results and auxiliary values.
+3. Runs the **NAPA** AprilTag detector to find tag corners and IDs.
+4. Filters detections by `tag_filter` before any markers are drawn or poses are estimated.
+5. Looks up each remaining tag's known field pose in `deploy/fmap.json`.
+6. Uses OpenCV `solvePnPGeneric` with the camera matrix, distortion coefficients, and tag size to estimate the camera pose in field coordinates. A single tag is solved with `SOLVEPNP_IPPE_SQUARE`; multiple tags use `SOLVEPNP_ITERATIVE`, and the solution with the lowest reprojection error is kept.
+7. Draws detection markers for the remaining tags on the output frame.
+8. Publishes results and auxiliary values.
 
 ```mermaid
 flowchart LR
     F[Frame] --> C[Crop]
     C --> G[Grayscale]
-    G --> D[AprilTag detector]
-    D --> M[Field map lookup]
-    M --> P[solvePnP]
+    G --> D[NAPA detector]
+    D --> T[Tag ID filter]
+    T --> M[Field map lookup]
+    M --> P[solvePnPGeneric]
     P --> R[Results + annotated frame]
 ```
+
+### Target specific tags
+
+The `tag_filter` setting limits the pipeline to a list of tag IDs, for example `1, 2, 7` in the dashboard. Leave it empty to use every detected tag.
+
+Filtering happens immediately after detection. Excluded tags are not drawn, are not added to `tags`, and do not contribute to the estimated camera pose. This is useful when aiming at one known tag or when other tags in view would pull the pose estimate away from your target.
 
 ## What you need
 
@@ -50,7 +58,7 @@ See [Camera Calibration](../../../getting-started/quick-start/camera-calibration
 
 ### 2. A field map
 
-The pipeline loads `deploy/fmap.json` from your project. The file lists every tag's field pose:
+The pipeline requires `deploy/fmap.json` from your project. The file lists every tag's field pose:
 
 ```json
 {
@@ -118,14 +126,14 @@ The final result contains:
 
 | Key | Type | Description |
 | --- | --- | --- |
-| `cameraEstimate_fieldSpace` | `[x, y, z, roll, pitch, yaw]` | Estimated camera pose in field coordinates (meters, degrees) |
-| `tags` | array | One entry per detected tag |
+| `cameraEstimate_fieldSpace` | `[x, y, z, roll, pitch, yaw]` or `null` | Estimated camera pose in field coordinates (meters, degrees); `null` when no pose is estimated |
+| `tags` | array | One entry per detected tag that passes `tag_filter` |
 | `tags[].tag_id` | int | AprilTag ID |
-| `tags[].hamming` | float | Hamming distance of the decoded tag |
+| `tags[].hamming` | int | Hamming distance of the decoded tag |
 | `tags[].tagPose_screenSpace` | `[x, y]` | Tag center in image pixels |
-| `reprojection_error` | float | Error of the pose fit; lower is better |
+| `reprojection_error` | float | Error of the pose fit; lower is better. `0.0` when no pose is estimated |
 
-In Java, `ApriltagResult.cameraEstimate_fieldSpace3d()` converts the pose array to a `Pose3d`. In Python, `ApriltagResult.cameraEstimate_fieldSpace3d` is a property that does the same.
+In Java, `ApriltagResult.cameraEstimate_fieldSpace3d()` converts the pose array to a `Pose3d`. In Python, `ApriltagResult.cameraEstimate_fieldSpace3d` is a property that does the same. Both return `null`/`None` when `cameraEstimate_fieldSpace` is unavailable.
 
 Read them from robot code with [SynapseLib](../../../robot-interfacing/synapse-bridge/getting-target-data.md), or inspect them in the dashboard's **Results** panel.
 
@@ -139,10 +147,11 @@ The camera is not the robot. To get the robot pose, apply the robot-to-camera tr
 
 ## Important behavior
 
-- **`publish_camera_field_pose` should stay `True`.** The pipeline currently serializes the camera estimate unconditionally when tags are present. Disabling pose estimation can cause a serialization error.
-- **`publish_tag_pose_3d` and `verbosity` are defined but not currently used** by the result serializer. They are reserved for future use.
-- **Tags not in `fmap.json` are ignored** with a warning.
-- **Results are cleared** when no tags are visible.
+- **Disabling `publish_camera_field_pose` skips pose estimation.** The result still contains `tags`, but `cameraEstimate_fieldSpace` is `null` (`None` in Python) and `reprojection_error` is `0.0`. It no longer causes a serialization error.
+- **Changing `tag_family` or any NAPA detection setting rebuilds the native detector.** Expect a brief rebuild when editing these values from the dashboard; avoid toggling them repeatedly.
+- **`publish_tag_pose_3d` and `verbosity` are defined but not currently used** by the result serializer. No published values change when you edit them.
+- **Tags not in `fmap.json` are ignored** with a warning, and are excluded from the published `tags` list.
+- **Results are cleared** when no tags remain after `tag_filter` is applied.
 
 ## Tuning
 
@@ -152,11 +161,11 @@ Common adjustments:
 
 | Problem | Try |
 | --- | --- |
-| Detection is too slow | Crop the image, raise `quad_decimate`, lower resolution, increase `num_threads` |
-| Tags are missed at long range | Lower `quad_decimate`, increase resolution, check lighting and focus |
-| Pose is jittery | Calibrate the camera, enable `refine_edges`, check tag size, lock exposure |
-| Pose is inaccurate | Verify calibration resolution and tag size, set `quad_decimate` to `1.0`, improve lighting |
-| False detections | Raise `min_white_black_diff`, lower `max_line_fit_mse`, use `tag36h11` |
+| Detection is too slow | Crop the image, raise `min_tag_px`, reduce `max_detections`, lower resolution |
+| Tags are missed at long range | Lower `min_tag_px`, lower `min_contrast` and `min_border_cells`, increase resolution, check lighting and focus |
+| Pose is jittery | Calibrate the camera, verify `tag_size`, use multiple tags, lock exposure |
+| Pose is inaccurate | Verify calibration resolution, tag size, and field map; check `reprojection_error`; keep `publish_camera_field_pose` enabled |
+| False detections | Raise `min_contrast`, raise `min_border_cells`, use `tag_filter`, confirm `tag_family` |
 
 ## Next steps
 

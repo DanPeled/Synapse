@@ -20,11 +20,12 @@ Auxiliary values are ordinary NetworkTables entries, so you can read them direct
 {% tab title="Java" %}
 ```java
 import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableEntry;
-import synapse.SynapseCamera;
+import edu.wpi.first.networktables.NetworkTableInstance;
 
-SynapseCamera camera = new SynapseCamera("camera0", "Synapse");
-NetworkTable data = camera.getDataTable();
+NetworkTable data = NetworkTableInstance.getDefault()
+    .getTable("Synapse")
+    .getSubTable("camera0")
+    .getSubTable("data");
 
 boolean hasResults = data.getEntry("hasResults").getBoolean(false);
 long tagCount = data.getEntry("tagCount").getInteger(0);
@@ -35,10 +36,14 @@ String label = data.getEntry("label").getString("");
 
 {% tab title="Python" %}
 ```python
-from synapselib import SynapseCamera
+from ntcore import NetworkTableInstance
 
-camera = SynapseCamera("camera0", "Synapse")
-data = camera.getDataTable()
+data = (
+    NetworkTableInstance.getDefault()
+    .getTable("Synapse")
+    .getSubTable("camera0")
+    .getSubTable("data")
+)
 
 has_results = data.getEntry("hasResults").getBoolean(False)
 tag_count = data.getEntry("tagCount").getInteger(0)
@@ -49,6 +54,8 @@ label = data.getEntry("label").getString("")
 {% endtabs %}
 
 Always pass a default value. If the pipeline has not published the key yet, the entry does not exist, and a read without a default returns an empty/zero value or raises depending on the API.
+
+Java's `SynapseCamera.getDataTable()` is `protected`, so use the explicit table path shown above from robot code. For final results, prefer the public `getResults(...)` / `getLatestResults(...)` APIs below.
 
 ## Reading final results
 
@@ -95,36 +102,28 @@ Field names must match the serialized names exactly. In Java, use `@JsonProperty
 
 {% tabs %}
 {% tab title="Java" %}
-Use `deserializeResults` with the raw entry:
+Use `getResults` with a reusable `SynapsePipelineType` (defined below):
 
 ```java
-import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.Optional;
 import synapse.SynapseCamera;
 
 public Optional<MyPipelineResult> readResults(SynapseCamera camera) {
-  byte[] raw = camera.getDataTable()
-      .getEntry("results")
-      .getRaw(new byte[0]);
-
-  if (raw.length == 0) {
-    return Optional.empty();
-  }
-
-  return camera.deserializeResults(
-      new TypeReference<MyPipelineResult>() {},
-      raw);
+  return camera.getResults(kMyPipeline);
 }
 ```
+
+If you need the raw bytes, read `<camera>/data/results` from an explicit NetworkTables table and pass them to `deserializeResults`.
 {% endtab %}
 
 {% tab title="Python" %}
 ```python
-from synapselib import SynapseCamera
+from synapselib import SynapseCamera, SynapsePipelineType
+
+kMyPipeline = SynapsePipelineType(MyPipelineResult, "MyPipeline")
 
 def read_results(camera: SynapseCamera):
-    raw = camera.getResultsEntry().getRaw(b"")
-    return camera.getResults(MyPipelineResult, raw)
+    return camera.getLatestResults(kMyPipeline)
 ```
 {% endtab %}
 {% endtabs %}
@@ -152,8 +151,7 @@ from synapselib import SynapsePipelineType
 
 kMyPipeline = SynapsePipelineType(MyPipelineResult, "MyPipeline")
 
-raw = camera.getResultsEntry().getRaw(b"")
-result = camera.getResults(kMyPipeline.getResultType(), raw)
+result = camera.getLatestResults(kMyPipeline)
 ```
 {% endtab %}
 {% endtabs %}
@@ -178,18 +176,18 @@ if ("MyPipeline".equals(camera.getPipelineType())) {
 {% tab title="Python" %}
 ```python
 if camera.getPipelineType() == "MyPipeline":
-    result = camera.getResults(kMyPipeline.getResultType(),
-                               camera.getResultsEntry().getRaw(b""))
+    result = camera.getLatestResults(kMyPipeline)
 ```
 {% endtab %}
 {% endtabs %}
 
 ## Nested results
 
-Nested dataclasses work on the Java side as long as the classes have no-argument constructors and public fields or setters.
+Nested result types are supported in both languages.
 
 ```python
 from dataclasses import dataclass
+from typing import Optional
 from synapse.core.results_api import PipelineResult
 
 @dataclass
@@ -201,10 +199,11 @@ class Target:
 @dataclass
 class TargetResult(PipelineResult):
     targets: list[Target]
-    best_id: int
+    best: Optional[Target] = None
+    best_id: int = -1
 ```
 
-On the Java side:
+On the Java side, use matching classes with no-argument constructors and public fields or setters:
 
 ```java
 public class Target {
@@ -216,25 +215,27 @@ public class Target {
 
 public class TargetResult {
   public Target[] targets;
+  public Target best;
   public int best_id;
   public TargetResult() {}
 }
 ```
 
-{% hint style="warning" %}
-Python's `getResults` has a bug with nested dataclass lists. See [Known Issues](../../additional-resources/known-issues.md) for the workaround using `msgpack` directly.
-{% endhint %}
+Python's deserializer recursively converts nested dataclasses, lists, dictionaries, optionals, and WPILib geometry fields. Java uses Jackson with the WPILib geometry module registered, so the same nested payloads deserialize into matching Java classes. Field names must still match the serialized names, and missing fields fall back to defaults where available.
 
 ## Listening for changes
 
 Polling once per robot loop is usually enough and is the simplest approach:
 
 ```java
+NetworkTable data = NetworkTableInstance.getDefault()
+    .getTable("Synapse")
+    .getSubTable("camera0")
+    .getSubTable("data");
+
 @Override
 public void robotPeriodic() {
-  boolean hasResults = camera.getDataTable()
-      .getEntry("hasResults")
-      .getBoolean(false);
+  boolean hasResults = data.getEntry("hasResults").getBoolean(false);
 
   if (hasResults) {
     camera.getResults(kMyPipeline).ifPresent(this::useResult);
@@ -243,11 +244,19 @@ public void robotPeriodic() {
 ```
 
 ```python
+from ntcore import NetworkTableInstance
+
+data = (
+    NetworkTableInstance.getDefault()
+    .getTable("Synapse")
+    .getSubTable("camera0")
+    .getSubTable("data")
+)
+
 def robotPeriodic(self):
-    has_results = camera.getDataTable().getEntry("hasResults").getBoolean(False)
+    has_results = data.getEntry("hasResults").getBoolean(False)
     if has_results:
-        raw = camera.getResultsEntry().getRaw(b"")
-        result = camera.getResults(kMyPipeline.getResultType(), raw)
+        result = camera.getLatestResults(kMyPipeline)
         if result is not None:
             self.use_result(result)
 ```

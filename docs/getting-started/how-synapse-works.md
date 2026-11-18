@@ -59,6 +59,10 @@ python main.py --headless     # skip the terminal UI
 `--headless` only hides the terminal status display. The web UI and camera streaming still run.
 {% endhint %}
 
+### Stopping the runtime
+
+Press `Ctrl+C`, or stop the `synapse-runtime` service, to shut down cleanly. The runtime releases resources in reverse startup order: the runtime (cameras and pipelines), NetworkTables, the device responder, the file server, and finally the WebSocket server. Each step is logged, and a failure in one step does not stop the rest. Most thread joins have a timeout, but the file server's join currently has none, so a stuck file server can still delay shutdown. Python code can call `Synapse.kInstance.shutdown()` to run the same path; `close()` and `cleanup()` are aliases.
+
 ## Projects
 
 A **Synapse project** is a normal folder on your development computer. It holds your camera configuration, your pipelines, and the `main.py` that starts the runtime.
@@ -70,7 +74,7 @@ my-synapse-project/
 ├── pyproject.toml         # project metadata
 ├── pipelines/             # your custom pipeline files
 ├── deploy/                # extra files copied to the coprocessor
-│   └── fmap.json          # optional AprilTag field map
+│   └── fmap.json          # AprilTag field map (required by ApriltagPipeline)
 └── config/                # created by the runtime
     ├── settings.yml
     └── camera_0/
@@ -85,6 +89,8 @@ When you deploy, the installer:
 3. Sets up or restarts the `synapse-runtime` service.
 
 The `config/` folder is created by the runtime the first time it starts, not by the project creation command.
+
+The AprilTag pipeline loads `deploy/fmap.json` when it starts, so that field map must be present for the pipeline to run.
 
 ## Pipelines
 
@@ -101,6 +107,7 @@ Synapse ships with:
 
 - **AprilTag pipeline** — detects AprilTags and estimates camera/robot pose.
 - **Color pipeline** — finds colored objects using HSV thresholds.
+- **Object-detection pipeline (YOLO)** — detects objects with an Ultralytics-compatible model; available when the optional extra is installed with `pip install "synapsefrc[yolo]"`.
 - **Calibration pipeline** — used internally by the camera calibration screen.
 
 You can add your own by creating a `*_pipeline.py` file in `pipelines/`. Synapse finds it automatically. See [Custom Pipelines](../usage/custom-pipelines/README.md).
@@ -124,7 +131,7 @@ There are two kinds of results:
 | Kind | How it is sent | Where to read it |
 | --- | --- | --- |
 | **Final results** | MessagePack-encoded bytes under `<camera>/data/results` | `SynapseCamera.getResults(...)` |
-| **Auxiliary values** | Plain primitive values under `<camera>/data/<key>` | `camera.getDataTable().getEntry(key)`, or the UI |
+| **Auxiliary values** | Plain primitive values under `<camera>/data/<key>` | The `<camera>/data` table in NetworkTables, or the UI |
 
 Final results are compact and typed. Auxiliary values are human-readable in NetworkTables and useful for debugging.
 

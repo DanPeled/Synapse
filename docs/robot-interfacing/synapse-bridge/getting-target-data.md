@@ -67,6 +67,8 @@ For a custom pipeline, the string is its pipeline type name, such as `MyPipeline
 
 ## Reading results
 
+Java reads the latest published result with `getResults(pipelineType)`. Python provides the convenience method `getLatestResults(pipelineType)`, which reads `data/results` and decodes it for you.
+
 {% tabs %}
 {% tab title="Java" %}
 ```java
@@ -87,10 +89,8 @@ if (results.isPresent()) {
 {% tab title="Python" %}
 ```python
 from synapselib import SynapsePipelineType
-from synapselib.pipelines.apriltag import ApriltagResult
 
-data = camera.getResultsEntry().getRaw(b"")
-results = camera.getResults(ApriltagResult, data)
+results = camera.getLatestResults(SynapsePipelineType.kApriltag)
 
 if results is not None:
     print(f"Tags: {len(results.tags)}")
@@ -98,10 +98,10 @@ if results is not None:
 {% endtab %}
 {% endtabs %}
 
-Java returns an `Optional<T>` that is empty when no bytes have been published. Python takes the result class and the raw bytes.
+Java returns an `Optional<T>` that is empty when no bytes have been published. Python returns the decoded result, or `None` when no result is available.
 
-{% hint style="warning" %}
-In Python, `getResults` requires the raw bytes. Call `camera.getResultsEntry().getRaw(b"")` first. There is no one-argument overload.
+{% hint style="info" %}
+Python still exposes `getResults(resultType, data)` if you already have raw MessagePack bytes. `getLatestResults(pipelineType)` is the shorter form for reading and decoding the current entry.
 {% endhint %}
 
 ## AprilTag results
@@ -113,19 +113,19 @@ In Python, `getResults` requires the raw bytes. Call `camera.getResultsEntry().g
 | Field / method | Type | Meaning |
 | --- | --- | --- |
 | `tags` | `ApriltagDetection[]` | Detected tags |
-| `cameraEstimate_fieldSpace` | `double[]` | Camera pose `[x, y, z, roll, pitch, yaw]` |
-| `reprojectionError` | `float` | Pose fit error; lower is better |
-| `cameraEstimate_fieldSpace3d()` | `Pose3d` | Camera pose as a WPILib pose |
+| `cameraEstimate_fieldSpace` | `double[]` or `null` | Camera pose `[x, y, z, roll, pitch, yaw]` |
+| `reprojectionError` | `double` | Pose fit error; lower is better. `0.0` when no pose is available |
+| `cameraEstimate_fieldSpace3d()` | `Pose3d` or `null` | Camera pose as a WPILib pose |
 
 `ApriltagDetection`:
 
 | Field / method | Type | Meaning |
 | --- | --- | --- |
 | `tagID` | `int` | Fiducial ID |
-| `hamming` | `float` | Bit errors in the detection; lower is better |
-| `tagPose_screenSpace` | `float[]` | Tag center `[x, y]` in image pixels |
-| `tx()` | `float` | Horizontal pixel coordinate |
-| `ty()` | `float` | Vertical pixel coordinate |
+| `hamming` | `int` | Bit errors in the detection; lower is better |
+| `tagPose_screenSpace` | `double[]` | Tag center `[x, y]` in image pixels |
+| `tx()` | `double` | Horizontal pixel coordinate |
+| `ty()` | `double` | Vertical pixel coordinate |
 {% endtab %}
 
 {% tab title="Python" %}
@@ -134,25 +134,26 @@ In Python, `getResults` requires the raw bytes. Call `camera.getResultsEntry().g
 | Field / property | Type | Meaning |
 | --- | --- | --- |
 | `tags` | `list[ApriltagDetection]` | Detected tags |
-| `cameraEstimate_fieldSpace` | `list[float]` | Camera pose `[x, y, z, roll, pitch, yaw]` |
-| `reprojection_error` | `float` | Pose fit error; lower is better |
-| `cameraEstimate_fieldSpace3d` | `Pose3d` | Camera pose as a WPILib pose (property) |
+| `cameraEstimate_fieldSpace` | `list[float]` or `None` | Camera pose `[x, y, z, roll, pitch, yaw]` |
+| `reprojection_error` | `float` | Pose fit error; lower is better. `0.0` when no pose is available |
+| `cameraEstimate_fieldSpace3d` | `Pose3d` or `None` | Camera pose as a WPILib pose (property) |
 
 `ApriltagDetection`:
 
-| Field / method | Type | Meaning |
+| Field / property | Type | Meaning |
 | --- | --- | --- |
 | `tag_id` | `int` | Fiducial ID |
-| `hamming` | `float` | Bit errors in the detection; lower is better |
+| `hamming` | `int` | Bit errors in the detection; lower is better |
 | `tagPose_screenSpace` | `list[float]` | Tag center `[x, y]` in image pixels |
 | `tx` | `float` | Horizontal pixel coordinate (property) |
-| `ty()` | `float` | Vertical pixel coordinate (method) |
+| `ty` | `float` | Vertical pixel coordinate (property) |
 {% endtab %}
 {% endtabs %}
 
 ### Units and coordinate systems
 
 - `cameraEstimate_fieldSpace` uses meters for translation and degrees for rotation.
+- `cameraEstimate_fieldSpace3d()` (Java) and `cameraEstimate_fieldSpace3d` (Python) convert those degrees to radians and return a WPILib `Pose3d`. They return `null`/`None` if no pose was published.
 - The pose is the **camera** pose in field space, not the robot pose. See [Robot Pose](robot-pose.md) to convert it.
 - `tagPose_screenSpace` is in **image pixels**: `(0, 0)` is the top-left corner and `(width, height)` is the bottom-right. The center of a 1920×1080 frame is `(960, 540)`.
 
@@ -196,8 +197,7 @@ target_tag_id = 1
 turn = 0.0
 
 if camera.getPipelineType() == SynapsePipelineType.kApriltag.typestring:
-    data = camera.getResultsEntry().getRaw(b"")
-    results = camera.getResults(ApriltagResult, data)
+    results = camera.getLatestResults(SynapsePipelineType.kApriltag)
 
     if results is not None:
         for tag in results.tags:
@@ -268,18 +268,12 @@ color.ifPresent(result -> {
 
 ```python
 from synapselib import SynapsePipelineType
-from synapselib.pipelines.color import ColorResult
 
-data = camera.getResultsEntry().getRaw(b"")
-color = camera.getResults(ColorResult, data)
+color = camera.getLatestResults(SynapsePipelineType.kColor)
 
 if color is not None and color.main_detection is not None:
     print(color.main_detection.center[0])
 ```
-
-{% hint style="warning" %}
-Python's nested result deserialization for `ApriltagResult` and `ColorResult` is currently unreliable because nested dicts are converted with the top-level result class. See [Known Issues](../../additional-resources/known-issues.md) for a workaround.
-{% endhint %}
 
 ## Latency and recording
 

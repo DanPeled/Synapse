@@ -57,7 +57,7 @@ The dialog lets you configure the Charuco board and capture images. Synapse show
 Calibrate at the same resolution the pipeline uses. Calibration data is stored separately for each resolution.
 {% endhint %}
 
-For the full procedure, board defaults, and tips, see [Camera Calibration](../../getting-started/quick-start/camera-calibration.md).
+For the full procedure, board defaults, and tips, see [Camera Calibration](../../getting-started/quick-start/camera-calibration.md). For the AprilTag settings that consume this calibration, see [ApriltagPipeline Settings](../built-in-pipelines/apriltag-pipeline/apriltagpipeline-settings.md).
 
 ## Import calibration results
 

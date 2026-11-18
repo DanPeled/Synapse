@@ -165,7 +165,7 @@ jobs:
   build:
     strategy:
       matrix:
-        python: ["3.11", "3.12", "3.13"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,7 +176,7 @@ jobs:
       - run: python -m compileall -q .
 ```
 
-Synapse supports Python 3.11 through 3.14, and the project's CI tests 3.11–3.13.
+Synapse supports Python 3.11 through 3.14. The Synapse repository's own CI matrix currently covers 3.11–3.13, so the 3.14 job above is an extra check rather than a version the project itself exercises in CI.
 
 ## Project in a subfolder
 

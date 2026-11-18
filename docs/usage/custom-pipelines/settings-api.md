@@ -182,19 +182,36 @@ The stored value is the option value, not the display key.
 
 ### `ListConstraint`
 
-A list value, optionally with length limits and nesting.
+A homogeneous list, optionally with a leaf type, length limits, and nesting.
 
 ```python
-ListConstraint(minLength=0, maxLength=10, depth=1)
+ListConstraint(itemType=int, minLength=0, maxLength=10, depth=1)
 ```
 
 | Argument | Meaning |
 | --- | --- |
+| `itemType` | Optional leaf type for every item: `int`, `float`, `str`, `bool`, `bytes`, `list`, or a `ValueTypeProto`. When omitted, item types are not checked. |
 | `minLength` | Minimum number of items (`0` means no minimum) |
 | `maxLength` | Maximum number of items (`0` means no maximum) |
-| `depth` | Nesting depth; `2` allows a list of lists |
+| `depth` | Allowed nesting depth; `2` allows lists of lists. Defaults to `1`. |
 
-The dashboard renders a list editor. The constraint checks the list shape, not the type of each item.
+`itemType` validates and normalizes each leaf. `int` rejects booleans and accepts integral floats; `float` converts integers to floats; `bool` accepts common values such as `"true"`, `"1"`, and `"yes"`; `str` and `bytes` require those exact types.
+
+```python
+tag_filter = settingField(
+    ListConstraint(itemType=int),
+    default=[],
+    description="Only report these tag IDs. Empty means all tags.",
+)
+```
+
+{% hint style="info" %}
+Use `itemType` for typed lists, especially when the list may be empty. The constraint's item type is sent with the value so an empty list is still published as the correct typed array. Without `itemType`, an empty list has no type information on the wire.
+{% endhint %}
+
+{% hint style="warning" %}
+The dashboard only renders flat lists (`depth=1`) of scalar items such as integers, floats, strings, and booleans. A larger `depth` can be validated in Python, but no control is generated, and non-empty nested lists cannot be serialized through `SettingValueProto`. Keep pipeline settings flat, or encode nested data as a string.
+{% endhint %}
 
 ### `ColorConstraint`
 
@@ -215,29 +232,37 @@ Use `rangeMode=True` for thresholds where a lower and upper color define a range
 
 ### `FileConstraint`
 
-A path to an existing file.
+A path to an existing file inside the Synapse project directory.
 
 ```python
-FileConstraint(fileTypes={".onnx", ".pt"})
+FileConstraint(path="config/models", fileTypes=[".pt", "onnx", ".engine"])
+```
+
+```python
+FileConstraint(path: Union[str, Path] = "", fileTypes: Optional[Iterable[str]] = None)
 ```
 
 | Argument | Meaning |
 | --- | --- |
-| `fileTypes` | Optional set of allowed file extensions |
+| `path` | Directory, relative to the project root, where the dashboard starts browsing and uploading files. An empty string means the project root. Backslashes are normalized to `/`. |
+| `fileTypes` | Optional allowed extensions. Entries are lowercased and normalized to a leading dot, so both `json` and `.json` mean the same thing. `None` or an empty collection allows any file. |
 
-Validation accepts a `pathlib.Path` or a string path. A string path must exist. Relative paths are stored as absolute paths.
+Validation accepts a `pathlib.Path` or a string. `None` and empty strings normalize to `""`. Other values must resolve to an existing, regular file inside the project root and must have an allowed extension. Absolute paths are accepted for validation, but they are **not** stored as absolute paths. If a saved value fails validation when settings load, Synapse logs the error and keeps the declared default.
+
+The stored value is the file's POSIX-style path **relative to the project root**, such as `config/models/coralAlgae-640-640-yolov8s.pt`. That makes the same value usable by the runtime, the file browser, and robot code.
 
 ## Supported value types
 
 Settings values can be:
 
-- Integers
-- Floats
-- Booleans
-- Strings
-- Lists of the above
+- Integers, floats, booleans, and strings
+- `pathlib.Path`, serialized as a POSIX string
+- Bytes
+- Flat lists of integers, floats, booleans, strings, or bytes
+- Typed lists declared with `ListConstraint(itemType=...)`, published as typed NetworkTables arrays
+- `None` or `""` for an empty file setting
 
-Bytes are supported by the settings serialization layer, but the dashboard does not provide a control for them. Use [auxiliary results](sending-results.md#auxiliary-values) for binary data.
+Bytes are supported by the settings serialization layer, but the dashboard does not provide a direct control for byte values or non-empty nested lists. Use [auxiliary results](sending-results.md#auxiliary-values) for arbitrary binary data.
 
 ## Camera properties
 

@@ -74,11 +74,15 @@ Optional<ApriltagResult> results =
     camera.getResults(SynapsePipelineType.kApriltag);
 
 results.ifPresent(result -> {
-  if (result.cameraEstimate_fieldSpace.length < 6) {
+  if (result.cameraEstimate_fieldSpace == null) {
     return;
   }
 
   Pose3d cameraPose = result.cameraEstimate_fieldSpace3d();
+  if (cameraPose == null) {
+    return;
+  }
+
   Pose3d robotPose = camera.estimateRobotPose(cameraPose);
 
   System.out.println("Robot: " + robotPose);
@@ -100,16 +104,24 @@ Set the offset before calling `estimateRobotPose`. If it is `null`, the conversi
 The Python `SynapseCamera` does not expose `estimateRobotPose` yet. Apply the same transform yourself with `wpimath`:
 
 ```python
-from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
+from synapselib import SynapsePipelineType
+from wpimath.geometry import Rotation3d, Transform3d, Translation3d
 
 robot_to_camera = Transform3d(
     Translation3d(0.35, 0.0, 1.4),
     Rotation3d.fromDegrees(0.0, 20.0, 0.0),
 )
 
-# camera_estimate is the Pose3d from ApriltagResult.cameraEstimate_fieldSpace3d
-robot_pose = camera_estimate.transformBy(robot_to_camera.inverse())
+results = camera.getLatestResults(SynapsePipelineType.kApriltag)
+
+if results is not None and results.cameraEstimate_fieldSpace is not None:
+    camera_estimate = results.cameraEstimate_fieldSpace3d
+    if camera_estimate is not None:
+        robot_pose = camera_estimate.transformBy(robot_to_camera.inverse())
+        print(f"Robot: {robot_pose}")
 ```
+
+The helper property `cameraEstimate_fieldSpace3d` converts the serialized degrees to radians and returns `None` when no pose is available, so check it before using it.
 
 {% hint style="info" %}
 `Rotation3d.fromDegrees(roll, pitch, yaw)` expects degrees. If you use the `Rotation3d(...)` constructor instead, the values are radians.
@@ -139,7 +151,7 @@ A single camera estimate can be noisy. Common approaches:
 The `stick_to_ground` AprilTag setting flattens the estimated camera pose to `z = 0` and zeroes roll and pitch. Enable it if you only care about the robot's 2D pose.
 
 {% hint style="info" %}
-`cameraEstimate_fieldSpace` is published only when the AprilTag setting `publish_camera_field_pose` is enabled. That setting is on by default.
+`cameraEstimate_fieldSpace` is `null`/`None` when the AprilTag setting `publish_camera_field_pose` is disabled or when the pose estimator cannot produce an estimate from the visible tags. That setting is on by default. When no tags are visible, the runtime clears the result and sets `hasResults` to `false`. Always check the raw field and the helper's return value before converting it to a robot pose.
 {% endhint %}
 
 ## Next steps

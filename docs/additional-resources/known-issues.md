@@ -43,26 +43,6 @@ python -m synapse_installer install orangepi
 
 `deploy` without a name still targets every configured device.
 
-## Python cannot deserialize nested results
-
-**Affects:** `synapselib` users reading `ApriltagResult` or `ColorResult`
-
-The Python MessagePack decoder applies the top-level result class to every nested dictionary. A `tags` list is deserialized as a list of `ApriltagResult` objects with empty fields, not `ApriltagDetection` objects.
-
-**Workaround:** Decode to plain dictionaries with `msgpack`:
-
-```python
-import msgpack
-
-raw = camera.getResultsEntry().getRaw(b"")
-data = msgpack.loads(raw, raw=False)
-
-for tag in data["tags"]:
-    print(tag["tag_id"], tag["tagPose_screenSpace"])
-```
-
-Flat result classes with no nested dataclasses deserialize correctly. Java is not affected.
-
 ## Camera settings are not published to NetworkTables by default
 
 **Affects:** `SynapseCamera.getSetting` / `setSetting` in both languages
@@ -80,22 +60,6 @@ Synapse.createAndRunRuntime(root=Path.cwd(), sendSettingsInNT=True)
 
 See [Runtime Camera Settings](../robot-interfacing/synapse-bridge/runtime-camera-settings.md).
 
-## AprilTag `critical_angle` is treated as radians
-
-**Affects:** AprilTag detection filtering
-
-The setting is labeled `0–90` and defaults to `45`, but it is passed directly to WPILib's `criticalAngle`, which expects **radians**. The effective value is about 45 radians, so the angle rejection is effectively disabled.
-
-**Workaround:** Until this is fixed, enter the value in radians. For 45°, use `0.785`.
-
-## Disabling `publish_camera_field_pose` breaks result serialization
-
-**Affects:** AprilTag pipeline when `publish_camera_field_pose = False`
-
-The result serializer reads `result.cameraPoseEstimate.cameraPoseEstimate` without checking for `None`. When field pose publishing is disabled, serialization raises an exception and no results are sent.
-
-**Workaround:** Keep `publish_camera_field_pose` enabled (the default).
-
 ## Unused AprilTag settings
 
 **Affects:** AprilTag settings panel
@@ -106,33 +70,13 @@ The result serializer reads `result.cameraPoseEstimate.cameraPoseEstimate` witho
 
 **Workaround:** None. Do not rely on these settings.
 
-## Python `tx` / `ty` are inconsistent
+## Cropping shifts the AprilTag pose
 
-**Affects:** `synapselib.pipelines.apriltag.ApriltagDetection`
+**Affects:** `ApriltagPipeline` with `crop_x` / `crop_y` set to anything other than `[-1, 1]`
 
-`tx` is a property, but `ty` is a method:
+The pipeline crops the frame before running the detector, so tag corners are measured in the cropped image. Pose estimation still uses the full-frame camera matrix because the setting-change handler never applies the crop offset. A crop that is not centered on the camera's principal point therefore shifts the estimated camera pose.
 
-```python
-x = tag.tx
-y = tag.ty()
-```
-
-Java exposes both as methods: `tag.tx()` and `tag.ty()`.
-
-**Workaround:** Use the attribute/method exactly as defined above.
-
-## Java and Python orientation setting types differ
-
-**Affects:** Predefined `Setting.kOrientation`
-
-Java defines `kOrientation` as a `String` setting. Python defines it as an `Integer` setting. Reading one with the other's type returns nothing.
-
-**Workaround:** Create the setting explicitly with the type the runtime publishes, or read the type first:
-
-```python
-from synapselib._synapse_camera import Setting
-orientation = Setting.stringSetting("orientation")
-```
+**Workaround:** Leave the crop at `[-1, 1]` when you rely on field localization, or keep the crop centered on the image and generous enough that the offset is small. Cropping still works normally for detection-only use.
 
 ## Capture latency is always zero
 
@@ -173,14 +117,6 @@ Camera performance may be significantly worse on Windows than on Linux. The caus
 The stream occasionally fails to attach after restarting the runtime, likely due to a UI lifecycle issue.
 
 **Workaround:** Refresh the browser tab. If that fails, navigate to the Camera page again.
-
-## Slow shutdown on some systems
-
-**Affects:** Ctrl+C / runtime shutdown
-
-Shutdown can take a long time on some operating systems, though it is usually fast on a robot coprocessor.
-
-**Workaround:** Wait for the process to exit. Avoid killing it mid-write, especially while settings are being saved.
 
 ## Next steps
 

@@ -11,6 +11,7 @@ This page explains how the panel works. For the settings of a specific pipeline,
 
 - [ApriltagPipeline Settings](../built-in-pipelines/apriltag-pipeline/apriltagpipeline-settings.md)
 - [Color Detection Pipeline](../built-in-pipelines/color-detection-pipeline.md)
+- [Object Detection Pipeline](../built-in-pipelines/object-detection-pipeline.md)
 
 ## Where settings live
 
@@ -54,10 +55,25 @@ The dashboard chooses a control from the setting's constraint:
 | `StringConstraint` | Text input |
 | `RangeConstraint` | Two-handle range slider |
 | `ColorConstraint` | Color picker |
-| `FileConstraint` | File picker |
-| `ListConstraint` | List editor |
+| `FileConstraint` | File control: read-only path field with **Browse**, **Upload**, **View**, **Clear**, and **Reset** |
+| `ListConstraint` | Comma-separated text input for a flat list |
 
 For more about constraints, see [Settings API](../custom-pipelines/settings-api.md).
+
+### File settings
+
+A `FileConstraint` renders the selected project-relative path in a read-only field:
+
+- **Browse** opens a file browser starting in the constraint's `path` directory. Folders can be navigated, and only files with the allowed `fileTypes` are shown. Selecting a file stores its path relative to the project root.
+- **Upload** opens a local file picker and copies the file onto the device, then selects the uploaded path. The browser accepts the same extensions; uploads from inside the browser go to the directory currently being viewed.
+- **View** reads the selected file from the device and shows a preview. JSON files are pretty-printed.
+- **Clear** (the `X` button) sets the value to an empty string. **Reset** restores the declared default. All of these controls are disabled while settings are locked.
+
+### Typed lists
+
+Flat lists are entered as comma-separated values and committed when the field loses focus or you press **Enter**. For example, the AprilTag `tag_filter` uses `ListConstraint(itemType=int)`, so enter tag IDs such as `1, 2, 5`. An empty field means no filter, and non-integer entries are rejected before the value is sent to the runtime.
+
+The dashboard cannot render nested lists (`depth > 1`); see the [Settings API](../custom-pipelines/settings-api.md#listconstraint) for the full contract.
 
 ## Changing a setting
 
@@ -86,6 +102,8 @@ Because deploys preserve the `config/` folder, saved settings survive a redeploy
 ## Lock
 
 Press **Lock** to make the settings controls read-only. Locking does not stop the pipeline and does not prevent robot code or NetworkTables from changing settings. It only prevents accidental changes from the browser.
+
+Locking also disables **Reset** and every file control (**Browse**, **Upload**, **View**, and **Clear**), not just sliders and text fields.
 
 Press **Unlock** to edit again.
 

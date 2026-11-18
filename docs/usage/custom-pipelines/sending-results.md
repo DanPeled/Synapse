@@ -9,7 +9,7 @@ Synapse gives every pipeline two ways to publish data:
 
 | Kind | Method | Encoding | Read by |
 | --- | --- | --- | --- |
-| **Final results** | `self.setResults(result)` | MessagePack bytes | `SynapseCamera.getResults(...)` |
+| **Final results** | `self.setResults(result)` | MessagePack bytes | `SynapseCamera.getResults(...)` / `getLatestResults(...)` |
 | **Auxiliary values** | `self.setDataValue(key, value)` | Native NetworkTables value | `data/<key>` entry |
 
 Final results are the structured output of your pipeline. Auxiliary values are small extras such as a detection count, a flag, or a debug number.
@@ -215,13 +215,11 @@ if (camera.getPipelineType().equals(SynapsePipelineType.kApriltag.typestring)) {
 
 {% tab title="Python" %}
 ```python
-from synapselib import SynapseCamera
-from synapselib.pipelines.apriltag import ApriltagResult
+from synapselib import SynapseCamera, SynapsePipelineType
 
 camera = SynapseCamera("camera0", "Synapse")
 
-data = camera.getResultsEntry().getRaw(b"")
-results = camera.getResults(ApriltagResult, data)
+results = camera.getLatestResults(SynapsePipelineType.kApriltag)
 
 if results is not None:
     for tag in results.tags:
@@ -250,7 +248,7 @@ Optional<MyPipelineResult> results = camera.getResults(kMyPipeline);
 {% tab title="Python" %}
 ```python
 from dataclasses import dataclass
-from synapselib import SynapsePipelineType
+from synapselib import SynapseCamera, SynapsePipelineType
 
 @dataclass
 class MyPipelineResult:
@@ -259,9 +257,9 @@ class MyPipelineResult:
     confidence: float
 
 kMyPipeline = SynapsePipelineType(MyPipelineResult, "MyPipeline")
+camera = SynapseCamera("camera0", "Synapse")
 
-data = camera.getResultsEntry().getRaw(b"")
-results = camera.getResults(kMyPipeline.getResultType(), data)
+results = camera.getLatestResults(kMyPipeline)
 ```
 {% endtab %}
 {% endtabs %}

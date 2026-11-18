@@ -39,133 +39,77 @@ The setting must match the physical tags. A `tag36h11` detector cannot read `tag
 
 ## Detection
 
-These settings control the AprilTag detector itself. They come from WPILib's AprilTag implementation.
+These settings control the **NAPA** AprilTag detector (`napa-vision==0.5.1`). NAPA performs detection only; pose estimation is handled separately by the pipeline's OpenCV `solvePnPGeneric` step. Changing `tag_family` or any of these detection settings rebuilds the native detector, so avoid toggling them repeatedly while the pipeline is running.
 
-### Number of Threads
-
-**Type:** Integer\
-**Default:** `1`\
-**Range:** `1` to the device's CPU thread count
-
-The number of CPU threads used for detection.
-
-More threads can reduce latency on multi-core devices, but they compete with camera capture, streaming, and other pipelines. Start with `1` or `2`, then increase only if detection latency is the bottleneck.
-
-***
-
-### Refine Edges
-
-**Type:** Boolean\
-**Default:** `False`
-
-Refines tag corners after the initial detection.
-
-Refinement can improve pose accuracy, especially with noisy or slightly blurred images. It also costs CPU time.
-
-Enable it when accuracy matters more than frame rate.
-
-***
-
-### Quad Decimate
-
-**Type:** Number\
-**Default:** `1.0`\
-**Range:** `1.0` and up
-
-Downsamples the image before detection.
-
-| Value | Effect |
-| --- | --- |
-| `1.0` | Full resolution, best accuracy and range |
-| `2.0` | Half resolution, faster, shorter range |
-| `3.0`+ | Much faster, but may miss small or distant tags |
-
-This is the first setting to change when detection is too slow.
-
-***
-
-### Quad Sigma
-
-**Type:** Number\
-**Default:** `0.0`\
-**Range:** `0.0` and up
-
-Applies Gaussian blur before detection.
-
-A small amount can reduce sensor noise. Too much blurs tag edges and reduces detection quality. Leave it at `0.0` unless you have a specific noise problem.
-
-***
-
-### Min Cluster Pixels
+### Min Tag Px
 
 **Type:** Integer\
-**Default:** `300`\
-**Range:** `1` and up
+**Default:** `32`\
+**Range:** `8`–`30000`, step `1`
 
-Rejects candidate quads that contain too few pixels.
+Smallest tag side, in pixels, that is guaranteed to be sampled.
 
-Raise it to ignore small, distant, or noisy candidates. Lower it if you need to detect very small tags, at the cost of more false candidates.
+Lower values find smaller or more distant tags, but cost more CPU time. Raise it when detection is too slow; lower it when distant tags are missed.
 
 ***
 
-### Max Num Maxima
+### Max Hamming
 
 **Type:** Integer\
-**Default:** `10`\
-**Range:** `1` and up
+**Default:** `-1`\
+**Range:** `-1`–`3`, step `1`
 
-The number of corner candidates considered when grouping pixels into a quad.
+Number of payload bits that may be corrected when decoding a tag.
 
-Higher values can help in cluttered scenes but cost processing time.
-
-***
-
-### Critical Angle
-
-**Type:** Number\
-**Default:** `45`\
-**Range:** `0`–`90`
-
-Controls rejection of quads whose edge pairs are nearly straight or nearly reversed. `0` disables this rejection.
-
-{% hint style="warning" %}
-WPILib expects this value in radians, but the pipeline currently forwards the configured value without converting degrees to radians. With the default `45`, the threshold is effectively very large and the rejection is mostly disabled. Leave it at the default unless you are testing this behavior. See [Known Issues](../../../additional-resources/known-issues.md).
-{% endhint %}
+`-1` uses the selected tag family's default. Values `0`–`3` allow progressively more bit errors, which can recover distorted tags but also increases the chance of false positives.
 
 ***
 
-### Max Line Fit MSE
-
-**Type:** Number\
-**Default:** `10`\
-**Range:** `0` and up
-
-The maximum mean squared error allowed when fitting lines to a contour.
-
-Lower values reject non-quad shapes earlier, which saves processing time but may reject valid tags in blurry images. Raise it if tags are being missed.
-
-***
-
-### Min White Black Diff
+### Min Contrast
 
 **Type:** Integer\
-**Default:** `5`\
-**Range:** `0`–`255`
+**Default:** `20`\
+**Range:** `1`–`255`, step `1`
 
-The minimum brightness difference between the white and black models of a tag.
+Minimum grey-level difference between the tag and its white margin.
 
 Raise it in low-contrast or brightly lit scenes to reject false positives. Lower it if real tags are being missed.
 
 ***
 
-### Deglitch
+### Min Border Cells
 
-**Type:** Boolean\
-**Default:** `False`
+**Type:** Integer\
+**Default:** `22`\
+**Range:** `0`–`28`, step `1`
 
-Removes small speckles from the thresholded image.
+Number of border cells that must read dark before a candidate is decoded, scaled for the selected family.
 
-Only useful for very noisy images. It adds processing time.
+Raise it to reject weaker candidates. Lower it if tags with damaged or poorly lit borders are being missed.
+
+***
+
+### Sharpening
+
+**Type:** Number\
+**Default:** `0.25`\
+**Range:** `0.0`–`1.0`
+
+Cell sharpening applied before decoding.
+
+A small amount can improve decoding on soft images. Too much can amplify sensor noise. Leave it near the default unless you have a specific contrast problem.
+
+***
+
+### Max Detections
+
+**Type:** Integer\
+**Default:** `64`\
+**Range:** `1` and up, step `1`
+
+Maximum number of tags returned per frame.
+
+Reduce it when you only expect a few tags and need to save processing time. Raise it if many tags are in view and some are being dropped.
 
 ***
 
@@ -184,7 +128,9 @@ Limits the horizontal area the detector processes.
 
 For example, `[-0.5, 0.5]` processes only the center half of the image. Cropping is one of the most effective ways to reduce latency when tags only appear in a known part of the frame.
 
-The camera matrix is adjusted automatically for the crop.
+{% hint style="warning" %}
+The camera matrix is not currently adjusted for the crop. Detections are measured in the cropped image, but the pose solver still uses the full-frame principal point, so a tight crop can make the published camera pose less accurate. Keep the crop generous, or leave it at `[-1, 1]` when you rely on field localization. See [Known Issues](../../../additional-resources/known-issues.md#cropping-shifts-the-apriltag-pose).
+{% endhint %}
 
 ***
 
@@ -200,6 +146,19 @@ Limits the vertical area the detector processes.
 - `1` is the bottom edge.
 
 Use it together with **Crop X** to focus on the region where tags appear.
+
+***
+
+### Tag Filter
+
+**Type:** Integer list\
+**Default:** `[]` (empty)
+
+Only report detections for these tag IDs. Leave the list empty to target every tag.
+
+The dashboard renders a comma-separated integer editor, for example `1, 2, 7`. Non-empty filters are applied immediately after detection, before markers are drawn, results are published, and the camera pose is estimated. Filtered-out tags therefore do not appear in `tags` and do not contribute to the camera pose.
+
+A filter with IDs that are not present in the field map still produces no result for those tags. Keep the list empty when you want the pipeline to use every tag it can see.
 
 ***
 
@@ -223,11 +182,9 @@ This can reduce noise for a flat-field robot, but it makes the estimate wrong wh
 
 Estimates and publishes the camera pose in field coordinates.
 
-This is the main output of the pipeline and is required for robot localization. Keep it enabled.
+This is the main output of the pipeline and is required for robot localization. Keep it enabled when you need a field pose.
 
-{% hint style="warning" %}
-The result serializer currently reads the camera pose unconditionally. Setting this to `False` while tags are visible can cause a serialization error. This setting is reserved for future use.
-{% endhint %}
+When this is `False`, the pipeline skips pose estimation entirely. The result still contains the filtered `tags`, but `cameraEstimate_fieldSpace` is `null` (`None` in Python) and `reprojection_error` is `0.0`. It no longer causes a serialization error.
 
 ***
 
@@ -247,12 +204,48 @@ This setting is defined but not currently used by the result serializer.
 ### Verbosity
 
 **Type:** Enum\
-**Default:** `kPoseOnly`
+**Options:** `kPoseOnly` (`0`), `kTagDetails` (`1`), `kTagDetectionData` (`2`), `kAll` (`3`)\
+**Default:** `kPoseOnly` (`0`)
 
-Reserved for controlling how much debug data is published per tag.
+Reserved for controlling how much debug data is published per tag. The helper that maps verbosity levels to ignored result keys exists, but it is not called by the current serializer.
 
 {% hint style="info" %}
-This setting is defined but not currently used by the result serializer.
+This setting is defined but not currently used. Changing it has no effect on published results.
+{% endhint %}
+
+## Config migration
+
+The switch from the WPILib detector to NAPA changed the detection settings. Old saved configs are accepted, but some keys are ignored and others are renamed automatically.
+
+**Retired keys (ignored when loading old configs):**
+
+- `detector_type`
+- `num_threads`
+- `refine_edges`
+- `quad_decimate`
+- `quad_sigma`
+- `min_cluster_pixels`
+- `max_num_maxima`
+- `critical_angle`
+- `max_line_fit_mse`
+- `min_white_black_diff`
+- `deglitch`
+
+**Renamed keys:**
+
+| Old key | Current key |
+| --- | --- |
+| `napa_min_tag_px` | `min_tag_px` |
+| `napa_max_hamming` | `max_hamming` |
+| `napa_min_contrast` | `min_contrast` |
+| `napa_min_border_cells` | `min_border_cells` |
+| `napa_sharpening` | `sharpening` |
+| `napa_max_detections` | `max_detections` |
+
+A renamed key is only applied when the current key is absent. If both are present, the current key wins. After upgrading, press **Save** in the dashboard to write the migrated settings back to disk.
+
+{% hint style="info" %}
+Example projects in the repository may still contain retired WPILib keys. They do not affect the running pipeline; use the current keys listed above when tuning detection.
 {% endhint %}
 
 ## Performance tuning
@@ -260,36 +253,40 @@ This setting is defined but not currently used by the result serializer.
 ### If detection is too slow
 
 1. Set **Crop X** and **Crop Y** to the region where tags appear.
-2. Increase **Quad Decimate** to `1.5` or `2.0`.
-3. Lower the camera resolution.
-4. Increase **Number of Threads** to `2`.
-5. Disable **Refine Edges**.
+2. Raise **Min Tag Px** (for example, `48` or `64`).
+3. Reduce **Max Detections** if you only expect a few tags.
+4. Lower the camera resolution.
+5. Raise **Min Contrast** or **Min Border Cells** slightly to reject weak candidates earlier.
+6. Avoid changing **Tag Family** or detection settings every frame; each change rebuilds the native detector.
 
 ### If tags are missed
 
-1. Set **Quad Decimate** back to `1.0`.
-2. Increase camera resolution or move the camera closer.
-3. Check focus and exposure.
-4. Raise **Max Line Fit MSE**.
-5. Lower **Min White Black Diff**.
-6. Lower **Min Cluster Pixels**.
+1. Lower **Min Tag Px**.
+2. Lower **Min Contrast** and **Min Border Cells**.
+3. Check **Max Hamming**; `-1` uses the family default, and `2` or `3` tolerates more distorted tags.
+4. Confirm **Tag Filter** is empty or contains the IDs you expect.
+5. Increase camera resolution or move the camera closer.
+6. Check focus, lighting, and **Tag Family**.
+7. Raise **Max Detections** if many tags are in view.
 
 ### If pose is inaccurate or jittery
 
 1. Confirm the camera is calibrated at the active resolution.
 2. Measure **Tag Size** with calipers.
-3. Set **Quad Decimate** to `1.0`.
-4. Enable **Refine Edges**.
-5. Lock camera exposure and focus.
-6. Make sure the field map poses are correct.
+3. Use multiple tags where possible and check `reprojection_error`.
+4. Lock camera exposure and focus.
+5. Make sure the field map poses are correct.
+6. Keep **Publish Camera Field Pose** enabled; with it disabled, no pose is produced.
+7. Only use **Stick To Ground** when the camera really is level at a fixed height.
 
 ### If there are false detections
 
-1. Raise **Min White Black Diff**.
-2. Lower **Max Line Fit MSE**.
-3. Confirm you are using the correct **Tag Family**.
-4. Crop out areas with reflections or screens.
-5. Improve lighting to reduce glare.
+1. Raise **Min Contrast**.
+2. Raise **Min Border Cells**.
+3. Lower **Sharpening** if noisy images are being over-sharpened.
+4. Use **Tag Filter** to allow only the IDs you expect.
+5. Confirm you are using the correct **Tag Family**.
+6. Crop out areas with reflections or screens and improve lighting to reduce glare.
 
 ## Next steps
 

@@ -165,13 +165,11 @@ result.ifPresent(r -> {
 ### Python
 
 ```python
-from synapselib.pipelines.color import ColorResult
+from synapselib import SynapsePipelineType
 
-raw = camera.getResultsEntry().getRaw(b"")
-if raw:
-    result = camera.getResults(ColorResult, raw)
-    if result.main_detection is not None:
-        print(result.main_detection.center, result.main_detection.area)
+result = camera.getLatestResults(SynapsePipelineType.kColor)
+if result is not None and result.main_detection is not None:
+    print(result.main_detection.center, result.main_detection.area)
 ```
 
 See [Getting Target Data](../../robot-interfacing/synapse-bridge/getting-target-data.md) for the full result-reading API.
@@ -192,7 +190,7 @@ Color thresholds depend heavily on lighting, camera exposure, and the object its
 8. Lock camera exposure so the thresholds stay valid.
 
 {% hint style="tip" %}
-If the target is white, gray, or black, HSV thresholding is usually a poor fit. Use a custom pipeline with a different method instead.
+If the target is white, gray, or black, HSV thresholding is usually a poor fit. Use a custom pipeline with a different method, or try the [Object Detection Pipeline](object-detection-pipeline.md) with a trained model, instead.
 {% endhint %}
 
 ## Limitations
@@ -202,10 +200,11 @@ If the target is white, gray, or black, HSV thresholding is usually a poor fit. 
 - Two objects of the same color cannot be distinguished without additional logic.
 - The pipeline does not estimate 3D position. It only reports pixel coordinates.
 
-For 3D position, combine color detection with a known camera geometry in a custom pipeline, or use AprilTags.
+For 3D position, combine color detection with a known camera geometry in a custom pipeline, use AprilTags, or use the [Object Detection Pipeline](object-detection-pipeline.md) with camera calibration and object dimensions.
 
 ## Next steps
 
+- [Object Detection Pipeline](object-detection-pipeline.md)
 - [Custom Pipelines](../custom-pipelines/README.md)
 - [Sending Results](../custom-pipelines/sending-results.md)
 - [Getting Target Data](../../robot-interfacing/synapse-bridge/getting-target-data.md)

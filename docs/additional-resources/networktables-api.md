@@ -75,6 +75,8 @@ Unsupported metrics report `0`, `-1`, or `0.0` depending on the platform. See th
 
 Each camera subtable is created from the camera nickname. For example, a camera named `camera0` publishes under `Synapse/camera0`.
 
+For the AprilTag pipeline, `data/tag_id` is a convenience auxiliary value that is written only when the fiducial ID changes. Do not expect it to be re-published on every frame.
+
 ## Reading values
 
 {% tabs %}
@@ -124,6 +126,8 @@ Always pass a default. Before the runtime publishes a key, the entry exists but 
 
 `data/results` is a `raw` entry containing MessagePack bytes. Decode it with the result class:
 
+When the AprilTag pipeline has no tags, it sets `data/hasResults` to `false` and clears `data/results` to an empty raw value. Treat empty bytes as “no result,” not as an empty result object.
+
 {% tabs %}
 {% tab title="Java" %}
 ```java
@@ -155,6 +159,10 @@ if raw:
 ```
 {% endtab %}
 {% endtabs %}
+
+{% hint style="info" %}
+MessagePack fields that could not be computed may be `null`. In AprilTag results, `cameraEstimate_fieldSpace` is `null` when field-pose publishing is disabled or no pose estimate is available, and `reprojection_error` is `0.0` in that case. Decode those fields as optional and check them before converting to a WPILib pose. Other pipelines may also publish nullable fields, such as object-detection `position3D`.
+{% endhint %}
 
 ## Writing values
 

@@ -9,8 +9,8 @@ Synapse ships with built-in pipelines, but you can also write your own. A custom
 
 Custom pipelines are useful for:
 
-- Detecting game pieces that the built-in pipelines do not handle.
-- Running a custom model or algorithm.
+- Detecting game pieces that the built-in pipelines do not handle. For trained YOLO/Ultralytics models, the built-in [Object Detection Pipeline](../built-in-pipelines/object-detection-pipeline.md) may be enough.
+- Running a custom model or algorithm. The built-in [Object Detection Pipeline](../built-in-pipelines/object-detection-pipeline.md) covers Ultralytics-compatible detection without custom code.
 - Drawing overlays for drivers.
 - Publishing your own results to robot code.
 
@@ -210,8 +210,13 @@ Synapse creates one pipeline instance per camera and pipeline slot.
 | `bind(cameraIndex, camera)` | Synapse attaches the pipeline to a camera and loads its camera properties |
 | `processFrame(img, timestamp)` | Runs once per frame |
 | `onSettingChanged(setting, value)` | Runs when a setting is changed |
+| `close()` | Runs during shutdown so the pipeline can release resources it owns. |
 
 If you override `bind`, call `super().bind(cameraIndex, camera)` first so the camera settings are loaded.
+
+If you override `close()`, release your own resources first and then call `super().close()` so its NetworkTables publishers are invalidated. The runtime calls `close()` automatically; do not call it from `processFrame`.
+
+The canonical runtime shutdown call is `Synapse.kInstance.shutdown()`. It runs registered cleanup callbacks exactly once in reverse registration order, so workers stop before the resources they use; runtime cleanup then closes pipelines and cameras. `Synapse.kInstance.cleanup()` and `Synapse.kInstance.close()` are backward-compatible aliases of `shutdown()`.
 
 ## Camera settings and calibration
 
@@ -300,6 +305,7 @@ class CirclePipeline(Pipeline[CircleSettings]):
 
 ## Next steps
 
+- [Object Detection Pipeline](../built-in-pipelines/object-detection-pipeline.md)
 - [Settings API](settings-api.md)
 - [Sending Results](sending-results.md)
 - [Accessing Global Settings](accessing-global-settings.md)

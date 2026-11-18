@@ -60,7 +60,7 @@ import synapse.SynapseCamera.Setting;
 Setting<Double> brightness = SynapseCamera.Setting.kBrightness;
 Setting<Double> gain = SynapseCamera.Setting.kGain;
 Setting<Double> exposure = SynapseCamera.Setting.kExposure;
-Setting<String> orientation = SynapseCamera.Setting.kOrientation;
+Setting<Long> orientation = SynapseCamera.Setting.kOrientation;
 
 // A setting from your pipeline's settings class
 Setting<Double> tagSize = SynapseCamera.Setting.doubleSetting("tag_size");
@@ -83,11 +83,10 @@ Available Java factories:
 | `stringSetting(key)` | `String` | `string` |
 | `doubleArraySetting(key)` | `double[]` | `double[]` |
 | `stringArraySetting(key)` | `String[]` | `string[]` |
+| `booleanSetting(key)` | `Boolean` | `boolean` |
+| `integerArraySetting(key)` | `long[]` | `int[]` |
+| `booleanArraySetting(key)` | `boolean[]` | `boolean[]` |
 | `generic(key, type, ntType)` | Custom | Custom |
-
-{% hint style="info" %}
-Java does not have a `booleanSetting` helper in the current release. Use `generic("key", Boolean.class, NetworkTableType.kBoolean)` if you need one.
-{% endhint %}
 
 ### Python
 
@@ -167,15 +166,20 @@ When enabled:
 
 ## Reading camera properties
 
-The built-in camera properties are available on every pipeline:
+The library provides predefined typed settings for common camera properties. A camera only publishes the properties its driver supports:
 
-| Setting | Key | Type |
-| --- | --- | --- |
-| Brightness | `brightness` | double |
-| Gain | `gain` | double |
-| Exposure | `exposure` | double |
-| Orientation | `orientation` | string (`0`, `90`, `180`, `270`) |
-| Resolution | `resolution` | string (`"1920x1080"`, ...) |
+| Setting | Key | Java constant | Python constant | Value type |
+| --- | --- | --- | --- | --- |
+| Brightness | `brightness` | `Setting.kBrightness` | `Setting.kBrightness` | `Double` / `float` |
+| Gain | `gain` | `Setting.kGain` | `Setting.kGain` | `Double` / `float` |
+| Exposure | `exposure` | `Setting.kExposure` | `Setting.kExposure` | `Double` / `float` |
+| Orientation | `orientation` | `Setting.kOrientation` | `Setting.kOrientation` | `Long` / `int` (degrees) |
+| Contrast | `contrast` | `Setting.kContrast` | `Setting.kContrast` | `Double` / `float` |
+| Saturation | `saturation` | `Setting.kSaturation` | `Setting.kSaturation` | `Double` / `float` |
+| Hue | `hue` | `Setting.kHue` | `Setting.kHue` | `Double` / `float` |
+| White balance temperature | `white_balance_temperature` | `Setting.kWhiteBalanceTemperature` | `Setting.kWhiteBalanceTemperature` | `Double` / `float` |
+| Sharpness | `sharpness` | `Setting.kSharpness` | `Setting.kSharpness` | `Double` / `float` |
+| Resolution | `resolution` | `Setting.stringSetting("resolution")` | `Setting.stringSetting("resolution")` | `String` / `str` |
 
 ```java
 camera.getSetting(SynapseCamera.Setting.kBrightness)
@@ -188,17 +192,9 @@ if brightness is not None:
     print(f"Brightness: {brightness}")
 ```
 
-### A note on orientation types
+### Orientation
 
-The Java predefined `kOrientation` is a `String` setting, while the Python predefined `kOrientation` is an `Integer` setting. If you use the predefined constants, read the type from the setting object rather than assuming. To avoid the mismatch, create the setting explicitly with the type your runtime publishes:
-
-```java
-Setting<String> orientation = SynapseCamera.Setting.stringSetting("orientation");
-```
-
-```python
-orientation = Setting.stringSetting("orientation")
-```
+`kOrientation` is an integer setting in both APIs: `Setting<Long>` in Java and `Setting[int]` in Python. The runtime publishes degrees (`0`, `90`, `180`, or `270`). Use the predefined constant directly; do not read it as a string. `resolution` is the common camera property that uses a string setting.
 
 ## Latency and recording
 
