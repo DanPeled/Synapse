@@ -25,7 +25,7 @@ class TestMain(unittest.TestCase):
         mock_exit.assert_called_once_with(0)
 
     # ----------------------- deploy command -----------------------
-    @patch("synapse_installer.deploy.setupAndRunDeploy")
+    @patch("synapse_installer.deploy.setupAndRunDeploy", return_value=0)
     @patch("synapse_installer.create.createProject")
     @patch("synapse_installer.sync.sync")
     def test_deploy_command(self, mock_sync, mock_create, mock_setup):
@@ -36,6 +36,13 @@ class TestMain(unittest.TestCase):
         mock_create.assert_not_called()
         mock_sync.assert_not_called()
         mock_exit.assert_called_once_with(0)
+
+    @patch("synapse_installer.deploy.setupAndRunDeploy", return_value=1)
+    def test_deploy_failure_propagates_exit_code(self, mock_setup):
+        test_argv = ["prog", "deploy", "-y"]
+        with patch.object(sys, "argv", test_argv), patch("sys.exit") as mock_exit:
+            main()
+        mock_exit.assert_called_once_with(1)
 
     # ----------------------- sync command -----------------------
     @patch("synapse_installer.sync.sync", return_value=0)
@@ -57,8 +64,30 @@ class TestMain(unittest.TestCase):
         test_argv = ["prog", "install", "arg1"]
         with patch.object(sys, "argv", test_argv), patch("sys.exit") as mock_exit:
             main()
-        mock_sync.assert_called_once_with(test_argv[2:])
-        mock_setup.assert_called_once_with(test_argv[2:])
+        mock_sync.assert_called_once_with(["arg1"])
+        mock_setup.assert_called_once()
+        assert mock_setup.call_args.args[0].devices == ["arg1"]
+        mock_exit.assert_called_once_with(0)
+
+    @patch("synapse_installer.sync.sync", return_value=1)
+    @patch("synapse_installer.deploy.setupAndRunDeploy", return_value=0)
+    def test_install_aborts_when_sync_fails(self, mock_setup, mock_sync):
+        test_argv = ["prog", "install", "arg1"]
+        with patch.object(sys, "argv", test_argv), patch("sys.exit") as mock_exit:
+            main()
+        mock_sync.assert_called_once_with(["arg1"])
+        mock_setup.assert_not_called()
+        mock_exit.assert_called_once_with(1)
+
+    @patch("synapse_installer.sync.sync", return_value=0)
+    @patch("synapse_installer.deploy.setupAndRunDeploy", return_value=0)
+    def test_install_dry_run_skips_sync(self, mock_setup, mock_sync):
+        test_argv = ["prog", "install", "--dry-run", "arg1"]
+        with patch.object(sys, "argv", test_argv), patch("sys.exit") as mock_exit:
+            main()
+        mock_sync.assert_not_called()
+        mock_setup.assert_called_once()
+        assert mock_setup.call_args.args[0].dryRun is True
         mock_exit.assert_called_once_with(0)
 
     # ----------------------- device add command -----------------------
@@ -74,10 +103,37 @@ class TestMain(unittest.TestCase):
         mock_add.assert_called_once()
         mock_exit.assert_called_once_with(0)
 
+    # ----------------------- device list command -----------------------
+    @patch("synapse_installer.deploy.listDevices", return_value=0)
+    def test_device_list_command(self, mock_list):
+        test_argv = ["prog", "device", "list"]
+        with (
+            patch.object(sys, "argv", test_argv),
+            patch("sys.exit") as mock_exit,
+            patch("pathlib.Path.exists", return_value=True),
+        ):
+            main()
+        mock_list.assert_called_once()
+        mock_exit.assert_called_once_with(0)
+
+    # ----------------------- device remove command -----------------------
+    @patch("synapse_installer.deploy.removeDevice", return_value=0)
+    def test_device_remove_command(self, mock_remove):
+        test_argv = ["prog", "device", "remove", "robot"]
+        with (
+            patch.object(sys, "argv", test_argv),
+            patch("sys.exit") as mock_exit,
+            patch("pathlib.Path.exists", return_value=True),
+        ):
+            main()
+        mock_remove.assert_called_once()
+        assert mock_remove.call_args.args[1] == "robot"
+        mock_exit.assert_called_once_with(0)
+
     # ----------------------- device unknown action -----------------------
     @patch("builtins.print")
     def test_device_unknown_action(self, mock_print):
-        test_argv = ["prog", "device", "remove"]
+        test_argv = ["prog", "device", "bogus"]
         with (
             patch.object(sys, "argv", test_argv),
             patch("sys.exit") as mock_exit,
