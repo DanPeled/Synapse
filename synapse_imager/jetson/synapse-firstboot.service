@@ -1,0 +1,15 @@
+[Unit]
+Description=Provision the Synapse runtime
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/synapse/.provisioned
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/synapse-firstboot.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
