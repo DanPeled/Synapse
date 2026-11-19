@@ -22,7 +22,8 @@ from synapse.core.camera.synapse_camera import SynapseCamera
 from synapse.log import warn
 from synapse.stypes import CameraID, Frame, PropertyMetaDict, Size
 from synapse_net.nt_client import NtClient
-from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
+from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d
+from wpiutil import PixelFormat
 
 from .model import (
     DEFAULT_CAMERA_OFFSET,
@@ -55,7 +56,7 @@ class SimCamera(SynapseCamera):
         self._running = True
         self._index: CameraID = -1
         self._mode = VideoMode(
-            VideoMode.PixelFormat.kMJPEG,
+            PixelFormat.MJPEG,
             SUPPORTED_RESOLUTIONS[0][0],
             SUPPORTED_RESOLUTIONS[0][1],
             int(MAX_FPS),
@@ -294,7 +295,7 @@ class SimCamera(SynapseCamera):
     def setVideoMode(self, videoMode: VideoMode) -> None:
         with self._lock:
             self._mode = VideoMode(
-                VideoMode.PixelFormat.kMJPEG,
+                PixelFormat.MJPEG,
                 max(1, int(videoMode.width)),
                 max(1, int(videoMode.height)),
                 max(1, int(videoMode.fps)) if videoMode.fps > 0 else int(MAX_FPS),
@@ -312,14 +313,14 @@ class SimCamera(SynapseCamera):
 
     def enumerateVideoModes(self) -> List[VideoMode]:
         return [
-            VideoMode(VideoMode.PixelFormat.kMJPEG, width, height, int(MAX_FPS))
+            VideoMode(PixelFormat.MJPEG, width, height, int(MAX_FPS))
             for width, height in SUPPORTED_RESOLUTIONS
         ]
 
     def getVideoMode(self) -> VideoMode:
         with self._lock:
             return VideoMode(
-                VideoMode.PixelFormat.kMJPEG,
+                PixelFormat.MJPEG,
                 self._mode.width,
                 self._mode.height,
                 self._mode.fps,

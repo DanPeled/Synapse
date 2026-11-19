@@ -9,10 +9,10 @@ from functools import cache
 from math import isfinite
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
+import wpimath as geometry
 from ntcore import NetworkTable, NetworkTableEntry, NetworkTableInstance
 from synapse_net.generated.messages.v1 import CalibrationDataProto
 from synapse_net.nt_client import NtClient
-from wpimath import geometry
 
 from ..log import err
 from ..stypes import CameraID, Resolution, ResolutionString

@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict
 
-from wpimath.geometry import Pose3d, Rotation3d
+from wpimath import Pose3d, Rotation3d
 
 from .model import cameraMatrix
 

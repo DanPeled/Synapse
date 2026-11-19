@@ -12,7 +12,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
-from wpimath.geometry import Pose3d, Rotation3d, Translation3d
+from wpimath import Pose3d, Rotation3d, Translation3d
 
 
 def _hashable(value: Any) -> Any:

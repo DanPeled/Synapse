@@ -89,7 +89,8 @@ def measure(
     from cscore import VideoMode
     from synapse_sim.camera import SimCamera
     from synapse_sim.viewer import STARTUP_TIMEOUT
-    from wpimath.geometry import Pose3d, Rotation3d, Translation3d
+    from wpimath import Pose3d, Rotation3d, Translation3d
+    from wpiutil import PixelFormat
 
     if collectStats:
         # The renderer only sends its per-second diagnostics when this is set.
@@ -97,7 +98,7 @@ def measure(
 
     camera = SimCamera.create(path=0, index=0)
     camera.setVideoMode(
-        VideoMode(VideoMode.PixelFormat.kMJPEG, width, height, int(targetFps))
+        VideoMode(PixelFormat.MJPEG, width, height, int(targetFps))
     )
     viewer = camera._viewer
 

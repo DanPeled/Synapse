@@ -447,25 +447,25 @@ class RuntimeManager:
         topic_type = topic.getType()
         value = event.data.value
 
-        if topic_type == NetworkTableType.kBoolean:
+        if topic_type == NetworkTableType.BOOLEAN:
             return value.getBoolean()
-        if topic_type == NetworkTableType.kFloat:
+        if topic_type == NetworkTableType.FLOAT:
             return value.getFloat()
-        if topic_type == NetworkTableType.kDouble:
+        if topic_type == NetworkTableType.DOUBLE:
             return value.getDouble()
-        if topic_type == NetworkTableType.kInteger:
+        if topic_type == NetworkTableType.INTEGER:
             return value.getInteger()
-        if topic_type == NetworkTableType.kString:
+        if topic_type == NetworkTableType.STRING:
             return value.getString()
-        if topic_type == NetworkTableType.kBooleanArray:
+        if topic_type == NetworkTableType.BOOLEAN_ARRAY:
             return value.getBooleanArray()
-        if topic_type == NetworkTableType.kFloatArray:
+        if topic_type == NetworkTableType.FLOAT_ARRAY:
             return value.getFloatArray()
-        if topic_type == NetworkTableType.kDoubleArray:
+        if topic_type == NetworkTableType.DOUBLE_ARRAY:
             return value.getDoubleArray()
-        if topic_type == NetworkTableType.kIntegerArray:
+        if topic_type == NetworkTableType.INTEGER_ARRAY:
             return value.getIntegerArray()
-        if topic_type == NetworkTableType.kStringArray:
+        if topic_type == NetworkTableType.STRING_ARRAY:
             return value.getStringArray()
         raise ValueError(f"Unsupported topic type: {topic_type}")
 
