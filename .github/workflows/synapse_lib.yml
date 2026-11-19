@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     container: wpilib/systemcore-cross-ubuntu:2027-24.04
     env:
-      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
+      GRADLE_USER_HOME: /github/home/.gradle
 
     steps:
       - name: Checkout repository
@@ -64,8 +64,8 @@ jobs:
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
-          path: ${{ env.GRADLE_USER_HOME }}
-          key: systemcore-cross-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile', 'versions.properties') }}
+          path: ~/.gradle
+          key: systemcore-cross-gradle-${{ hashFiles('versions.properties', 'synapse_lib/*.gradle', 'examples/*.gradle') }}
           restore-keys: |
             systemcore-cross-gradle-
 
