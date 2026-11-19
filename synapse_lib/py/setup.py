@@ -21,13 +21,19 @@ for line in (Path(__file__).resolve().parents[2] / "versions.properties").read_t
     if separator:
         versions[key.strip()] = value.strip()
 
+WPILIB_VERSION: Final[str] = versions["wpilibPythonVersion"]
+
 setup(
     name="synapsefrclib",
     version=versions["synapsePythonVersion"],
     packages=find_packages(where=SOURCE_DIR),
     package_dir={"": SOURCE_DIR},
     python_requires=">=3.11, <=3.14",
-    install_requires=["pyntcore", "msgpack", "robotpy_wpimath"],
+    install_requires=[
+        f"pyntcore=={WPILIB_VERSION}",
+        "msgpack",
+        f"robotpy_wpimath=={WPILIB_VERSION}",
+    ],
     extras_require={"dev": []},
     include_package_data=True,
 )

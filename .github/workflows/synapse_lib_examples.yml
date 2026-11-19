@@ -46,7 +46,7 @@ jobs:
 
   build_synapse:
     name: "Build Synapse Processor - ${{ matrix.example }}"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         example: [synapseproject, bullseye_project]

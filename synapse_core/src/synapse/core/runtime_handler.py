@@ -370,7 +370,7 @@ class RuntimeManager:
 
                 if NtClient.INSTANCE is not None:
                     self._addNtListener(
-                        entry, EventFlags.kValueRemote, updateSettingListener
+                        entry, EventFlags.VALUE_REMOTE, updateSettingListener
                     )
 
         for key in pipeline_config.getMap().keys():
@@ -714,7 +714,7 @@ class RuntimeManager:
                 assert isinstance(event.data, ValueEventData)
                 self.cameraViewIDs[cameraIndex] = event.data.value.getString()
 
-            self._addNtListener(entry, EventFlags.kValueRemote, onViewIDChanged)
+            self._addNtListener(entry, EventFlags.VALUE_REMOTE, onViewIDChanged)
 
         if result is None:
             return
@@ -778,7 +778,7 @@ class RuntimeManager:
                 )
 
             self._addNtListener(
-                entry, EventFlags.kValueRemote, updateNTPipelineListener
+                entry, EventFlags.VALUE_REMOTE, updateNTPipelineListener
             )
 
             entry.setInteger(self.pipelineHandler.defaultPipelineIndexes[cameraIndex])
@@ -1050,7 +1050,7 @@ class RuntimeManager:
             )
             assert recordEntry is not None
 
-            self._addNtListener(recordEntry, EventFlags.kValueRemote, listener)
+            self._addNtListener(recordEntry, EventFlags.VALUE_REMOTE, listener)
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.pipelineHandler.onRemovePipeline.add(onRemovePipeline)  # pyright: ignore

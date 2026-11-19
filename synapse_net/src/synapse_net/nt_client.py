@@ -70,10 +70,10 @@ class NtClient:
         def connectionListener(event: Event):
             if isinstance(event.data, ConnectionInfo):
                 ip = event.data.remote_ip
-                if event.is_(EventFlags.kConnected):
+                if event.is_(EventFlags.CONNECTED):
                     info(f"Connected to NetworkTables server ({ip})")
                     NtClient.onConnect.call(ip)
-                elif event.is_(EventFlags.kDisconnected):
+                elif event.is_(EventFlags.DISCONNECTED):
                     info(f"Disconnected from NetworkTables server ({ip})")
                     NtClient.onDisconnect.call(ip)
 
