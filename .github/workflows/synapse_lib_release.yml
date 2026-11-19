@@ -36,6 +36,7 @@ jobs:
     env:
       releaseVersion: ${{ inputs.releaseVersion }}
       workingDirectory: ${{ github.workspace }}/synapse_lib
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
 
     steps:
       - name: Configure git user
@@ -45,6 +46,14 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.GRADLE_USER_HOME }}
+          key: synapselib-release-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile', 'versions.properties') }}
+          restore-keys: |
+            synapselib-release-gradle-
 
       - name: Set release version
         run: |
