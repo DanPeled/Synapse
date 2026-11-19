@@ -10,20 +10,17 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             switch (requested.id.id) {
-                case 'edu.wpi.first.GradleRIO':
+                case 'org.wpilib.GradleRIO':
                     useVersion(versions.gradleRioVersion)
                     break
-                case 'edu.wpi.first.NativeUtils':
+                case 'org.wpilib.NativeUtils':
                     useVersion(versions.nativeUtilsVersion)
                     break
-                case 'edu.wpi.first.GradleJni':
+                case 'org.wpilib.GradleJni':
                     useVersion(versions.gradleJniVersion)
                     break
-                case 'edu.wpi.first.GradleVsCode':
+                case 'org.wpilib.GradleVsCode':
                     useVersion(versions.gradleVsCodeVersion)
-                    break
-                case 'edu.wpi.first.wpilib.repositories.WPILibRepositoriesPlugin':
-                    useVersion(versions.wpilibRepositoriesVersion)
                     break
                 case 'com.diffplug.spotless':
                     useVersion(versions.spotlessVersion)

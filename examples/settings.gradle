@@ -31,7 +31,7 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             switch (requested.id.id) {
-                case 'edu.wpi.first.GradleRIO':
+                case 'org.wpilib.GradleRIO':
                     useVersion(versions.gradleRioVersion)
                     break
                 case 'com.diffplug.spotless':

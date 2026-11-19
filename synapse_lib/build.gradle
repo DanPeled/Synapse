@@ -1,14 +1,13 @@
-import edu.wpi.first.toolchain.*
+import org.wpilib.toolchain.*
 
 plugins {
     id 'cpp'
     id 'java'
-    id 'google-test'
-    id 'edu.wpi.first.wpilib.repositories.WPILibRepositoriesPlugin'
-    id 'edu.wpi.first.NativeUtils'
-    id 'edu.wpi.first.GradleJni'
-    id 'edu.wpi.first.GradleRIO'
-    id 'edu.wpi.first.GradleVsCode'
+    id 'google-test-test-suite'
+    id 'org.wpilib.NativeUtils'
+    id 'org.wpilib.GradleJni'
+    id 'org.wpilib.GradleRIO'
+    id 'org.wpilib.GradleVsCode'
     id 'com.diffplug.spotless'
 }
 
@@ -24,11 +23,10 @@ ext.wpilibVersion = versions.wpilibVersion
 repositories {
     mavenCentral()
 }
-if (project.hasProperty('releaseMode')) {
-    wpilibRepositories.addAllReleaseRepositories(project)
-} else {
-    wpilibRepositories.addAllDevelopmentRepositories(project)
-}
+
+// GradleRIO provides the WPILib repositories. The 2027 alpha artifacts are only
+// published to the development repository.
+wpi.maven.useDevelopment = !project.hasProperty('releaseMode')
 
 java {
     sourceCompatibility = JavaVersion.toVersion(versions.javaVersion)
@@ -40,21 +38,22 @@ apply from: 'config.gradle'
 
 // Apply Java configuration
 dependencies {
-    implementation "edu.wpi.first.cscore:cscore-java:$wpilibVersion"
-    implementation "edu.wpi.first.cameraserver:cameraserver-java:$wpilibVersion"
-    implementation "edu.wpi.first.ntcore:ntcore-java:$wpilibVersion"
-    implementation "edu.wpi.first.wpilibj:wpilibj-java:$wpilibVersion"
-    implementation "edu.wpi.first.wpiutil:wpiutil-java:$wpilibVersion"
-    implementation "edu.wpi.first.wpimath:wpimath-java:$wpilibVersion"
-    implementation "edu.wpi.first.wpiunits:wpiunits-java:$wpilibVersion"
-    implementation "edu.wpi.first.hal:hal-java:$wpilibVersion"
+    implementation "org.wpilib.cscore:cscore-java:$wpilibVersion"
+    implementation "org.wpilib.cameraserver:cameraserver-java:$wpilibVersion"
+    implementation "org.wpilib.ntcore:ntcore-java:$wpilibVersion"
+    implementation "org.wpilib.wpilibj:wpilibj-java:$wpilibVersion"
+    implementation "org.wpilib.wpiutil:wpiutil-java:$wpilibVersion"
+    implementation "org.wpilib.wpimath:wpimath-java:$wpilibVersion"
+    implementation "org.wpilib.wpiunits:wpiunits-java:$wpilibVersion"
+    implementation "org.wpilib.hal:hal-java:$wpilibVersion"
+    implementation "org.wpilib.telemetry:telemetry-java:$wpilibVersion"
     implementation "org.ejml:ejml-simple:$versions.ejmlVersion"
     implementation "com.fasterxml.jackson.core:jackson-annotations:$versions.jacksonVersion"
     implementation "com.fasterxml.jackson.core:jackson-core:$versions.jacksonVersion"
     implementation "com.fasterxml.jackson.module:jackson-module-parameter-names:$versions.jacksonVersion"
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$versions.jacksonVersion"
     implementation "com.fasterxml.jackson.core:jackson-databind:$versions.jacksonVersion"
-    implementation "edu.wpi.first.thirdparty.frc2025.opencv:opencv-java:$versions.opencvVersion"
+    implementation "org.wpilib.thirdparty.opencv:opencv-java:$versions.opencvVersion"
 
     implementation "org.msgpack:jackson-dataformat-msgpack:$versions.msgpackVersion"
     implementation "org.msgpack:msgpack-core:$versions.msgpackVersion"
