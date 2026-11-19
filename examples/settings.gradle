@@ -1,10 +1,11 @@
 import org.gradle.internal.os.OperatingSystem
 
 pluginManagement {
+    def versions = new Properties()
+    file('../versions.properties').withInputStream { versions.load(it) }
+
     repositories {
-        mavenLocal()
-        gradlePluginPortal()
-        String frcYear = '2026'
+        String wpilibYear = versions.frcYear
         File frcHome
         if (OperatingSystem.current().isWindows()) {
             String publicFolder = System.getenv('PUBLIC')
@@ -12,16 +13,31 @@ pluginManagement {
                 publicFolder = "C:\\Users\\Public"
             }
             def homeRoot = new File(publicFolder, "wpilib")
-            frcHome = new File(homeRoot, frcYear)
+            frcHome = new File(homeRoot, wpilibYear)
         } else {
             def userFolder = System.getProperty("user.home")
             def homeRoot = new File(userFolder, "wpilib")
-            frcHome = new File(homeRoot, frcYear)
+            frcHome = new File(homeRoot, wpilibYear)
         }
         def frcHomeMaven = new File(frcHome, 'maven')
         maven {
             name = 'frcHome'
             url = frcHomeMaven
+        }
+        mavenLocal()
+        gradlePluginPortal()
+    }
+
+    resolutionStrategy {
+        eachPlugin {
+            switch (requested.id.id) {
+                case 'edu.wpi.first.GradleRIO':
+                    useVersion(versions.gradleRioVersion)
+                    break
+                case 'com.diffplug.spotless':
+                    useVersion(versions.spotlessVersion)
+                    break
+            }
         }
     }
 }

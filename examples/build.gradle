@@ -1,12 +1,15 @@
 plugins {
     id "java"
-    id "edu.wpi.first.GradleRIO" version "2026.1.1"
-    id 'com.diffplug.spotless' version '6.20.0'
+    id "edu.wpi.first.GradleRIO"
+    id 'com.diffplug.spotless'
 }
 
+def versions = new Properties()
+file("$rootDir/../versions.properties").withInputStream { versions.load(it) }
+
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.toVersion(versions.javaVersion)
+    targetCompatibility = JavaVersion.toVersion(versions.javaVersion)
 }
 
 def example = findProperty("example") ?: "aimAtTarget"
@@ -70,7 +73,7 @@ dependencies {
     annotationProcessor wpi.java.deps.wpilibAnnotations()
     implementation wpi.java.deps.wpilib()
     implementation wpi.java.vendor.java()
-    implementation("synapse.vision:synapse_lib:2026.0.1")
+    implementation("synapse.vision:synapse_lib:${versions.synapseVersion}")
 
 
 
