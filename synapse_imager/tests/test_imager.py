@@ -247,3 +247,18 @@ def testReleaseWorkflowStructure() -> None:
         == "${{ fromJSON(needs.prepare.outputs.matrix) }}"
     )
     assert jobs["release"]["if"] == "startsWith(github.ref, 'refs/tags/')"
+
+
+def testReleaseWorkflowRegistersQemuForCrossArchBuilds() -> None:
+    workflowPath = REPO_ROOT / ".github/workflows/release_images.yml"
+    workflow = yaml.safe_load(workflowPath.read_text())
+
+    steps = workflow["jobs"]["images"]["steps"]
+    qemuSteps = [
+        step
+        for step in steps
+        if step.get("uses", "").startswith("docker/setup-qemu-action@")
+    ]
+
+    assert len(qemuSteps) == 1
+    assert qemuSteps[0]["if"] == "matrix.platform != 'overlay'"
