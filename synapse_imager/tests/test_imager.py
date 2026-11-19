@@ -124,6 +124,13 @@ def testProvisionScriptInstallsRuntimeAndService() -> None:
     assert "3, 11" in text
 
 
+def testArmbianBuildForwardsKernelFlagsToCompileSh() -> None:
+    text = (IMAGER_DIR / "armbian/build.sh").read_text()
+
+    assert 'compile_args+=("KERNEL_EXTRA_CFLAGS=${KERNEL_EXTRA_CFLAGS}")' in text
+    assert './compile.sh build "${compile_args[@]}"' in text
+
+
 def testRaspberryPiStageUsesSharedProvisioner() -> None:
     text = (
         IMAGER_DIR / "raspberrypi/stage-synapse/00-synapse/01-run.sh"
@@ -200,6 +207,7 @@ def testPlatformBuildDryRunUsesRegistryDefaults() -> None:
     assert plan["command"] == ["bash", "armbian/build.sh"]
     assert plan["env"]["BOARD"] == "orangepi5"
     assert plan["env"]["PREFER_DOCKER"] == "yes"
+    assert plan["env"]["KERNEL_EXTRA_CFLAGS"] == "-Wno-incompatible-pointer-types"
     assert plan["env"]["SYNAPSE_PLATFORM"] == "armbian"
     assert plan["env"]["SYNAPSE_TARGET"] == "orangepi5"
 
