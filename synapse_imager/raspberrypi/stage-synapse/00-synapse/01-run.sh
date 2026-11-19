@@ -9,12 +9,13 @@
 
 install -d -m 0755 "${ROOTFS_DIR}/opt/synapse-build"
 install -m 0755 files/provision.sh "${ROOTFS_DIR}/opt/synapse-build/provision.sh"
-install -m 0644 files/synapsefrc.whl "${ROOTFS_DIR}/opt/synapse-build/synapsefrc.whl"
+# The build wrapper stages the wheel under its release filename. Keep it that
+# way: pip rejects a bare "synapsefrc.whl" as an invalid wheel name.
+install -m 0644 files/synapsefrc-*.whl "${ROOTFS_DIR}/opt/synapse-build/"
 cp -a files/sample_project "${ROOTFS_DIR}/opt/synapse-build/sample_project"
 
 on_chroot <<EOF
 bash /opt/synapse-build/provision.sh \
-  --wheel /opt/synapse-build/synapsefrc.whl \
   --project /opt/synapse-build/sample_project \
   --user "${FIRST_USER_NAME}" \
   --home "/home/${FIRST_USER_NAME}" \

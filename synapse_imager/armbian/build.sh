@@ -105,7 +105,9 @@ rm -rf "${USERPATCHES}"
 mkdir -p "${OVERLAY}"
 
 install -m 0755 "${IMAGER_DIR}/common/provision.sh" "${OVERLAY}/provision.sh"
-install -m 0644 "${WHEEL}" "${OVERLAY}/synapsefrc.whl"
+# Preserve the release wheel's PEP 427 filename. pip rejects a bare
+# "synapsefrc.whl" with "Invalid wheel filename (wrong number of parts)".
+install -m 0644 "${WHEEL}" "${OVERLAY}/$(basename "${WHEEL}")"
 cp -a "${IMAGER_DIR}/sample_project" "${OVERLAY}/sample_project"
 install -m 0755 "${SCRIPT_DIR}/customize-image.sh" "${USERPATCHES}/customize-image.sh"
 
@@ -114,18 +116,28 @@ install -m 0755 "${SCRIPT_DIR}/customize-image.sh" "${USERPATCHES}/customize-ima
   printf 'TARGET_PASSWORD=%q\n' "${TARGET_PASSWORD}"
 } >"${OVERLAY}/image.env"
 
+compile_args=(
+  BOARD="${BOARD}"
+  BRANCH="${BRANCH}"
+  RELEASE="${RELEASE}"
+  BUILD_DESKTOP=no
+  BUILD_MINIMAL=no
+  KERNEL_CONFIGURE=no
+  COMPRESS_OUTPUTIMAGE="${COMPRESS_OUTPUTIMAGE}"
+  PREFER_DOCKER="${PREFER_DOCKER}"
+)
+
+# Armbian's Docker relaunch only forwards cmdline params, not arbitrary
+# environment variables. Pass kernel flags explicitly so fixes such as the
+# 6.18 vsi-iommu -Werror workaround survive into the build container.
+if [[ -n "${KERNEL_EXTRA_CFLAGS:-}" ]]; then
+  compile_args+=("KERNEL_EXTRA_CFLAGS=${KERNEL_EXTRA_CFLAGS}")
+fi
+
 echo "Building Armbian image for ${BOARD} (${RELEASE}, ${BRANCH}) with Synapse ${VERSION}..."
 (
   cd "${ARMBIAN_DIR}"
-  ./compile.sh build \
-    BOARD="${BOARD}" \
-    BRANCH="${BRANCH}" \
-    RELEASE="${RELEASE}" \
-    BUILD_DESKTOP=no \
-    BUILD_MINIMAL=no \
-    KERNEL_CONFIGURE=no \
-    COMPRESS_OUTPUTIMAGE="${COMPRESS_OUTPUTIMAGE}" \
-    PREFER_DOCKER="${PREFER_DOCKER}"
+  ./compile.sh build "${compile_args[@]}"
 )
 
 shopt -s nullglob

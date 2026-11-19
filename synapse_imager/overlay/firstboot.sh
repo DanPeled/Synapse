@@ -34,8 +34,9 @@ if [[ -z "${USER_NAME}" ]]; then
 fi
 
 echo "Provisioning Synapse for ${USER_NAME}..."
+# provision.sh discovers synapsefrc-*.whl next to itself. The staged wheel
+# keeps its release filename so pip accepts it.
 bash "${STAGING}/provision.sh" \
-  --wheel "${STAGING}/synapsefrc.whl" \
   --project "${STAGING}/sample_project" \
   --user "${USER_NAME}" \
   --clean-apt \

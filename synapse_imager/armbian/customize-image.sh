@@ -46,8 +46,9 @@ fi
 rm -f /root/.not_logged_in_yet
 passwd -l root >/dev/null 2>&1 || true
 
+# provision.sh discovers synapsefrc-*.whl next to itself. The staged wheel
+# keeps its release filename so pip accepts it.
 bash "${STAGING}/provision.sh" \
-  --wheel "${STAGING}/synapsefrc.whl" \
   --project "${STAGING}/sample_project" \
   --user "${TARGET_USER}" \
   --clean-apt
