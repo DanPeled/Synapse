@@ -125,6 +125,15 @@ jobs:
           large-packages: true
           swap-storage: true
 
+      # Armbian forces NEEDS_BINFMT=yes for image builds and verifies it with
+      # `arch-test <arch>`. Its own update-binfmts calls cannot register
+      # interpreters from inside the build container, so register them on the
+      # runner host first. Without this, every cross-arch Armbian job fails at
+      # "arch-test: not supported on this machine/kernel".
+      - name: Set up QEMU binfmt handlers
+        if: matrix.platform != 'overlay'
+        uses: docker/setup-qemu-action@v3
+
       - name: Install host build dependencies
         if: matrix.setup != ''
         run: bash "synapse_imager/${{ matrix.setup }}"
