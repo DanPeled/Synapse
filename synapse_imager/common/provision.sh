@@ -156,6 +156,18 @@ if [[ ! -f "${WHEEL}" ]]; then
 fi
 WHEEL="$(cd "$(dirname "${WHEEL}")" && pwd)/$(basename "${WHEEL}")"
 
+# pip validates wheel filenames strictly. A bare "synapsefrc.whl" looks like a
+# wheel to the staging scripts but fails in pip with "Invalid wheel filename
+# (wrong number of parts)". Fail early here with an actionable message.
+wheel_name="$(basename "${WHEEL}")"
+wheel_stem="${wheel_name%.whl}"
+IFS='-' read -r -a wheel_parts <<<"${wheel_stem}"
+if [[ "${wheel_name}" != *.whl ]] || (( ${#wheel_parts[@]} < 5 )); then
+  echo "Invalid wheel filename: ${wheel_name}" >&2
+  echo "Expected <distribution>-<version>-<python>-<abi>-<platform>.whl" >&2
+  exit 1
+fi
+
 PROJECT="${PROJECT:-${SCRIPT_DIR}/sample_project}"
 if [[ ! -d "${PROJECT}" ]]; then
   echo "Project not found: ${PROJECT}" >&2

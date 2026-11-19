@@ -34,6 +34,15 @@ def runPlatforms(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def codeLines(path: Path) -> str:
+    """Script text without comment-only lines."""
+    return "\n".join(
+        line
+        for line in path.read_text().splitlines()
+        if not line.lstrip().startswith("#")
+    )
+
+
 def registryTargets() -> set[str]:
     parser = configparser.ConfigParser(interpolation=None)
     parser.optionxform = lambda optionstr: optionstr
@@ -131,12 +140,47 @@ def testArmbianBuildForwardsKernelFlagsToCompileSh() -> None:
     assert './compile.sh build "${compile_args[@]}"' in text
 
 
+def testBuildersStageWheelWithReleaseFilename() -> None:
+    """pip rejects a bare synapsefrc.whl; staging must keep the PEP 427 name."""
+    builders = (
+        IMAGER_DIR / "armbian/build.sh",
+        IMAGER_DIR / "overlay/build.sh",
+        IMAGER_DIR / "raspberrypi/build.sh",
+    )
+    for builder in builders:
+        text = codeLines(builder)
+        assert "synapsefrc.whl" not in text, f"{builder} stages an invalid wheel name"
+        assert 'install -m 0644 "${WHEEL}"' in text
+        assert '$(basename "${WHEEL}")' in text
+
+
+def testProvisionCallersUseSharedWheelDiscovery() -> None:
+    callers = (
+        IMAGER_DIR / "armbian/customize-image.sh",
+        IMAGER_DIR / "overlay/firstboot.sh",
+        IMAGER_DIR / "raspberrypi/stage-synapse/00-synapse/01-run.sh",
+    )
+    for caller in callers:
+        text = codeLines(caller)
+        assert "synapsefrc.whl" not in text, f"{caller} references an invalid wheel name"
+        assert "provision.sh" in text
+
+
+def testProvisionScriptRejectsInvalidWheelFilenames() -> None:
+    text = (IMAGER_DIR / "common/provision.sh").read_text()
+
+    assert "synapsefrc-*.whl" in text
+    assert "Invalid wheel filename" in text
+    assert "wheel_parts" in text
+
+
 def testRaspberryPiStageUsesSharedProvisioner() -> None:
     text = (
         IMAGER_DIR / "raspberrypi/stage-synapse/00-synapse/01-run.sh"
     ).read_text()
 
     assert "provision.sh" in text
+    assert "files/synapsefrc-*.whl" in text
     assert "--cleanup" in text
     assert "--user" in text
 

@@ -81,7 +81,9 @@ mkdir -p \
 
 install -m 0755 "${IMAGER_DIR}/common/provision.sh" \
   "${STAGE}/opt/synapse-build/provision.sh"
-install -m 0644 "${WHEEL}" "${STAGE}/opt/synapse-build/synapsefrc.whl"
+# Keep the release wheel's PEP 427 filename; pip rejects a bare
+# "synapsefrc.whl" as an invalid wheel name.
+install -m 0644 "${WHEEL}" "${STAGE}/opt/synapse-build/$(basename "${WHEEL}")"
 cp -a "${IMAGER_DIR}/sample_project" "${STAGE}/opt/synapse-build/sample_project"
 
 install -m 0755 "${SCRIPT_DIR}/firstboot.sh" \

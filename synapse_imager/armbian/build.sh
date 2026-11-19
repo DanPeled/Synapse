@@ -105,7 +105,9 @@ rm -rf "${USERPATCHES}"
 mkdir -p "${OVERLAY}"
 
 install -m 0755 "${IMAGER_DIR}/common/provision.sh" "${OVERLAY}/provision.sh"
-install -m 0644 "${WHEEL}" "${OVERLAY}/synapsefrc.whl"
+# Preserve the release wheel's PEP 427 filename. pip rejects a bare
+# "synapsefrc.whl" with "Invalid wheel filename (wrong number of parts)".
+install -m 0644 "${WHEEL}" "${OVERLAY}/$(basename "${WHEEL}")"
 cp -a "${IMAGER_DIR}/sample_project" "${OVERLAY}/sample_project"
 install -m 0755 "${SCRIPT_DIR}/customize-image.sh" "${USERPATCHES}/customize-image.sh"
 
