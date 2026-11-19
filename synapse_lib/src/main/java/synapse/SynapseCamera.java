@@ -2,22 +2,22 @@ package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.networktables.FloatSubscriber;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableEntry;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.NetworkTableType;
-import edu.wpi.first.networktables.PubSubOption;
-import edu.wpi.first.networktables.RawSubscriber;
-import edu.wpi.first.networktables.StringSubscriber;
-import edu.wpi.first.wpilibj.DriverStation;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
+import org.wpilib.driverstation.DriverStationErrors;
+import org.wpilib.math.geometry.Pose3d;
+import org.wpilib.math.geometry.Transform3d;
+import org.wpilib.networktables.FloatSubscriber;
+import org.wpilib.networktables.NetworkTable;
+import org.wpilib.networktables.NetworkTableEntry;
+import org.wpilib.networktables.NetworkTableInstance;
+import org.wpilib.networktables.NetworkTableType;
+import org.wpilib.networktables.PubSubOption;
+import org.wpilib.networktables.RawSubscriber;
+import org.wpilib.networktables.StringSubscriber;
 import synapse.generated.SynapseApi;
 import synapse.util.deserializers.WPILibGeometryModule;
 
@@ -112,25 +112,21 @@ public class SynapseCamera implements AutoCloseable {
       m_pipelineTypeSubscriber =
           m_table
               .getStringTopic(NetworkTableTopics.kPipelineTypeTopic)
-              .subscribe(
-                  "Unknown", PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+              .subscribe("Unknown", PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
       m_captureLatencySubscriber =
           m_table
               .getFloatTopic(NetworkTableTopics.kCaptureLatencyTopic)
-              .subscribe(0, PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+              .subscribe(0, PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
       m_processLatencySubscriber =
           m_table
               .getFloatTopic(NetworkTableTopics.kProcessLatencyTopic)
-              .subscribe(0, PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+              .subscribe(0, PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
       // The runtime publishes pipeline results under <camera>/data/results.
       m_resultsSubscriber =
           m_dataTable
               .getRawTopic(NetworkTableTopics.kResultsTopic)
               .subscribe(
-                  "raw",
-                  new byte[0],
-                  PubSubOption.keepDuplicates(true),
-                  PubSubOption.pollStorage(10));
+                  "raw", new byte[0], PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
     }
   }
 
@@ -287,14 +283,14 @@ public class SynapseCamera implements AutoCloseable {
     if (!entry.exists()) return Optional.empty();
 
     return switch (entry.getType()) {
-      case kDouble -> Optional.of(entry.getDouble(0.0));
-      case kDoubleArray -> Optional.of(entry.getDoubleArray(new double[0]));
-      case kString -> Optional.of(entry.getString(""));
-      case kStringArray -> Optional.of(entry.getStringArray(new String[0]));
-      case kInteger -> Optional.of(entry.getInteger(0));
-      case kIntegerArray -> Optional.of(entry.getIntegerArray(new long[0]));
-      case kBoolean -> Optional.of(entry.getBoolean(false));
-      case kBooleanArray -> Optional.of(entry.getBooleanArray(new boolean[0]));
+      case DOUBLE -> Optional.of(entry.getDouble(0.0));
+      case DOUBLE_ARRAY -> Optional.of(entry.getDoubleArray(new double[0]));
+      case STRING -> Optional.of(entry.getString(""));
+      case STRING_ARRAY -> Optional.of(entry.getStringArray(new String[0]));
+      case INTEGER -> Optional.of(entry.getInteger(0));
+      case INTEGER_ARRAY -> Optional.of(entry.getIntegerArray(new long[0]));
+      case BOOLEAN -> Optional.of(entry.getBoolean(false));
+      case BOOLEAN_ARRAY -> Optional.of(entry.getBooleanArray(new boolean[0]));
       default -> Optional.empty();
     };
   }
@@ -313,16 +309,16 @@ public class SynapseCamera implements AutoCloseable {
 
     Object value =
         switch (entry.getType()) {
-          case kDouble -> entry.getDouble(0.0);
-          case kDoubleArray -> entry.getDoubleArray(new double[0]);
-          case kString -> entry.getString("");
-          case kStringArray -> entry.getStringArray(new String[0]);
-          case kInteger -> entry.getInteger(0);
-          case kIntegerArray -> entry.getIntegerArray(new long[0]);
-          case kBoolean -> entry.getBoolean(false);
-          case kBooleanArray -> entry.getBooleanArray(new boolean[0]);
+          case DOUBLE -> entry.getDouble(0.0);
+          case DOUBLE_ARRAY -> entry.getDoubleArray(new double[0]);
+          case STRING -> entry.getString("");
+          case STRING_ARRAY -> entry.getStringArray(new String[0]);
+          case INTEGER -> entry.getInteger(0);
+          case INTEGER_ARRAY -> entry.getIntegerArray(new long[0]);
+          case BOOLEAN -> entry.getBoolean(false);
+          case BOOLEAN_ARRAY -> entry.getBooleanArray(new boolean[0]);
           default -> {
-            DriverStation.reportWarning(
+            DriverStationErrors.reportWarning(
                 "[SynapseCamera] Unsupported NT type for key '" + setting.getKey() + "'", false);
             yield null;
           }
@@ -331,7 +327,7 @@ public class SynapseCamera implements AutoCloseable {
     if (value == null
         || !setting.getValueType().isInstance(value)
         || !setting.getNtType().equals(entry.getType())) {
-      DriverStation.reportWarning(
+      DriverStationErrors.reportWarning(
           "[SynapseCamera] Type mismatch for key '"
               + setting.getKey()
               + "', expected "
@@ -451,7 +447,7 @@ public class SynapseCamera implements AutoCloseable {
     /** The Java class of the value type for this setting. */
     protected final Class<T> valueType;
 
-    /** The NetworkTableType corresponding to this setting (e.g., kDouble, kString). */
+    /** The NetworkTableType corresponding to this setting (e.g., DOUBLE, STRING). */
     protected final NetworkTableType ntType;
 
     /**
@@ -495,7 +491,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for Double values
      */
     public static Setting<Double> doubleSetting(String key) {
-      return new Setting<>(key, Double.class, NetworkTableType.kDouble);
+      return new Setting<>(key, Double.class, NetworkTableType.DOUBLE);
     }
 
     /**
@@ -505,7 +501,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for Long values
      */
     public static Setting<Long> integerSetting(String key) {
-      return new Setting<>(key, Long.class, NetworkTableType.kInteger);
+      return new Setting<>(key, Long.class, NetworkTableType.INTEGER);
     }
 
     /**
@@ -515,7 +511,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for String values
      */
     public static Setting<String> stringSetting(String key) {
-      return new Setting<>(key, String.class, NetworkTableType.kString);
+      return new Setting<>(key, String.class, NetworkTableType.STRING);
     }
 
     /**
@@ -525,7 +521,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for double array values
      */
     public static Setting<double[]> doubleArraySetting(String key) {
-      return new Setting<>(key, double[].class, NetworkTableType.kDoubleArray);
+      return new Setting<>(key, double[].class, NetworkTableType.DOUBLE_ARRAY);
     }
 
     /**
@@ -535,7 +531,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for string array values
      */
     public static Setting<String[]> stringArraySetting(String key) {
-      return new Setting<>(key, String[].class, NetworkTableType.kStringArray);
+      return new Setting<>(key, String[].class, NetworkTableType.STRING_ARRAY);
     }
 
     /**
@@ -545,7 +541,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for Boolean values
      */
     public static Setting<Boolean> booleanSetting(String key) {
-      return new Setting<>(key, Boolean.class, NetworkTableType.kBoolean);
+      return new Setting<>(key, Boolean.class, NetworkTableType.BOOLEAN);
     }
 
     /**
@@ -555,7 +551,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for long array values
      */
     public static Setting<long[]> integerArraySetting(String key) {
-      return new Setting<>(key, long[].class, NetworkTableType.kIntegerArray);
+      return new Setting<>(key, long[].class, NetworkTableType.INTEGER_ARRAY);
     }
 
     /**
@@ -565,7 +561,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for boolean array values
      */
     public static Setting<boolean[]> booleanArraySetting(String key) {
-      return new Setting<>(key, boolean[].class, NetworkTableType.kBooleanArray);
+      return new Setting<>(key, boolean[].class, NetworkTableType.BOOLEAN_ARRAY);
     }
 
     /**
