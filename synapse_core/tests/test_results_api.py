@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from math import radians
 
 import msgpack
+import wpimath as geometry
 from synapse.core import results_api as api
-from wpimath import geometry
 
 # -------------------
 # Dummy PipelineResult subclasses for testing

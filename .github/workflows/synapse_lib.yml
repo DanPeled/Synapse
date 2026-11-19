@@ -8,12 +8,14 @@ on:
       - "synapse_lib/schema/**"
       - "synapse_lib/tools/**"
       - "synapse_lib/*.gradle"
+      - "versions.properties"
   pull_request:
     paths:
       - "synapse_lib/src/**"
       - "synapse_lib/schema/**"
       - "synapse_lib/tools/**"
       - "synapse_lib/*.gradle"
+      - "versions.properties"
 
 permissions:
   contents: read
@@ -34,24 +36,24 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile', 'versions.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
 
       - name: Build Project
         run: |
           cd synapse_lib
           ./gradlew build
 
-  roborio-cross-build:
+  systemcore-cross-build:
     runs-on: ubuntu-latest
-    container: wpilib/roborio-cross-ubuntu:2025-22.04
+    container: wpilib/systemcore-cross-ubuntu:2027-24.04
 
     steps:
       - name: Checkout repository
@@ -61,17 +63,17 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.gradle/caches
-          key: roborio-cross-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile') }}
+          key: systemcore-cross-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile', 'versions.properties') }}
           restore-keys: |
-            roborio-cross-gradle-
+            systemcore-cross-gradle-
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
 
-      - name: Build for RoboRIO
+      - name: Build for SystemCore
         run: |
           cd synapse_lib
           ./gradlew build
@@ -91,15 +93,15 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile', 'versions.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
 
       - name: Run Tests
         run: |
@@ -117,15 +119,15 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.gradle/caches
-          key: ubuntu-latest-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile') }}
+          key: ubuntu-latest-gradle-${{ hashFiles('**/*.gradle', '**/gradle.lockfile', 'versions.properties') }}
           restore-keys: |
             ubuntu-latest-gradle-
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
 
       - name: Run Spotless Check
         run: |

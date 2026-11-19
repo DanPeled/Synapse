@@ -1,6 +1,6 @@
 package frc.robot;
 
-import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import org.wpilib.math.kinematics.DifferentialDriveKinematics;
 
 public final class Constants {
 

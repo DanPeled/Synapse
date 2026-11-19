@@ -219,9 +219,9 @@ JAVA_HELPERS: Dict[str, Dict[str, Any]] = {
     },
     "apriltagCameraPose3d": {
         "imports": {
-            "edu.wpi.first.math.geometry.Pose3d",
-            "edu.wpi.first.math.geometry.Rotation3d",
-            "edu.wpi.first.math.geometry.Translation3d",
+            "org.wpilib.math.geometry.Pose3d",
+            "org.wpilib.math.geometry.Rotation3d",
+            "org.wpilib.math.geometry.Translation3d",
         },
         "code": """  /**
    * Returns the camera's estimated pose in field space as a 3D pose.
@@ -805,7 +805,7 @@ def render_python_module(schema: Schema, models: Sequence[Dict[str, Any]]) -> st
         lines.append("\n")
         if geometryNeeded:
             lines.append(
-                "from wpimath.geometry import Pose3d, Rotation3d, Translation3d\n"
+                "from wpimath import Pose3d, Rotation3d, Translation3d\n"
             )
         lines.extend(crossModuleImports)
 

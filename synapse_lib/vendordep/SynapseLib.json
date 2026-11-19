@@ -1,16 +1,16 @@
 {
   "fileName": "SynapseLib.json",
   "name": "SynapseLib",
-  "version": "2026.0.1",
-  "frcYear": "2026",
+  "version": "2027.0.0a1",
+  "wpilibYear": "2027_alpha7",
   "uuid": "af8da96d-542f-4c60-9659-f49d22f50343",
-  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/2026.0.1/"],
-  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-2026.0.1.json",
+  "mavenUrls": ["https://danpeled.github.io/Synapse/maven/2027.0.0a1/"],
+  "jsonUrl": "https://danpeled.github.io/Synapse/SynapseLib-2027.0.0a1.json",
   "javaDependencies": [
     {
       "groupId": "synapse",
       "artifactId": "Synapse-java",
-      "version": "2026.0.1"
+      "version": "2027.0.0a1"
     },
     {
       "groupId": "com.fasterxml.jackson.core",
@@ -53,17 +53,17 @@
     {
       "groupId": "synapse",
       "artifactId": "Synapse-cpp",
-      "version": "2026.0.1",
+      "version": "2027.0.0a1",
       "libName": "Vendor",
       "headerClassifier": "headers",
       "sharedLibrary": false,
       "skipInvalidPlatforms": true,
       "binaryPlatforms": [
-        "windowsx86-64",
+        "linuxsystemcore",
         "linuxarm64",
+        "windowsx86-64",
+        "windowsarm64",
         "linuxx86-64",
-        "linuxathena",
-        "linuxarm32",
         "osxuniversal"
       ]
     }

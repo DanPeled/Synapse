@@ -1,6 +1,31 @@
 pluginManagement {
+    def versions = new Properties()
+    file('../versions.properties').withInputStream { versions.load(it) }
+
     repositories {
         mavenLocal()
         gradlePluginPortal()
+    }
+
+    resolutionStrategy {
+        eachPlugin {
+            switch (requested.id.id) {
+                case 'org.wpilib.GradleRIO':
+                    useVersion(versions.gradleRioVersion)
+                    break
+                case 'org.wpilib.NativeUtils':
+                    useVersion(versions.nativeUtilsVersion)
+                    break
+                case 'org.wpilib.GradleJni':
+                    useVersion(versions.gradleJniVersion)
+                    break
+                case 'org.wpilib.GradleVsCode':
+                    useVersion(versions.gradleVsCodeVersion)
+                    break
+                case 'com.diffplug.spotless':
+                    useVersion(versions.spotlessVersion)
+                    break
+            }
+        }
     }
 }

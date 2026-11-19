@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from cscore import VideoMode
 from synapse.stypes import CameraID, Frame, Resolution
+from wpiutil import PixelFormat
 
 from ...stypes import CameraName, PropertyMetaDict, Size
 from .synapse_camera import SynapseCamera
@@ -33,12 +34,12 @@ class NoSignalCamera(SynapseCamera):
 
     def getVideoMode(self) -> VideoMode:
         return VideoMode(
-            VideoMode.PixelFormat.kMJPEG, self.resolution[0], self.resolution[1], 30
+            PixelFormat.MJPEG, self.resolution[0], self.resolution[1], 30
         )
 
     def enumerateVideoModes(self) -> List[VideoMode]:
         return [
-            VideoMode(VideoMode.PixelFormat.kMJPEG, w, h, 30)
+            VideoMode(PixelFormat.MJPEG, w, h, 30)
             for w, h in [
                 (1920, 1080),
                 (1280, 720),

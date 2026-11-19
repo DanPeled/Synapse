@@ -30,7 +30,8 @@ from synapse_sim.model import (
 from synapse_sim.setup import installSimulation
 from synapse_sim.three import L_METERS, W_METERS, camera_spec, wpi_camera_to_three
 from synapse_sim.viewer import SimulationViewer, findChrome
-from wpimath.geometry import Pose3d, Rotation3d, Translation3d
+from wpimath import Pose3d, Rotation3d, Translation3d
+from wpiutil import PixelFormat
 
 REPO_ROOT = Path(__file__).parents[2]
 SIM_ASSETS = Path(__file__).parents[1] / "src" / "synapse_sim" / "assets"
@@ -344,7 +345,7 @@ class TestSimCameraFrame(unittest.TestCase):
             table.getEntry(SimCamera.CAMERA_POSE_KEY).setDoubleArray(
                 [10.877494, 7.424498, 0.889, 0.0, 0.0, 0.0]
             )
-            camera.setVideoMode(VideoMode(VideoMode.PixelFormat.kMJPEG, 640, 480, 30))
+            camera.setVideoMode(VideoMode(PixelFormat.MJPEG, 640, 480, 30))
 
             buffer = np.zeros((480, 640, 3), dtype=np.uint8)
             timestamp, frame = camera.grabFrame(buffer)

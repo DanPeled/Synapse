@@ -11,8 +11,7 @@ import numpy as np
 from synapse.pipelines.apriltag.apriltag_detector import CameraPoseEstimate
 from synapse.pipelines.apriltag.apriltag_robotpy import AprilTagDetection
 from synapse.pipelines.apriltag.field_loader import TagId
-from wpimath import units
-from wpimath.geometry import Pose3d, Rotation3d, Transform3d, Translation3d
+from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d, units
 
 
 class PnPPoseEstimator:

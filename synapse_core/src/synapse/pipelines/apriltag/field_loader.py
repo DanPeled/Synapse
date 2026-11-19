@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional
 
-from wpimath.geometry import Pose3d, Quaternion, Rotation3d, Translation3d
+from wpimath import Pose3d, Quaternion, Rotation3d, Translation3d
 
 TagId = int
 

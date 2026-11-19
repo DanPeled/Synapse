@@ -14,6 +14,7 @@ from cscore import (
     VideoProperty,
     VideoSource,
 )
+from wpiutil import PixelFormat
 
 from ...stypes import CameraID, PropertyMetaDict, Resolution, Size
 from .synapse_camera import SynapseCamera
@@ -90,7 +91,7 @@ class CsCoreCamera(SynapseCamera):
                 width=videoMode.width,
                 height=videoMode.height,
                 fps=videoMode.fps,
-                pixelFormat=VideoMode.PixelFormat.kMJPEG,
+                pixelFormat=PixelFormat.MJPEG,
             )
         except Exception:
             try:

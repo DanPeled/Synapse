@@ -1,17 +1,17 @@
 package frc.robot;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.wpilibj.Encoder;
-import edu.wpi.first.wpilibj.Joystick;
-import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive;
-import edu.wpi.first.wpilibj.motorcontrol.PWMSparkMax;
-import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
-import edu.wpi.first.wpilibj.simulation.EncoderSim;
-import edu.wpi.first.wpilibj.smartdashboard.Field2d;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import java.util.Optional;
+import org.wpilib.drive.DifferentialDrive;
+import org.wpilib.drivers.motor.PWMSparkMax;
+import org.wpilib.driverstation.Joystick;
+import org.wpilib.framework.TimedRobot;
+import org.wpilib.hardware.rotation.Encoder;
+import org.wpilib.math.geometry.Pose2d;
+import org.wpilib.simulation.DifferentialDrivetrainSim;
+import org.wpilib.simulation.EncoderSim;
+import org.wpilib.smartdashboard.Field2d;
+import org.wpilib.system.RobotController;
+import org.wpilib.telemetry.Telemetry;
 import synapse.SynapseCamera;
 import synapse.SynapsePipelineType;
 import synapse.pipelines.apriltag.ApriltagResult;
@@ -39,9 +39,9 @@ public class Robot extends TimedRobot {
   // Simulation objects (for testing without a real robot)
   private final DifferentialDrivetrainSim driveSim =
       DifferentialDrivetrainSim.createKitbotSim(
-          DifferentialDrivetrainSim.KitbotMotor.kDualCIMPerSide,
-          DifferentialDrivetrainSim.KitbotGearing.k10p71,
-          DifferentialDrivetrainSim.KitbotWheelSize.kSixInch,
+          DifferentialDrivetrainSim.KitbotMotor.DUAL_CIM_PER_SIDE,
+          DifferentialDrivetrainSim.KitbotGearing.RATIO_10P71,
+          DifferentialDrivetrainSim.KitbotWheelSize.SIX_INCH,
           null);
 
   private final EncoderSim leftEncoderSim = new EncoderSim(leftEncoder);
@@ -54,13 +54,13 @@ public class Robot extends TimedRobot {
   private final SynapseCamera camera =
       new SynapseCamera(SynapseConstants.CAMERA_NAME, SynapseConstants.PROCESSOR_NAME);
 
-  @Override
-  public void robotInit() {
+  /** Called once at the beginning of the robot program. */
+  public Robot() {
     // Invert right side motors (depends on wiring/gearbox)
     rightMotor.setInverted(true);
 
-    // Add Field2d to SmartDashboard for visualization
-    SmartDashboard.putData("Field", field);
+    // Publish Field2d to telemetry for visualization
+    Telemetry.log("Field", field);
 
     // Configure encoder distance per pulse (wheel circumference / pulses per
     // revolution)
@@ -107,16 +107,16 @@ public class Robot extends TimedRobot {
   public void simulationPeriodic() {
     // Apply motor voltages to drivetrain simulation
     driveSim.setInputs(
-        leftMotor.get() * RobotController.getBatteryVoltage(),
-        rightMotor.get() * RobotController.getBatteryVoltage());
+        leftMotor.getThrottle() * RobotController.getBatteryVoltage(),
+        rightMotor.getThrottle() * RobotController.getBatteryVoltage());
 
     driveSim.update(0.02); // Advance simulation by 20ms (match TimedRobot period)
 
     // Update simulated encoders with positions and velocities from drivetrain sim
-    leftEncoderSim.setDistance(driveSim.getLeftPositionMeters());
-    leftEncoderSim.setRate(driveSim.getLeftVelocityMetersPerSecond());
-    rightEncoderSim.setDistance(driveSim.getRightPositionMeters());
-    rightEncoderSim.setRate(driveSim.getRightVelocityMetersPerSecond());
+    leftEncoderSim.setDistance(driveSim.getLeftPosition());
+    leftEncoderSim.setRate(driveSim.getLeftVelocity());
+    rightEncoderSim.setDistance(driveSim.getRightPosition());
+    rightEncoderSim.setRate(driveSim.getRightVelocity());
 
     // Update robot pose on Field2d for visualization
     Pose2d pose = driveSim.getPose();

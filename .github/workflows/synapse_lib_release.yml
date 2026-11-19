@@ -46,25 +46,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Force pubVersion to dev
+      - name: Set release version
+        run: |
+          sed -i "s/^synapseVersion=.*/synapseVersion=${{ inputs.releaseVersion }}/" versions.properties
+          echo "Set synapseVersion=${{ inputs.releaseVersion }}"
+
+      - name: Force dev version
         if: ${{ inputs.forceDev }}
         run: |
-          sed -i "s/def pubVersion *= *'.*'/def pubVersion = 'dev'/" publish.gradle
-          echo "Forced pubVersion=dev"
-        working-directory: ${{ env.workingDirectory }}
+          sed -i 's/^synapseVersion=.*/synapseVersion=dev/' versions.properties
+          echo "Forced synapseVersion=dev"
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
 
       - name: Make gradlew executable
         run: chmod +x gradlew
         working-directory: ${{ env.workingDirectory }}
 
-      - name: Install RoboRIO toolchain
-        run: ./gradlew installRoboRioToolchain
+      - name: Install SystemCore toolchain
+        run: ./gradlew installSystemCoreToolchain
         working-directory: ${{ env.workingDirectory }}
 
       - name: Build synapse_lib

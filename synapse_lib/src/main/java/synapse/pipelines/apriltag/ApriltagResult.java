@@ -9,10 +9,10 @@
 package synapse.pipelines.apriltag;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Translation3d;
 import java.util.Arrays;
+import org.wpilib.math.geometry.Pose3d;
+import org.wpilib.math.geometry.Rotation3d;
+import org.wpilib.math.geometry.Translation3d;
 
 /** Represents the result of detecting AprilTags in a single frame. */
 public class ApriltagResult {

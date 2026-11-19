@@ -7,7 +7,7 @@ from dataclasses import fields, is_dataclass
 from typing import Any
 
 import msgpack
-from wpimath import geometry
+import wpimath as geometry
 
 
 class PipelineResult: ...
