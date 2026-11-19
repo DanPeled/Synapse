@@ -46,6 +46,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.gradle
+          key: synapselib-release-gradle-${{ hashFiles('versions.properties', 'synapse_lib/*.gradle', 'examples/*.gradle') }}
+          restore-keys: |
+            synapselib-release-gradle-
+
       - name: Set release version
         run: |
           sed -i "s/^synapseVersion=.*/synapseVersion=${{ inputs.releaseVersion }}/" versions.properties

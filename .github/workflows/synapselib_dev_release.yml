@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - "synapse_lib/src/**"
+      - "synapse_lib/*.gradle"
+      - "versions.properties"
+      - ".github/workflows/synapselib_dev_release.yml"
+      - ".github/workflows/synapse_lib_release.yml"
+  workflow_dispatch:
 
 jobs:
   dev:

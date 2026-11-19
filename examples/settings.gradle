@@ -27,6 +27,11 @@ pluginManagement {
         mavenLocal()
         gradlePluginPortal()
         mavenCentral()
+        // Fallbacks for intermittent Maven Central resolution failures in CI.
+        maven { url = uri('https://repo1.maven.org/maven2') }
+        maven {
+            url = uri('https://maven-central.storage-download.googleapis.com/maven2')
+        }
     }
 
     resolutionStrategy {
