@@ -301,6 +301,22 @@ def testReleaseWorkflowStructure() -> None:
     assert jobs["release"]["if"] == "startsWith(github.ref, 'refs/tags/')"
 
 
+def testPublishImagesWorkflowStructure() -> None:
+    workflowPath = REPO_ROOT / ".github/workflows/publish_images.yml"
+    workflow = yaml.safe_load(workflowPath.read_text())
+
+    triggers = workflow.get("on") or workflow.get(True)
+    assert isinstance(triggers, dict)
+    assert "workflow_dispatch" in triggers
+    inputs = triggers["workflow_dispatch"]["inputs"]
+    assert {"run_id", "release_tag"} <= inputs.keys()
+
+    jobs = workflow["jobs"]
+    assert "publish" in jobs
+    assert jobs["publish"]["permissions"]["contents"] == "write"
+    assert jobs["publish"]["permissions"]["actions"] == "read"
+
+
 def testReleaseWorkflowRegistersQemuForCrossArchBuilds() -> None:
     workflowPath = REPO_ROOT / ".github/workflows/release_images.yml"
     workflow = yaml.safe_load(workflowPath.read_text())
