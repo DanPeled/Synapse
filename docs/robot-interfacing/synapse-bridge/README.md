@@ -17,7 +17,7 @@ With SynapseLib you can:
 - Convert a camera pose to a robot pose (Java).
 
 {% hint style="warning" %}
-Synapse and SynapseLib communicate over NetworkTables. Make sure the runtime is connected to the same NetworkTables server as your robot code. On a robot, that server runs on the RoboRIO. See [Networking](../../getting-started/quick-start/networking.md).
+Synapse and SynapseLib communicate over NetworkTables. Make sure the runtime is connected to the same NetworkTables server as your robot code. On a robot, that server runs on the robot controller (SystemCore in the 2027 examples). See [Networking](../../getting-started/quick-start/networking.md).
 {% endhint %}
 
 ## How it fits together
@@ -42,8 +42,12 @@ SynapseLib wraps that subtable. The camera name must match the name configured i
 
 | Language | Package | Status |
 | --- | --- | --- |
-| Java | `synapse` vendordep | Available |
-| Python | `synapsefrclib` (`synapselib`) | Available as an alpha |
+| Java | `synapse` vendordep | Available for the 2027 alpha |
+| Python | `synapsefrclib` (`synapselib`) | Available for the 2027 alpha |
+
+{% hint style="warning" %}
+The 2027 alpha uses WPILib 2027 alpha 8, Java 25, and Gradle 9.2.0. Replace `WPILibNewCommands.json` with `CommandsV2.json` in robot projects. The Python package is `2027.0.0a1`; the pinned 2027 Java vendordep is not published yet, so use the `dev` vendordep.
+{% endhint %}
 
 ## Pages
 

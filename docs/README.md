@@ -24,6 +24,10 @@ Synapse is a vision processing library and toolset for [FRC](https://www.firstin
 
 If you have never used Synapse before, start with [How Synapse Works](getting-started/how-synapse-works.md) and then follow the [Quick Start](getting-started/quick-start/README.md).
 
+{% hint style="info" %}
+The current pre-release is `2027.0.0a1`, built for WPILib 2027 alpha 8. See the [2027 alpha release notes](https://github.com/DanPeled/Synapse/releases/tag/v2027.0.0a1) for the full change list and prebuilt device images.
+{% endhint %}
+
 ## What you get
 
 <table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-cover data-type="files"></th></tr></thead><tbody><tr><td><strong>Extendable</strong></td><td>Use the built-in AprilTag, color, and object-detection pipelines, or write your own Python pipeline</td><td><a href=".gitbook/assets/settings.png">settings.png</a></td></tr><tr><td><strong>Fast to iterate</strong></td><td>Deploy your vision project to the coprocessor like robot code, with one command</td><td><a href=".gitbook/assets/rush.png">rush.png</a></td></tr><tr><td><strong>Built-in UI</strong></td><td>Tune settings, watch camera streams, and inspect results live from a web browser</td><td><a href=".gitbook/assets/ux-design.png">ux-design.png</a></td></tr></tbody></table>
@@ -34,7 +38,7 @@ If you have never used Synapse before, start with [How Synapse Works](getting-st
 | --- | --- | --- |
 | **Synapse runtime** (`synapsefrc`) | Reads cameras, runs pipelines, and publishes results | Coprocessor |
 | **Web UI** | Live camera feeds, pipeline management, settings, logs, and device controls | Any browser on the same network |
-| **SynapseLib** | A Java/Python library that reads results and changes settings from robot code | RoboRIO |
+| **SynapseLib** | A Java/Python library that reads results and changes settings from robot code | Robot controller |
 | **Synapse Manager** | A desktop app that finds devices, opens their dashboards, and deploys projects | Your development computer |
 | **Synapse Sim** | Simulated cameras that render a 3D field, so you can test without hardware | Your development computer |
 

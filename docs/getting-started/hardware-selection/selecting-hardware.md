@@ -24,13 +24,16 @@ The coprocessor runs the Synapse runtime and does all vision processing.
 
 | Device | Strengths | Things to know |
 | --- | --- | --- |
-| **Orange Pi 5** | Fast CPU, NPU, good price, 4/8/16 GB options | Needs a 5V/4A supply; some images need extra setup for Wi-Fi |
-| **Raspberry Pi 5** | Widely available, strong ecosystem, 2× USB 3.0 | Needs a 5V/5A supply; active cooling strongly recommended |
-| **Orange Pi 5 Plus** | More I/O and dual Ethernet | Larger and more expensive |
-| **Mini PC (x86)** | Easiest compatibility, fastest CPU | Higher power draw and weight |
+| **Orange Pi 5 / 5 Plus / 5 Max** | Fast CPU, NPU, good price, 4/8/16 GB options | Needs a 5V/4A supply; prebuilt Armbian images are published for these boards |
+| **Raspberry Pi 5** | Widely available, strong ecosystem, 2× USB 3.0 | Needs a 5V/5A supply; active cooling strongly recommended; prebuilt Raspberry Pi OS image is published |
+| **Radxa Rock 5B** | Strong CPU and I/O in an SBC form factor | A prebuilt Armbian image is published |
+| **Jetson devices** | Strong GPU for object detection | No redistributable full image; use the Linux overlay on JetPack/L4T |
+| **Mini PC (x86)** | Easiest compatibility, fastest CPU | Use the Linux overlay on Ubuntu Server 24.04 |
 
 {% hint style="info" %}
 Any Linux-compatible device can work as long as it meets the requirements in [Deploying on Custom Hardware](deploying-on-custom-hardware.md). The device does not need a desktop environment.
+
+The [2027 alpha release](https://github.com/DanPeled/Synapse/releases/tag/v2027.0.0a1) includes prebuilt images and overlays for the devices above. See [Device Images](../installing-software.md#device-images) for details.
 {% endhint %}
 
 ### CPU vs. NPU
@@ -71,7 +74,7 @@ A wider field of view lets the camera see more tags, but each tag occupies fewer
 ## Power
 
 - Use a regulated 5V supply that can provide the device's rated current.
-- On a robot, use a dedicated 5V regulator (for example a Pololu S13V30F5 or a Zinc V) rather than the RoboRIO's 5V rail.
+- On a robot, use a dedicated 5V regulator (for example a Pololu S13V30F5 or a Zinc V) rather than the robot controller's 5V rail.
 - Add a capacitor or use a regulator with good transient response if the device reboots when motors start.
 - See [Wiring](../quick-start/wiring.md) for diagrams.
 

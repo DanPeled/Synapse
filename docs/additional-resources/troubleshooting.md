@@ -53,10 +53,10 @@ Work through this list in order:
 3. **Camera name** — The name passed to `SynapseCamera` must match the camera nickname in the dashboard.
 4. **Pipeline type** — Call `getPipelineType()` and confirm it matches the result class you are decoding.
 5. **Results published** — The pipeline may not have produced a result yet. Check for `hasResults` or look at the dashboard results panel.
-6. **Network** — The RoboRIO and coprocessor must be on the same network and able to reach each other.
+6. **Network** — The robot controller and coprocessor must be on the same network and able to reach each other.
 
 {% hint style="info" %}
-If the runtime is in `--server` mode, it hosts its own NetworkTables server. Your robot code must connect to that server, not the RoboRIO.
+If the runtime is in `--server` mode, it hosts its own NetworkTables server. Your robot code must connect to that server, not the robot controller.
 
 If a connection is not established within about 10 seconds, the runtime logs a timeout warning and continues starting. Recheck the team number and network when you see that warning.
 {% endhint %}

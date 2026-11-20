@@ -11,6 +11,10 @@ Choose the tab for your robot language.
 {% tab title="Java" %}
 Java projects use a WPILib **vendordep**. The vendordep tells GradleRIO where to download the library and its dependencies.
 
+{% hint style="warning" %}
+For the 2027 alpha, use the current `dev` vendordep below. The pinned `SynapseLib-2027.0.0a1.json` URL listed in the alpha release notes is not published yet. See [Known Issues](../../additional-resources/known-issues.md#2027-alpha-java-vendordep-is-not-published).
+{% endhint %}
+
 ### Install from VS Code
 
 1. Open your robot project in VS Code with the WPILib extension installed.
@@ -20,7 +24,7 @@ Java projects use a WPILib **vendordep**. The vendordep tells GradleRIO where to
 5. Paste this URL:
 
 ```text
-https://danpeled.github.io/Synapse/SynapseLib-2026.0.1.json
+https://danpeled.github.io/Synapse/SynapseLib-dev.json
 ```
 
 6. Press Enter and let Gradle sync.
@@ -29,7 +33,7 @@ https://danpeled.github.io/Synapse/SynapseLib-2026.0.1.json
 
 Download the JSON file:
 
-{% embed url="https://danpeled.github.io/Synapse/SynapseLib-2026.0.1.json" %}
+{% embed url="https://danpeled.github.io/Synapse/SynapseLib-dev.json" %}
 
 Save it as `vendordeps/SynapseLib.json` inside your robot project, then run a Gradle build or restart VS Code.
 
@@ -44,7 +48,7 @@ import synapse.SynapseCamera;
 If Gradle reports no errors, the vendordep is installed.
 
 {% hint style="info" %}
-Match the vendordep version to your WPILib season. The `2026.0.1` vendordep targets the 2026 FRC season. If you use a different WPILib year, use the vendordep published for that year.
+The `dev` vendordep tracks the current 2027 alpha code and targets WPILib 2027 alpha 8, GradleRIO 2027, Gradle 9.2.0, and Java 25. It may change between builds. For a stable 2026 project, use `https://danpeled.github.io/Synapse/SynapseLib-2026.0.1.json` instead.
 {% endhint %}
 {% endtab %}
 
@@ -54,7 +58,7 @@ The Python library is published as `synapsefrclib` and imported as `synapselib`.
 ### Requirements
 
 - Python `>=3.11, <=3.14`
-- RobotPy with `pyntcore` and `robotpy_wpimath`
+- RobotPy `2027.0.0a6` with `pyntcore` and `robotpy_wpimath`
 - `msgpack`
 
 The installer pulls these dependencies in automatically.
@@ -92,7 +96,7 @@ from synapselib import SynapseCamera, SynapsePipelineType
 If the import succeeds, the library is installed.
 
 {% hint style="warning" %}
-The Python package is currently an alpha (`2027.0.0a1`) and tracks a newer WPILib release than the Java vendordep. Pin the version you test with, and reinstall after updating the repository.
+The Python package is versioned `2027.0.0a1` and pins RobotPy `2027.0.0a6`. The matching pinned Java vendordep is not published yet, so use the `dev` vendordep for Java 2027 alpha projects. Pin the versions you test with and reinstall after updating the repository.
 {% endhint %}
 {% endtab %}
 {% endtabs %}

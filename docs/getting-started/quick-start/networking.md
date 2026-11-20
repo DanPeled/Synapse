@@ -5,7 +5,7 @@ icon: network-wired
 
 # Networking
 
-The coprocessor needs to be on the same network as your RoboRIO, your driver station, and your development computer. This page covers the physical connections and the addresses Synapse uses.
+The coprocessor needs to be on the same network as your robot controller, your driver station, and your development computer. This page covers the physical connections and the addresses Synapse uses.
 
 ## Physical connection
 
@@ -65,7 +65,7 @@ Synapse Manager and `python -m synapse_installer device add` also discover devic
 
 ## Configuring the device network
 
-You can set the team number, NetworkTables table name, hostname, IP mode, and network interface from the dashboard:
+You can set the team number, NetworkTables table name, hostname, static address, and network interface from the dashboard:
 
 1. Open `http://<device-ip>:3000`.
 2. Go to **Settings**.
@@ -74,14 +74,14 @@ You can set the team number, NetworkTables table name, hostname, IP mode, and ne
 See [Settings Page](../../usage/built-in-pipelines-1/settings-page.md#network-settings) for each field.
 
 {% hint style="info" %}
-If you set a static IP, the runtime creates a virtual interface for it so the device can keep its normal DHCP connection for updates. Make sure the static IP is on the same subnet as your robot network.
+If you enable **Static Address**, the runtime adds a secondary address on the selected physical interface while DHCP stays enabled. Use an address on the same subnet as your robot network; the suggested team address is a good starting point.
 {% endhint %}
 
 ## Team number and NetworkTables
 
 The **Team Number** setting decides which NetworkTables server the runtime connects to when it is not running in `--server` or `--sim` mode.
 
-- On a robot, this is the RoboRIO's team number.
+- On a robot, this is the robot controller's team number.
 - If the team number is wrong, robot code will not see any Synapse data.
 - Changing the team number requires a runtime restart.
 

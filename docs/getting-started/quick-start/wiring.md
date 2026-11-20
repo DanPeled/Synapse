@@ -16,7 +16,7 @@ This page is adapted from [PhotonVision's Wiring Guide](https://docs.photonvisio
 3. **Run Ethernet** from the coprocessor to your network switch or radio.
 
 {% hint style="danger" %}
-Do not power the coprocessor from the RoboRIO's 5V rail. It cannot supply enough current, and a brownout will reboot both devices.
+Do not power the coprocessor from the robot controller's 5V rail. It cannot supply enough current, and a brownout may reboot both devices.
 {% endhint %}
 
 {% tabs fullWidth="true" %}

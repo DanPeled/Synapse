@@ -46,14 +46,15 @@ The network settings card controls how the device connects to your robot network
 | **Team Number** | The FRC team number. The runtime connects to the NetworkTables server at that team's address (`10.TE.AM.2`). |
 | **NetworkTable** | The root NetworkTables table name Synapse publishes under. Defaults to `Synapse`. |
 | **Manage Device Networking** | Enables or disables changes to the device's network configuration |
-| **IP Mode** | `DHCP` or `Static` |
-| **Static IP** | The address to assign when using static mode. The subnet mask is fixed at `/24`. |
+| **Static Address** | Adds a fixed IPv4 address alongside DHCP so the robot network can always reach the device. DHCP stays enabled for internet access. |
+| **Static IP** | The static address to add, for example `10.12.34.11`. Shown when **Static Address** is enabled. |
+| **CIDR prefix** | Prefix length entered after `/`, from `1` to `32`. Defaults to `24`. |
 | **Hostname** | The device's hostname on the local network |
-| **NetworkManager Interface** | Which network interface the address is applied to |
+| **Network Interface** | Physical interface for the static address. Virtual interfaces such as `lo`, Docker bridges, VPNs, and `tailscale` are hidden. |
 
 ### Team number
 
-The team number must match your robot. If it is wrong, the runtime will not connect to the RoboRIO's NetworkTables server, and robot code will not see any data.
+The team number must match your robot. If it is wrong, the runtime will not connect to the robot controller's NetworkTables server, and robot code will not see any data.
 
 ### NetworkTable
 
@@ -67,16 +68,18 @@ SynapseCamera camera = new SynapseCamera("camera0", "Synapse");
 
 If you change this value, change the coprocessor name in robot code to match.
 
-### DHCP vs static
+### DHCP and static addresses
 
-- **DHCP** lets the router assign an address. The address may change after a reboot.
-- **Static** keeps the same address. Synapse adds the static address to the selected interface and also runs `dhclient` on that interface.
+- **DHCP** assigns an address from the router. It can change after a reboot, but it keeps internet access working.
+- **Static Address** adds a secondary IPv4 address on the selected physical interface while DHCP remains enabled. The device is then reachable at both addresses.
 
-{% hint style="warning" %}
-Changing network settings requires a runtime restart. The page warns you that the new values take effect after restarting. Make sure the new address is reachable before you disconnect.
-{% endhint %}
+When you enable **Static Address**, Synapse suggests an address based on the team number (for example `10.12.34.11` for team 1234). You can accept the suggestion or enter your own valid host address. Network and broadcast addresses are rejected, as are loopback, link-local, multicast, and reserved addresses.
 
-Press **Save** in the network card to apply the changes.
+Turning **Static Address** off removes only the static address. DHCP is not disabled, so internet access is unaffected.
+
+Synapse uses NetworkManager when it is running, then netplan, then a generic `ip addr` fallback that reapplies the address if the interface resets. The address is saved in `config/settings.yml` and reapplied on startup; the legacy `interfrace` key is still read from older configs.
+
+Press **Save** to open a confirmation dialog showing the address, prefix, and interface that will be applied. Applying the change can briefly drop the connection to the device. Team number and NetworkTables table changes take effect after a runtime restart; the other network settings apply immediately.
 
 ## Device control
 

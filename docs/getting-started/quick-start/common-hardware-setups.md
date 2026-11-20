@@ -74,7 +74,7 @@ Recommended regulators and wiring:
 
 On a robot:
 
-- Wire the regulator directly to the power distribution board, not through the RoboRIO's 5V rail.
+- Wire the regulator directly to the power distribution board, not through the robot controller's 5V rail.
 - Use locking connectors or hot glue the barrel/USB-C connector.
 - Add strain relief so vibration does not unplug the device mid-match.
 
@@ -83,7 +83,7 @@ See [Wiring](wiring.md) for diagrams.
 ## Network
 
 - A network switch is strongly recommended on the robot.
-- Use Ethernet between the coprocessor, RoboRIO, and radio when possible.
+- Use Ethernet between the coprocessor, robot controller, and radio when possible.
 - If you use Wi-Fi, use 5 GHz and keep the device close to the access point.
 
 ## Example setups

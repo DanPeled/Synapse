@@ -156,7 +156,7 @@ SynapseLib also lets you change settings and read latency values. See [SynapseLi
 ```mermaid
 flowchart TB
     subgraph Robot
-        R[RoboRIO<br/>NetworkTables server]
+        R[Robot controller<br/>NetworkTables server]
         C[Coprocessor<br/>Synapse runtime]
         CAM[Cameras]
     end
@@ -168,7 +168,7 @@ flowchart TB
     L <-->|UDP 45454 discovery| C
 ```
 
-- The **RoboRIO** hosts the NetworkTables server during a match.
+- The **robot controller** (SystemCore in the 2027 examples) hosts the NetworkTables server during a match.
 - The **coprocessor** connects to that server using its team number.
 - Your **laptop** opens the web UI at `http://<coprocessor-ip>:3000`.
 

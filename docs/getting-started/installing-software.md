@@ -10,7 +10,7 @@ Installing Synapse has two parts:
 1. **Your development computer** — installs the `synapsefrc` package, which includes the runtime, the installer, and the web UI.
 2. **Your coprocessor** — gets a Python environment and runs the runtime as a systemd service.
 
-You do not install Synapse on the RoboRIO. Robot code uses [SynapseLib](../robot-interfacing/synapse-bridge/README.md) instead.
+You do not install Synapse on the robot controller. Robot code uses [SynapseLib](../robot-interfacing/synapse-bridge/README.md) instead.
 
 ## Development computer installation
 
@@ -102,20 +102,35 @@ Building Python from source can take 20–60 minutes on a Pi. A distribution ima
 Non-interactive runs, such as CI or a GUI launcher, reject an unknown SSH host key instead of prompting. Connect once with `ssh <user>@<device-ip>` or run `install` from a terminal to trust the key.
 {% endhint %}
 
-### Imaging a device
+### Device images
+
+The [2027 alpha release](https://github.com/DanPeled/Synapse/releases/tag/v2027.0.0a1) publishes prebuilt images and overlays with the Synapse runtime, a sample project, passwordless `sudo`, and the `synapse-runtime` systemd service already set up.
+
+Flashable images:
+
+- **Raspberry Pi 5** — `synapse-raspberrypi-<version>-raspios-bookworm-arm64.img.xz`
+- **Orange Pi 5 / 5 Plus / 5 Max** — `synapse-orangepi5{,-plus,-max}-<version>-armbian-bookworm.img.xz`
+- **Radxa Rock 5B** — `synapse-rock-5b-<version>-armbian-bookworm.img.xz`
+
+Overlays for systems that need their own OS image:
+
+- **Jetson (JetPack/L4T)** — `synapse-jetson-overlay-<version>.tar.gz`
+- **x86_64 mini PCs** — `synapse-x86_64-overlay-<version>.tar.gz`
+
+NVIDIA does not allow redistribution of a complete JetPack/L4T image, and x86 mini PCs normally ship without an OS. For those targets, install JetPack/L4T or Ubuntu Server 24.04 first, then extract the matching overlay:
+
+```bash
+sudo tar -xzf synapse-<target>-overlay-<version>.tar.gz -C /
+sudo /opt/synapse-build/install.sh
+```
+
+The overlay's first-boot service also installs the runtime and places the sample project in the first regular user's home directory. First boot needs internet access to download Python dependencies.
 
 {% hint style="info" %}
-There are currently no official Synapse device images. Any minimal 64-bit Debian/Ubuntu-based Linux image with SSH should work.
+These images are alpha artifacts. For other hardware, any minimal 64-bit Debian/Ubuntu-based Linux image with SSH should work. A recommended imaging tool is [Balena Etcher](https://etcher.balena.io/).
 {% endhint %}
 
-Recommended imaging tool: [Balena Etcher](https://etcher.balena.io/).
-
-Suggested images:
-
-- **Orange Pi 5** — [Armbian Bookworm 25.5.1](https://distrohub.kyiv.ua/armbian-dl/orangepi5/archive/Armbian_25.5.1_Orangepi5_bookworm_vendor_6.1.115_minimal.img.xz)
-- **Raspberry Pi 5** — [Armbian for Raspberry Pi](https://www.armbian.com/rpi4b/) (instructions included on the download page)
-
-After imaging:
+After imaging or applying an overlay:
 
 1. Boot the device.
 2. Connect it to your network. See [Networking](quick-start/networking.md).

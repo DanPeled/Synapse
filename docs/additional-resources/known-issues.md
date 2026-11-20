@@ -11,6 +11,14 @@ These issues are present in the current codebase. Each entry includes a workarou
 Found an issue that is not listed here? Open an issue on [GitHub](https://github.com/DanPeled/Synapse/issues) with your runtime version and logs.
 {% endhint %}
 
+## 2027 alpha Java vendordep is not published
+
+**Affects:** Java robot projects using the 2027 alpha
+
+The `v2027.0.0a1` release notes link to `SynapseLib-2027.0.0a1.json`, but that file and the matching `2027.0.0a1` Maven artifacts are not published on GitHub Pages yet.
+
+**Workaround:** Use the current `SynapseLib-dev.json` vendordep described in [Installing SynapseLib](../robot-interfacing/synapse-bridge/installing-synapse-bridge.md). It tracks the 2027 alpha code but may change between builds. Re-check for a pinned vendordep before relying on it for a season release.
+
 ## Generated `main.py` has a broken import
 
 **Affects:** New projects created with `python -m synapse_installer create`

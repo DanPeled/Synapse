@@ -26,7 +26,7 @@ The installer's `sync` step expects:
 | **SSH server** | The installer connects over SSH to deploy and configure the device |
 | `sudo` for the SSH user | Install packages and create the systemd service |
 | **systemd** | Runs the runtime as `synapse-runtime` |
-| `netplan` and `dhclient` | Optional, but needed for static IP configuration from the UI |
+| `nmcli` (NetworkManager) or `netplan`, with `iproute2` as a fallback | Optional, but needed to configure a static address from the UI |
 
 If Python 3.11–3.14 is not installed, the installer builds Python 3.12.2 from source. This requires build tools and can take a long time. Installing a compatible Python through the distribution's package manager is much faster.
 
