@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Run the Synapse first-boot provisioning on a running device.
+
+set -euo pipefail
+
+exec /usr/local/sbin/synapse-firstboot.sh

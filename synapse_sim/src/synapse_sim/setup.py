@@ -4,7 +4,7 @@
 
 """Installs the simulated camera into an existing runtime."""
 
-from typing import Dict, SupportsFloat, cast
+from typing import Dict, SupportsFloat, SupportsIndex, cast
 
 from ntcore import NetworkTableInstance
 from synapse.core.camera_factory import CalibrationData, CameraConfig
@@ -58,10 +58,10 @@ def installSimulation(runtimeHandler) -> None:
         .getSubTable(SimCamera.TABLE_NAME)
     )
     table.getEntry(SimCamera.ROBOT_POSE_KEY).setDefaultDoubleArray(
-        cast(list[SupportsFloat], DEFAULT_ROBOT_POSE)
+        cast(list[SupportsFloat | SupportsIndex], DEFAULT_ROBOT_POSE)
     )
     table.getEntry(SimCamera.CAMERA_OFFSET_KEY).setDefaultDoubleArray(
-        cast(list[SupportsFloat], DEFAULT_CAMERA_OFFSET)
+        cast(list[SupportsFloat | SupportsIndex], DEFAULT_CAMERA_OFFSET)
     )
 
     camerasTable = table.getSubTable(SimCamera.CAMERAS_TABLE)

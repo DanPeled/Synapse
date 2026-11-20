@@ -41,8 +41,7 @@ from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
 from synapse.pipelines.apriltag.pnp_pose_estimator import PnPPoseEstimator
 from synapse.stypes import CameraID
 from typing_extensions import Buffer
-from wpimath import units
-from wpimath.geometry import Pose3d, Rotation3d, Translation3d
+from wpimath import Pose3d, Rotation3d, Translation3d, units
 
 
 class ApriltagVerbosity(Enum):

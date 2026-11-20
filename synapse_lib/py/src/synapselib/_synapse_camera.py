@@ -283,19 +283,19 @@ class SynapseCamera:
 
         t = entry.getType()
 
-        if t == NetworkTableType.kDouble:
+        if t == NetworkTableType.DOUBLE:
             return entry.getDouble(0.0)
-        if t == NetworkTableType.kString:
+        if t == NetworkTableType.STRING:
             return entry.getString("")
-        if t == NetworkTableType.kBoolean:
+        if t == NetworkTableType.BOOLEAN:
             return entry.getBoolean(False)
-        if t == NetworkTableType.kInteger:
+        if t == NetworkTableType.INTEGER:
             return entry.getInteger(0)
-        if t == NetworkTableType.kDoubleArray:
+        if t == NetworkTableType.DOUBLE_ARRAY:
             return entry.getDoubleArray([])
-        if t == NetworkTableType.kStringArray:
+        if t == NetworkTableType.STRING_ARRAY:
             return entry.getStringArray([])
-        if t == NetworkTableType.kBooleanArray:
+        if t == NetworkTableType.BOOLEAN_ARRAY:
             return entry.getBooleanArray([])
 
         return None
@@ -317,19 +317,19 @@ class SynapseCamera:
         if entry.getType() != setting.ntType:
             return None
 
-        if entry.getType() == NetworkTableType.kDouble:
+        if entry.getType() == NetworkTableType.DOUBLE:
             val = entry.getDouble(0.0)
-        elif entry.getType() == NetworkTableType.kInteger:
+        elif entry.getType() == NetworkTableType.INTEGER:
             val = entry.getInteger(0)
-        elif entry.getType() == NetworkTableType.kString:
+        elif entry.getType() == NetworkTableType.STRING:
             val = entry.getString("")
-        elif entry.getType() == NetworkTableType.kBoolean:
+        elif entry.getType() == NetworkTableType.BOOLEAN:
             val = entry.getBoolean(False)
-        elif entry.getType() == NetworkTableType.kDoubleArray:
+        elif entry.getType() == NetworkTableType.DOUBLE_ARRAY:
             val = entry.getDoubleArray([])
-        elif entry.getType() == NetworkTableType.kStringArray:
+        elif entry.getType() == NetworkTableType.STRING_ARRAY:
             val = entry.getStringArray([])
-        elif entry.getType() == NetworkTableType.kBooleanArray:
+        elif entry.getType() == NetworkTableType.BOOLEAN_ARRAY:
             val = entry.getBooleanArray([])
         else:
             return None
@@ -349,19 +349,19 @@ class SynapseCamera:
         """
         entry = self.getCachedEntry(setting.key, self.getSettingsTable())
 
-        if setting.ntType == NetworkTableType.kDouble:
+        if setting.ntType == NetworkTableType.DOUBLE:
             entry.setDouble(float(value))  # pyright: ignore
-        elif setting.ntType == NetworkTableType.kInteger:
+        elif setting.ntType == NetworkTableType.INTEGER:
             entry.setInteger(int(value))  # pyright: ignore
-        elif setting.ntType == NetworkTableType.kString:
+        elif setting.ntType == NetworkTableType.STRING:
             entry.setString(str(value))
-        elif setting.ntType == NetworkTableType.kBoolean:
+        elif setting.ntType == NetworkTableType.BOOLEAN:
             entry.setBoolean(bool(value))
-        elif setting.ntType == NetworkTableType.kDoubleArray:
+        elif setting.ntType == NetworkTableType.DOUBLE_ARRAY:
             entry.setDoubleArray(value)  # type: ignore
-        elif setting.ntType == NetworkTableType.kStringArray:
+        elif setting.ntType == NetworkTableType.STRING_ARRAY:
             entry.setStringArray(value)  # type: ignore
-        elif setting.ntType == NetworkTableType.kBooleanArray:
+        elif setting.ntType == NetworkTableType.BOOLEAN_ARRAY:
             entry.setBooleanArray(value)  # type: ignore
         else:
             raise TypeError(f"Unsupported NT type for setting '{setting.key}'")
@@ -453,27 +453,27 @@ class Setting(Generic[T]):
 
     @staticmethod
     def doubleSetting(key: str) -> "Setting[float]":
-        return Setting(key, float, NetworkTableType.kDouble)
+        return Setting(key, float, NetworkTableType.DOUBLE)
 
     @staticmethod
     def integerSetting(key: str) -> "Setting[int]":
-        return Setting(key, int, NetworkTableType.kInteger)
+        return Setting(key, int, NetworkTableType.INTEGER)
 
     @staticmethod
     def stringSetting(key: str) -> "Setting[str]":
-        return Setting(key, str, NetworkTableType.kString)
+        return Setting(key, str, NetworkTableType.STRING)
 
     @staticmethod
     def doubleArraySetting(key: str) -> "Setting[list[float]]":
-        return Setting(key, list, NetworkTableType.kDoubleArray)
+        return Setting(key, list, NetworkTableType.DOUBLE_ARRAY)
 
     @staticmethod
     def stringArraySetting(key: str) -> "Setting[list[str]]":
-        return Setting(key, list, NetworkTableType.kStringArray)
+        return Setting(key, list, NetworkTableType.STRING_ARRAY)
 
     @staticmethod
     def booleanSetting(key: str) -> "Setting[bool]":
-        return Setting(key, bool, NetworkTableType.kBoolean)
+        return Setting(key, bool, NetworkTableType.BOOLEAN)
 
 
 Setting.kBrightness = Setting.doubleSetting(_topics.BRIGHTNESS_SETTING)

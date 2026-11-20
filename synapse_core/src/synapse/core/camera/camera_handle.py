@@ -10,6 +10,7 @@ from typing import Any, Final, List, Optional, Tuple
 import numpy as np
 from cscore import VideoMode
 from synapse.stypes import CameraID
+from wpiutil import PixelFormat
 
 from ...log import warn
 from .synapse_camera import SynapseCamera
@@ -47,7 +48,7 @@ class CameraHandle:
             warn(f"No video modes on camera: {self.cameraIndex}")
             return
 
-        pixelFormat = VideoMode.PixelFormat.kMJPEG
+        pixelFormat = PixelFormat.MJPEG
 
         # Always select a valid mode
         mode = self._selectBestVideoMode(
@@ -111,7 +112,7 @@ class CameraHandle:
         width: int,
         height: int,
         fps: int,
-        pixelFormat: VideoMode.PixelFormat,
+        pixelFormat: PixelFormat,
         videoModes: List[VideoMode],
     ) -> Optional[VideoMode]:
         if not videoModes:
@@ -142,7 +143,7 @@ class CameraHandle:
             height = int(resolution[1])
             self.setVideoMode(
                 VideoMode(
-                    VideoMode.PixelFormat.kMJPEG,
+                    PixelFormat.MJPEG,
                     width,
                     height,
                     int(self.camera.getMaxFPS()),

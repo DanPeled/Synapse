@@ -6,11 +6,17 @@
 from setuptools import find_packages, setup
 
 version_vars = {}
-with open("synapse_core/src/synapse/__version__.py") as f:
-    exec(f.read(), version_vars)
+with open("versions.properties", encoding="utf-8") as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith(("#", "!")):
+            continue
+        key, separator, value = line.partition("=")
+        if separator:
+            version_vars[key.strip()] = value.strip()
 
-SYNAPSE_VERSION = version_vars["SYNAPSE_VERSION"]
-WPILIB_VERSION = version_vars["WPILIB_VERSION"]
+SYNAPSE_VERSION = version_vars["synapsePythonVersion"]
+WPILIB_VERSION = version_vars["wpilibPythonVersion"]
 
 
 modules = {

@@ -8,20 +8,24 @@ on:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - "synapse_imager/**"
       - "synapse_sim/**"
       - "setup.py"
       - "MANIFEST.in"
       - "pyproject.toml"
+      - "versions.properties"
       - ".github/workflows/synapse_ci.yml"
   pull_request:
     paths:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - "synapse_imager/**"
       - "synapse_sim/**"
       - "setup.py"
       - "MANIFEST.in"
       - "pyproject.toml"
+      - "versions.properties"
       - ".github/workflows/synapse_ci.yml"
 
 jobs:
@@ -112,16 +116,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: bookworm-arm64-3.11
-            container: python:3.11-bookworm
+          - name: trixie-arm64-3.11
+            container: python:3.11-trixie
             platform: linux/arm64
             python_version: "3.11"
-          - name: bookworm-arm64-3.12
-            container: python:3.12-bookworm
+          - name: trixie-arm64-3.12
+            container: python:3.12-trixie
             platform: linux/arm64
             python_version: "3.12"
-          - name: bookworm-arm64-3.13
-            container: python:3.13-bookworm
+          - name: trixie-arm64-3.13
+            container: python:3.13-trixie
             platform: linux/arm64
             python_version: "3.13"
           #

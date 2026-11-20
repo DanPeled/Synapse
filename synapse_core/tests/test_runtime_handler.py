@@ -69,7 +69,7 @@ class TestRuntimeManager(unittest.TestCase):
         mock_event.data.topic.getType = type_prop
         mock_event.data.value = value
 
-        with patch("synapse.core.runtime_handler.NetworkTableType.kBoolean", "Boolean"):
+        with patch("synapse.core.runtime_handler.NetworkTableType.BOOLEAN", "Boolean"):
             result = self.handler.getEventDataValue(mock_event)
             self.assertTrue(result)
 

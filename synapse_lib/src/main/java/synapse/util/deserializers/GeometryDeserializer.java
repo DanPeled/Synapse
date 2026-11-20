@@ -4,11 +4,11 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import edu.wpi.first.math.geometry.*;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import org.wpilib.math.geometry.*;
 
 /**
  * Generic deserializer for WPILib geometry classes such as Translation2d, Rotation2d, Pose2d,

@@ -26,6 +26,7 @@
 - `synapse_net`: Contains the networking library for the runtime, including NetworkTables and socket communication, as well as Protocol Buffers message definitions.
 - `synapse_lib` Contains the vendordep library for the robot to communicate with the Synapse runtime.
 - `synapse_ui`: Contains the graphical user interface (UI) for interacting with the Synapse runtime.
+- `synapse_imager`: Builds release images for coprocessors with the runtime and a sample project preinstalled.
 
 ## License
 
