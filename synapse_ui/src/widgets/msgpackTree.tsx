@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ChevronRight } from "lucide-react";
 import { decode } from "@msgpack/msgpack";
@@ -114,13 +114,17 @@ export function MsgPackTree({
 }) {
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
-  let decoded: unknown = null; // default to null
-
-  if (encoded !== null && encoded.byteLength !== 0) {
-    decoded = decode(
+  // Results arrive every frame, but this component also re-renders for local
+  // UI state (expansion, copy feedback, etc.). Only decode when the payload
+  // actually changes.
+  const decoded = useMemo(() => {
+    if (!encoded || encoded.byteLength === 0) {
+      return null;
+    }
+    return decode(
       encoded instanceof ArrayBuffer ? new Uint8Array(encoded) : encoded,
     );
-  }
+  }, [encoded]);
 
   return (
     <Table>

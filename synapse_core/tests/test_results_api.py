@@ -234,3 +234,29 @@ def test_serialize_pipeline_result_msgpack():
     packed = api.serializePipelineResult(pr)
     unpacked = msgpack.unpackb(packed, raw=False)
     assert unpacked["translation"] == [1, 2]
+
+
+def test_fast_serializer_keeps_the_wire_format():
+    """The optimized path must stay byte-for-byte compatible with parse+packb."""
+    results = [
+        PRInt(42),
+        PRFloat(3.14),
+        PRStr("hello"),
+        PRBool(True),
+        PRTranslation2d(1, 2),
+        PRTranslation3d(1, 2, 3),
+        PRRotation2d(45),
+        PRRotation3d(10, 20, 30),
+        PRPose2d(5, 7, 90),
+        PRPose3d(1, 2, 3, 10, 20, 30),
+        PRTransform2d(1, 2, 90),
+        PRTransform3d(1, 2, 3, 10, 20, 30),
+        PRTwist2d(1, 2, 3),
+        PRTwist3d(1, 2, 3, 4, 5, 6),
+        PRDataclass(3, "hello"),
+        PRContainer(),
+    ]
+
+    for result in results:
+        expected = msgpack.packb(api.parsePipelineResult(result), use_bin_type=True)
+        assert api.serializePipelineResult(result) == expected
