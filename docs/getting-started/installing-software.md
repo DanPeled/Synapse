@@ -104,42 +104,85 @@ Non-interactive runs, such as CI or a GUI launcher, reject an unknown SSH host k
 
 ### Device images
 
-The [2027 alpha release](https://github.com/DanPeled/Synapse/releases/tag/v2027.0.0a1) publishes prebuilt images and overlays with the Synapse runtime, a sample project, passwordless `sudo`, and the `synapse-runtime` systemd service already set up.
+The [2027 alpha release](https://github.com/DanPeled/Synapse/releases/tag/v2027.0.0a1) publishes prebuilt images and overlays. They are built from the release wheel, so the runtime and dashboard match the release tag.
 
-Flashable images:
+#### What is preinstalled
 
-- **Raspberry Pi 5** — `synapse-raspberrypi-<version>-raspios-bookworm-arm64.img.xz`
-- **Orange Pi 5 / 5 Plus / 5 Max** — `synapse-orangepi5{,-plus,-max}-<version>-armbian-bookworm.img.xz`
-- **Radxa Rock 5B** — `synapse-rock-5b-<version>-armbian-bookworm.img.xz`
+Every image uses the same layout:
 
-Overlays for systems that need their own OS image:
+| Item | Location |
+| --- | --- |
+| Sample project | `$HOME/Synapse` |
+| Python virtual environment | `$HOME/.venv` |
+| systemd service | `synapse-runtime` |
+| Passwordless `sudo` rule | `/etc/sudoers.d/90-synapse-<user>` |
 
-- **Jetson (JetPack/L4T)** — `synapse-jetson-overlay-<version>.tar.gz`
-- **x86_64 mini PCs** — `synapse-x86_64-overlay-<version>.tar.gz`
+The sample project starts without a camera. Replace it with a real project using `python -m synapse_installer deploy` when you are ready.
 
-NVIDIA does not allow redistribution of a complete JetPack/L4T image, and x86 mini PCs normally ship without an OS. For those targets, install JetPack/L4T or Ubuntu Server 24.04 first, then extract the matching overlay:
+#### Flashable images
+
+| Device | Release asset | Notes |
+| --- | --- | --- |
+| Raspberry Pi 3/4/5, Zero 2 W (64-bit) | `synapse-raspberrypi-<version>-raspios-bookworm-arm64.img.xz` | Raspberry Pi OS Bookworm |
+| Orange Pi 5 / 5 Plus / 5 Max | `synapse-orangepi5-<version>-armbian-bookworm.img.xz`, `synapse-orangepi5-plus-<version>-armbian-bookworm.img.xz`, `synapse-orangepi5-max-<version>-armbian-bookworm.img.xz` | Armbian Bookworm |
+| Radxa Rock 5B | `synapse-rock-5b-<version>-armbian-bookworm.img.xz` | Armbian Bookworm |
+
+Use [Balena Etcher](https://etcher.balena.io/) or your board's normal flashing tool to write the `.img.xz` archive to a microSD card or SSD. Etcher can write the compressed file directly.
+
+#### Linux overlays
+
+| Device | Release asset | Notes |
+| --- | --- | --- |
+| Jetson (JetPack/L4T) | `synapse-jetson-overlay-<version>.tar.gz` | NVIDIA does not permit redistribution of a complete JetPack/L4T image |
+| x86_64 mini PCs (Beelink, Intel NUC, and similar) | `synapse-x86_64-overlay-<version>.tar.gz` | Install Ubuntu Server 24.04 first |
+
+An overlay does not replace the operating system. Install JetPack/L4T or Ubuntu Server 24.04 first, then extract the matching overlay on the running device:
 
 ```bash
 sudo tar -xzf synapse-<target>-overlay-<version>.tar.gz -C /
 sudo /opt/synapse-build/install.sh
 ```
 
-The overlay's first-boot service also installs the runtime and places the sample project in the first regular user's home directory. First boot needs internet access to download Python dependencies.
+The overlay's `synapse-firstboot.service` finds the first regular user, provisions the runtime for that user, and disables itself after a successful run. It does not create a new user. First boot needs internet access to download Python dependencies, and the rootfs must provide Python 3.11 or newer (JetPack 7 / Ubuntu 24.04 or later).
 
-{% hint style="info" %}
-These images are alpha artifacts. For other hardware, any minimal 64-bit Debian/Ubuntu-based Linux image with SSH should work. A recommended imaging tool is [Balena Etcher](https://etcher.balena.io/).
+#### Default credentials
+
+| Image | SSH user | Password |
+| --- | --- | --- |
+| Raspberry Pi | `pi` | `synapse` |
+| Armbian | `synapse` | `synapse` |
+
+Linux overlays use the first regular user already on the system and do not set a password.
+
+{% hint style="warning" %}
+Change the default password before putting a device on an untrusted network. The images intentionally include a passwordless `sudo` rule because the installer requires `sudo -n true` to deploy, so a compromised runtime user has root-equivalent access.
 {% endhint %}
 
-After imaging or applying an overlay:
+#### First boot
 
-1. Boot the device.
-2. Connect it to your network. See [Networking](quick-start/networking.md).
-3. Enable SSH if it is not enabled by default.
-4. Confirm you can connect:
+Images keep DHCP enabled so the device can reach the internet, DNS, and a default gateway. To make it reachable at a predictable robot-network address, set an optional static address under **Settings > Network Settings**. It is added as a secondary address while DHCP stays enabled. See [Settings Page](../usage/built-in-pipelines-1/settings-page.md#dhcp-and-static-addresses).
 
-```bash
-ssh <username>@<device-ip>
-```
+1. Flash the image or apply the overlay as described above.
+2. Boot the device and connect it to your network. See [Networking](quick-start/networking.md).
+3. Find its IP address from your router, or run `hostname -I` on the device.
+4. Connect over SSH using the credentials from the table above:
+
+   ```bash
+   ssh <username>@<device-ip>
+   ```
+
+5. Change the password with `passwd`, then confirm the runtime is running:
+
+   ```bash
+   sudo -n true
+   sudo systemctl status synapse-runtime
+   ```
+
+6. Open the dashboard at `http://<device-ip>:3000`.
+
+{% hint style="info" %}
+These images are alpha artifacts. For other hardware, any minimal 64-bit Debian/Ubuntu-based Linux image with SSH should work. See [Deploying on Custom Hardware](hardware-selection/deploying-on-custom-hardware.md) for the full requirements.
+{% endhint %}
 
 ### Deploy your first project
 
