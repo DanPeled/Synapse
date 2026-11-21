@@ -10,12 +10,11 @@ import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.wpilib.driverstation.DriverStationErrors;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Transform3d;
-import org.wpilib.networktables.FloatSubscriber;
+import org.wpilib.networktables.DoubleSubscriber;
 import org.wpilib.networktables.NetworkTable;
 import org.wpilib.networktables.NetworkTableEntry;
 import org.wpilib.networktables.NetworkTableInstance;
 import org.wpilib.networktables.NetworkTableType;
-import org.wpilib.networktables.PubSubOption;
 import org.wpilib.networktables.RawSubscriber;
 import org.wpilib.networktables.StringSubscriber;
 import synapse.generated.SynapseApi;
@@ -58,10 +57,10 @@ public class SynapseCamera implements AutoCloseable {
   protected NetworkTableEntry m_recordStateEntry;
 
   /** Entry for tracking the latency of frame capture (in seconds) */
-  protected FloatSubscriber m_captureLatencySubscriber;
+  protected DoubleSubscriber m_captureLatencySubscriber;
 
   /** Entry for tracking the latency of frame processing (in seconds) */
-  protected FloatSubscriber m_processLatencySubscriber;
+  protected DoubleSubscriber m_processLatencySubscriber;
 
   /**
    * ObjectMapper configured for MessagePack serialization/deserialization.
@@ -109,24 +108,18 @@ public class SynapseCamera implements AutoCloseable {
 
       m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
       m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
+      // These subscribers only ever call get(), so duplicate values and deep
+      // poll storage only add NetworkTables traffic and queue work on the
+      // robot. Latest-value subscriptions are sufficient for every topic here.
       m_pipelineTypeSubscriber =
-          m_table
-              .getStringTopic(NetworkTableTopics.kPipelineTypeTopic)
-              .subscribe("Unknown", PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
+          m_table.getStringTopic(NetworkTableTopics.kPipelineTypeTopic).subscribe("Unknown");
       m_captureLatencySubscriber =
-          m_table
-              .getFloatTopic(NetworkTableTopics.kCaptureLatencyTopic)
-              .subscribe(0, PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
+          m_table.getDoubleTopic(NetworkTableTopics.kCaptureLatencyTopic).subscribe(0.0);
       m_processLatencySubscriber =
-          m_table
-              .getFloatTopic(NetworkTableTopics.kProcessLatencyTopic)
-              .subscribe(0, PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
+          m_table.getDoubleTopic(NetworkTableTopics.kProcessLatencyTopic).subscribe(0.0);
       // The runtime publishes pipeline results under <camera>/data/results.
       m_resultsSubscriber =
-          m_dataTable
-              .getRawTopic(NetworkTableTopics.kResultsTopic)
-              .subscribe(
-                  "raw", new byte[0], PubSubOption.KEEP_DUPLICATES, PubSubOption.pollStorage(10));
+          m_dataTable.getRawTopic(NetworkTableTopics.kResultsTopic).subscribe("raw", new byte[0]);
     }
   }
 

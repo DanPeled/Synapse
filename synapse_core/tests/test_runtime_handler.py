@@ -13,6 +13,7 @@ from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
 from synapse.core.runtime_handler import RuntimeManager
+from synapse_net.socketServer import WebSocketServer
 
 
 class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):
@@ -73,6 +74,30 @@ class TestRuntimeManager(unittest.TestCase):
             result = self.handler.getEventDataValue(mock_event)
             self.assertTrue(result)
 
+    def test_send_latency_reuses_publishers(self):
+        table = MagicMock()
+        publishers = {}
+
+        def getDoubleTopic(key):
+            topic = MagicMock()
+            topic.publish.return_value = publishers.setdefault(key, MagicMock())
+            return topic
+
+        table.getDoubleTopic.side_effect = getDoubleTopic
+        self.mock_camera_handler.getCameraHandle.return_value = "handle"
+
+        with (
+            patch("synapse.core.runtime_handler.getCameraTable", return_value=table),
+            patch.object(WebSocketServer, "kInstance", None),
+        ):
+            self.handler.sendLatency(0, 0.1, 0.2, 30)
+            self.handler._lastLatencyReportTime.clear()
+            self.handler.sendLatency(0, 0.1, 0.3, 30)
+
+        assert table.getDoubleTopic.call_count == 2
+        publishers["captureLatency"].set.assert_called_with(0.1)
+        assert publishers["processLatency"].set.call_args_list[-1].args == (0.3,)
+
     def test_setup_calls_all_components(self):
         with (
             patch.object(self.handler.pipelineHandler, "setup") as setup_loader,
@@ -88,6 +113,8 @@ class TestRuntimeManager(unittest.TestCase):
             assign_defaults.assert_called_once()
             setup_nt.assert_called_once()
             start_metrics.assert_called_once()
+            self.assertTrue(self.handler.isSetup)
+            self.assertTrue(self.handler.setupEvent.is_set())
 
     def test_request_stop_clears_running_event(self):
         self.handler.running.set()
@@ -96,6 +123,50 @@ class TestRuntimeManager(unittest.TestCase):
 
         self.assertFalse(self.handler.running.is_set())
         self.assertTrue(self.handler.stopped.is_set())
+
+    def test_add_nt_listener_is_idempotent_by_key(self):
+        entry = MagicMock()
+
+        with patch(
+            "synapse.core.runtime_handler.NetworkTableInstance.getDefault"
+        ) as nt:
+            nt.return_value.addListener.return_value = 10
+            self.handler._addNtListener(
+                entry, 1, lambda event: None, key=(0, "settings", "brightness")
+            )
+            self.handler._addNtListener(
+                entry, 1, lambda event: None, key=(0, "settings", "brightness")
+            )
+
+        assert self.handler._ntListeners == [10]
+        assert self.handler._ntListenerKeys == {(0, "settings", "brightness"): 10}
+
+    def test_pipeline_nt_listener_binds_each_camera_index(self):
+        self.mock_camera_handler.cameraHandles = {0: MagicMock(), 1: MagicMock()}
+        self.handler.pipelineHandler.defaultPipelineIndexes = {0: 0, 1: 1}
+        self.handler.setPipelineByIndex = MagicMock()
+        self.handler.onPipelineChangedFromNT = MagicMock()
+
+        with (
+            patch(
+                "synapse.core.runtime_handler.getCameraSettingEntry",
+                return_value=MagicMock(),
+            ),
+            patch.object(self.handler, "_addNtListener") as addListener,
+        ):
+            self.handler.setupNetworkTables()
+
+        callbacks = [call.args[2] for call in addListener.call_args_list]
+        assert len(callbacks) == 2
+
+        for cameraIndex, callback in enumerate(callbacks):
+            event = MagicMock()
+            event.data.__class__ = ValueEventData
+            event.data.value.getInteger.return_value = 7
+            callback(event)
+            self.handler.setPipelineByIndex.assert_any_call(
+                pipelineIndex=7, cameraIndex=cameraIndex
+            )
 
     def test_run_blocks_until_stop_requested(self):
         thread = threading.Thread(target=self.handler.run, daemon=True)
@@ -126,10 +197,13 @@ class TestRuntimeManager(unittest.TestCase):
         self.handler.metricsThread = metricsThread
 
         publisher = MagicMock()
+        latencyPublisher = MagicMock()
         versionPublisher = MagicMock()
         self.handler.propPubs[(0, "setting")] = publisher
+        self.handler._latencyPubs[(0, "captureLatency")] = latencyPublisher
         self.handler.versionPublisher = versionPublisher
         self.handler._ntListeners = [10, 11]
+        self.handler.setupEvent.set()
 
         with (
             patch("synapse.core.runtime_handler.NetworkTableInstance") as nt,
@@ -145,6 +219,8 @@ class TestRuntimeManager(unittest.TestCase):
         self.assertEqual(self.handler.cameraManagementThreads, {})
         self.assertEqual(self.handler._ntListeners, [])
         self.assertEqual(self.handler.propPubs, {})
+        self.assertEqual(self.handler._latencyPubs, {})
+        latencyPublisher.close.assert_called_once()
         self.assertIsNone(self.handler.versionPublisher)
         nt.getDefault.return_value.removeListener.assert_any_call(10)
         nt.getDefault.return_value.removeListener.assert_any_call(11)
@@ -153,6 +229,7 @@ class TestRuntimeManager(unittest.TestCase):
         pipelineCleanup.assert_called_once()
         self.mock_camera_handler.cleanup.assert_called_once()
         self.assertFalse(self.handler.isSetup)
+        self.assertFalse(self.handler.setupEvent.is_set())
 
     def test_cleanup_is_idempotent(self):
         self.handler.cleanup()

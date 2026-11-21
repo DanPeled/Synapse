@@ -138,6 +138,19 @@ def test_sendToAllSync_calls_asyncio_run(monkeypatch):
     assert called.get("called") is True
 
 
+def test_sendToAllSync_resolves_message_factory(monkeypatch):
+    server = WebSocketServer("localhost", 8765)
+
+    called = {}
+
+    async def mock_sendToAll(message):
+        called["message"] = message
+
+    monkeypatch.setattr(server, "sendToAll", mock_sendToAll)
+    server.sendToAllSync(lambda: b"message")
+    assert called.get("message") == b"message"
+
+
 @pytest.mark.asyncio
 async def test_sendToAllSync_queues_messages_when_loop_running():
     server = WebSocketServer("localhost", 8765)
@@ -166,6 +179,87 @@ async def test_sendToAllSync_queues_messages_when_loop_running():
     await server.close()
     assert server._sendQueue is None
     assert server._sendTask is None
+
+
+@pytest.mark.asyncio
+async def test_coalesces_pending_messages_by_key():
+    server = WebSocketServer("localhost", 8765)
+    server.loop = asyncio.get_running_loop()
+
+    client = AsyncMock()
+    client.open = True
+    server.clients.add(client)
+
+    server.sendToAllSync(b"stale", coalesce_key=("results", 0, 0))
+    server.sendToAllSync(b"newest", coalesce_key=("results", 0, 0))
+    server.sendToAllSync(b"other", coalesce_key=("results", 1, 0))
+    server.sendToAllSync(b"event")
+
+    for _ in range(10):
+        if server._sendQueue is not None:
+            break
+        await asyncio.sleep(0)
+
+    assert server._sendQueue is not None
+    await asyncio.wait_for(server._sendQueue.join(), timeout=1)
+
+    sent = [call.args[0] for call in client.send.await_args_list]
+    assert sent.count(b"stale") == 0
+    assert sent.count(b"newest") == 1
+    assert sent.count(b"other") == 1
+    assert sent.count(b"event") == 1
+
+    await server.close()
+    assert server._coalesced == {}
+    assert server._wakeupPending is False
+
+
+@pytest.mark.asyncio
+async def test_lazy_coalesced_message_is_built_only_for_newest():
+    server = WebSocketServer("localhost", 8765)
+    server.loop = asyncio.get_running_loop()
+
+    client = AsyncMock()
+    client.open = True
+    server.clients.add(client)
+
+    built = []
+
+    def factory(value: bytes):
+        def build() -> bytes:
+            built.append(value)
+            return value
+
+        return build
+
+    server.sendToAllSync(factory(b"stale"), coalesce_key=("results", 0, 0))
+    server.sendToAllSync(factory(b"newest"), coalesce_key=("results", 0, 0))
+
+    for _ in range(10):
+        if server._sendQueue is not None:
+            break
+        await asyncio.sleep(0)
+
+    assert server._sendQueue is not None
+    await asyncio.wait_for(server._sendQueue.join(), timeout=1)
+
+    assert built == [b"newest"]
+    assert [call.args[0] for call in client.send.await_args_list] == [b"newest"]
+
+    await server.close()
+
+
+def test_has_clients_only_counts_open_clients():
+    server = WebSocketServer("localhost", 8765)
+    assert server.hasClients is False
+
+    openClient = AsyncMock()
+    openClient.open = True
+    closedClient = AsyncMock()
+    closedClient.open = False
+    server.clients.update({openClient, closedClient})
+
+    assert server.hasClients is True
 
 
 @pytest.mark.asyncio

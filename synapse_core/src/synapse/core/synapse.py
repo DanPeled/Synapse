@@ -352,11 +352,8 @@ class Synapse:
                     ),
                 )
 
-                while not getattr(self.runtimeHandler, "isSetup", False):
-                    try:
-                        await asyncio.sleep(0.01)
-                    except Exception:
-                        break
+                # Blocking Event.wait must not run on the websocket loop.
+                await asyncio.to_thread(self.runtimeHandler.setupEvent.wait)
 
                 pipeline_bindings = getattr(
                     self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {}
@@ -365,8 +362,9 @@ class Synapse:
                     for id, pipeline in pipelines.items():
                         try:
                             msg = pipelineToProto(pipeline, id, cameraid)
-                            await self.websocket.sendToAll(
-                                createMessage(MessageTypeProto.ADD_PIPELINE, msg)
+                            await self.websocket.sendToClient(
+                                ws,
+                                createMessage(MessageTypeProto.ADD_PIPELINE, msg),
                             )
                         except Exception:
                             continue
@@ -388,11 +386,12 @@ class Synapse:
                         continue
 
                 try:
-                    await self.websocket.sendToAll(
+                    await self.websocket.sendToClient(
+                        ws,
                         MessageProto(
                             MessageTypeProto.SEND_PIPELINE_TYPES,
                             pipeline_type_info=typeMessages,
-                        ).SerializeToString()
+                        ).SerializeToString(),
                     )
                 except Exception:
                     pass
@@ -420,8 +419,9 @@ class Synapse:
                             handle.stream,
                             camera_configs[id].id if id in camera_configs else "",
                         )
-                        await self.websocket.sendToAll(
-                            createMessage(MessageTypeProto.ADD_CAMERA, msg)
+                        await self.websocket.sendToClient(
+                            ws,
+                            createMessage(MessageTypeProto.ADD_CAMERA, msg),
                         )
                     except Exception:
                         continue
@@ -431,11 +431,12 @@ class Synapse:
                         calibrations = getattr(config, "calibration", {}) or {}
                         for calib in calibrations.values():
                             calibProto = calib.toProto(id)
-                            await self.websocket.sendToAll(
+                            await self.websocket.sendToClient(
+                                ws,
                                 MessageProto(
                                     type=MessageTypeProto.CALIBRATION_DATA,
                                     calibration_data=calibProto,
-                                ).SerializeToString()
+                                ).SerializeToString(),
                             )
                     except Exception:
                         continue
@@ -443,7 +444,7 @@ class Synapse:
                 try:
                     for log_ in logs:
                         msg = createMessage(MessageTypeProto.LOG, log_)
-                        await self.websocket.sendToAll(msg)
+                        await self.websocket.sendToClient(ws, msg)
                 except Exception:
                     pass
             except Exception as e:

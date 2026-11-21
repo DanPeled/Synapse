@@ -6,6 +6,7 @@ import os
 import threading
 import time
 import traceback
+from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain
 from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
@@ -33,6 +34,15 @@ from .camera.synapse_camera import SynapseCamera
 from .camera_factory import CameraConfig, CameraFactory, getCameraTableName
 from .global_settings import GlobalSettings
 from .lifecycle import joinThread
+
+
+@dataclass
+class FPSView:
+    font = cv2.FONT_HERSHEY_PLAIN
+    fontScale = 3
+    thickness = 2
+    color = (0, 256, 0)
+    position = (10, 30)
 
 
 class CameraHandler:
@@ -397,7 +407,9 @@ class CameraHandler:
             interpolation=cv2.INTER_AREA,
         )
 
-    def publishFrame(self, frame: Frame, handle: CameraHandle) -> None:
+    def publishFrame(
+        self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
+    ) -> None:
         """
         Publishes a frame to the output stream and optionally writes it to the recording output
         if recording is enabled.
@@ -405,6 +417,7 @@ class CameraHandler:
         Args:
             frame (Frame): The image frame to publish.
             camera (CameraHandle): The camera that produced the frame.
+            fps: Optional camera FPS to draw on frames that are actually streamed.
         """
         assert frame is not None
 
@@ -417,6 +430,23 @@ class CameraHandler:
             return
 
         self.lastPublishTime[cameraIndex] = now
+
+        # Draw only on frames that survive the stream throttle. At higher camera
+        # FPS this avoids full-frame text draws on frames nobody will see.
+        if fps is not None:
+            try:
+                cv2.putText(
+                    frame,
+                    f"FPS: {int(fps)}",
+                    FPSView.position,
+                    FPSView.font,
+                    FPSView.fontScale,
+                    FPSView.color,
+                    FPSView.thickness,
+                    lineType=cv2.LINE_8,
+                )
+            except Exception:
+                pass
 
         streamSize = self.streamSizes.get(cameraIndex)
         if streamSize is None:

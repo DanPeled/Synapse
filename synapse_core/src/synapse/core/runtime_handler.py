@@ -8,7 +8,6 @@ import threading
 import time
 import traceback
 from asyncio import Queue
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
 
@@ -17,6 +16,7 @@ import numpy as np
 import synapse.__version__ as versionFile
 import synapse.log as log
 from ntcore import (
+    DoublePublisher,
     Event,
     EventFlags,
     NetworkTable,
@@ -54,15 +54,6 @@ from .pipeline import (
 )
 from .pipeline_handler import PipelineHandler
 from .settings_api import CameraSettings
-
-
-@dataclass
-class FPSView:
-    font = cv2.FONT_HERSHEY_PLAIN
-    fontScale = 3
-    thickness = 2
-    color = (0, 256, 0)
-    position = (10, 30)
 
 
 def sendWebUIIP():
@@ -105,11 +96,13 @@ class RuntimeManager:
         # the per-frame path does not have to read NetworkTables.
         self.cameraViewIDs: Dict[CameraID, str] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
+        self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
         self._ntListeners: List[int] = []
+        self._ntListenerKeys: Dict[Tuple[CameraID, str, str], int] = {}
 
         # ``running`` is set while the runtime should keep going. ``stopped`` is
         # the inverse, so worker loops can block until shutdown is requested.
@@ -121,6 +114,7 @@ class RuntimeManager:
         self._cleanedUp = False
 
         self.isSetup: bool = False
+        self.setupEvent = threading.Event()
         self.lastLatencyReportTime: float = time.time()
         self.versionPublisher: Optional[StringPublisher] = None
 
@@ -216,6 +210,7 @@ class RuntimeManager:
         sendWebUIIP()
 
         self.isSetup = True
+        self.setupEvent.set()
 
     def assignDefaultPipelines(self) -> None:
         """
@@ -363,14 +358,22 @@ class RuntimeManager:
 
             self.onSettingChangedFromNT.call(prop, value, cameraIndex)
 
-        def addlistener(key: str) -> None:
+        def addlistener(settingKey: str) -> None:
             nt_table = getCameraTable(handle)
             if nt_table is not None:
-                entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
+                entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(
+                    settingKey
+                )
 
                 if NtClient.INSTANCE is not None:
                     self._addNtListener(
-                        entry, EventFlags.VALUE_REMOTE, updateSettingListener
+                        entry,
+                        EventFlags.VALUE_REMOTE,
+                        updateSettingListener,
+                        # Register each setting once per camera. Switching
+                        # pipelines previously stacked duplicate callbacks,
+                        # multiplying setting writes and UI traffic.
+                        key=(cameraIndex, NTKeys.kSettings.value, settingKey),
                     )
 
         for key in pipeline_config.getMap().keys():
@@ -579,31 +582,39 @@ class RuntimeManager:
         while self.running.is_set():
             cam = handle.camera
             try:
-                if cam.isConnected():
-                    ret, frame = handle.grabFrame()
-                    if ret and frame is not None:
-                        # If we just switched resolution, sometimes the first frame might be bad
-                        try:
-                            h, w = frame.shape[:2]
-                            if h == 0 or w == 0:
-                                raise ValueError("bad frame")
-                        except Exception:
-                            # Try again quickly without going to no-signal
-                            time.sleep(0.002)
-                            continue
-                        try:
-                            frame = self.fixtureFrame(cameraIndex, frame)
-                        except Exception:
-                            pass
-                        try:
-                            self._processAndPublishFrame(cameraIndex, frame)
-                        except Exception:
-                            pass
-                        continue
-            except Exception:
-                pass
+                if not cam.isConnected():
+                    # Avoid spinning while a camera is disconnected. The frame
+                    # producer already has its own short retry delay.
+                    time.sleep(0.01)
+                    continue
 
-    def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
+                ret, frame, captureLatency = handle.grabFrame()
+                if not ret or frame is None:
+                    continue
+
+                # If we just switched resolution, sometimes the first frame might be bad
+                try:
+                    h, w = frame.shape[:2]
+                    if h == 0 or w == 0:
+                        raise ValueError("bad frame")
+                except Exception:
+                    # Try again quickly without going to no-signal
+                    time.sleep(0.002)
+                    continue
+                try:
+                    frame = self.fixtureFrame(cameraIndex, frame)
+                except Exception:
+                    pass
+                try:
+                    self._processAndPublishFrame(cameraIndex, frame, captureLatency)
+                except Exception:
+                    pass
+            except Exception:
+                time.sleep(0.002)
+
+    def _processAndPublishFrame(
+        self, cameraIndex: CameraID, frame: Frame, captureLatency: float = 0.0
+    ):
         camera_handles = self.cameraHandler.cameraHandles
         handle = camera_handles[cameraIndex]
 
@@ -644,23 +655,9 @@ class RuntimeManager:
         processLatency = time.perf_counter() - processStart
 
         try:
-            cv2.putText(
-                processedFrame,
-                f"FPS: {int(cameraFps)}",
-                FPSView.position,
-                FPSView.font,
-                FPSView.fontScale,
-                FPSView.color,
-                FPSView.thickness,
-                lineType=cv2.LINE_8,
-            )
-        except Exception:
-            pass
-
-        try:
             self.sendLatency(
                 cameraIndex,
-                0.0,
+                captureLatency,
                 processLatency,
                 cameraFps,
             )
@@ -668,7 +665,7 @@ class RuntimeManager:
             pass
 
         try:
-            self.cameraHandler.publishFrame(processedFrame, handle)
+            self.cameraHandler.publishFrame(processedFrame, handle, fps=int(cameraFps))
         except Exception:
             pass
 
@@ -740,9 +737,19 @@ class RuntimeManager:
 
         self._lastLatencyReportTime[cameraIndex] = current_time
 
-        cameraTable = getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex))
-        cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
-        cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
+        for key, value in (
+            (NTKeys.kCaptureLatency.value, captureLatency),
+            (NTKeys.kProcessLatency.value, processingLatency),
+        ):
+            pubKey = (cameraIndex, key)
+            publisher = self._latencyPubs.get(pubKey)
+            if publisher is None:
+                cameraTable = getCameraTable(
+                    self.cameraHandler.getCameraHandle(cameraIndex)
+                )
+                publisher = cameraTable.getDoubleTopic(key).publish()
+                self._latencyPubs[pubKey] = publisher
+            publisher.set(value)
 
         if WebSocketServer.kInstance is not None:
             WebSocketServer.kInstance.sendToAllSync(
@@ -766,7 +773,9 @@ class RuntimeManager:
                     CameraSettingsKeys.kPipeline.value
                 )
 
-            def updateNTPipelineListener(event: Event):
+            def updateNTPipelineListener(
+                event: Event, cameraIndex: CameraID = cameraIndex
+            ):
                 assert isinstance(event.data, ValueEventData)
 
                 pipelineIndex = event.data.value.getInteger()
@@ -778,7 +787,10 @@ class RuntimeManager:
                 )
 
             self._addNtListener(
-                entry, EventFlags.VALUE_REMOTE, updateNTPipelineListener
+                entry,
+                EventFlags.VALUE_REMOTE,
+                updateNTPipelineListener,
+                key=(cameraIndex, CameraSettingsKeys.kPipeline.value, ""),
             )
 
             entry.setInteger(self.pipelineHandler.defaultPipelineIndexes[cameraIndex])
@@ -955,8 +967,10 @@ class RuntimeManager:
             log.info(f"Removing {listenerCount} NetworkTables listener(s)...")
         self._removeNtListeners()
 
-        publisherCount = len(self.propPubs) + (
-            1 if self.versionPublisher is not None else 0
+        publisherCount = (
+            len(self.propPubs)
+            + len(self._latencyPubs)
+            + (1 if self.versionPublisher is not None else 0)
         )
         if publisherCount:
             log.info(f"Closing {publisherCount} NetworkTables publisher(s)...")
@@ -966,6 +980,12 @@ class RuntimeManager:
             except Exception as error:
                 log.err(f"Failed to close publisher {key}: {error}")
         self.propPubs.clear()
+        for key, publisher in self._latencyPubs.items():
+            try:
+                publisher.close()
+            except Exception as error:
+                log.err(f"Failed to close latency publisher {key}: {error}")
+        self._latencyPubs.clear()
         if self.versionPublisher is not None:
             try:
                 self.versionPublisher.close()
@@ -978,6 +998,7 @@ class RuntimeManager:
         log.info("Releasing camera resources...")
         self.cameraHandler.cleanup()
         self.isSetup = False
+        self.setupEvent.clear()
         log.info("Runtime resources released.")
 
     def _addNtListener(
@@ -985,11 +1006,20 @@ class RuntimeManager:
         entry: NetworkTableEntry,
         flags: int,
         callback: Any,
+        *,
+        key: Optional[Tuple[CameraID, str, str]] = None,
     ) -> None:
-        """Track a NetworkTables listener so it can be removed on shutdown."""
-        self._ntListeners.append(
-            NetworkTableInstance.getDefault().addListener(entry, flags, callback)
-        )
+        """Track a NetworkTables listener so it can be removed on shutdown.
+
+        ``key`` makes registration idempotent, which matters because switching
+        pipelines re-runs the settings setup for the same camera and topics.
+        """
+        if key is not None and key in self._ntListenerKeys:
+            return
+        listener = NetworkTableInstance.getDefault().addListener(entry, flags, callback)
+        self._ntListeners.append(listener)
+        if key is not None:
+            self._ntListenerKeys[key] = listener
 
     def _removeNtListeners(self) -> None:
         """Remove every NetworkTables listener registered by the runtime."""
@@ -1000,6 +1030,7 @@ class RuntimeManager:
             except Exception as error:
                 log.err(f"Failed to remove NetworkTables listener {listener}: {error}")
         self._ntListeners.clear()
+        self._ntListenerKeys.clear()
 
     def setupCallbacks(self):
         def onRemovePipeline(
