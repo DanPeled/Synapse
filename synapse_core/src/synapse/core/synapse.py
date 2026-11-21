@@ -575,20 +575,25 @@ class Synapse:
         def onSettingChangedInNt(
             setting: str, value: Any, cameraIndex: CameraID
         ) -> None:
+            pipelineIndex = Synapse.kInstance.runtimeHandler.pipelineBindings[
+                cameraIndex
+            ]
             setSettingProto: SetPipleineSettingMessageProto = (
                 SetPipleineSettingMessageProto(
                     setting=setting,
                     value=settingValueToProto(value),
-                    pipeline_index=Synapse.kInstance.runtimeHandler.pipelineBindings[
-                        cameraIndex
-                    ],
+                    pipeline_index=pipelineIndex,
                     cameraid=cameraIndex,
                 )
             )
 
-            msg = createMessage(MessageTypeProto.SET_SETTING, setSettingProto)
+            def buildMessage() -> bytes:
+                return createMessage(MessageTypeProto.SET_SETTING, setSettingProto)
 
-            Synapse.kInstance.websocket.sendToAllSync(msg)
+            Synapse.kInstance.websocket.sendToAllSync(
+                buildMessage,
+                coalesce_key=("setting", cameraIndex, pipelineIndex, setting),
+            )
 
         def onPipelineIndexChangedInNt(
             pipelineIndex: PipelineID, cameraIndex: CameraID

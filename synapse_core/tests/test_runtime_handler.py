@@ -205,8 +205,15 @@ class TestRuntimeManager(unittest.TestCase):
 
         self.assertEqual(len(waits), 1)
         self.assertAlmostEqual(waits[0], 0.95)
+
+        sendCall = ws.sendToAllSync.call_args
+        assert sendCall.kwargs["coalesce_key"] == ("metrics",)
+        payload = sendCall.args[0]
+        assert callable(payload)
+        with patch("synapse.core.runtime_handler.createMessage", createMessage):
+            payload()
         createMessage.assert_called_once()
-        ws.sendToAllSync.assert_any_call(createMessage.return_value)
+        ws.sendToAllSync.assert_any_call(payload, coalesce_key=("metrics",))
 
     def test_request_stop_clears_running_event(self):
         self.handler.running.set()

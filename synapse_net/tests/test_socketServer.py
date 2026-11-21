@@ -215,6 +215,51 @@ async def test_coalesces_pending_messages_by_key():
 
 
 @pytest.mark.asyncio
+async def test_control_message_is_not_dropped_while_coalescing():
+    server = WebSocketServer("localhost", 8765)
+    server.loop = asyncio.get_running_loop()
+
+    client = AsyncMock()
+    client.open = True
+    server.clients.add(client)
+
+    firstSendStarted = asyncio.Event()
+    releaseFirstSend = asyncio.Event()
+    originalSendToAll = server.sendToAll
+
+    async def slowSendToAll(message):
+        if message == b"first":
+            firstSendStarted.set()
+            await releaseFirstSend.wait()
+        await originalSendToAll(message)
+
+    server.sendToAll = slowSendToAll
+
+    server.sendToAllSync(b"first", coalesce_key=("metrics",))
+    for _ in range(10):
+        if firstSendStarted.is_set():
+            break
+        await asyncio.sleep(0)
+    assert firstSendStarted.is_set()
+
+    # The newer value supersedes the pending coalesced value, while the
+    # unkeyed control message must still be delivered exactly once.
+    server.sendToAllSync(b"newest", coalesce_key=("metrics",))
+    server.sendToAllSync(b"control")
+
+    assert server._sendQueue is not None
+    releaseFirstSend.set()
+    await asyncio.wait_for(server._sendQueue.join(), timeout=1)
+
+    sent = [call.args[0] for call in client.send.await_args_list]
+    assert sent.count(b"first") == 1
+    assert sent.count(b"newest") == 1
+    assert sent.count(b"control") == 1
+
+    await server.close()
+
+
+@pytest.mark.asyncio
 async def test_lazy_coalesced_message_is_built_only_for_newest():
     server = WebSocketServer("localhost", 8765)
     server.loop = asyncio.get_running_loop()

@@ -277,20 +277,22 @@ class RuntimeManager:
                 ws = WebSocketServer.kInstance
                 if ws is not None and ws.hasClients:
                     try:
-                        metricsMessage = HardwareMetricsProto()
-                        metricsMessage.cpu_temp = cpuTemp
-                        metricsMessage.cpu_usage = cpuUsage
-                        metricsMessage.uptime = uptime
-                        metricsMessage.memory = memory
-                        metricsMessage.ram_usage = usedRam
-                        metricsMessage.disk_usage = usedDiskPct
 
-                        ws.sendToAllSync(
-                            createMessage(
+                        def buildMetricsMessage() -> bytes:
+                            metricsMessage = HardwareMetricsProto(
+                                cpu_temp=cpuTemp,
+                                cpu_usage=cpuUsage,
+                                uptime=uptime,
+                                memory=memory,
+                                ram_usage=usedRam,
+                                disk_usage=usedDiskPct,
+                            )
+                            return createMessage(
                                 MessageTypeProto.SEND_METRICS,
                                 metricsMessage,
                             )
-                        )
+
+                        ws.sendToAllSync(buildMetricsMessage, coalesce_key=("metrics",))
                     except Exception:
                         pass
 
@@ -766,9 +768,11 @@ class RuntimeManager:
                 self._latencyPubs[pubKey] = publisher
             publisher.set(value)
 
-        if WebSocketServer.kInstance is not None:
-            WebSocketServer.kInstance.sendToAllSync(
-                createMessage(
+        ws = WebSocketServer.kInstance
+        if ws is not None:
+
+            def buildMessage() -> bytes:
+                return createMessage(
                     MessageTypeProto.REPORT_CAMERA_PERFORMANCE,
                     CameraPerformanceProto(
                         latency_capture=secondsToMilliseconds(captureLatency),
@@ -777,6 +781,9 @@ class RuntimeManager:
                         camera_index=cameraIndex,
                     ),
                 )
+
+            ws.sendToAllSync(
+                buildMessage, coalesce_key=("camera_performance", cameraIndex)
             )
 
     def setupNetworkTables(self) -> None:
