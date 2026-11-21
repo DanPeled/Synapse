@@ -10,7 +10,7 @@ import threading
 import traceback
 from multiprocessing import Process
 from pathlib import Path
-from typing import Any, Final, List, Optional
+from typing import Any, Final, List, Optional, Tuple, TypeAlias, cast
 
 import psutil
 from synapse.__version__ import SYNAPSE_VERSION
@@ -22,6 +22,7 @@ from synapse_net.devicenetworking import (
 from synapse_net.file_server import FileServer
 from synapse_net.generated.messages.v1 import (
     DeviceInfoProto,
+    LogLevelProto,
     MessageProto,
     MessageTypeProto,
     PipelineProto,
@@ -51,7 +52,7 @@ from ..bcolors import MarkupColors
 from ..hardware.deploy_dir import DeployDirectory
 from ..hardware.deviceactions import reboot
 from ..hardware.metrics import Platform
-from ..log import err, info, logs, missingFeature, warn
+from ..log import err, info, logs, missingFeature, socketLog, warn
 from ..stypes import (
     CameraID,
     CameraName,
@@ -63,6 +64,7 @@ from ..stypes import (
 from ..util import getIP, resolveGenericArgument
 from .camera.camera_handle import CameraHandle
 from .camera_factory import CalibrationData
+from .command_dispatcher import CommandDispatcher
 from .config import Config, NetworkConfig
 from .global_settings import GlobalSettings
 from .lifecycle import ShutdownStack, joinThread
@@ -77,6 +79,8 @@ from .settings_api import (
 )
 
 kCalibrationImportDirectory: Final[str] = ".calibration_import"
+
+MessageCommand: TypeAlias = Tuple[Any, MessageProto]
 
 
 class Synapse:
@@ -102,6 +106,7 @@ class Synapse:
         self.managerResponderProcess: Optional[Process] = None
         self.__sendSettingsInNT: Final[bool] = sendSettingsInNT
         self._shutdownStack = ShutdownStack()
+        self._commandDispatcher: Optional[CommandDispatcher[MessageCommand]] = None
 
     def init(
         self,
@@ -144,6 +149,7 @@ class Synapse:
         )
 
         self.runtimeHandler = runtimeHandler
+        self._shutdownStack.register("save worker", self.runtimeHandler.stopSaveWorker)
         self.setupRuntimeCallbacks()
 
         self._shutdownStack.register("networking", self.networkingManager.close)
@@ -294,77 +300,49 @@ class Synapse:
         self.runtimeHandler.run()
 
     def setupWebsocket(self) -> None:
-        import asyncio
-
-        import psutil
-
         self.websocket = WebSocketServer("0.0.0.0", 8765)
 
         # Create a new asyncio event loop for the websocket thread
         new_loop = asyncio.new_event_loop()
         self.websocket.loop = new_loop  # store for shutdown
 
+        # All command handlers run on one FIFO worker. The websocket loop only
+        # parses and enqueues messages, so blocking commands cannot stall UI
+        # sends or other clients.
+        self._ensureCommandDispatcher()
+        self._shutdownStack.register("command dispatcher", self._stopCommandDispatcher)
+
         @self.websocket.on(SocketEvent.kConnect)
         async def on_connect(ws):
-            import synapse.hardware.metrics as metrics
-
-            from ..__version__ import SYNAPSE_VERSION
-
-            try:
-                if self.ntClient:
-                    connectionDetails = SetConnectionInfoProto(
-                        connected_to_networktables=self.ntClient.nt_inst.isConnected()
-                    )
-
-                    await self.websocket.sendToClient(
-                        ws,
-                        createMessage(
-                            MessageTypeProto.SET_DEVICE_CONNECTION_STATUS,
-                            connectionDetails,
-                        ),
-                    )
-
-                deviceInfo: DeviceInfoProto = DeviceInfoProto(
+            def buildDeviceInfo() -> DeviceInfoProto:
+                deviceInfo = DeviceInfoProto(
                     ip=getIP(),
                     version=SYNAPSE_VERSION,
-                    platform=metrics.Platform.getCurrentPlatform().getOSType().value,
+                    platform=Platform.getCurrentPlatform().getOSType().value,
                     hostname=self.runtimeHandler.networkSettings.hostname,
                 )
-
                 try:
                     deviceInfo.network_interfaces.extend(psutil.net_if_addrs().keys())
                 except Exception:
                     pass
+                return deviceInfo
 
-                await self.websocket.sendToClient(
-                    ws,
-                    createMessage(
-                        MessageTypeProto.SET_NETWORK_SETTINGS,
-                        self.runtimeHandler.networkSettings.toProto(),
-                    ),
-                )
-
-                await self.websocket.sendToClient(
-                    ws,
-                    createMessage(
-                        MessageTypeProto.SEND_DEVICE_INFO,
-                        deviceInfo,
-                    ),
-                )
-
-                # Blocking Event.wait must not run on the websocket loop.
-                await asyncio.to_thread(self.runtimeHandler.setupEvent.wait)
+            def buildInitialMessages() -> List[bytes]:
+                messages: List[bytes] = []
 
                 pipeline_bindings = getattr(
-                    self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {}
+                    self.runtimeHandler.pipelineHandler,
+                    "pipelineInstanceBindings",
+                    {},
                 )
                 for cameraid, pipelines in pipeline_bindings.items():
                     for id, pipeline in pipelines.items():
                         try:
-                            msg = pipelineToProto(pipeline, id, cameraid)
-                            await self.websocket.sendToClient(
-                                ws,
-                                createMessage(MessageTypeProto.ADD_PIPELINE, msg),
+                            messages.append(
+                                createMessage(
+                                    MessageTypeProto.ADD_PIPELINE,
+                                    pipelineToProto(pipeline, id, cameraid),
+                                )
                             )
                         except Exception:
                             continue
@@ -385,16 +363,12 @@ class Synapse:
                     except Exception:
                         continue
 
-                try:
-                    await self.websocket.sendToClient(
-                        ws,
-                        MessageProto(
-                            MessageTypeProto.SEND_PIPELINE_TYPES,
-                            pipeline_type_info=typeMessages,
-                        ).SerializeToString(),
-                    )
-                except Exception:
-                    pass
+                messages.append(
+                    MessageProto(
+                        MessageTypeProto.SEND_PIPELINE_TYPES,
+                        pipeline_type_info=typeMessages,
+                    ).SerializeToString()
+                )
 
                 camera_handles = getattr(
                     self.runtimeHandler.cameraHandler, "cameraHandles", {}
@@ -419,10 +393,7 @@ class Synapse:
                             handle.stream,
                             camera_configs[id].id if id in camera_configs else "",
                         )
-                        await self.websocket.sendToClient(
-                            ws,
-                            createMessage(MessageTypeProto.ADD_CAMERA, msg),
-                        )
+                        messages.append(createMessage(MessageTypeProto.ADD_CAMERA, msg))
                     except Exception:
                         continue
 
@@ -430,33 +401,72 @@ class Synapse:
                     try:
                         calibrations = getattr(config, "calibration", {}) or {}
                         for calib in calibrations.values():
-                            calibProto = calib.toProto(id)
-                            await self.websocket.sendToClient(
-                                ws,
+                            messages.append(
                                 MessageProto(
                                     type=MessageTypeProto.CALIBRATION_DATA,
-                                    calibration_data=calibProto,
-                                ).SerializeToString(),
+                                    calibration_data=calib.toProto(id),
+                                ).SerializeToString()
                             )
                     except Exception:
                         continue
 
-                try:
-                    for log_ in logs:
-                        msg = createMessage(MessageTypeProto.LOG, log_)
-                        await self.websocket.sendToClient(ws, msg)
-                except Exception:
-                    pass
+                for log_ in tuple(logs):
+                    try:
+                        messages.append(createMessage(MessageTypeProto.LOG, log_))
+                    except Exception:
+                        continue
+
+                return messages
+
+            try:
+                if self.ntClient:
+                    connected = await asyncio.to_thread(
+                        lambda: self.ntClient.nt_inst.isConnected()
+                    )
+                    await self.websocket.sendToClient(
+                        ws,
+                        createMessage(
+                            MessageTypeProto.SET_DEVICE_CONNECTION_STATUS,
+                            SetConnectionInfoProto(
+                                connected_to_networktables=connected
+                            ),
+                        ),
+                    )
+
+                deviceInfo = await asyncio.to_thread(buildDeviceInfo)
+
+                await self.websocket.sendToClient(
+                    ws,
+                    createMessage(
+                        MessageTypeProto.SET_NETWORK_SETTINGS,
+                        self.runtimeHandler.networkSettings.toProto(),
+                    ),
+                )
+
+                await self.websocket.sendToClient(
+                    ws,
+                    createMessage(MessageTypeProto.SEND_DEVICE_INFO, deviceInfo),
+                )
+
+                # Blocking Event.wait must not run on the websocket loop.
+                await asyncio.to_thread(self.runtimeHandler.setupEvent.wait)
+
+                # Serializing the initial snapshot can touch cameras, settings
+                # and logs; build it off-loop and only send on the loop.
+                for message in await asyncio.to_thread(buildInitialMessages):
+                    await self.websocket.sendToClient(ws, message)
             except Exception as e:
-                err(f"Error in websocket on_connect: {e}")
+                await asyncio.to_thread(err, f"Error in websocket on_connect: {e}")
 
         @self.websocket.on(SocketEvent.kMessage)
         async def on_message(ws, msg):
-            self.onMessage(ws, msg)
+            self.queueMessage(ws, msg)
 
         @self.websocket.on(SocketEvent.kError)
         async def on_error(ws, error_msg):
-            err(f"Socket: {ws.remote_address}: {error_msg}")
+            await asyncio.to_thread(
+                err, f"Socket: {getattr(ws, 'remote_address', 'unknown')}: {error_msg}"
+            )
 
         def start_loop(loop):
             asyncio.set_event_loop(loop)
@@ -702,6 +712,8 @@ class Synapse:
                 ),
             )
 
+        self.runtimeHandler.onSaveError.add(self._reportSaveFailure)
+
         self.runtimeHandler.pipelineHandler.onAddPipeline.add(onAddPipeline)
         self.runtimeHandler.cameraHandler.onAddCamera.add(onAddCamera)
         self.runtimeHandler.cameraHandler.onCameraStreamChanged.add(
@@ -798,8 +810,63 @@ class Synapse:
 
         return None
 
+    def _ensureCommandDispatcher(self) -> "CommandDispatcher[MessageCommand]":
+        dispatcher = self._commandDispatcher
+        if dispatcher is None:
+            dispatcher = CommandDispatcher[MessageCommand](
+                lambda command: self.handleMessage(*command),
+                self._reportCommandError,
+            )
+            dispatcher.start()
+            self._commandDispatcher = dispatcher
+        return dispatcher
+
+    def _stopCommandDispatcher(self) -> None:
+        dispatcher = self._commandDispatcher
+        if dispatcher is not None:
+            dispatcher.stop()
+            self._commandDispatcher = None
+
+    def _reportParseError(self, error: Exception) -> None:
+        # Called on the websocket loop: only queue a status log, never touch
+        # log files or other blocking resources here.
+        errString = "Could not parse websocket message:\n" + "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        socketLog(errString, cast(LogLevelProto, LogLevelProto.ERROR), self.websocket)
+
+    def _reportCommandError(self, error: Exception) -> None:
+        errString = "Failed to handle websocket command:\n" + "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        err(errString)
+
+    def _reportSaveFailure(self, error: Exception) -> None:
+        errString = "Failed to save Synapse settings:\n" + "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        err(errString)
+
+    def queueMessage(self, ws: Any, msg: Any) -> None:
+        """Parse on the websocket loop and enqueue the blocking handler."""
+        try:
+            msgObj = MessageProto().parse(msg)
+        except Exception as error:
+            self._reportParseError(error)
+            return
+
+        self._ensureCommandDispatcher().submit((ws, msgObj))
+
     def onMessage(self, ws, msg) -> None:
-        msgObj = MessageProto().parse(msg)
+        """Synchronous entry point retained for non-websocket callers."""
+        try:
+            msgObj = MessageProto().parse(msg)
+        except Exception as error:
+            self._reportParseError(error)
+            return
+        self.handleMessage(ws, msgObj)
+
+    def handleMessage(self, ws, msgObj: MessageProto) -> None:
         msgType = msgObj.type
 
         if msgType == MessageTypeProto.SET_SETTING:
@@ -912,6 +979,8 @@ class Synapse:
         elif msgType == MessageTypeProto.REBOOT:
             reboot()
         elif msgType == MessageTypeProto.FORMAT:
+            # Ensure a debounced save cannot recreate the file we are deleting.
+            self.runtimeHandler.cancelPendingSaves()
             configFilePath = Config.getInstance().path
             os.remove(configFilePath)
             warn("Config file deleted! all settings will be lost")
