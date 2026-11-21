@@ -6,7 +6,7 @@
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, PropertyMock, call, patch
 
 import numpy as np
 from ntcore import ValueEventData
@@ -115,6 +115,98 @@ class TestRuntimeManager(unittest.TestCase):
             start_metrics.assert_called_once()
             self.assertTrue(self.handler.isSetup)
             self.assertTrue(self.handler.setupEvent.is_set())
+
+    def _runMetricsCycles(self, ws, clocks, cycles):
+        """Run the metrics worker for a fixed number of fake cycles."""
+        metrics = MagicMock()
+        metrics.getCpuTemp.return_value = 41.0
+        metrics.sampleCpuUtilization.return_value = 12.5
+        metrics.getMemory.return_value = 8192
+        metrics.getUptime.return_value = 1234.0
+        metrics.getGPUMemorySplit.return_value = 0
+        metrics.getUsedRam.return_value = 2048
+        metrics.getUsedDiskPct.return_value = 55.0
+        metrics.getNpuUsage.return_value = 0.0
+
+        entry = MagicMock()
+        nt = MagicMock()
+        nt.getDoubleArrayTopic.return_value.publish.return_value = entry
+
+        self.handler.running.set()
+        waits = []
+
+        def waitForNextCycle(delay):
+            waits.append(delay)
+            if len(waits) >= cycles:
+                self.handler.running.clear()
+
+        self.handler.stopped = MagicMock()
+        self.handler.stopped.wait.side_effect = waitForNextCycle
+
+        clockValues = iter(clocks)
+
+        def nextClock():
+            try:
+                return next(clockValues)
+            except StopIteration:
+                return 1000.0
+
+        with (
+            patch(
+                "synapse.core.runtime_handler.NetworkTableInstance.getDefault",
+                return_value=nt,
+            ),
+            patch("synapse.hardware.metrics.MetricsManager", return_value=metrics),
+            patch(
+                "synapse.core.runtime_handler._metricsMonotonic",
+                side_effect=nextClock,
+            ),
+            patch.object(WebSocketServer, "kInstance", ws),
+            patch("synapse.core.runtime_handler.createMessage") as createMessage,
+        ):
+            self.handler.startMetricsThread()
+            thread = self.handler.metricsThread
+            assert thread is not None
+            thread.join(timeout=2.0)
+
+            self.assertFalse(thread.is_alive())
+            self.handler.metricsThread = None
+
+        return metrics, entry, waits, createMessage
+
+    def test_metrics_thread_schedules_from_cycle_start(self):
+        metrics, entry, waits, createMessage = self._runMetricsCycles(
+            ws=None,
+            clocks=[10.0, 10.2, 11.0, 11.3],
+            cycles=2,
+        )
+
+        # Collection took 0.2 s and 0.3 s, so the wake is relative to each
+        # cycle start instead of a fixed 1 s after collection finished.
+        self.assertEqual(len(waits), 2)
+        for actual, expected in zip(waits, [0.8, 0.7]):
+            self.assertAlmostEqual(actual, expected)
+        self.assertEqual(
+            metrics.sampleCpuUtilization.call_args_list,
+            [call(now=10.0), call(now=11.0)],
+        )
+        entry.set.assert_called_with([41.0, 12.5, 8192, 1234.0, 0, 2048, 55.0, 0.0])
+        createMessage.assert_not_called()
+
+    def test_metrics_thread_publishes_only_to_connected_clients(self):
+        ws = MagicMock()
+        ws.hasClients = True
+
+        _, _, waits, createMessage = self._runMetricsCycles(
+            ws=ws,
+            clocks=[20.0, 20.05],
+            cycles=1,
+        )
+
+        self.assertEqual(len(waits), 1)
+        self.assertAlmostEqual(waits[0], 0.95)
+        createMessage.assert_called_once()
+        ws.sendToAllSync.assert_any_call(createMessage.return_value)
 
     def test_request_stop_clears_running_event(self):
         self.handler.running.set()

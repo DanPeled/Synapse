@@ -4,9 +4,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import importlib.util
-from http.server import SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from socketserver import TCPServer
 from threading import Thread
 
 from synapse.log import info
@@ -54,6 +53,15 @@ class MultiHTMLHandler(SimpleHTTPRequestHandler):
         return super().send_error(404)
 
 
+class ReusableThreadingHTTPServer(ThreadingHTTPServer):
+    """HTTP server that serves UI assets concurrently and restarts cleanly."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+    # Handler threads are daemons, so shutdown should not wait for slow assets.
+    block_on_close = False
+
+
 class UIHandle:
     """
     Handles launching the Synapse UI (Next.js compatible) HTTP server.
@@ -76,13 +84,9 @@ class UIHandle:
 
         serve_dir = Path(spec.origin).parent
 
-        # Custom TCPServer that allows address reuse (helps restart server quickly)
-        class ReusableTCPServer(TCPServer):
-            allow_reuse_address = True
-
         def serve():
             try:
-                with ReusableTCPServer(
+                with ReusableThreadingHTTPServer(
                     ("", port),
                     lambda *args, **kwargs: MultiHTMLHandler(
                         *args, directory=str(serve_dir), **kwargs

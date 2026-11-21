@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import unittest
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, call, mock_open, patch
 
 from synapse.hardware.metrics import (
     LinuxCmds,
@@ -110,10 +110,38 @@ class TestMetricsManager(unittest.TestCase):
         self.assertEqual(used_ram, 2048)
 
     @patch("psutil.cpu_percent")
-    def test_getUtilization(self, mock_cpu_percent):
+    def test_getUtilization_is_non_blocking_and_primed(self, mock_cpu_percent):
         mock_cpu_percent.return_value = 45.5
-        util = self.metrics.getCpuUtilization()
-        self.assertEqual(util, 45.5)
+
+        # The first non-blocking sample only establishes a psutil baseline.
+        self.assertEqual(self.metrics.getCpuUtilization(), 0.0)
+        mock_cpu_percent.assert_called_once_with(interval=None)
+
+    @patch("psutil.cpu_percent")
+    def test_sample_uses_explicit_timestamps_and_throttles(self, mock_cpu_percent):
+        mock_cpu_percent.side_effect = [0.0, 45.5, 90.0]
+        metrics = MetricsManager(cpuSampleInterval=1.0)
+
+        self.assertEqual(metrics.sampleCpuUtilization(now=100.0), 0.0)
+        self.assertEqual(metrics.sampleCpuUtilization(now=100.5), 0.0)
+        # A sample too soon after the previous one reuses the cached value.
+        mock_cpu_percent.assert_called_once_with(interval=None)
+
+        self.assertEqual(metrics.sampleCpuUtilization(now=101.0), 45.5)
+        self.assertEqual(metrics.sampleCpuUtilization(now=101.5), 45.5)
+        self.assertEqual(metrics.sampleCpuUtilization(now=102.0), 90.0)
+        self.assertEqual(mock_cpu_percent.call_args_list, [call(interval=None)] * 3)
+
+    @patch("psutil.cpu_percent", side_effect=[0.0, 55.5])
+    @patch("synapse.hardware.metrics.time.monotonic", side_effect=[10.0, 11.0])
+    def test_getUtilization_uses_default_monotonic_clock(
+        self, mock_monotonic, mock_cpu_percent
+    ):
+        metrics = MetricsManager()
+
+        self.assertEqual(metrics.getCpuUtilization(), 0.0)
+        self.assertEqual(metrics.getCpuUtilization(), 55.5)
+        self.assertEqual(mock_monotonic.call_count, 2)
 
     @patch("time.time", return_value=10000)
     @patch("psutil.boot_time", return_value=9000)
