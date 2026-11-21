@@ -8,7 +8,6 @@ import threading
 import time
 
 import numpy as np
-
 from synapse.core.camera.camera_handle import CameraHandle
 
 
