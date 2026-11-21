@@ -5,7 +5,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from functools import cache
 from math import isfinite
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
@@ -316,13 +315,34 @@ def listToTransform3d(dataList: List[List[float]]) -> geometry.Transform3d:
         )
 
 
-@cache
 def getCameraTable(handle: CameraHandle) -> NetworkTable:
-    return (
-        NetworkTableInstance.getDefault()
-        .getTable(NtClient.NT_TABLE)
-        .getSubTable(getCameraTableName(handle))
-    )
+    """Return the NetworkTables table for a camera.
+
+    The table is cached on the handle itself (rather than in a global
+    ``@cache`` keyed by the handle) so renaming a camera can invalidate it
+    without leaving every other camera's cache behind.
+    """
+    tableName = getCameraTableName(handle)
+    table = getattr(handle, "ntTable", None)
+    if table is None or getattr(handle, "ntTableName", None) != tableName:
+        table = (
+            NetworkTableInstance.getDefault()
+            .getTable(NtClient.NT_TABLE)
+            .getSubTable(tableName)
+        )
+        handle.ntTable = table
+        handle.ntTableName = tableName
+    return table
+
+
+def invalidateCameraTable(handle: CameraHandle) -> None:
+    """Force the next ``getCameraTable`` call to resolve the current name."""
+    invalidator = getattr(handle, "invalidateNtTable", None)
+    if invalidator is not None:
+        invalidator()
+        return
+    handle.ntTable = None
+    handle.ntTableName = ""
 
 
 def getCameraTableName(handle: CameraHandle) -> str:

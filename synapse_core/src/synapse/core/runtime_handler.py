@@ -430,6 +430,7 @@ class RuntimeManager:
         if not self.__sendSettingsInNT:
             return
 
+        assert camera is not None
         nt_table = getCameraTable(camera)
         key = (cameraIndex, prop)
 
@@ -567,13 +568,16 @@ class RuntimeManager:
         if not hasattr(self, "__pipelineEntryCache"):
             self.__pipelineEntryCache = {}
 
+        handle = self.cameraHandler.getCameraHandle(cameraIndex)
+        assert handle is not None
+
         if cameraIndex not in self.__pipelineEntryCache:
-            table = getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex))
+            table = getCameraTable(handle)
             pipeline_entryPath = f"{CameraSettingsKeys.kPipeline.value}"
             self.__pipelineEntryCache[cameraIndex] = table.getEntry(pipeline_entryPath)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
-        getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex)).getEntry(
+        getCameraTable(handle).getEntry(
             CameraSettingsKeys.kPipelineType.value
         ).setString(
             self.pipelineHandler.pipelineTypeNames[cameraIndex].get(
@@ -711,9 +715,9 @@ class RuntimeManager:
     ) -> Optional[Frame]:
         entry = self.cameraFrameEntries.get(cameraIndex)
         if entry is None:
-            entry = getCameraTable(
-                self.cameraHandler.getCameraHandle(cameraIndex)
-            ).getEntry(CameraSettingsKeys.kViewID.value)
+            handle = self.cameraHandler.getCameraHandle(cameraIndex)
+            assert handle is not None
+            entry = getCameraTable(handle).getEntry(CameraSettingsKeys.kViewID.value)
             if not entry.exists():
                 entry.setString(self.DEFAULT_STEP)
             self.cameraFrameEntries[cameraIndex] = entry
@@ -728,7 +732,12 @@ class RuntimeManager:
                 assert isinstance(event.data, ValueEventData)
                 self.cameraViewIDs[cameraIndex] = event.data.value.getString()
 
-            self._addNtListener(entry, EventFlags.VALUE_REMOTE, onViewIDChanged)
+            self._addNtListener(
+                entry,
+                EventFlags.VALUE_REMOTE,
+                onViewIDChanged,
+                key=(cameraIndex, CameraSettingsKeys.kViewID.value, ""),
+            )
 
         if result is None:
             return
@@ -761,9 +770,9 @@ class RuntimeManager:
             pubKey = (cameraIndex, key)
             publisher = self._latencyPubs.get(pubKey)
             if publisher is None:
-                cameraTable = getCameraTable(
-                    self.cameraHandler.getCameraHandle(cameraIndex)
-                )
+                handle = self.cameraHandler.getCameraHandle(cameraIndex)
+                assert handle is not None
+                cameraTable = getCameraTable(handle)
                 publisher = cameraTable.getDoubleTopic(key).publish()
                 self._latencyPubs[pubKey] = publisher
             publisher.set(value)
@@ -786,36 +795,56 @@ class RuntimeManager:
                 buildMessage, coalesce_key=("camera_performance", cameraIndex)
             )
 
-    def setupNetworkTables(self) -> None:
-        for cameraIndex, handle in self.cameraHandler.cameraHandles.items():
-            entry = getCameraSettingEntry(handle, CameraSettingsKeys.kPipeline.value)
+    def _setupCameraRecordListener(
+        self, cameraIndex: CameraID, handle: CameraHandle
+    ) -> None:
+        entry = getCameraSettingEntry(handle, CameraSettingsKeys.kRecord.value)
+        if entry is None:
+            return
 
-            if entry is None:
-                entry = getCameraTable(handle).getEntry(
-                    CameraSettingsKeys.kPipeline.value
-                )
+        def listener(event: Event) -> None:
+            value = self.getEventDataValue(event)
+            assert isinstance(value, bool)
+            self.cameraHandler.setRecordingStatus(cameraIndex, value)
 
-            def updateNTPipelineListener(
-                event: Event, cameraIndex: CameraID = cameraIndex
-            ):
-                assert isinstance(event.data, ValueEventData)
+        self._addNtListener(
+            entry,
+            EventFlags.VALUE_REMOTE,
+            listener,
+            key=(cameraIndex, CameraSettingsKeys.kRecord.value, ""),
+        )
 
-                pipelineIndex = event.data.value.getInteger()
+    def _setupCameraPipelineListener(
+        self, cameraIndex: CameraID, handle: CameraHandle
+    ) -> None:
+        entry = getCameraSettingEntry(handle, CameraSettingsKeys.kPipeline.value)
 
-                self.onPipelineChangedFromNT.call(pipelineIndex, cameraIndex)
+        if entry is None:
+            entry = getCameraTable(handle).getEntry(CameraSettingsKeys.kPipeline.value)
 
-                self.setPipelineByIndex(
-                    pipelineIndex=pipelineIndex, cameraIndex=cameraIndex
-                )
+        def updateNTPipelineListener(event: Event, cameraIndex: CameraID = cameraIndex):
+            assert isinstance(event.data, ValueEventData)
 
-            self._addNtListener(
-                entry,
-                EventFlags.VALUE_REMOTE,
-                updateNTPipelineListener,
-                key=(cameraIndex, CameraSettingsKeys.kPipeline.value, ""),
+            pipelineIndex = event.data.value.getInteger()
+
+            self.onPipelineChangedFromNT.call(pipelineIndex, cameraIndex)
+
+            self.setPipelineByIndex(
+                pipelineIndex=pipelineIndex, cameraIndex=cameraIndex
             )
 
-            entry.setInteger(self.pipelineHandler.defaultPipelineIndexes[cameraIndex])
+        self._addNtListener(
+            entry,
+            EventFlags.VALUE_REMOTE,
+            updateNTPipelineListener,
+            key=(cameraIndex, CameraSettingsKeys.kPipeline.value, ""),
+        )
+
+        entry.setInteger(self.pipelineHandler.defaultPipelineIndexes[cameraIndex])
+
+    def setupNetworkTables(self) -> None:
+        for cameraIndex, handle in self.cameraHandler.cameraHandles.items():
+            self._setupCameraPipelineListener(cameraIndex, handle)
         for cameraIndex, status in self.cameraHandler.recordingStatus.items():
             handle = self.cameraHandler.getCameraHandle(cameraIndex)
             assert handle is not None
@@ -1043,16 +1072,69 @@ class RuntimeManager:
         if key is not None:
             self._ntListenerKeys[key] = listener
 
-    def _removeNtListeners(self) -> None:
-        """Remove every NetworkTables listener registered by the runtime."""
+    def _removeNtListeners(self, cameraID: Optional[CameraID] = None) -> None:
+        """Remove runtime NetworkTables listeners, optionally for one camera."""
         instance = NetworkTableInstance.getDefault()
-        for listener in self._ntListeners:
+
+        if cameraID is None:
+            for listener in self._ntListeners:
+                try:
+                    instance.removeListener(listener)
+                except Exception as error:
+                    log.err(
+                        f"Failed to remove NetworkTables listener {listener}: {error}"
+                    )
+            self._ntListeners.clear()
+            self._ntListenerKeys.clear()
+            return
+
+        removed = []
+        for key, listener in list(self._ntListenerKeys.items()):
+            if key[0] != cameraID:
+                continue
             try:
                 instance.removeListener(listener)
             except Exception as error:
                 log.err(f"Failed to remove NetworkTables listener {listener}: {error}")
-        self._ntListeners.clear()
-        self._ntListenerKeys.clear()
+            removed.append(listener)
+            del self._ntListenerKeys[key]
+        self._ntListeners = [item for item in self._ntListeners if item not in removed]
+
+    def _closeCameraPublishers(self, cameraID: CameraID) -> None:
+        """Release cached publishers/entries bound to a camera's old NT path."""
+        for publishers in (self.propPubs, self._latencyPubs):
+            for key, publisher in list(publishers.items()):
+                if key[0] != cameraID:
+                    continue
+                try:
+                    publisher.close()
+                except Exception as error:
+                    log.err(f"Failed to close publisher {key}: {error}")
+                del publishers[key]
+
+        self.cameraFrameEntries.pop(cameraID, None)
+        self.cameraViewIDs.pop(cameraID, None)
+        if hasattr(self, "_RuntimeManager__pipelineEntryCache"):
+            self.__pipelineEntryCache.pop(cameraID, None)
+
+    def _rebindCameraNt(self, cameraID: CameraID) -> None:
+        """Re-register a camera's NT state after it has been renamed."""
+        if not self.isSetup:
+            return
+
+        handle = self.cameraHandler.getCameraHandle(cameraID)
+        if handle is None:
+            return
+
+        self._removeNtListeners(cameraID)
+        self._closeCameraPublishers(cameraID)
+        self._setupCameraRecordListener(cameraID, handle)
+        self._setupCameraPipelineListener(cameraID, handle)
+
+        pipelineIndex = self.pipelineBindings.get(
+            cameraID, DEFAULT_PIPELINE_FOR_NEW_CAMERA
+        )
+        self.setPipelineByIndex(cameraID, pipelineIndex)
 
     def setupCallbacks(self):
         def onRemovePipeline(
@@ -1092,20 +1174,13 @@ class RuntimeManager:
         def onAddCamera(
             cameraIndex: CameraID, name: CameraName, handle: CameraHandle
         ) -> None:
-            def listener(event, cameraIndex: CameraID = cameraIndex) -> None:
-                value = self.getEventDataValue(event)
-                assert isinstance(value, bool)
+            self._setupCameraRecordListener(cameraIndex, handle)
 
-                self.cameraHandler.setRecordingStatus(cameraIndex, value)
-
-            recordEntry = getCameraSettingEntry(
-                handle, CameraSettingsKeys.kRecord.value
-            )
-            assert recordEntry is not None
-
-            self._addNtListener(recordEntry, EventFlags.VALUE_REMOTE, listener)
+        def onCameraRenamed(cameraID: CameraID, newName: CameraName) -> None:
+            self._rebindCameraNt(cameraID)
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
+        self.cameraHandler.onRenameCamera.add(onCameraRenamed)
         self.pipelineHandler.onRemovePipeline.add(onRemovePipeline)  # pyright: ignore
         self.pipelineHandler.onDefaultPipelineSet.add(onSetDefaultPipeline)
 
