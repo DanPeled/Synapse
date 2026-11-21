@@ -263,6 +263,10 @@ Transform2d, Twist2d, and their 3D counterparts.</div>
 <dd>
 <div class="block">Typed getter for camera settings.</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#getSettingReader(java.lang.String)" class="member-name-link">getSettingReader(String)</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Returns a latest-value reader for a setting topic, creating it once.</div>
+</dd>
 <dt><a href="synapse/SynapseCamera.html#getSettingsTable()" class="member-name-link">getSettingsTable()</a> - Method in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Returns the settings subtable.</div>
@@ -403,11 +407,15 @@ Transform2d, Twist2d, and their 3D counterparts.</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#m_entryCache" class="member-name-link">m_entryCache</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">Cache of all NetworkTableEntries for quick access</div>
+<div class="block">Cache of NetworkTableEntries, keyed by full topic path to avoid cross-subtable collisions</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#m_pipelineEntry" class="member-name-link">m_pipelineEntry</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">Cached entry for the current pipeline ID</div>
+<div class="block">Entry used to publish the current pipeline ID</div>
+</dd>
+<dt><a href="synapse/SynapseCamera.html#m_pipelineSubscriber" class="member-name-link">m_pipelineSubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Latest-value subscriber for the current pipeline ID</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#m_pipelineTypeSubscriber" class="member-name-link">m_pipelineTypeSubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
@@ -419,7 +427,11 @@ Transform2d, Twist2d, and their 3D counterparts.</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#m_recordStateEntry" class="member-name-link">m_recordStateEntry</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
-<div class="block">Entry that indicates whether recording is currently active</div>
+<div class="block">Entry used to publish the recording state</div>
+</dd>
+<dt><a href="synapse/SynapseCamera.html#m_recordStateSubscriber" class="member-name-link">m_recordStateSubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Latest-value subscriber for the recording state</div>
 </dd>
 <dt><a href="synapse/SynapseCamera.html#m_resultsSubscriber" class="member-name-link">m_resultsSubscriber</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
@@ -430,13 +442,29 @@ Transform2d, Twist2d, and their 3D counterparts.</div>
 <div class="block">Transform representing the physical offset between the robot's coordinate frame and the
 camera's coordinate frame.</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#m_settingReaders" class="member-name-link">m_settingReaders</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Latest-value readers for settings, keyed by full topic path</div>
+</dd>
 <dt><a href="synapse/SynapseCamera.html#m_settingsTable" class="member-name-link">m_settingsTable</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Subtable containing camera settings</div>
 </dd>
+<dt><a href="synapse/SynapseCamera.html#m_settingsTablePath" class="member-name-link">m_settingsTablePath</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Full path of the settings subtable, usable without touching NetworkTables in tests.</div>
+</dd>
 <dt><a href="synapse/SynapseCamera.html#m_table" class="member-name-link">m_table</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
 <dd>
 <div class="block">Root table for this camera</div>
+</dd>
+<dt><a href="synapse/SynapseCamera.html#m_warnedSettingKeys" class="member-name-link">m_warnedSettingKeys</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Setting keys for which a type mismatch has already been reported</div>
+</dd>
+<dt><a href="synapse/SynapseCamera.html#m_warningReporter" class="member-name-link">m_warningReporter</a> - Variable in class synapse.<a href="synapse/SynapseCamera.html" title="class in synapse">SynapseCamera</a></dt>
+<dd>
+<div class="block">Reporter for setting type mismatches; overridable in tests.</div>
 </dd>
 <dt><a href="synapse/pipelines/color/ColorResult.html#main_detection" class="member-name-link">main_detection</a> - Variable in class synapse.pipelines.color.<a href="synapse/pipelines/color/ColorResult.html" title="class in synapse.pipelines.color">ColorResult</a></dt>
 <dd>

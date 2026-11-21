@@ -64,12 +64,18 @@ loadScripts(document, 'script');</script>
 <li><a href="#synapseTableName" tabindex="0">synapseTableName</a></li>
 <li><a href="#m_table" tabindex="0">m_table</a></li>
 <li><a href="#m_settingsTable" tabindex="0">m_settingsTable</a></li>
+<li><a href="#m_settingsTablePath" tabindex="0">m_settingsTablePath</a></li>
 <li><a href="#m_dataTable" tabindex="0">m_dataTable</a></li>
 <li><a href="#m_entryCache" tabindex="0">m_entryCache</a></li>
+<li><a href="#m_settingReaders" tabindex="0">m_settingReaders</a></li>
+<li><a href="#m_warnedSettingKeys" tabindex="0">m_warnedSettingKeys</a></li>
+<li><a href="#m_warningReporter" tabindex="0">m_warningReporter</a></li>
 <li><a href="#m_pipelineEntry" tabindex="0">m_pipelineEntry</a></li>
+<li><a href="#m_pipelineSubscriber" tabindex="0">m_pipelineSubscriber</a></li>
 <li><a href="#m_pipelineTypeSubscriber" tabindex="0">m_pipelineTypeSubscriber</a></li>
 <li><a href="#m_resultsSubscriber" tabindex="0">m_resultsSubscriber</a></li>
 <li><a href="#m_recordStateEntry" tabindex="0">m_recordStateEntry</a></li>
+<li><a href="#m_recordStateSubscriber" tabindex="0">m_recordStateSubscriber</a></li>
 <li><a href="#m_captureLatencySubscriber" tabindex="0">m_captureLatencySubscriber</a></li>
 <li><a href="#m_processLatencySubscriber" tabindex="0">m_processLatencySubscriber</a></li>
 <li><a href="#s_ObjectMapper" tabindex="0">s_ObjectMapper</a></li>
@@ -91,6 +97,7 @@ loadScripts(document, 'script');</script>
 <li><a href="#getSettingsTable()" tabindex="0">getSettingsTable()</a></li>
 <li><a href="#getDataTable()" tabindex="0">getDataTable()</a></li>
 <li><a href="#getCachedEntry(java.lang.String,org.wpilib.networktables.NetworkTable)" tabindex="0">getCachedEntry(String, NetworkTable)</a></li>
+<li><a href="#getSettingReader(java.lang.String)" tabindex="0">getSettingReader(String)</a></li>
 <li><a href="#getPipeline()" tabindex="0">getPipeline()</a></li>
 <li><a href="#setPipeline(long)" tabindex="0">setPipeline(long)</a></li>
 <li><a href="#getPipelineType()" tabindex="0">getPipelineType()</a></li>
@@ -184,27 +191,37 @@ methods for retrieving results and metrics.</div>
 <div class="col-first odd-row-color"><code>protected final <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>, org.wpilib.networktables.NetworkTableEntry&gt;</code></div>
 <div class="col-second odd-row-color"><code><a href="#m_entryCache" class="member-name-link">m_entryCache</a></code></div>
 <div class="col-last odd-row-color">
-<div class="block">Cache of all NetworkTableEntries for quick access</div>
+<div class="block">Cache of NetworkTableEntries, keyed by full topic path to avoid cross-subtable collisions</div>
 </div>
 <div class="col-first even-row-color"><code>protected org.wpilib.networktables.NetworkTableEntry</code></div>
 <div class="col-second even-row-color"><code><a href="#m_pipelineEntry" class="member-name-link">m_pipelineEntry</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">Cached entry for the current pipeline ID</div>
+<div class="block">Entry used to publish the current pipeline ID</div>
 </div>
-<div class="col-first odd-row-color"><code>protected org.wpilib.networktables.StringSubscriber</code></div>
-<div class="col-second odd-row-color"><code><a href="#m_pipelineTypeSubscriber" class="member-name-link">m_pipelineTypeSubscriber</a></code></div>
+<div class="col-first odd-row-color"><code>protected org.wpilib.networktables.IntegerSubscriber</code></div>
+<div class="col-second odd-row-color"><code><a href="#m_pipelineSubscriber" class="member-name-link">m_pipelineSubscriber</a></code></div>
 <div class="col-last odd-row-color">
+<div class="block">Latest-value subscriber for the current pipeline ID</div>
+</div>
+<div class="col-first even-row-color"><code>protected org.wpilib.networktables.StringSubscriber</code></div>
+<div class="col-second even-row-color"><code><a href="#m_pipelineTypeSubscriber" class="member-name-link">m_pipelineTypeSubscriber</a></code></div>
+<div class="col-last even-row-color">
 <div class="block">Entry for storing or retrieving the camera's current pipeline type</div>
 </div>
-<div class="col-first even-row-color"><code>protected org.wpilib.networktables.DoubleSubscriber</code></div>
-<div class="col-second even-row-color"><code><a href="#m_processLatencySubscriber" class="member-name-link">m_processLatencySubscriber</a></code></div>
-<div class="col-last even-row-color">
+<div class="col-first odd-row-color"><code>protected org.wpilib.networktables.DoubleSubscriber</code></div>
+<div class="col-second odd-row-color"><code><a href="#m_processLatencySubscriber" class="member-name-link">m_processLatencySubscriber</a></code></div>
+<div class="col-last odd-row-color">
 <div class="block">Entry for tracking the latency of frame processing (in seconds)</div>
 </div>
-<div class="col-first odd-row-color"><code>protected org.wpilib.networktables.NetworkTableEntry</code></div>
-<div class="col-second odd-row-color"><code><a href="#m_recordStateEntry" class="member-name-link">m_recordStateEntry</a></code></div>
+<div class="col-first even-row-color"><code>protected org.wpilib.networktables.NetworkTableEntry</code></div>
+<div class="col-second even-row-color"><code><a href="#m_recordStateEntry" class="member-name-link">m_recordStateEntry</a></code></div>
+<div class="col-last even-row-color">
+<div class="block">Entry used to publish the recording state</div>
+</div>
+<div class="col-first odd-row-color"><code>protected org.wpilib.networktables.BooleanSubscriber</code></div>
+<div class="col-second odd-row-color"><code><a href="#m_recordStateSubscriber" class="member-name-link">m_recordStateSubscriber</a></code></div>
 <div class="col-last odd-row-color">
-<div class="block">Entry that indicates whether recording is currently active</div>
+<div class="block">Latest-value subscriber for the recording state</div>
 </div>
 <div class="col-first even-row-color"><code>protected org.wpilib.networktables.RawSubscriber</code></div>
 <div class="col-second even-row-color"><code><a href="#m_resultsSubscriber" class="member-name-link">m_resultsSubscriber</a></code></div>
@@ -217,15 +234,35 @@ methods for retrieving results and metrics.</div>
 <div class="block">Transform representing the physical offset between the robot's coordinate frame and the
 camera's coordinate frame.</div>
 </div>
-<div class="col-first even-row-color"><code>protected org.wpilib.networktables.NetworkTable</code></div>
-<div class="col-second even-row-color"><code><a href="#m_settingsTable" class="member-name-link">m_settingsTable</a></code></div>
+<div class="col-first even-row-color"><code>protected final <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>, synapse.SynapseCamera.SettingReader&gt;</code></div>
+<div class="col-second even-row-color"><code><a href="#m_settingReaders" class="member-name-link">m_settingReaders</a></code></div>
 <div class="col-last even-row-color">
+<div class="block">Latest-value readers for settings, keyed by full topic path</div>
+</div>
+<div class="col-first odd-row-color"><code>protected org.wpilib.networktables.NetworkTable</code></div>
+<div class="col-second odd-row-color"><code><a href="#m_settingsTable" class="member-name-link">m_settingsTable</a></code></div>
+<div class="col-last odd-row-color">
 <div class="block">Subtable containing camera settings</div>
+</div>
+<div class="col-first even-row-color"><code>protected <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
+<div class="col-second even-row-color"><code><a href="#m_settingsTablePath" class="member-name-link">m_settingsTablePath</a></code></div>
+<div class="col-last even-row-color">
+<div class="block">Full path of the settings subtable, usable without touching NetworkTables in tests.</div>
 </div>
 <div class="col-first odd-row-color"><code>protected org.wpilib.networktables.NetworkTable</code></div>
 <div class="col-second odd-row-color"><code><a href="#m_table" class="member-name-link">m_table</a></code></div>
 <div class="col-last odd-row-color">
 <div class="block">Root table for this camera</div>
+</div>
+<div class="col-first even-row-color"><code>protected final <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</code></div>
+<div class="col-second even-row-color"><code><a href="#m_warnedSettingKeys" class="member-name-link">m_warnedSettingKeys</a></code></div>
+<div class="col-last even-row-color">
+<div class="block">Setting keys for which a type mismatch has already been reported</div>
+</div>
+<div class="col-first odd-row-color"><code>protected <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html" title="class or interface in java.util.function" class="external-link">Consumer</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</code></div>
+<div class="col-second odd-row-color"><code><a href="#m_warningReporter" class="member-name-link">m_warningReporter</a></code></div>
+<div class="col-last odd-row-color">
+<div class="block">Reporter for setting type mismatches; overridable in tests.</div>
 </div>
 <div class="col-first even-row-color"><code>protected static final com.fasterxml.jackson.databind.ObjectMapper</code></div>
 <div class="col-second even-row-color"><code><a href="#s_ObjectMapper" class="member-name-link">s_ObjectMapper</a></code></div>
@@ -351,40 +388,45 @@ camera's coordinate frame.</div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Typed getter for camera settings.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected org.wpilib.networktables.NetworkTable</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSettingsTable()" class="member-name-link">getSettingsTable</a>()</code></div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected synapse.SynapseCamera.SettingReader</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSettingReader(java.lang.String)" class="member-name-link">getSettingReader</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;key)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns a latest-value reader for a setting topic, creating it once.</div>
+</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected org.wpilib.networktables.NetworkTable</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getSettingsTable()" class="member-name-link">getSettingsTable</a>()</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Returns the settings subtable.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code>static boolean</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code><a href="#isJUnitTest()" class="member-name-link">isJUnitTest</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code>static boolean</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4"><code><a href="#isJUnitTest()" class="member-name-link">isJUnitTest</a>()</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4">
 <div class="block">Checks whether the current execution is in a JUnit or TestNG test.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setPipeline(long)" class="member-name-link">setPipeline</a><wbr>(long&nbsp;pipeline)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setPipeline(long)" class="member-name-link">setPipeline</a><wbr>(long&nbsp;pipeline)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the current pipeline ID.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRecordStatus(boolean)" class="member-name-link">setRecordStatus</a><wbr>(boolean&nbsp;status)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRecordStatus(boolean)" class="member-name-link">setRecordStatus</a><wbr>(boolean&nbsp;status)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the camera recording status.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRobotToCameraOffset(org.wpilib.math.geometry.Transform3d)" class="member-name-link">setRobotToCameraOffset</a><wbr>(org.wpilib.math.geometry.Transform3d&nbsp;robotToCameraOffset)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setRobotToCameraOffset(org.wpilib.math.geometry.Transform3d)" class="member-name-link">setRobotToCameraOffset</a><wbr>(org.wpilib.math.geometry.Transform3d&nbsp;robotToCameraOffset)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Assigns the transform offset between the robot and camera coordinate frames.</div>
 </div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;void</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setSetting(synapse.SynapseCamera.Setting,T)" class="member-name-link">setSetting</a><wbr>(<a href="SynapseCamera.Setting.html" title="class in synapse">SynapseCamera.Setting</a>&lt;T&gt;&nbsp;setting,
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setSetting(synapse.SynapseCamera.Setting,T)" class="member-name-link">setSetting</a><wbr>(<a href="SynapseCamera.Setting.html" title="class in synapse">SynapseCamera.Setting</a>&lt;T&gt;&nbsp;setting,
  T&nbsp;value)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Typed setter for camera settings.</div>
 </div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="SynapseCamera.html" title="class in synapse">SynapseCamera</a></code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#withRobotToCameraOffset(org.wpilib.math.geometry.Transform3d)" class="member-name-link">withRobotToCameraOffset</a><wbr>(org.wpilib.math.geometry.Transform3d&nbsp;robotToCameraOffset)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="SynapseCamera.html" title="class in synapse">SynapseCamera</a></code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#withRobotToCameraOffset(org.wpilib.math.geometry.Transform3d)" class="member-name-link">withRobotToCameraOffset</a><wbr>(org.wpilib.math.geometry.Transform3d&nbsp;robotToCameraOffset)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the transform offset between the robot reference frame and the camera, and returns this
 instance for chaining.</div>
 </div>
@@ -442,6 +484,15 @@ instance for chaining.</div>
 </section>
 </li>
 <li>
+<section class="detail" id="m_settingsTablePath">
+<h3>m_settingsTablePath</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">m_settingsTablePath</span></div>
+<div class="block">Full path of the settings subtable, usable without touching NetworkTables in tests.</div>
+</div>
+</section>
+</li>
+<li>
 <section class="detail" id="m_dataTable">
 <h3>m_dataTable</h3>
 <div class="horizontal-scroll">
@@ -455,7 +506,34 @@ instance for chaining.</div>
 <h3>m_entryCache</h3>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">protected final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>, org.wpilib.networktables.NetworkTableEntry&gt;</span>&nbsp;<span class="element-name">m_entryCache</span></div>
-<div class="block">Cache of all NetworkTableEntries for quick access</div>
+<div class="block">Cache of NetworkTableEntries, keyed by full topic path to avoid cross-subtable collisions</div>
+</div>
+</section>
+</li>
+<li>
+<section class="detail" id="m_settingReaders">
+<h3>m_settingReaders</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>, synapse.SynapseCamera.SettingReader&gt;</span>&nbsp;<span class="element-name">m_settingReaders</span></div>
+<div class="block">Latest-value readers for settings, keyed by full topic path</div>
+</div>
+</section>
+</li>
+<li>
+<section class="detail" id="m_warnedSettingKeys">
+<h3>m_warnedSettingKeys</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</span>&nbsp;<span class="element-name">m_warnedSettingKeys</span></div>
+<div class="block">Setting keys for which a type mismatch has already been reported</div>
+</div>
+</section>
+</li>
+<li>
+<section class="detail" id="m_warningReporter">
+<h3>m_warningReporter</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html" title="class or interface in java.util.function" class="external-link">Consumer</a>&lt;<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</span>&nbsp;<span class="element-name">m_warningReporter</span></div>
+<div class="block">Reporter for setting type mismatches; overridable in tests.</div>
 </div>
 </section>
 </li>
@@ -464,7 +542,16 @@ instance for chaining.</div>
 <h3>m_pipelineEntry</h3>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type">org.wpilib.networktables.NetworkTableEntry</span>&nbsp;<span class="element-name">m_pipelineEntry</span></div>
-<div class="block">Cached entry for the current pipeline ID</div>
+<div class="block">Entry used to publish the current pipeline ID</div>
+</div>
+</section>
+</li>
+<li>
+<section class="detail" id="m_pipelineSubscriber">
+<h3>m_pipelineSubscriber</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type">org.wpilib.networktables.IntegerSubscriber</span>&nbsp;<span class="element-name">m_pipelineSubscriber</span></div>
+<div class="block">Latest-value subscriber for the current pipeline ID</div>
 </div>
 </section>
 </li>
@@ -491,7 +578,16 @@ instance for chaining.</div>
 <h3>m_recordStateEntry</h3>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type">org.wpilib.networktables.NetworkTableEntry</span>&nbsp;<span class="element-name">m_recordStateEntry</span></div>
-<div class="block">Entry that indicates whether recording is currently active</div>
+<div class="block">Entry used to publish the recording state</div>
+</div>
+</section>
+</li>
+<li>
+<section class="detail" id="m_recordStateSubscriber">
+<h3>m_recordStateSubscriber</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type">org.wpilib.networktables.BooleanSubscriber</span>&nbsp;<span class="element-name">m_recordStateSubscriber</span></div>
+<div class="block">Latest-value subscriber for the recording state</div>
 </div>
 </section>
 </li>
@@ -680,13 +776,31 @@ yielding an estimated robot pose in the same coordinate frame.</div>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">org.wpilib.networktables.NetworkTableEntry</span>&nbsp;<span class="element-name">getCachedEntry</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;key,
  org.wpilib.networktables.NetworkTable&nbsp;table)</span></div>
-<div class="block">Retrieves a cached NetworkTableEntry for a given key.</div>
+<div class="block">Retrieves a cached NetworkTableEntry for a given key.
+
+<p>The cache key includes the table path so identically named settings in different subtables
+cannot share an entry.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
 <dd><code>key</code> - the entry key</dd>
 <dd><code>table</code> - the table to fetch the entry from</dd>
 <dt>Returns:</dt>
 <dd>the cached or newly fetched NetworkTableEntry</dd>
+</dl>
+</div>
+</section>
+</li>
+<li>
+<section class="detail" id="getSettingReader(java.lang.String)">
+<h3>getSettingReader</h3>
+<div class="horizontal-scroll">
+<div class="member-signature"><span class="modifiers">protected</span>&nbsp;<span class="return-type">synapse.SynapseCamera.SettingReader</span>&nbsp;<span class="element-name">getSettingReader</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;key)</span></div>
+<div class="block">Returns a latest-value reader for a setting topic, creating it once.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>key</code> - the setting key</dd>
+<dt>Returns:</dt>
+<dd>the cached or newly created setting reader</dd>
 </dl>
 </div>
 </section>
