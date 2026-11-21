@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import unittest
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 from synapse.alert import alert
@@ -39,6 +40,7 @@ class TestAlertFunction(unittest.TestCase):
         sent_msg = call.args[0]
         if callable(sent_msg):
             sent_msg = sent_msg()
+        sent_msg = cast(bytes, sent_msg)
         self.assertIsInstance(sent_msg, bytes)
         self.assertGreater(len(sent_msg), 0)  # simple sanity check that bytes were sent
 

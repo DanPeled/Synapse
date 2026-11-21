@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import synapse.log as log
@@ -20,7 +20,8 @@ from synapse_net.socketServer import WebSocketServer
 
 def resolvePayload(payload: Any) -> bytes:
     """Resolve the lazy builders used for coalesced messages."""
-    return payload() if callable(payload) else payload
+    resolved = payload() if callable(payload) else payload
+    return cast(bytes, resolved)
 
 
 def makeRuntimeManager() -> tuple[RuntimeManager, MagicMock]:
