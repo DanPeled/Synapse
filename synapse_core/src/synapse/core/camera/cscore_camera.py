@@ -26,6 +26,7 @@ class CsCoreCamera(SynapseCamera):
         self.sink: CvSink
         self._properties: Dict[str, VideoProperty] = {}
         self.propertyMeta: PropertyMetaDict = {}
+        self._videoModes: Optional[List[VideoMode]] = None
 
     def getProperties(self) -> List:
         return list(self._properties.values())
@@ -61,7 +62,11 @@ class CsCoreCamera(SynapseCamera):
         return inst
 
     def enumerateVideoModes(self) -> List[VideoMode]:
-        return self.camera.enumerateVideoModes()
+        # Enumerating video modes talks to the camera, so only do it once. The
+        # camera handle and settings API both ask for these on every bind.
+        if self._videoModes is None:
+            self._videoModes = list(self.camera.enumerateVideoModes() or [])
+        return self._videoModes
 
     def getPropertyMeta(self) -> PropertyMetaDict:
         return self.propertyMeta
