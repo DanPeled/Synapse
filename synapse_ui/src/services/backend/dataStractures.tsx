@@ -21,6 +21,13 @@ export type CameraID = number;
 export type PipelineID = number;
 export type PipelineTypename = string;
 export type PipelineResultMap = Map<string, PipelineResultProto>;
+export type CameraPipelinesMap = Map<PipelineID, PipelineProto>;
+export type PipelinesMap = Map<CameraID, CameraPipelinesMap>;
+export type CameraPipelinesSetter = (
+  value:
+    | CameraPipelinesMap
+    | ((prev: CameraPipelinesMap) => CameraPipelinesMap),
+) => void;
 
 export namespace BackendStateSystem {
   export interface State {
@@ -33,7 +40,7 @@ export namespace BackendStateSystem {
     stateRef?: RefObject<State>;
     cameras: Map<CameraID, CameraProto>;
     cameraperformance: Map<CameraID, CameraPerformanceProto>;
-    pipelines: Map<CameraID, Map<PipelineID, PipelineProto>>;
+    pipelines: PipelinesMap;
     pipelineresults: Map<CameraID, Map<PipelineID, PipelineResultMap>>;
     pipelinetypes: Map<PipelineTypename, PipelineTypeProto>;
     calibrationdata: Map<CameraID, Map<string, CalibrationDataProto>>;

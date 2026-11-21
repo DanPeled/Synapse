@@ -31,10 +31,7 @@ import {
   MessageTypeProto,
 } from "@/generated/messages/v1/message";
 import { SaveActionsDialog } from "./save_actions";
-import {
-  PipelineID,
-  PipelineResultMap,
-} from "@/services/backend/dataStractures";
+import { CameraPipelinesMap } from "@/services/backend/dataStractures";
 
 interface CameraViewProps {
   selectedCamera?: CameraProto;
@@ -130,11 +127,17 @@ export default function Dashboard() {
 
   // ===== Update pipelines immutably =====
   function setPipelinesOfSelectedCamera(
-    newpipelines: Map<PipelineID, PipelineProto>,
+    update:
+      | CameraPipelinesMap
+      | ((prev: CameraPipelinesMap) => CameraPipelinesMap),
   ) {
     setPipelines((prev) => {
+      const current = prev.get(selectedCameraIndex) ?? new Map();
+      const next = typeof update === "function" ? update(current) : update;
+      if (next === current) return prev;
+
       const copy = new Map(prev);
-      copy.set(selectedCameraIndex, newpipelines);
+      copy.set(selectedCameraIndex, next);
       return copy;
     });
   }
