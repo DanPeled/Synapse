@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -34,6 +35,20 @@ class TestPublishFrame(unittest.TestCase):
 
         self.output = MagicMock()
         self.handler.streamOutputs[0] = self.output
+
+    def test_fps_overlay_is_drawn_only_for_published_frames(self):
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        self.handler.publishInterval = 1.0
+        self.handler.lastPublishTime[0] = time.perf_counter()
+
+        with patch("synapse.core.camera_handler.cv2.putText") as putText:
+            self.handler.publishFrame(frame, self.handle, fps=30)
+            putText.assert_not_called()
+
+            self.handler.lastPublishTime[0] = 0.0
+            self.handler.publishFrame(frame, self.handle, fps=30)
+
+        putText.assert_called_once()
 
     def test_skips_resize_when_frame_matches_stream_size(self):
         frame = np.zeros((240, 320, 3), dtype=np.uint8)

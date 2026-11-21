@@ -8,7 +8,6 @@ import threading
 import time
 import traceback
 from asyncio import Queue
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
 
@@ -55,15 +54,6 @@ from .pipeline import (
 )
 from .pipeline_handler import PipelineHandler
 from .settings_api import CameraSettings
-
-
-@dataclass
-class FPSView:
-    font = cv2.FONT_HERSHEY_PLAIN
-    fontScale = 3
-    thickness = 2
-    color = (0, 256, 0)
-    position = (10, 30)
 
 
 def sendWebUIIP():
@@ -581,31 +571,39 @@ class RuntimeManager:
         while self.running.is_set():
             cam = handle.camera
             try:
-                if cam.isConnected():
-                    ret, frame = handle.grabFrame()
-                    if ret and frame is not None:
-                        # If we just switched resolution, sometimes the first frame might be bad
-                        try:
-                            h, w = frame.shape[:2]
-                            if h == 0 or w == 0:
-                                raise ValueError("bad frame")
-                        except Exception:
-                            # Try again quickly without going to no-signal
-                            time.sleep(0.002)
-                            continue
-                        try:
-                            frame = self.fixtureFrame(cameraIndex, frame)
-                        except Exception:
-                            pass
-                        try:
-                            self._processAndPublishFrame(cameraIndex, frame)
-                        except Exception:
-                            pass
-                        continue
-            except Exception:
-                pass
+                if not cam.isConnected():
+                    # Avoid spinning while a camera is disconnected. The frame
+                    # producer already has its own short retry delay.
+                    time.sleep(0.01)
+                    continue
 
-    def _processAndPublishFrame(self, cameraIndex: CameraID, frame: Frame):
+                ret, frame, captureLatency = handle.grabFrame()
+                if not ret or frame is None:
+                    continue
+
+                # If we just switched resolution, sometimes the first frame might be bad
+                try:
+                    h, w = frame.shape[:2]
+                    if h == 0 or w == 0:
+                        raise ValueError("bad frame")
+                except Exception:
+                    # Try again quickly without going to no-signal
+                    time.sleep(0.002)
+                    continue
+                try:
+                    frame = self.fixtureFrame(cameraIndex, frame)
+                except Exception:
+                    pass
+                try:
+                    self._processAndPublishFrame(cameraIndex, frame, captureLatency)
+                except Exception:
+                    pass
+            except Exception:
+                time.sleep(0.002)
+
+    def _processAndPublishFrame(
+        self, cameraIndex: CameraID, frame: Frame, captureLatency: float = 0.0
+    ):
         camera_handles = self.cameraHandler.cameraHandles
         handle = camera_handles[cameraIndex]
 
@@ -646,23 +644,9 @@ class RuntimeManager:
         processLatency = time.perf_counter() - processStart
 
         try:
-            cv2.putText(
-                processedFrame,
-                f"FPS: {int(cameraFps)}",
-                FPSView.position,
-                FPSView.font,
-                FPSView.fontScale,
-                FPSView.color,
-                FPSView.thickness,
-                lineType=cv2.LINE_8,
-            )
-        except Exception:
-            pass
-
-        try:
             self.sendLatency(
                 cameraIndex,
-                0.0,
+                captureLatency,
                 processLatency,
                 cameraFps,
             )
@@ -670,7 +654,7 @@ class RuntimeManager:
             pass
 
         try:
-            self.cameraHandler.publishFrame(processedFrame, handle)
+            self.cameraHandler.publishFrame(processedFrame, handle, fps=int(cameraFps))
         except Exception:
             pass
 

@@ -30,12 +30,13 @@ class CameraHandle:
             np.zeros((1920, 1080, 3), dtype=np.uint8) for _ in range(self._poolSize)
         ]
 
-        # Queue now holds the INDEX of the filled buffer, not a copy of the frame data
-        # Tuple[bool, Optional[int]]: (hasFrame, buffer_index)
-        self._frameQueue: queue.Queue[Tuple[bool, Optional[int]]] = queue.Queue(
-            maxsize=1
-        )
-        # --- END FIX ---
+        # The queue holds the capture timestamp and the INDEX of the filled
+        # buffer, not a copy of the frame data. The event lets the processing
+        # thread wake as soon as a frame is available instead of polling a
+        # timeout, which previously added up to 20 ms of pickup jitter.
+        self._frameQueue: "queue.Queue[Tuple[int, int]]" = queue.Queue(maxsize=1)
+        self._frameReady = threading.Event()
+        self._frameMutex = threading.Lock()
 
         self._running: bool = True
         self._thread: Optional[threading.Thread] = None
@@ -89,8 +90,10 @@ class CameraHandle:
                 ]
 
                 try:
-                    with self._frameQueue.mutex:
-                        self._frameQueue.queue.clear()
+                    with self._frameMutex:
+                        with self._frameQueue.mutex:
+                            self._frameQueue.queue.clear()
+                        self._frameReady.clear()
                 except Exception:
                     pass
         except Exception:
@@ -200,15 +203,18 @@ class CameraHandle:
                 continue
 
             if timestamp and timestamp > 0:
-                # If queue is full, drop oldest frame
-                if self._frameQueue.full():
-                    try:
-                        self._frameQueue.get_nowait()
-                    except queue.Empty:
-                        pass
-
+                # Keep only the newest frame. The mutex makes the queue and the
+                # readiness event one atomic handoff so the consumer cannot
+                # clear a wakeup for a frame it has not dequeued yet.
                 try:
-                    self._frameQueue.put_nowait((True, buffer_index))
+                    with self._frameMutex:
+                        if self._frameQueue.full():
+                            try:
+                                self._frameQueue.get_nowait()
+                            except queue.Empty:
+                                pass
+                        self._frameQueue.put_nowait((int(timestamp), buffer_index))
+                        self._frameReady.set()
                 except queue.Full:
                     pass
 
@@ -225,22 +231,37 @@ class CameraHandle:
             if mode.fps > 0:
                 time.sleep(1.0 / mode.fps / 2.0)
 
-    def grabFrame(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def grabFrame(
+        self, timeout: float = 0.02
+    ) -> Tuple[bool, Optional[np.ndarray], float]:
+        """Wait for the newest frame and its capture-to-pickup latency in seconds."""
+        if not self._frameReady.wait(timeout):
+            return False, None, 0.0
+
         try:
-            hasFrame, index = self._frameQueue.get(timeout=0.02)
-            if hasFrame and index is not None:
-                pool = self._bufferPool
-                if index < len(pool):
-                    return True, pool[index]
-        except queue.Empty:
-            pass
+            with self._frameMutex:
+                try:
+                    timestampUs, index = self._frameQueue.get_nowait()
+                except queue.Empty:
+                    self._frameReady.clear()
+                    return False, None, 0.0
+                if self._frameQueue.empty():
+                    self._frameReady.clear()
+
+            pool = self._bufferPool
+            if index < len(pool):
+                # cscore timestamps are monotonic microseconds. Clamp negative
+                # values so a clock mismatch can never report negative latency.
+                captureLatency = max(0.0, time.monotonic() - timestampUs / 1_000_000.0)
+                return True, pool[index], captureLatency
         except Exception:
             pass
 
-        return False, None
+        return False, None, 0.0
 
     def close(self):
         self._running = False
+        self._frameReady.set()
         if self._thread is not None:
             self._thread.join(timeout=1.0)
 
