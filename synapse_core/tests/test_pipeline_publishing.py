@@ -31,7 +31,7 @@ def test_results_are_throttled_to_nt_publish_interval() -> None:
         patch.object(pipeline, "setDataValue") as setDataValue,
     ):
         for _ in range(5):
-            pipeline.setResults(object())
+            pipeline.setResults(PipelineResult())
 
         assert serialize.call_count == 1
         assert setDataValue.call_count == 1

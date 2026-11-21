@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from typing import Any, cast
 from unittest.mock import MagicMock, call
 
 from synapse.pipelines.system.calibration_pipeline import CalibrationPipeline
@@ -14,8 +15,12 @@ def makePipeline() -> CalibrationPipeline:
     pipeline = object.__new__(CalibrationPipeline)
     pipeline._lastPicturesLeft = None
     pipeline._lastCanTakePicture = None
-    pipeline.setDataValue = MagicMock()
+    pipeline.setDataValue = cast(Any, MagicMock())
     return pipeline
+
+
+def publishCalls(pipeline: CalibrationPipeline) -> MagicMock:
+    return cast(MagicMock, pipeline.setDataValue)
 
 
 def test_pictures_left_is_published_only_on_change() -> None:
@@ -25,7 +30,7 @@ def test_pictures_left_is_published_only_on_change() -> None:
     pipeline._publishPicturesLeft("3 / 20")
     pipeline._publishPicturesLeft("2 / 20")
 
-    assert pipeline.setDataValue.call_args_list == [
+    assert publishCalls(pipeline).call_args_list == [
         call("Pictures Left", "3 / 20"),
         call("Pictures Left", "2 / 20"),
     ]
@@ -39,7 +44,7 @@ def test_can_take_picture_is_published_only_on_change() -> None:
     pipeline._publishCanTakePicture(True)
     pipeline._publishCanTakePicture(True)
 
-    assert pipeline.setDataValue.call_args_list == [
+    assert publishCalls(pipeline).call_args_list == [
         call("Can Take Picture", False),
         call("Can Take Picture", True),
     ]
