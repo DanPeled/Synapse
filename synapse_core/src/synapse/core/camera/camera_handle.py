@@ -9,6 +9,7 @@ from typing import Any, Final, List, Optional, Tuple
 
 import numpy as np
 from cscore import VideoMode
+from ntcore import NetworkTable
 from synapse.stypes import CameraID
 from wpiutil import PixelFormat
 
@@ -22,6 +23,11 @@ class CameraHandle:
         self.name = name
         self.stream: str = ""
         self.cameraIndex = index
+
+        # Resolved lazily by ``getCameraTable`` and refreshed whenever the
+        # camera is renamed so NetworkTables paths never go stale.
+        self.ntTable: Optional[NetworkTable] = None
+        self.ntTableName: str = ""
 
         self._videoModes: List[VideoMode] = self.camera.enumerateVideoModes()
 
@@ -268,3 +274,8 @@ class CameraHandle:
     def setIndex(self, cameraIndex: CameraID) -> None:
         self.cameraIndex = cameraIndex
         self.stream = ""
+
+    def invalidateNtTable(self) -> None:
+        """Forget the cached table so the next lookup uses the current name."""
+        self.ntTable = None
+        self.ntTableName = ""
