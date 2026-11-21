@@ -413,6 +413,7 @@ class RuntimeManager:
         if not self.__sendSettingsInNT:
             return
 
+        assert camera is not None
         nt_table = getCameraTable(camera)
         key = (cameraIndex, prop)
 
@@ -550,13 +551,16 @@ class RuntimeManager:
         if not hasattr(self, "__pipelineEntryCache"):
             self.__pipelineEntryCache = {}
 
+        handle = self.cameraHandler.getCameraHandle(cameraIndex)
+        assert handle is not None
+
         if cameraIndex not in self.__pipelineEntryCache:
-            table = getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex))
+            table = getCameraTable(handle)
             pipeline_entryPath = f"{CameraSettingsKeys.kPipeline.value}"
             self.__pipelineEntryCache[cameraIndex] = table.getEntry(pipeline_entryPath)
 
         self.__pipelineEntryCache[cameraIndex].setInteger(pipelineIndex)
-        getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex)).getEntry(
+        getCameraTable(handle).getEntry(
             CameraSettingsKeys.kPipelineType.value
         ).setString(
             self.pipelineHandler.pipelineTypeNames[cameraIndex].get(
@@ -694,9 +698,9 @@ class RuntimeManager:
     ) -> Optional[Frame]:
         entry = self.cameraFrameEntries.get(cameraIndex)
         if entry is None:
-            entry = getCameraTable(
-                self.cameraHandler.getCameraHandle(cameraIndex)
-            ).getEntry(CameraSettingsKeys.kViewID.value)
+            handle = self.cameraHandler.getCameraHandle(cameraIndex)
+            assert handle is not None
+            entry = getCameraTable(handle).getEntry(CameraSettingsKeys.kViewID.value)
             if not entry.exists():
                 entry.setString(self.DEFAULT_STEP)
             self.cameraFrameEntries[cameraIndex] = entry
@@ -749,9 +753,9 @@ class RuntimeManager:
             pubKey = (cameraIndex, key)
             publisher = self._latencyPubs.get(pubKey)
             if publisher is None:
-                cameraTable = getCameraTable(
-                    self.cameraHandler.getCameraHandle(cameraIndex)
-                )
+                handle = self.cameraHandler.getCameraHandle(cameraIndex)
+                assert handle is not None
+                cameraTable = getCameraTable(handle)
                 publisher = cameraTable.getDoubleTopic(key).publish()
                 self._latencyPubs[pubKey] = publisher
             publisher.set(value)

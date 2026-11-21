@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from synapse.core.camera.camera_handle import CameraHandle
@@ -168,9 +169,9 @@ def test_runtime_rebind_replaces_only_renamed_camera_nt_state():
     latencyPublisher = MagicMock()
     manager.propPubs = {(0, "brightness"): publisher0, (1, "brightness"): publisher1}
     manager._latencyPubs = {(0, "captureLatency"): latencyPublisher}
-    manager.cameraFrameEntries = {0: "entry0", 1: "entry1"}
+    manager.cameraFrameEntries = cast(Any, {0: "entry0", 1: "entry1"})
     manager.cameraViewIDs = {0: "default", 1: "other"}
-    manager._RuntimeManager__pipelineEntryCache = {0: "entry0", 1: "entry1"}
+    setattr(manager, "_RuntimeManager__pipelineEntryCache", {0: "entry0", 1: "entry1"})
     manager._ntListenerKeys = {(0, "pipeline", ""): 10, (1, "pipeline", ""): 11}
     manager._ntListeners = [10, 11]
 
@@ -191,7 +192,7 @@ def test_runtime_rebind_replaces_only_renamed_camera_nt_state():
     assert 0 not in manager._latencyPubs
     assert 0 not in manager.cameraFrameEntries
     assert 0 not in manager.cameraViewIDs
-    assert 0 not in manager._RuntimeManager__pipelineEntryCache
+    assert 0 not in getattr(manager, "_RuntimeManager__pipelineEntryCache")
     assert (1, "brightness") in manager.propPubs
     setupRecord.assert_called_once_with(0, handle)
     setupPipeline.assert_called_once_with(0, handle)
