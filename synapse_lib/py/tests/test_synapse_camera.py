@@ -4,14 +4,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import unittest
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock
 
 import msgpack
+from ntcore import NetworkTableInstance
 from wpimath import Pose3d, Rotation2d, Translation3d
 
 from synapselib import SynapseCamera, SynapsePipelineType
+from synapselib._synapse_camera import Setting
 from synapselib.pipelines.apriltag import ApriltagDetection, ApriltagResult
 from synapselib.pipelines.color import ColorDetection, ColorResult
 
@@ -37,40 +40,79 @@ class TestSynapsePipeline(unittest.TestCase):
 
 class TestSynapseCamera(unittest.TestCase):
     def setUp(self):
-        # Mock NTCore tables and entries
-        self.mock_entry = MagicMock()
-        self.mock_table = MagicMock()
-        self.mock_table.getEntry.return_value = self.mock_entry
-        self.mock_instance = MagicMock()
-        self.mock_instance.getTable.return_value.getSubTable.return_value = (
-            self.mock_table
-        )
-
-        # Patch NTCore instance
-        import ntcore
-
-        ntcore.NetworkTableInstance.getDefault = MagicMock(
-            return_value=self.mock_instance
-        )
-
+        self.instance = NetworkTableInstance.getDefault()
+        self.instance.startLocal()
+        self.table = self.instance.getTable("Synapse").getSubTable("Cam1")
         self.camera = SynapseCamera("Cam1")
+
+    def tearDown(self):
+        self.camera.close()
+        self.instance.stopLocal()
 
     def test_pipeline_set_get(self):
         self.camera.setPipeline(5)
-        self.mock_entry.setInteger.assert_called_with(5)
-        self.mock_entry.getInteger.return_value = 5
+        self.instance.flush()
         self.assertEqual(self.camera.getPipeline(), 5)
+        self.assertIsNotNone(self.camera.pipelineSubscriber)
 
     def test_recording_status(self):
-        self.mock_entry.getBoolean.return_value = True
+        self.camera.setRecordStatus(True)
+        self.instance.flush()
         self.assertTrue(self.camera.getRecordingStatus())
         self.camera.setRecordStatus(False)
-        self.mock_entry.setBoolean.assert_called_with(False)
+        self.instance.flush()
+        self.assertFalse(self.camera.getRecordingStatus())
+        self.assertIsNotNone(self.camera.recordStateSubscriber)
 
     def test_get_pipeline_type(self):
-        self.mock_entry.getString.return_value = "ApriltagPipeline"
-        self.camera._SynapseCamera__pipelineTypeEntry = self.mock_entry  # pyright: ignore
+        publisher = self.table.getStringTopic(
+            SynapseCamera.NetworkTableTopics.kPipelineTypeTopic
+        ).publish()
+        publisher.set("ApriltagPipeline")
+        self.instance.flush()
         self.assertEqual(self.camera.getPipelineType(), "ApriltagPipeline")
+        self.assertIsNotNone(self.camera.pipelineTypeSubscriber)
+        publisher.close()
+
+    def test_cached_entries_are_keyed_by_full_topic_path(self):
+        settings = self.instance.getTable("/Synapse/CacheTest/settings")
+        data = self.instance.getTable("/Synapse/CacheTest/data")
+
+        self.camera.getCachedEntry("value", settings)
+        self.camera.getCachedEntry("value", data)
+        self.camera.getCachedEntry("value", settings)
+
+        self.assertEqual(len(self.camera.entryCache), 2)
+        self.assertIn("/Synapse/CacheTest/settings/value", self.camera.entryCache)
+        self.assertIn("/Synapse/CacheTest/data/value", self.camera.entryCache)
+
+    def test_settings_use_one_latest_value_subscriber_per_topic(self):
+        settings = self.instance.getTable("/Synapse/SubscriberTest/settings")
+        publisher = settings.getDoubleTopic(Setting.kBrightness.key).publish()
+        publisher.set(0.75)
+        self.instance.flush()
+        self.camera.settingsTable = settings
+
+        self.assertEqual(self.camera.getSetting(Setting.kBrightness), 0.75)
+        self.assertEqual(self.camera.getSetting(Setting.kBrightness), 0.75)
+        self.assertEqual(len(self.camera.settingSubscribers), 1)
+        publisher.close()
+
+    def test_type_mismatch_is_reported_only_once_per_setting(self):
+        settings = self.instance.getTable("/Synapse/MismatchTest/settings")
+        publisher = settings.getStringTopic(Setting.kBrightness.key).publish()
+        publisher.set("wrong")
+        self.instance.flush()
+        self.camera.settingsTable = settings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.assertIsNone(self.camera.getSetting(Setting.kBrightness))
+            self.assertIsNone(self.camera.getSetting(Setting.kBrightness))
+
+        self.assertEqual(len(caught), 1)
+        self.assertEqual(len(self.camera.warnedSettingKeys), 1)
+        publisher.close()
 
 
 class TestResultDecoding(unittest.TestCase):

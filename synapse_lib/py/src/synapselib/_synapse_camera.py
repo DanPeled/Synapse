@@ -5,14 +5,22 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Generic, Optional, Type, TypeVar, cast
+import warnings
+from typing import Any, Dict, Generic, Optional, Set, Type, TypeVar, cast
 
 import msgpack
 from ntcore import (
+    BooleanSubscriber,
+    DoubleSubscriber,
+    GenericSubscriber,
+    IntegerSubscriber,
     NetworkTable,
     NetworkTableEntry,
     NetworkTableInstance,
     NetworkTableType,
+    RawSubscriber,
+    StringSubscriber,
+    Value,
 )
 
 from ._deserialization import from_dict
@@ -94,13 +102,21 @@ class SynapseCamera:
         self.dataTable: Optional[NetworkTable] = None
 
         self.entryCache: Dict[str, NetworkTableEntry] = {}
+        self.settingSubscribers: Dict[str, GenericSubscriber] = {}
+        self.warnedSettingKeys: Set[str] = set()
 
         self.pipelineEntry: Optional[NetworkTableEntry] = None
+        self.pipelineSubscriber: Optional[IntegerSubscriber] = None
         self.pipelineTypeEntry: Optional[NetworkTableEntry] = None
+        self.pipelineTypeSubscriber: Optional[StringSubscriber] = None
         self.resultsEntry: Optional[NetworkTableEntry] = None
+        self.resultsSubscriber: Optional[RawSubscriber] = None
         self.recordStateEntry: Optional[NetworkTableEntry] = None
+        self.recordStateSubscriber: Optional[BooleanSubscriber] = None
         self.captureLatencyEntry: Optional[NetworkTableEntry] = None
+        self.captureLatencySubscriber: Optional[DoubleSubscriber] = None
         self.processLatencyEntry: Optional[NetworkTableEntry] = None
+        self.processLatencySubscriber: Optional[DoubleSubscriber] = None
 
         inst = NetworkTableInstance.getDefault()
         self.table = inst.getTable(self.synapseTableName).getSubTable(self.cameraName)
@@ -164,9 +180,75 @@ class SynapseCamera:
         """
 
         assert table is not None
-        if key not in self.entryCache:
-            self.entryCache[key] = table.getEntry(key)
-        return self.entryCache[key]
+        cache_key = self._cacheKey(table, key)
+        if cache_key not in self.entryCache:
+            self.entryCache[cache_key] = table.getEntry(key)
+        return self.entryCache[cache_key]
+
+    def getSettingSubscriber(
+        self, key: str, table: Optional[NetworkTable]
+    ) -> GenericSubscriber:
+        """
+        Returns a cached latest-value subscriber for a setting topic.
+
+        :param key: the setting key
+        :param table: the table that owns the setting
+        :return: the cached or newly created generic subscriber
+        """
+
+        assert table is not None
+        cache_key = self._cacheKey(table, key)
+        if cache_key not in self.settingSubscribers:
+            self.settingSubscribers[cache_key] = table.getTopic(key).genericSubscribe()
+        return self.settingSubscribers[cache_key]
+
+    @staticmethod
+    def _cacheKey(table: NetworkTable, key: str) -> str:
+        """Builds a cache key from the full NetworkTables topic path."""
+
+        return f"{table.getPath()}/{key}"
+
+    @staticmethod
+    def _valueToObject(value: Value) -> Optional[object]:
+        """Converts an NT value to the Python type used by :class:`Setting`."""
+
+        if value.isDouble():
+            return value.getDouble()
+        if value.isInteger():
+            return value.getInteger()
+        if value.isString():
+            return value.getString()
+        if value.isBoolean():
+            return value.getBoolean()
+        if value.isDoubleArray():
+            return value.getDoubleArray()
+        if value.isIntegerArray():
+            return value.getIntegerArray()
+        if value.isStringArray():
+            return value.getStringArray()
+        if value.isBooleanArray():
+            return value.getBooleanArray()
+        return None
+
+    def _warnMismatchOnce(
+        self,
+        setting: "Setting[Any]",
+        actualType: NetworkTableType,
+        value: Optional[object],
+    ) -> None:
+        """Reports a setting type mismatch only once per full topic path."""
+
+        warningKey = self._cacheKey(self.getSettingsTable(), setting.key)
+        if warningKey in self.warnedSettingKeys:
+            return
+        self.warnedSettingKeys.add(warningKey)
+        warnings.warn(
+            f"[SynapseCamera] Type mismatch for key '{setting.key}', expected "
+            f"{setting.ntType} ({setting.valueType.__name__}) but received "
+            f"{actualType} ({type(value).__name__})",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     # ---------------------------------------
     # Pipeline getters / setters
@@ -178,11 +260,12 @@ class SynapseCamera:
 
         :return: the pipeline index
         """
-        if self.pipelineEntry is None:
-            self.pipelineEntry = self.getCachedEntry(
-                self.NetworkTableTopics.kPipelineTopic, self.table
-            )
-        return self.pipelineEntry.getInteger(-1)
+        if self.pipelineSubscriber is None:
+            assert self.table is not None
+            self.pipelineSubscriber = self.table.getIntegerTopic(
+                self.NetworkTableTopics.kPipelineTopic
+            ).subscribe(-1)
+        return self.pipelineSubscriber.get()
 
     def setPipeline(self, pipeline: int) -> None:
         """
@@ -206,11 +289,12 @@ class SynapseCamera:
 
         :return: the pipeline type
         """
-        if self.pipelineTypeEntry is None:
-            self.pipelineTypeEntry = self.getCachedEntry(
-                self.NetworkTableTopics.kPipelineTypeTopic, self.table
-            )
-        return self.pipelineTypeEntry.getString("unknown")
+        if self.pipelineTypeSubscriber is None:
+            assert self.table is not None
+            self.pipelineTypeSubscriber = self.table.getStringTopic(
+                self.NetworkTableTopics.kPipelineTypeTopic
+            ).subscribe("unknown")
+        return self.pipelineTypeSubscriber.get()
 
     # ---------------------------------------
     # Recording
@@ -222,11 +306,12 @@ class SynapseCamera:
 
         :return: true if recording, false otherwise
         """
-        if self.recordStateEntry is None:
-            self.recordStateEntry = self.getCachedEntry(
-                self.NetworkTableTopics.kRecordStatusTopic, self.table
-            )
-        return self.recordStateEntry.getBoolean(False)
+        if self.recordStateSubscriber is None:
+            assert self.table is not None
+            self.recordStateSubscriber = self.table.getBooleanTopic(
+                self.NetworkTableTopics.kRecordStatusTopic
+            ).subscribe(False)
+        return self.recordStateSubscriber.get()
 
     def setRecordStatus(self, status: bool) -> None:
         """
@@ -250,11 +335,12 @@ class SynapseCamera:
 
         :return: capture latency in seconds, or 0.0 if it has not been published
         """
-        if self.captureLatencyEntry is None:
-            self.captureLatencyEntry = self.getCachedEntry(
-                self.NetworkTableTopics.kCaptureLatencyTopic, self.table
-            )
-        return self.captureLatencyEntry.getDouble(0.0)
+        if self.captureLatencySubscriber is None:
+            assert self.table is not None
+            self.captureLatencySubscriber = self.table.getDoubleTopic(
+                self.NetworkTableTopics.kCaptureLatencyTopic
+            ).subscribe(0.0)
+        return self.captureLatencySubscriber.get()
 
     def getProcessLatency(self) -> float:
         """
@@ -262,11 +348,12 @@ class SynapseCamera:
 
         :return: processing latency in seconds, or 0.0 if it has not been published
         """
-        if self.processLatencyEntry is None:
-            self.processLatencyEntry = self.getCachedEntry(
-                self.NetworkTableTopics.kProcessLatencyTopic, self.table
-            )
-        return self.processLatencyEntry.getDouble(0.0)
+        if self.processLatencySubscriber is None:
+            assert self.table is not None
+            self.processLatencySubscriber = self.table.getDoubleTopic(
+                self.NetworkTableTopics.kProcessLatencyTopic
+            ).subscribe(0.0)
+        return self.processLatencySubscriber.get()
 
     # ---------------------------------------
     # Untyped deprecated setting getter
@@ -279,26 +366,10 @@ class SynapseCamera:
         :param key: the setting key
         :return: Optional containing the value if present
         """
-        entry = self.getCachedEntry(key, self.getSettingsTable())
-
-        t = entry.getType()
-
-        if t == NetworkTableType.DOUBLE:
-            return entry.getDouble(0.0)
-        if t == NetworkTableType.STRING:
-            return entry.getString("")
-        if t == NetworkTableType.BOOLEAN:
-            return entry.getBoolean(False)
-        if t == NetworkTableType.INTEGER:
-            return entry.getInteger(0)
-        if t == NetworkTableType.DOUBLE_ARRAY:
-            return entry.getDoubleArray([])
-        if t == NetworkTableType.STRING_ARRAY:
-            return entry.getStringArray([])
-        if t == NetworkTableType.BOOLEAN_ARRAY:
-            return entry.getBooleanArray([])
-
-        return None
+        value = self.getSettingSubscriber(key, self.getSettingsTable()).get()
+        if not value.isValid():
+            return None
+        return self._valueToObject(value)
 
     # ---------------------------------------
     # Typed settings
@@ -312,31 +383,20 @@ class SynapseCamera:
         :param <T>: the value type
         :return: Optional containing value if present and type matches
         """
-        entry = self.getCachedEntry(setting.key, self.getSettingsTable())
-
-        if entry.getType() != setting.ntType:
+        value = self.getSettingSubscriber(setting.key, self.getSettingsTable()).get()
+        if not value.isValid():
             return None
 
-        if entry.getType() == NetworkTableType.DOUBLE:
-            val = entry.getDouble(0.0)
-        elif entry.getType() == NetworkTableType.INTEGER:
-            val = entry.getInteger(0)
-        elif entry.getType() == NetworkTableType.STRING:
-            val = entry.getString("")
-        elif entry.getType() == NetworkTableType.BOOLEAN:
-            val = entry.getBoolean(False)
-        elif entry.getType() == NetworkTableType.DOUBLE_ARRAY:
-            val = entry.getDoubleArray([])
-        elif entry.getType() == NetworkTableType.STRING_ARRAY:
-            val = entry.getStringArray([])
-        elif entry.getType() == NetworkTableType.BOOLEAN_ARRAY:
-            val = entry.getBooleanArray([])
-        else:
+        converted = self._valueToObject(value)
+        if converted is None or value.type() != setting.ntType:
+            self._warnMismatchOnce(setting, value.type(), converted)
             return None
 
-        if isinstance(val, setting.valueType):
-            return val
-        return None
+        if not isinstance(converted, setting.valueType):
+            self._warnMismatchOnce(setting, value.type(), converted)
+            return None
+
+        return cast(T, converted)
 
     def setSetting(self, setting: "Setting[T]", value: T) -> None:
         """
@@ -409,8 +469,35 @@ class SynapseCamera:
         :param pipelineType: the pipeline type whose results should be decoded
         :return: the latest decoded results, or ``None`` when no results are available
         """
-        data = self.getResultsEntry().getRaw(b"")
+        if self.resultsSubscriber is None:
+            assert self.table is not None
+            self.resultsSubscriber = (
+                self.getDataTable()
+                .getRawTopic(self.NetworkTableTopics.kResultsTopic)
+                .subscribe("raw", b"")
+            )
+        data = self.resultsSubscriber.get()
         return self.getResults(pipelineType.getResultType(), data)
+
+    # ---------------------------------------
+    # Cleanup
+    # ---------------------------------------
+
+    def close(self) -> None:
+        """Closes the typed latest-value subscribers owned by this camera."""
+
+        for subscriber in (
+            self.pipelineSubscriber,
+            self.pipelineTypeSubscriber,
+            self.recordStateSubscriber,
+            self.captureLatencySubscriber,
+            self.processLatencySubscriber,
+            self.resultsSubscriber,
+        ):
+            if subscriber is not None:
+                subscriber.close()
+        self.settingSubscribers.clear()
+        self.warnedSettingKeys.clear()
 
     # ---------------------------------------
     # Name

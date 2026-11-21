@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation3d;
+import org.wpilib.networktables.NetworkTableType;
 import synapse.pipelines.apriltag.ApriltagResult;
 import synapse.pipelines.color.ColorResult;
 
@@ -154,5 +156,62 @@ class SynapseCameraTest {
     assertEquals(9.0, result.translation.getZ());
     // Rotation2d is sent in degrees and must come back as the same angle.
     assertEquals(90.0, result.rotation.getDegrees(), 1e-9);
+  }
+
+  @Test
+  void cacheKeysIncludeTheFullTablePath() {
+    assertEquals(
+        "/Synapse/Cam/settings/value", SynapseCamera.cacheKey("/Synapse/Cam/settings", "value"));
+    assertEquals("/Synapse/Cam/data/value", SynapseCamera.cacheKey("/Synapse/Cam/data", "value"));
+  }
+
+  @Test
+  void settingsUseOneLatestValueReaderPerTopic() {
+    FakeSettingReader reader =
+        new FakeSettingReader(new SynapseCamera.SettingValue(true, NetworkTableType.DOUBLE, 0.75));
+    String key = SynapseCamera.Setting.kBrightness.getKey();
+    camera.m_settingsTablePath = "/Synapse/Test/settings";
+    camera.m_settingReaders.put(SynapseCamera.cacheKey(camera.m_settingsTablePath, key), reader);
+
+    assertEquals(0.75, camera.getSetting(SynapseCamera.Setting.kBrightness).orElseThrow());
+    assertEquals(0.75, camera.getSetting(SynapseCamera.Setting.kBrightness).orElseThrow());
+    assertEquals(2, reader.reads);
+    assertEquals(1, camera.m_settingReaders.size());
+  }
+
+  @Test
+  void typeMismatchIsReportedOnlyOncePerSetting() {
+    FakeSettingReader reader =
+        new FakeSettingReader(
+            new SynapseCamera.SettingValue(true, NetworkTableType.STRING, "wrong"));
+    String key = SynapseCamera.Setting.kBrightness.getKey();
+    List<String> warnings = new ArrayList<>();
+    camera.m_settingsTablePath = "/Synapse/Test/settings";
+    camera.m_warningReporter = warnings::add;
+    camera.m_settingReaders.put(SynapseCamera.cacheKey(camera.m_settingsTablePath, key), reader);
+
+    assertTrue(camera.getSetting(SynapseCamera.Setting.kBrightness).isEmpty());
+    assertTrue(camera.getSetting(SynapseCamera.Setting.kBrightness).isEmpty());
+    assertEquals(1, warnings.size());
+    assertEquals(1, camera.m_warnedSettingKeys.size());
+  }
+
+  /** Deterministic setting reader that never touches NetworkTables. */
+  private static final class FakeSettingReader implements SynapseCamera.SettingReader {
+    private final SynapseCamera.SettingValue m_value;
+    private int reads;
+
+    private FakeSettingReader(SynapseCamera.SettingValue value) {
+      m_value = value;
+    }
+
+    @Override
+    public SynapseCamera.SettingValue read() {
+      reads++;
+      return m_value;
+    }
+
+    @Override
+    public void close() {}
   }
 }
