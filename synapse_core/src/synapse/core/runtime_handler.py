@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import faulthandler
+import os
+import tempfile
 import threading
 import time
 import traceback
@@ -66,6 +68,41 @@ def sendWebUIIP():
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
 DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
 METRICS_INTERVAL_SECONDS: Final[float] = 1.0
+
+# UI changes often arrive in bursts. Wait for a short quiet period before
+# writing, but bound the wait so a continuous stream still produces saves.
+SAVE_DEBOUNCE_SECONDS: Final[float] = 0.25
+MAX_SAVE_DELAY_SECONDS: Final[float] = 1.0
+SAVE_WORKER_TIMEOUT_SECONDS: Final[float] = 5.0
+
+
+def _atomicWriteText(path: Path, content: str) -> None:
+    """Write a YAML/text file atomically using a sibling temporary file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    existingMode: Optional[int] = None
+    try:
+        existingMode = path.stat().st_mode & 0o777
+    except OSError:
+        pass
+
+    descriptor, tempName = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            file.write(content)
+            file.flush()
+            os.fsync(file.fileno())
+        if existingMode is not None:
+            os.chmod(tempName, existingMode)
+        os.replace(tempName, path)
+    except Exception:
+        try:
+            os.unlink(tempName)
+        except OSError:
+            pass
+        raise
 
 
 def _metricsMonotonic() -> float:
@@ -145,6 +182,17 @@ class RuntimeManager:
         self.onSettingChangedFromNT: SettingChangedCallback = Callback()
         self.onPipelineChangedFromNT: Callback[PipelineID, CameraID] = Callback()
         self.onPipelineChanged: Callback[PipelineID, CameraID] = Callback()
+        self.onSaveError: Callback[[Exception]] = Callback()
+
+        # One worker owns all config writes. Requests are coalesced so bursts
+        # of UI/NT callbacks result in a single (or bounded) number of saves.
+        self._saveLock = threading.Lock()
+        self._saveRequested = threading.Event()
+        self._saveStopped = threading.Event()
+        self._savePending = False
+        self._saveCancelled = False
+        self._saveThread: Optional[threading.Thread] = None
+        self._saveDebounceSeconds = SAVE_DEBOUNCE_SECONDS
 
         def onAddCamera(cameraID: CameraID, name: str, handle: CameraHandle):
             if cameraID not in self.pipelineBindings:
@@ -921,6 +969,137 @@ class RuntimeManager:
             },
         }
 
+    def requestSave(self) -> None:
+        """Request a debounced save without blocking the caller.
+
+        All requests are coalesced by one background worker. Once the worker is
+        stopped, late requests are written synchronously so settings are not
+        silently dropped during shutdown.
+        """
+        stopped = False
+        with self._saveLock:
+            if self._saveCancelled:
+                return
+            if self._saveStopped.is_set():
+                stopped = True
+            else:
+                self._savePending = True
+                self._saveRequested.set()
+                if self._saveThread is None:
+                    self._saveThread = threading.Thread(
+                        target=self._saveWorker,
+                        name="SynapseSave",
+                        daemon=True,
+                    )
+                    self._saveThread.start()
+
+        if stopped:
+            self._saveAndReport()
+
+    def save(self) -> None:
+        """Schedule a save on the shared debounced save worker."""
+        self.requestSave()
+
+    def _saveWorker(self) -> None:
+        while True:
+            self._saveRequested.wait()
+            self._saveRequested.clear()
+
+            with self._saveLock:
+                if self._saveStopped.is_set() and not self._savePending:
+                    return
+                if not self._savePending:
+                    continue
+
+            firstRequest = time.monotonic()
+            deadline = firstRequest + self._saveDebounceSeconds
+            maxDeadline = firstRequest + MAX_SAVE_DELAY_SECONDS
+
+            while True:
+                waitFor = max(0.0, min(deadline, maxDeadline) - time.monotonic())
+                if waitFor <= 0:
+                    break
+                if self._saveStopped.wait(waitFor):
+                    break
+                if self._saveRequested.is_set():
+                    self._saveRequested.clear()
+                    deadline = min(
+                        time.monotonic() + self._saveDebounceSeconds,
+                        maxDeadline,
+                    )
+
+            with self._saveLock:
+                if not self._savePending:
+                    continue
+                self._savePending = False
+
+            self._saveAndReport()
+
+            if self._saveStopped.is_set():
+                with self._saveLock:
+                    if not self._savePending:
+                        return
+
+    def stopSaveWorker(
+        self,
+        timeout: float = SAVE_WORKER_TIMEOUT_SECONDS,
+        *,
+        flush: bool = True,
+    ) -> None:
+        """Stop the save worker after optionally flushing pending saves.
+
+        Idempotent. ``flush=False`` drops pending writes, which is needed before
+        destructive operations such as formatting the config away.
+        """
+        with self._saveLock:
+            thread = self._saveThread
+            if thread is None:
+                return
+            self._saveStopped.set()
+            if not flush:
+                self._savePending = False
+            self._saveRequested.set()
+
+        joinThread(thread, "Save", timeout)
+
+    def cancelPendingSaves(self) -> None:
+        """Drop queued saves and prevent later saves from recreating files."""
+        with self._saveLock:
+            self._saveCancelled = True
+        self.stopSaveWorker(flush=False)
+
+    def _saveAndReport(self) -> None:
+        try:
+            self.saveNow()
+        except Exception as error:
+            errString = "Failed to save Synapse settings:\n" + "".join(
+                traceback.format_exception(type(error), error, error.__traceback__)
+            )
+            if self.onSaveError.callbacks:
+                self.onSaveError(error)
+            else:
+                log.err(errString)
+
+    def saveNow(self) -> None:
+        """Perform the actual save. Only the save worker should call this."""
+        y = yaml.safe_dump(
+            self.toDict(),
+            default_flow_style=None,  # use block style by default
+            sort_keys=False,  # preserve key order
+            indent=2,  # control indentation
+            width=80,  # wrap width for long lists
+        )
+        savefile = Config.getInstance().path
+        _atomicWriteText(savefile, y)
+
+        self.savePipelines()
+        self.saveCameras()
+
+        log.info(
+            MarkupColors.bold(f"Saved into {savefile.absolute().__str__()}"),
+            shouldAlert=True,
+        )
+
     def savePipelines(self) -> None:
         cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}  # TODO
         for (
@@ -946,46 +1125,23 @@ class RuntimeManager:
                 / f"camera_{cameraid}"
                 / "pipeline_settings.yml"
             )
-            savefile.parent.mkdir(parents=True, exist_ok=True)
-            with open(savefile, "w") as f:
-                f.write(y)
+            _atomicWriteText(savefile, y)
 
-    def save(self) -> None:
-        y = yaml.safe_dump(
-            self.toDict(),
-            default_flow_style=None,  # use block style by default
-            sort_keys=False,  # preserve key order
-            indent=2,  # control indentation
-            width=80,  # wrap width for long lists
-        )
-        savefile = Config.getInstance().path
-        with open(savefile, "w") as f:
-            f.write(y)
-
-        self.savePipelines()
-        self.saveCameras()
-
-        log.info(
-            MarkupColors.bold(f"Saved into {savefile.absolute().__str__()}"),
-            shouldAlert=True,
-        )
-
-    def saveCameras(self):
+    def saveCameras(self) -> None:
         for cameraid, config in self.cameraHandler.cameraConfigBindings.items():
             savefile = (
                 Config.getInstance().path.parent
                 / f"camera_{cameraid}"
                 / "camera_configs.yml"
             )
-            with open(savefile, "w") as f:
-                y = yaml.safe_dump(
-                    {"camera_configs": config.toDict()},
-                    default_flow_style=None,  # use block style by default
-                    sort_keys=False,  # preserve key order
-                    indent=2,  # control indentation
-                    width=80,  # wrap width for long lists
-                )
-                f.write(y)
+            y = yaml.safe_dump(
+                {"camera_configs": config.toDict()},
+                default_flow_style=None,  # use block style by default
+                sort_keys=False,  # preserve key order
+                indent=2,  # control indentation
+                width=80,  # wrap width for long lists
+            )
+            _atomicWriteText(savefile, y)
 
     def requestStop(self) -> None:
         """Ask all runtime worker loops to stop."""
@@ -1058,6 +1214,9 @@ class RuntimeManager:
         self.cameraHandler.cleanup()
         self.isSetup = False
         self.setupEvent.clear()
+
+        # Flush any debounced writes after the state they describe is stable.
+        self.stopSaveWorker()
         log.info("Runtime resources released.")
 
     def _addNtListener(
