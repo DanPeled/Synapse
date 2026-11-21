@@ -90,7 +90,7 @@ def test_metrics_use_a_single_coalesce_key() -> None:
     ws = MagicMock()
     metricsManager = MagicMock()
     metricsManager.getCpuTemp.return_value = 41.0
-    metricsManager.getCpuUtilization.return_value = 42.0
+    metricsManager.sampleCpuUtilization.return_value = 42.0
     metricsManager.getMemory.return_value = 43.0
     metricsManager.getUptime.return_value = 44.0
     metricsManager.getGPUMemorySplit.return_value = 45.0
