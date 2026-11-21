@@ -113,6 +113,8 @@ class TestRuntimeManager(unittest.TestCase):
             assign_defaults.assert_called_once()
             setup_nt.assert_called_once()
             start_metrics.assert_called_once()
+            self.assertTrue(self.handler.isSetup)
+            self.assertTrue(self.handler.setupEvent.is_set())
 
     def test_request_stop_clears_running_event(self):
         self.handler.running.set()
@@ -157,6 +159,7 @@ class TestRuntimeManager(unittest.TestCase):
         self.handler._latencyPubs[(0, "captureLatency")] = latencyPublisher
         self.handler.versionPublisher = versionPublisher
         self.handler._ntListeners = [10, 11]
+        self.handler.setupEvent.set()
 
         with (
             patch("synapse.core.runtime_handler.NetworkTableInstance") as nt,
@@ -182,6 +185,7 @@ class TestRuntimeManager(unittest.TestCase):
         pipelineCleanup.assert_called_once()
         self.mock_camera_handler.cleanup.assert_called_once()
         self.assertFalse(self.handler.isSetup)
+        self.assertFalse(self.handler.setupEvent.is_set())
 
     def test_cleanup_is_idempotent(self):
         self.handler.cleanup()

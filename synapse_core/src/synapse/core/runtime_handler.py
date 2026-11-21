@@ -113,6 +113,7 @@ class RuntimeManager:
         self._cleanedUp = False
 
         self.isSetup: bool = False
+        self.setupEvent = threading.Event()
         self.lastLatencyReportTime: float = time.time()
         self.versionPublisher: Optional[StringPublisher] = None
 
@@ -208,6 +209,7 @@ class RuntimeManager:
         sendWebUIIP()
 
         self.isSetup = True
+        self.setupEvent.set()
 
     def assignDefaultPipelines(self) -> None:
         """
@@ -982,6 +984,7 @@ class RuntimeManager:
         log.info("Releasing camera resources...")
         self.cameraHandler.cleanup()
         self.isSetup = False
+        self.setupEvent.clear()
         log.info("Runtime resources released.")
 
     def _addNtListener(

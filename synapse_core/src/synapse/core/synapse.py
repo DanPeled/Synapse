@@ -352,11 +352,8 @@ class Synapse:
                     ),
                 )
 
-                while not getattr(self.runtimeHandler, "isSetup", False):
-                    try:
-                        await asyncio.sleep(0.01)
-                    except Exception:
-                        break
+                # Blocking Event.wait must not run on the websocket loop.
+                await asyncio.to_thread(self.runtimeHandler.setupEvent.wait)
 
                 pipeline_bindings = getattr(
                     self.runtimeHandler.pipelineHandler, "pipelineInstanceBindings", {}
