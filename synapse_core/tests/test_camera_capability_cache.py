@@ -2,12 +2,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import List, Optional
+from typing import List, Optional, cast
 from unittest.mock import MagicMock, patch
 
 from cscore import VideoMode
 from synapse.core.camera.camera_handle import CameraHandle
 from synapse.core.camera.cscore_camera import CsCoreCamera
+from synapse.core.camera.synapse_camera import SynapseCamera
 from synapse.core.settings_api import CameraSettings
 from wpiutil import PixelFormat
 
@@ -64,7 +65,7 @@ class FakeCamera:
 
 def makeHandle(camera: FakeCamera) -> CameraHandle:
     with patch.object(CameraHandle, "_startFrameThread"):
-        return CameraHandle(camera, "test camera", 0)
+        return CameraHandle(cast(SynapseCamera, camera), "test camera", 0)
 
 
 def test_cscore_camera_caches_video_modes() -> None:
