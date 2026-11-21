@@ -62,6 +62,40 @@ class TestRuntimeManager(unittest.TestCase):
             self.handler.setPipelineByIndex(cameraIndex=5, pipelineIndex=1)
             mock_log.assert_called_once()
 
+    def test_pipeline_exceptions_are_throttled_per_camera(self):
+        camera = MagicMock()
+        camera.name = "Camera 0"
+        self.mock_camera_handler.cameraHandles = {0: camera}
+        self.handler.pipelineBindings = {0: 0}
+
+        failingPipeline = MagicMock()
+        failingPipeline.processFrame.side_effect = RuntimeError("boom")
+        self.handler.pipelineHandler.getPipeline = MagicMock(
+            return_value=failingPipeline
+        )
+        self.handler.sendLatency = MagicMock()
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        with patch("synapse.core.runtime_handler.log.err") as mock_log:
+            for _ in range(100):
+                self.handler._processAndPublishFrame(0, frame)
+
+        mock_log.assert_called_once()
+        assert "Camera 0" in mock_log.call_args.args[0]
+        assert "RuntimeError: boom" in mock_log.call_args.args[0]
+
+        # A second camera gets its own full first report.
+        secondCamera = MagicMock()
+        secondCamera.name = "Camera 1"
+        self.mock_camera_handler.cameraHandles[1] = secondCamera
+        self.handler.pipelineBindings[1] = 0
+
+        with patch("synapse.core.runtime_handler.log.err") as mock_log:
+            self.handler._processAndPublishFrame(1, frame)
+
+        mock_log.assert_called_once()
+        assert "Camera 1" in mock_log.call_args.args[0]
+
     def test_get_event_data_value_bool(self):
         mock_event = MagicMock()
         type_prop = PropertyMock(return_value="Boolean")
@@ -206,8 +240,15 @@ class TestRuntimeManager(unittest.TestCase):
         self.assertEqual(len(waits), 1)
         self.assertAlmostEqual(waits[0], 0.95)
 
-        sendCall = ws.sendToAllSync.call_args
-        assert sendCall.kwargs["coalesce_key"] == ("metrics",)
+        # Log records are now sent asynchronously by the logging writer, so
+        # select the metrics payload instead of assuming it is the last send.
+        metricCalls = [
+            call_
+            for call_ in ws.sendToAllSync.call_args_list
+            if call_.kwargs.get("coalesce_key") == ("metrics",)
+        ]
+        assert len(metricCalls) == 1
+        sendCall = metricCalls[0]
         payload = sendCall.args[0]
         assert callable(payload)
         with patch("synapse.core.runtime_handler.createMessage", createMessage):
