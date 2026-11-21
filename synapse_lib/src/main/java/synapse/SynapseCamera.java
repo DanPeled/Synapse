@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.wpilib.driverstation.DriverStationErrors;
 import org.wpilib.math.geometry.Pose3d;
@@ -31,6 +32,21 @@ import synapse.util.deserializers.WPILibGeometryModule;
  */
 public class SynapseCamera implements AutoCloseable {
 
+  /** Immutable snapshot of a setting topic's latest value. */
+  record SettingValue(boolean valid, NetworkTableType type, Object value) {
+    static SettingValue invalid() {
+      return new SettingValue(false, null, null);
+    }
+  }
+
+  /** Testable reader for a setting topic's latest value. */
+  interface SettingReader extends AutoCloseable {
+    SettingValue read();
+
+    @Override
+    void close();
+  }
+
   /** Camera name */
   protected final String m_cameraName;
 
@@ -43,17 +59,24 @@ public class SynapseCamera implements AutoCloseable {
   /** Subtable containing camera settings */
   protected NetworkTable m_settingsTable;
 
+  /** Full path of the settings subtable, usable without touching NetworkTables in tests. */
+  protected String m_settingsTablePath;
+
   /** Subtable containing camera data/results */
   protected NetworkTable m_dataTable;
 
   /** Cache of NetworkTableEntries, keyed by full topic path to avoid cross-subtable collisions */
   protected final Map<String, NetworkTableEntry> m_entryCache = new ConcurrentHashMap<>();
 
-  /** Latest-value subscribers for settings, keyed by full topic path */
-  protected final Map<String, GenericSubscriber> m_settingSubscribers = new ConcurrentHashMap<>();
+  /** Latest-value readers for settings, keyed by full topic path */
+  protected final Map<String, SettingReader> m_settingReaders = new ConcurrentHashMap<>();
 
   /** Setting keys for which a type mismatch has already been reported */
   protected final Set<String> m_warnedSettingKeys = ConcurrentHashMap.newKeySet();
+
+  /** Reporter for setting type mismatches; overridable in tests. */
+  protected Consumer<String> m_warningReporter =
+      message -> DriverStationErrors.reportWarning(message, false);
 
   /** Entry used to publish the current pipeline ID */
   protected NetworkTableEntry m_pipelineEntry;
@@ -121,6 +144,7 @@ public class SynapseCamera implements AutoCloseable {
           NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
 
       m_settingsTable = m_table.getSubTable(SynapseApi.SETTINGS_TABLE);
+      m_settingsTablePath = m_settingsTable.getPath();
       m_dataTable = m_table.getSubTable(SynapseApi.DATA_TABLE);
 
       m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
@@ -221,23 +245,50 @@ public class SynapseCamera implements AutoCloseable {
    * @return the cached or newly fetched NetworkTableEntry
    */
   public NetworkTableEntry getCachedEntry(String key, NetworkTable table) {
-    return m_entryCache.computeIfAbsent(cacheKey(table, key), ignored -> table.getEntry(key));
+    return m_entryCache.computeIfAbsent(
+        cacheKey(table.getPath(), key), ignored -> table.getEntry(key));
   }
 
   /**
-   * Returns a latest-value subscriber for a setting topic, creating it once.
+   * Returns a latest-value reader for a setting topic, creating it once.
    *
    * @param key the setting key
-   * @param table the table that owns the setting
-   * @return the cached or newly created generic subscriber
+   * @return the cached or newly created setting reader
    */
-  protected GenericSubscriber getSettingSubscriber(String key, NetworkTable table) {
-    return m_settingSubscribers.computeIfAbsent(
-        cacheKey(table, key), ignored -> table.getTopic(key).genericSubscribe());
+  protected SettingReader getSettingReader(String key) {
+    return m_settingReaders.computeIfAbsent(
+        cacheKey(settingsPath(), key),
+        ignored ->
+            new NetworkTablesSettingReader(getSettingsTable().getTopic(key).genericSubscribe()));
   }
 
-  private static String cacheKey(NetworkTable table, String key) {
-    return table.getPath() + "/" + key;
+  static String cacheKey(String tablePath, String key) {
+    return tablePath + "/" + key;
+  }
+
+  private String settingsPath() {
+    return m_settingsTablePath != null ? m_settingsTablePath : getSettingsTable().getPath();
+  }
+
+  /** Adapts a generic NetworkTables subscriber to a testable setting reader. */
+  private static final class NetworkTablesSettingReader implements SettingReader {
+    private final GenericSubscriber m_subscriber;
+
+    private NetworkTablesSettingReader(GenericSubscriber subscriber) {
+      m_subscriber = subscriber;
+    }
+
+    @Override
+    public SettingValue read() {
+      NetworkTableValue value = m_subscriber.get();
+      if (!value.isValid()) return SettingValue.invalid();
+      return new SettingValue(true, value.getType(), toObject(value));
+    }
+
+    @Override
+    public void close() {
+      m_subscriber.close();
+    }
   }
 
   /**
@@ -311,9 +362,9 @@ public class SynapseCamera implements AutoCloseable {
    */
   @Deprecated(forRemoval = true, since = "2025.0.1")
   public Optional<Object> getSetting(String key) {
-    NetworkTableValue value = getSettingSubscriber(key, getSettingsTable()).get();
-    if (!value.isValid()) return Optional.empty();
-    return Optional.ofNullable(toObject(value));
+    SettingValue value = getSettingReader(key).read();
+    if (!value.valid()) return Optional.empty();
+    return Optional.ofNullable(value.value());
   }
 
   /**
@@ -324,17 +375,17 @@ public class SynapseCamera implements AutoCloseable {
    * @return Optional containing value if present and type matches
    */
   public <T> Optional<T> getSetting(Setting<T> setting) {
-    NetworkTableValue value = getSettingSubscriber(setting.getKey(), getSettingsTable()).get();
-    if (!value.isValid()) return Optional.empty();
+    SettingValue value = getSettingReader(setting.getKey()).read();
+    if (!value.valid()) return Optional.empty();
 
-    Object converted = toObject(value);
-    if (converted == null || value.getType() != setting.getNtType()) {
-      warnMismatchOnce(setting, value.getType(), converted);
+    Object converted = value.value();
+    if (converted == null || value.type() != setting.getNtType()) {
+      warnMismatchOnce(setting, value.type(), converted);
       return Optional.empty();
     }
 
     if (!setting.getValueType().isInstance(converted)) {
-      warnMismatchOnce(setting, value.getType(), converted);
+      warnMismatchOnce(setting, value.type(), converted);
       return Optional.empty();
     }
 
@@ -359,10 +410,10 @@ public class SynapseCamera implements AutoCloseable {
   }
 
   private <T> void warnMismatchOnce(Setting<T> setting, NetworkTableType actualType, Object value) {
-    String warningKey = cacheKey(getSettingsTable(), setting.getKey());
+    String warningKey = cacheKey(settingsPath(), setting.getKey());
     if (!m_warnedSettingKeys.add(warningKey)) return;
 
-    DriverStationErrors.reportWarning(
+    m_warningReporter.accept(
         "[SynapseCamera] Type mismatch for key '"
             + setting.getKey()
             + "', expected "
@@ -373,8 +424,7 @@ public class SynapseCamera implements AutoCloseable {
             + actualType
             + " ("
             + (value == null ? "null" : value.getClass().getSimpleName())
-            + ")",
-        false);
+            + ")");
   }
 
   /**
@@ -676,8 +726,8 @@ public class SynapseCamera implements AutoCloseable {
     m_pipelineSubscriber.close();
     m_recordStateSubscriber.close();
     m_resultsSubscriber.close();
-    m_settingSubscribers.values().forEach(GenericSubscriber::close);
-    m_settingSubscribers.clear();
+    m_settingReaders.values().forEach(SettingReader::close);
+    m_settingReaders.clear();
     m_warnedSettingKeys.clear();
   }
 }
