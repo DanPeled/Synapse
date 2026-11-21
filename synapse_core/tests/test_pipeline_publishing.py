@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from typing import Callable, cast
 from unittest.mock import MagicMock, patch
 
 from synapse.core.pipeline import Pipeline, PipelineResult, PipelineSettings
@@ -20,11 +21,10 @@ class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):
         return None
 
 
-def test_results_are_throttled_to_nt_publish_interval() -> None:
+def test_results_are_published_immediately() -> None:
     pipeline = DummyPipeline()
 
     with (
-        patch("synapse.core.pipeline.RESULTS_PUBLISH_INTERVAL", 0.1),
         patch(
             "synapse.core.pipeline.serializePipelineResult", return_value=b"x"
         ) as serialize,
@@ -33,12 +33,12 @@ def test_results_are_throttled_to_nt_publish_interval() -> None:
         for _ in range(5):
             pipeline.setResults(PipelineResult())
 
-        assert serialize.call_count == 1
-        assert setDataValue.call_count == 1
+        assert serialize.call_count == 5
+        assert setDataValue.call_count == 5
 
-        # A "no results" transition must clear stale robot-side data right away.
+        # A "no results" transition clears stale robot-side data too.
         pipeline.setResults(None)
-        assert setDataValue.call_count == 2
+        assert setDataValue.call_count == 6
         assert setDataValue.call_args.args == ("results", b"")
 
 
@@ -50,7 +50,9 @@ def test_result_messages_carry_camera_id_and_coalesce_key() -> None:
     with patch.object(WebSocketServer, "kInstance", ws):
         pipeline.setDataValue("results", b"\x01", isMsgpack=True)
 
-    message = MessageProto().parse(ws.sendToAllSync.call_args.args[0])
+    payload = ws.sendToAllSync.call_args.args[0]
+    assert callable(payload)
+    message = MessageProto().parse(cast(Callable[[], bytes], payload)())
     result = message.pipeline_result
 
     assert result.cameraid == 2
@@ -63,6 +65,24 @@ def test_result_messages_carry_camera_id_and_coalesce_key() -> None:
         3,
         "results",
     )
+
+
+def test_websocket_message_is_built_lazily() -> None:
+    pipeline = DummyPipeline()
+    ws = MagicMock()
+    ws.hasClients = True
+
+    with (
+        patch.object(WebSocketServer, "kInstance", ws),
+        patch("synapse.core.pipeline.createMessage", return_value=b"encoded") as build,
+    ):
+        pipeline.setDataValue("results", b"\x01", isMsgpack=True)
+        build.assert_not_called()
+
+        payload = ws.sendToAllSync.call_args.args[0]
+        assert callable(payload)
+        assert cast(Callable[[], bytes], payload)() == b"encoded"
+        build.assert_called_once()
 
 
 def test_no_websocket_message_is_built_without_clients() -> None:

@@ -24,6 +24,14 @@ from .generated.messages.v1 import MessageProto, MessageTypeProto
 # overhead.
 _MESSAGE_FIELD_NAMES = frozenset(f.name for f in fields(MessageProto))
 
+# A coalesced result can be supplied as a factory so protobuf encoding happens
+# only if the value is actually sent. Non-coalesced messages are always ready.
+MessageData = Union[Data, Callable[[], Data]]
+
+
+def _resolveMessage(message: MessageData) -> Data:
+    return message() if callable(message) else message
+
 
 class SocketEvent(Enum):
     kConnect = "connect"
@@ -78,7 +86,7 @@ class WebSocketServer:
         # Coalesced messages are kept by key so a slow UI only ever receives
         # the newest value for a given result topic. The queue holds a single
         # wakeup for the whole map instead of one entry per frame.
-        self._coalesced: "OrderedDict[Hashable, Data]" = OrderedDict()
+        self._coalesced: "OrderedDict[Hashable, MessageData]" = OrderedDict()
         self._wakeupPending = False
 
     @property
@@ -129,7 +137,9 @@ class WebSocketServer:
         if coros:
             await asyncio.gather(*coros, return_exceptions=True)
 
-    def sendToAllSync(self, message: Data, *, coalesce_key: Optional[Hashable] = None):
+    def sendToAllSync(
+        self, message: MessageData, *, coalesce_key: Optional[Hashable] = None
+    ):
         try:
             if self.loop and self.loop.is_running():
                 # Hand the message to the background send loop. Running the
@@ -138,17 +148,17 @@ class WebSocketServer:
                 self.loop.call_soon_threadsafe(self._enqueue, message, coalesce_key)
                 return
             # Run in a temporary event loop (e.g. during test or before full setup)
-            asyncio.run(self.sendToAll(message))
+            asyncio.run(self.sendToAll(_resolveMessage(message)))
         except Exception:
             pass
 
-    def _enqueue(self, message: Data, coalesce_key: Optional[Hashable]):
+    def _enqueue(self, message: MessageData, coalesce_key: Optional[Hashable]):
         """Queue a message for the background sender (must run on the loop)."""
         if self._sendQueue is None:
             self._sendQueue = asyncio.Queue()
 
         if coalesce_key is None:
-            self._sendQueue.put_nowait((None, message, False))
+            self._sendQueue.put_nowait((None, _resolveMessage(message), False))
         else:
             # Replacing the value for an existing key is enough: the original
             # wakeup is still queued and will pick up this newer message.
@@ -169,7 +179,7 @@ class WebSocketServer:
                 if isWakeup:
                     if self._coalesced:
                         _, coalescedMessage = self._coalesced.popitem(last=False)
-                        await self.sendToAll(coalescedMessage)
+                        await self.sendToAll(_resolveMessage(coalescedMessage))
                     if self._coalesced:
                         self._sendQueue.put_nowait((None, None, True))
                     else:

@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
@@ -11,7 +10,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Final,
     Generic,
     Hashable,
     Iterable,
@@ -93,13 +91,6 @@ PipelineProcessFrameResult = FrameResult
 DataTableKey = "data"
 ResultsTopicKey = "results"
 
-# NetworkTables only puts a value on the wire every 100 ms by default. Writing
-# a fresh msgpack payload every camera frame mostly produces work that no
-# subscriber can observe, so publish results at the same cadence. Consumers
-# that need the newest value still get it; the UI is updated over WebSocket at
-# this rate too.
-RESULTS_PUBLISH_INTERVAL: Final[float] = 0.1
-
 
 class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     __is_enabled__ = True
@@ -118,7 +109,6 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
         self._ntDataTable = None
         self._ntPublishers = {}
-        self._lastResultsPublishTime = float("-inf")
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         self.invalidateCachedEntries()
@@ -146,7 +136,6 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
                 pass
         self._ntPublishers.clear()
         self._ntDataTable = None
-        self._lastResultsPublishTime = float("-inf")
 
     def _getDataTable(self) -> Optional[NetworkTable]:
         if not self.ntTable:
@@ -212,43 +201,41 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         if ws and ws.hasClients:
             try:
                 cameraid = max(self.cameraIndex, 0)
+                pipelineIndex = self.pipelineIndex
                 coalesceKey: Hashable = (
                     MessageTypeProto.SET_PIPELINE_RESULT,
                     cameraid,
-                    self.pipelineIndex,
+                    pipelineIndex,
                     key,
                 )
-                ws.sendToAllSync(
-                    createMessage(
+
+                # Build the protobuf only if this value survives coalescing.
+                # Results can be produced much faster than the UI can consume
+                # them; serializing every superseded value would burn CPU without
+                # changing what the UI displays.
+                def buildMessage() -> bytes:
+                    return createMessage(
                         MessageTypeProto.SET_PIPELINE_RESULT,
                         PipelineResultProto(
                             is_msgpack=isMsgpack,
                             key=key,
                             value=settingValueToProto(parsed),
-                            pipeline_index=self.pipelineIndex,
+                            pipeline_index=pipelineIndex,
                             cameraid=cameraid,
                         ),
-                    ),
-                    coalesce_key=coalesceKey,
-                )
+                    )
+
+                ws.sendToAllSync(buildMessage, coalesce_key=coalesceKey)
             except Exception:
                 pass
 
-    def setResults(self, value: TResultType | None, *, immediate: bool = False) -> None:
-        """Publish a result, at most once per ``RESULTS_PUBLISH_INTERVAL``.
+    def setResults(self, value: TResultType | None) -> None:
+        """Publish the newest result immediately.
 
-        ``None`` marks the transition to "no result" and is always published
-        immediately so a stale pose is never left on the robot side.
+        NetworkTables already keeps only the latest value per topic, so every
+        completed result is handed to it as soon as it is available. Adding an
+        application-level interval here would only delay fresh vision data.
         """
-        now = time.monotonic()
-        if (
-            value is not None
-            and not immediate
-            and now - self._lastResultsPublishTime < RESULTS_PUBLISH_INTERVAL
-        ):
-            return
-
-        self._lastResultsPublishTime = now
         self.setDataValue(
             ResultsTopicKey,
             serializePipelineResult(value) if value is not None else bytes(),
