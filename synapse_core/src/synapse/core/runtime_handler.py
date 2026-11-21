@@ -105,6 +105,10 @@ class RuntimeManager:
         self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
+        # Persistent pipeline failures must not format/log a full traceback on
+        # every camera frame. This reports the first failure per camera, then
+        # periodic counts.
+        self._pipelineErrorThrottle = log.ExceptionThrottle()
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
         self._ntListeners: List[int] = []
@@ -669,9 +673,13 @@ class RuntimeManager:
                 if out is not None:
                     processedFrame = out
             except Exception as e:
-                log.err(
-                    f"Pipeline error for camera {getattr(handle, 'name', cameraIndex)}: {e}\n{traceback.format_exc()}"
+                detail = self._pipelineErrorThrottle.exceptionDetail(
+                    cameraIndex, e, lambda: "\n" + traceback.format_exc()
                 )
+                if detail is not None:
+                    log.err(
+                        f"Pipeline error for camera {getattr(handle, 'name', cameraIndex)}: {detail}"
+                    )
 
         processLatency = time.perf_counter() - processStart
 
