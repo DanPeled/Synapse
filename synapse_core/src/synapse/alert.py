@@ -15,7 +15,11 @@ def alert(alertType: AlertTypeProto, message: str) -> None:
     assert alertType != AlertTypeProto.UNSPECIFIED
 
     if WebSocketServer.kInstance is not None:
-        msg = createMessage(
-            MessageTypeProto.ALERT, AlertProto(type=alertType, message=message)
+        alertProto = AlertProto(type=alertType, message=message)
+
+        def buildMessage() -> bytes:
+            return createMessage(MessageTypeProto.ALERT, alertProto)
+
+        WebSocketServer.kInstance.sendToAllSync(
+            buildMessage, coalesce_key=("alert", alertType)
         )
-        WebSocketServer.kInstance.sendToAllSync(msg)

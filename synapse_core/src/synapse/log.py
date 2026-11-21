@@ -76,16 +76,17 @@ logs = deque(maxlen=1000)
 def socketLog(
     text: str, msgType: v1.LogLevelProto, socket: Optional[WebSocketServer]
 ) -> None:
-    logs.append(
-        v1.LogMessageProto(
-            message=text, level=msgType, timestamp=int(time.time() * 1_000)
-        )
+    logMessage = v1.LogMessageProto(
+        message=text, level=msgType, timestamp=int(time.time() * 1_000)
     )
+    logs.append(logMessage)
 
     if socket is not None:
-        msg = createMessage(v1.MessageTypeProto.LOG, logs[-1])
 
-        socket.sendToAllSync(msg)
+        def buildMessage() -> bytes:
+            return createMessage(v1.MessageTypeProto.LOG, logMessage)
+
+        socket.sendToAllSync(buildMessage, coalesce_key=("log", msgType))
 
 
 def addTime(text: str) -> str:

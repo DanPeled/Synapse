@@ -33,7 +33,12 @@ class TestAlertFunction(unittest.TestCase):
 
         # Assert
         self.mock_ws_instance.sendToAllSync.assert_called_once()
-        sent_msg = self.mock_ws_instance.sendToAllSync.call_args[0][0]
+        call = self.mock_ws_instance.sendToAllSync.call_args
+        assert call.kwargs["coalesce_key"] == ("alert", alert_type)
+
+        sent_msg = call.args[0]
+        if callable(sent_msg):
+            sent_msg = sent_msg()
         self.assertIsInstance(sent_msg, bytes)
         self.assertGreater(len(sent_msg), 0)  # simple sanity check that bytes were sent
 
