@@ -25,7 +25,9 @@ def test_results_are_throttled_to_nt_publish_interval() -> None:
 
     with (
         patch("synapse.core.pipeline.RESULTS_PUBLISH_INTERVAL", 0.1),
-        patch("synapse.core.pipeline.serializePipelineResult", return_value=b"x") as serialize,
+        patch(
+            "synapse.core.pipeline.serializePipelineResult", return_value=b"x"
+        ) as serialize,
         patch.object(pipeline, "setDataValue") as setDataValue,
     ):
         for _ in range(5):

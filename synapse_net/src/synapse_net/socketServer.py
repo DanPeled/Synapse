@@ -129,9 +129,7 @@ class WebSocketServer:
         if coros:
             await asyncio.gather(*coros, return_exceptions=True)
 
-    def sendToAllSync(
-        self, message: Data, *, coalesce_key: Optional[Hashable] = None
-    ):
+    def sendToAllSync(self, message: Data, *, coalesce_key: Optional[Hashable] = None):
         try:
             if self.loop and self.loop.is_running():
                 # Hand the message to the background send loop. Running the
