@@ -5,7 +5,10 @@ import {
   PipelineProto,
   PipelineTypeProto,
 } from "@/generated/messages/v1/pipeline";
-import { PipelineID } from "@/services/backend/dataStractures";
+import {
+  CameraPipelinesMap,
+  CameraPipelinesSetter,
+} from "@/services/backend/dataStractures";
 import { generateControlFromSettingMeta } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
@@ -54,8 +57,8 @@ export function PipelineConfigControl({
     setting: string,
     pipeline: PipelineProto,
   ) => void;
-  setPipelines: (val: Map<PipelineID, PipelineProto>) => void;
-  pipelines: Map<PipelineID, PipelineProto>;
+  setPipelines: CameraPipelinesSetter;
+  pipelines: CameraPipelinesMap;
   locked: boolean;
 }) {
   const [controls, setControls] = useState<

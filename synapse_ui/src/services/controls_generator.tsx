@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { ConstraintTypeProto } from "@/generated/settings/v1/constraint_type";
 import { SettingMetaProto } from "@/generated/settings/v1/settings";
 import { SettingValueProto } from "@/generated/settings/v1/value";
@@ -14,20 +15,18 @@ import { RefreshCcw } from "lucide-react";
 import assert from "assert";
 import { hasSettingValue } from "./backend/backendContext";
 import { PipelineProto } from "@/generated/messages/v1/pipeline";
-import { PipelineID } from "./backend/dataStractures";
+import {
+  CameraPipelinesMap,
+  CameraPipelinesSetter,
+} from "./backend/dataStractures";
+import { patchCameraPipelinesSetting } from "./backend/stateBatching";
+import { createSettingSendThrottle } from "./settingThrottle";
 import { FileSettingControl } from "@/widgets/fileSetting";
 import { RangeSlider } from "@/widgets/range";
 import { ListSettingControl } from "@/widgets/listSetting";
 import { ValueTypeProto } from "@/generated/settings/v1/value_type";
 
-export function generateControlFromSettingMeta({
-  setting,
-  selectedPipeline,
-  pipelines,
-  setPipelines,
-  setSetting,
-  locked,
-}: {
+interface GeneratedSettingControlProps {
   setting: SettingMetaProto;
   selectedPipeline?: PipelineProto;
   setSetting: (
@@ -35,41 +34,57 @@ export function generateControlFromSettingMeta({
     setting: string,
     pipeline: PipelineProto,
   ) => void;
-  setPipelines: (val: Map<PipelineID, PipelineProto>) => void;
-  pipelines: Map<number, PipelineProto>;
+  setPipelines: CameraPipelinesSetter;
+  pipelines: CameraPipelinesMap;
   locked: boolean;
-}) {
+}
+
+function GeneratedSettingControl({
+  setting,
+  selectedPipeline,
+  setPipelines,
+  setSetting,
+  locked,
+}: GeneratedSettingControlProps) {
+  const setSettingRef = useRef(setSetting);
+  setSettingRef.current = setSetting;
+  const selectedPipelineRef = useRef(selectedPipeline);
+  selectedPipelineRef.current = selectedPipeline;
+
+  const throttleRef = useRef<ReturnType<
+    typeof createSettingSendThrottle
+  > | null>(null);
+  let throttle = throttleRef.current;
+  if (throttle === null) {
+    throttle = createSettingSendThrottle((pending) => {
+      setSettingRef.current(pending.value, pending.setting, pending.pipeline!);
+    });
+    throttleRef.current = throttle;
+  }
+
+  // Make sure the last value of a drag reaches the backend on unmount.
+  useEffect(() => () => throttle?.flush(), []);
+
+  const setValue = (val: SettingValueProto) => {
+    if (!hasSettingValue(val)) return;
+
+    const pipeline = selectedPipelineRef.current;
+    if (pipeline) {
+      setPipelines((prev) =>
+        patchCameraPipelinesSetting(prev, pipeline, setting.name, val),
+      );
+    }
+    throttle.enqueue({
+      value: val,
+      setting: setting.name,
+      pipeline,
+    });
+  };
+
   return (
     <GenerateControl
-      key={setting.name + setting.category}
       setting={setting}
-      setValue={(val) => {
-        if (hasSettingValue(val)) {
-          setTimeout(() => {
-            if (selectedPipeline !== undefined) {
-              const oldPipelines = pipelines;
-
-              const newSettingsValues = {
-                ...selectedPipeline.settingsValues,
-                [setting.name]: val,
-              };
-
-              const updatedPipeline = {
-                ...selectedPipeline,
-                settingsValues: newSettingsValues,
-              };
-
-              const newPipelines = new Map(oldPipelines);
-              newPipelines.set(selectedPipeline.index, updatedPipeline);
-              setPipelines(newPipelines);
-            }
-          }, 0);
-
-          setTimeout(() => {
-            setSetting(val, setting.name, selectedPipeline!);
-          }, 0);
-        }
-      }}
+      setValue={setValue}
       value={
         selectedPipeline?.settingsValues[setting.name] ??
         setting.default ??
@@ -77,6 +92,19 @@ export function generateControlFromSettingMeta({
       }
       defaultValue={setting.default}
       locked={locked}
+    />
+  );
+}
+
+export function generateControlFromSettingMeta({
+  setting,
+  ...props
+}: GeneratedSettingControlProps) {
+  return (
+    <GeneratedSettingControl
+      key={setting.name + setting.category}
+      setting={setting}
+      {...props}
     />
   );
 }
