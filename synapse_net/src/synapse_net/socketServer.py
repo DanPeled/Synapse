@@ -6,10 +6,11 @@
 import asyncio
 import inspect
 import traceback
+from collections import OrderedDict
 from dataclasses import fields
 from enum import Enum
 from functools import lru_cache
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Union
+from typing import Any, Callable, Coroutine, Dict, Hashable, List, Optional, Set, Union
 
 import betterproto
 from websockets.exceptions import ConnectionClosed
@@ -74,6 +75,16 @@ class WebSocketServer:
         # creating a Task per frame.
         self._sendQueue: Optional[asyncio.Queue] = None
         self._sendTask: Optional[asyncio.Task] = None
+        # Coalesced messages are kept by key so a slow UI only ever receives
+        # the newest value for a given result topic. The queue holds a single
+        # wakeup for the whole map instead of one entry per frame.
+        self._coalesced: "OrderedDict[Hashable, Data]" = OrderedDict()
+        self._wakeupPending = False
+
+    @property
+    def hasClients(self) -> bool:
+        """Whether at least one websocket client is currently open."""
+        return any(getattr(client, "open", False) for client in tuple(self.clients))
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable[..., Coroutine]):
@@ -118,24 +129,36 @@ class WebSocketServer:
         if coros:
             await asyncio.gather(*coros, return_exceptions=True)
 
-    def sendToAllSync(self, message: Data):
+    def sendToAllSync(
+        self, message: Data, *, coalesce_key: Optional[Hashable] = None
+    ):
         try:
             if self.loop and self.loop.is_running():
                 # Hand the message to the background send loop. Running the
                 # enqueue on the websocket loop keeps the queue and the send
                 # task bound to the loop that actually performs the I/O.
-                self.loop.call_soon_threadsafe(self._enqueue, message)
+                self.loop.call_soon_threadsafe(self._enqueue, message, coalesce_key)
                 return
             # Run in a temporary event loop (e.g. during test or before full setup)
             asyncio.run(self.sendToAll(message))
         except Exception:
             pass
 
-    def _enqueue(self, message: Data):
+    def _enqueue(self, message: Data, coalesce_key: Optional[Hashable]):
         """Queue a message for the background sender (must run on the loop)."""
         if self._sendQueue is None:
             self._sendQueue = asyncio.Queue()
-        self._sendQueue.put_nowait(message)
+
+        if coalesce_key is None:
+            self._sendQueue.put_nowait((None, message, False))
+        else:
+            # Replacing the value for an existing key is enough: the original
+            # wakeup is still queued and will pick up this newer message.
+            self._coalesced[coalesce_key] = message
+            if not self._wakeupPending:
+                self._wakeupPending = True
+                self._sendQueue.put_nowait((None, None, True))
+
         if self._sendTask is None or self._sendTask.done():
             self._sendTask = asyncio.get_running_loop().create_task(self._sendLoop())
 
@@ -143,9 +166,18 @@ class WebSocketServer:
         """Drain the send queue sequentially, one message at a time."""
         assert self._sendQueue is not None
         while True:
-            message = await self._sendQueue.get()
+            _, message, isWakeup = await self._sendQueue.get()
             try:
-                await self.sendToAll(message)
+                if isWakeup:
+                    if self._coalesced:
+                        _, coalescedMessage = self._coalesced.popitem(last=False)
+                        await self.sendToAll(coalescedMessage)
+                    if self._coalesced:
+                        self._sendQueue.put_nowait((None, None, True))
+                    else:
+                        self._wakeupPending = False
+                elif message is not None:
+                    await self.sendToAll(message)
             except Exception:
                 pass
             finally:
@@ -172,6 +204,8 @@ class WebSocketServer:
                 pass
         self._sendTask = None
         self._sendQueue = None
+        self._coalesced.clear()
+        self._wakeupPending = False
         if self._server:
             # If _server is a coroutine, await it first
             if asyncio.iscoroutine(self._server):

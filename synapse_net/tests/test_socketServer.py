@@ -169,6 +169,52 @@ async def test_sendToAllSync_queues_messages_when_loop_running():
 
 
 @pytest.mark.asyncio
+async def test_coalesces_pending_messages_by_key():
+    server = WebSocketServer("localhost", 8765)
+    server.loop = asyncio.get_running_loop()
+
+    client = AsyncMock()
+    client.open = True
+    server.clients.add(client)
+
+    server.sendToAllSync(b"stale", coalesce_key=("results", 0, 0))
+    server.sendToAllSync(b"newest", coalesce_key=("results", 0, 0))
+    server.sendToAllSync(b"other", coalesce_key=("results", 1, 0))
+    server.sendToAllSync(b"event")
+
+    for _ in range(10):
+        if server._sendQueue is not None:
+            break
+        await asyncio.sleep(0)
+
+    assert server._sendQueue is not None
+    await asyncio.wait_for(server._sendQueue.join(), timeout=1)
+
+    sent = [call.args[0] for call in client.send.await_args_list]
+    assert sent.count(b"stale") == 0
+    assert sent.count(b"newest") == 1
+    assert sent.count(b"other") == 1
+    assert sent.count(b"event") == 1
+
+    await server.close()
+    assert server._coalesced == {}
+    assert server._wakeupPending is False
+
+
+def test_has_clients_only_counts_open_clients():
+    server = WebSocketServer("localhost", 8765)
+    assert server.hasClients is False
+
+    openClient = AsyncMock()
+    openClient.open = True
+    closedClient = AsyncMock()
+    closedClient.open = False
+    server.clients.update({openClient, closedClient})
+
+    assert server.hasClients is True
+
+
+@pytest.mark.asyncio
 async def test_close_calls_close_and_wait_closed(monkeypatch):
     server = WebSocketServer("localhost", 8765)
 
