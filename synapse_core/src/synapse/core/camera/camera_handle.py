@@ -9,7 +9,7 @@ from typing import Any, Final, List, Optional, Tuple
 
 import numpy as np
 from cscore import VideoMode
-from synapse.stypes import CameraID
+from synapse.stypes import CameraID, PropertyMetaDict
 from wpiutil import PixelFormat
 
 from ...log import warn
@@ -23,11 +23,32 @@ class CameraHandle:
         self.stream: str = ""
         self.cameraIndex = index
 
-        self._videoModes: List[VideoMode] = self.camera.enumerateVideoModes()
+        # Video modes and property metadata are stable for the lifetime of a
+        # camera. Cache them once here instead of re-querying the camera every
+        # time a pipeline is bound to it.
+        self._videoModes: List[VideoMode] = list(
+            self.camera.enumerateVideoModes() or []
+        )
+        self._propertyMeta: PropertyMetaDict = self.camera.getPropertyMeta()
+
+        try:
+            self._activeVideoMode: Optional[VideoMode] = self.camera.getVideoMode()
+        except Exception:
+            self._activeVideoMode = None
+
+        initialWidth, initialHeight = 1920, 1080
+        if self._activeVideoMode is not None:
+            try:
+                if self._activeVideoMode.width > 0 and self._activeVideoMode.height > 0:
+                    initialWidth = int(self._activeVideoMode.width)
+                    initialHeight = int(self._activeVideoMode.height)
+            except (TypeError, ValueError):
+                pass
 
         self._poolSize: Final[int] = 2
         self._bufferPool: List[np.ndarray] = [
-            np.zeros((1920, 1080, 3), dtype=np.uint8) for _ in range(self._poolSize)
+            np.zeros((initialHeight, initialWidth, 3), dtype=np.uint8)
+            for _ in range(self._poolSize)
         ]
 
         # The queue holds the capture timestamp and the INDEX of the filled
@@ -45,7 +66,7 @@ class CameraHandle:
         self._startFrameThread()
 
     def setVideoMode(self, videoMode: VideoMode) -> None:
-        if self._videoModes is None or len(self._videoModes) == 0:
+        if not self._videoModes:
             warn(f"No video modes on camera: {self.cameraIndex}")
             return
 
@@ -63,24 +84,27 @@ class CameraHandle:
         if mode is None:
             return
 
+        effectiveMode = VideoMode(pixelFormat, mode.width, mode.height, mode.fps)
+
+        # Applying a video mode can rebuild frame buffers and stall the camera.
+        # Avoid both when the camera is already in the requested mode.
+        if self._isActiveVideoMode(effectiveMode):
+            return
+
         # Apply it
         try:
-            self.camera.setVideoMode(
-                VideoMode(
-                    pixelFormat,
-                    mode.width,
-                    mode.height,
-                    mode.fps,
-                )
-            )
+            self.camera.setVideoMode(effectiveMode)
         except Exception:
             try:
                 # Try to set with exact requested values
                 self.camera.setVideoMode(videoMode)
             except Exception:
                 return
+            effectiveMode = VideoMode(
+                pixelFormat, videoMode.width, videoMode.height, videoMode.fps
+            )
 
-        H, W = mode.height, mode.width
+        H, W = effectiveMode.height, effectiveMode.width
 
         # Atomically rebuild buffers
         try:
@@ -98,17 +122,25 @@ class CameraHandle:
                     pass
         except Exception:
             return
+
+        self._activeVideoMode = effectiveMode
+
         # Give camera a moment to start producing frames
         time.sleep(0.01)
 
-        requested = (mode.width, mode.height, mode.fps)
-        selected = (mode.width, mode.height, mode.fps)
-
-        if requested != selected:
-            warn(
-                f"Using video mode {mode.width}x{mode.height}@{mode.fps} "
-                f"(requested {mode.width}x{mode.height}@{mode.fps})"
+    def _isActiveVideoMode(self, mode: VideoMode) -> bool:
+        active = self._activeVideoMode
+        if active is None:
+            return False
+        try:
+            return (
+                active.width == mode.width
+                and active.height == mode.height
+                and active.fps == mode.fps
+                and active.pixelFormat == mode.pixelFormat
             )
+        except Exception:
+            return False
 
     def _selectBestVideoMode(
         self,
@@ -140,7 +172,9 @@ class CameraHandle:
     def setProperty(self, prop: str, value: Any) -> None:
         if prop == "orientation":
             return
-        if prop == "resolution" and isinstance(value, str):
+        if prop == "resolution":
+            if not isinstance(value, str):
+                return
             resolution = value.split("x")
             width = int(resolution[0])
             height = int(resolution[1])
@@ -152,10 +186,19 @@ class CameraHandle:
                     int(self.camera.getMaxFPS()),
                 )
             )
-        meta = self.camera.getPropertyMeta().get(prop)
-        if meta is not None:
-            value = int(np.clip(value, meta["min"], meta["max"]))
-            self.camera.setProperty(prop, value)
+            return
+
+        meta = self._propertyMeta.get(prop)
+        if meta is None:
+            return
+
+        value = int(np.clip(value, meta["min"], meta["max"]))
+        try:
+            if self.camera.getProperty(prop) == value:
+                return
+        except Exception:
+            pass
+        self.camera.setProperty(prop, value)
 
     def getProperty(self, prop: str) -> Any:
         return self.camera.getProperty(prop)
