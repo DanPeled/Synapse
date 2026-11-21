@@ -13,12 +13,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.wpilib.math.geometry.Pose3d;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.math.geometry.Translation3d;
+import org.wpilib.networktables.DoublePublisher;
+import org.wpilib.networktables.NetworkTable;
+import org.wpilib.networktables.NetworkTableInstance;
+import org.wpilib.networktables.NetworkTableType;
+import org.wpilib.networktables.NetworkTableValue;
+import org.wpilib.networktables.StringPublisher;
 import synapse.pipelines.apriltag.ApriltagResult;
 import synapse.pipelines.color.ColorResult;
 
@@ -26,11 +33,19 @@ class SynapseCameraTest {
 
   private SynapseCamera camera;
   private ObjectMapper mapper;
+  private NetworkTableInstance ntInstance;
 
   @BeforeEach
   void setup() {
     camera = new SynapseCamera("TestCamera");
     mapper = new ObjectMapper(new MessagePackFactory());
+    ntInstance = NetworkTableInstance.getDefault();
+    ntInstance.startLocal();
+  }
+
+  @AfterEach
+  void teardown() {
+    ntInstance.stopLocal();
   }
 
   @Test
@@ -154,5 +169,61 @@ class SynapseCameraTest {
     assertEquals(9.0, result.translation.getZ());
     // Rotation2d is sent in degrees and must come back as the same angle.
     assertEquals(90.0, result.rotation.getDegrees(), 1e-9);
+  }
+
+  @Test
+  void cachedEntriesAreKeyedByFullTopicPath() {
+    NetworkTable settings = ntInstance.getTable("/Synapse/CacheTest/settings");
+    NetworkTable data = ntInstance.getTable("/Synapse/CacheTest/data");
+
+    camera.getCachedEntry("value", settings);
+    camera.getCachedEntry("value", data);
+    camera.getCachedEntry("value", settings);
+
+    assertEquals(2, camera.m_entryCache.size());
+    assertTrue(camera.m_entryCache.containsKey("/Synapse/CacheTest/settings/value"));
+    assertTrue(camera.m_entryCache.containsKey("/Synapse/CacheTest/data/value"));
+  }
+
+  @Test
+  void settingsUseOneLatestValueSubscriberPerTopic() {
+    NetworkTable settings = ntInstance.getTable("/Synapse/SubscriberTest/settings");
+    String key = SynapseCamera.Setting.kBrightness.getKey();
+    DoublePublisher publisher = settings.getDoubleTopic(key).publish();
+    publisher.set(0.75);
+    ntInstance.flush();
+    camera.m_settingsTable = settings;
+
+    assertEquals(0.75, camera.getSetting(SynapseCamera.Setting.kBrightness).orElseThrow());
+    assertEquals(0.75, camera.getSetting(SynapseCamera.Setting.kBrightness).orElseThrow());
+    assertEquals(1, camera.m_settingSubscribers.size());
+    publisher.close();
+  }
+
+  @Test
+  void typeMismatchIsReportedOnlyOncePerSetting() {
+    NetworkTable settings = ntInstance.getTable("/Synapse/MismatchTest/settings");
+    String key = SynapseCamera.Setting.kBrightness.getKey();
+    StringPublisher publisher = settings.getStringTopic(key).publish();
+    publisher.set("wrong");
+    ntInstance.flush();
+    camera.m_settingsTable = settings;
+
+    assertTrue(camera.getSetting(SynapseCamera.Setting.kBrightness).isEmpty());
+    assertTrue(camera.getSetting(SynapseCamera.Setting.kBrightness).isEmpty());
+    assertEquals(1, camera.m_warnedSettingKeys.size());
+    publisher.close();
+  }
+
+  @Test
+  void toObjectHandlesAllSupportedTypes() {
+    assertEquals(1.5, SynapseCamera.toObject(NetworkTableValue.makeDouble(1.5)));
+    assertEquals(2L, SynapseCamera.toObject(NetworkTableValue.makeInteger(2)));
+    assertEquals("x", SynapseCamera.toObject(NetworkTableValue.makeString("x")));
+    assertEquals(true, SynapseCamera.toObject(NetworkTableValue.makeBoolean(true)));
+    assertArrayEquals(
+        new double[] {1.0, 2.0},
+        (double[]) SynapseCamera.toObject(NetworkTableValue.makeDoubleArray(new double[] {1, 2})));
+    assertEquals(NetworkTableType.DOUBLE, NetworkTableValue.makeDouble(1.0).getType());
   }
 }
