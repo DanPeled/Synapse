@@ -65,6 +65,12 @@ def sendWebUIIP():
 
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
 DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
+METRICS_INTERVAL_SECONDS: Final[float] = 1.0
+
+
+def _metricsMonotonic() -> float:
+    """Cycle clock for the metrics loop, kept separate for tests."""
+    return time.monotonic()
 
 
 class RuntimeManager:
@@ -244,8 +250,12 @@ class RuntimeManager:
             )
 
             while self.running.is_set():
+                cycleStart = _metricsMonotonic()
+
                 cpuTemp = metricsManager.getCpuTemp()
-                cpuUsage = metricsManager.getCpuUtilization()
+                # Pass the cycle start so the CPU sample uses an explicit
+                # timestamp instead of relying on psutil's blocking interval.
+                cpuUsage = metricsManager.sampleCpuUtilization(now=cycleStart)
                 memory = metricsManager.getMemory()
                 uptime = metricsManager.getUptime()
                 gpuMemorySplit = metricsManager.getGPUMemorySplit()
@@ -265,7 +275,7 @@ class RuntimeManager:
                 ]
 
                 ws = WebSocketServer.kInstance
-                if ws is not None:
+                if ws is not None and ws.hasClients:
                     try:
                         metricsMessage = HardwareMetricsProto()
                         metricsMessage.cpu_temp = cpuTemp
@@ -289,10 +299,15 @@ class RuntimeManager:
                 except Exception:
                     pass
 
-                self.stopped.wait(1.0)
+                # Schedule the next wake relative to the start of this cycle so
+                # collection time does not accumulate into a slower cadence.
+                remaining = METRICS_INTERVAL_SECONDS - (
+                    _metricsMonotonic() - cycleStart
+                )
+                self.stopped.wait(max(0.0, remaining))
 
         self.metricsThread = threading.Thread(target=metricsWorker, daemon=True)
-        log.info("Startig metrics thread")
+        log.info("Starting metrics thread")
         self.metricsThread.start()
 
     def __setupPipelineForCamera(
