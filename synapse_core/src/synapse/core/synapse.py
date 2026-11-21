@@ -572,6 +572,27 @@ class Synapse:
                 createMessage(MessageTypeProto.ADD_CAMERA, cameraProto)
             )
 
+        def onCameraStreamChanged(cameraIndex: CameraID, handle: CameraHandle) -> None:
+            # CSCore publishes streams asynchronously. Send an ADD_CAMERA update
+            # when the URL arrives without re-running camera setup callbacks.
+            config = self.runtimeHandler.cameraHandler.cameraConfigBindings.get(
+                cameraIndex
+            )
+            cameraMsg = cameraToProto(
+                cameraIndex,
+                handle.name,
+                handle.camera,
+                self.runtimeHandler.pipelineBindings.get(cameraIndex, 0),
+                self.runtimeHandler.pipelineHandler.defaultPipelineIndexes.get(
+                    cameraIndex, 0
+                ),
+                handle.stream,
+                config.id if config is not None else "",
+            )
+            self.websocket.sendToAllSync(
+                createMessage(MessageTypeProto.ADD_CAMERA, cameraMsg)
+            )
+
         def onSettingChangedInNt(
             setting: str, value: Any, cameraIndex: CameraID
         ) -> None:
@@ -678,6 +699,9 @@ class Synapse:
 
         self.runtimeHandler.pipelineHandler.onAddPipeline.add(onAddPipeline)
         self.runtimeHandler.cameraHandler.onAddCamera.add(onAddCamera)
+        self.runtimeHandler.cameraHandler.onCameraStreamChanged.add(
+            onCameraStreamChanged
+        )
         self.runtimeHandler.onSettingChangedFromNT.add(onSettingChangedInNt)
         self.runtimeHandler.onPipelineChanged.add(onPipelineIndexChangedInNt)
         self.runtimeHandler.pipelineHandler.onDefaultPipelineSet.add(

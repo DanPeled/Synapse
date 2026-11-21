@@ -15,7 +15,7 @@ import cscore as cs
 import cv2
 import numpy as np
 import synapse.log as log
-from ntcore import NetworkTableInstance
+from ntcore import EventFlags, NetworkTableEntry, NetworkTableInstance
 from synapse_net.nt_client import NtClient
 
 from ..callback import Callback
@@ -31,7 +31,12 @@ from ..stypes import (
 from .camera.camera_handle import CameraHandle
 from .camera.no_signal import NoSignalCamera, generateNoSignalFrame
 from .camera.synapse_camera import SynapseCamera
-from .camera_factory import CameraConfig, CameraFactory, getCameraTableName
+from .camera_factory import (
+    CameraConfig,
+    CameraFactory,
+    getCameraTableName,
+    invalidateCameraTable,
+)
 from .global_settings import GlobalSettings
 from .lifecycle import joinThread
 
@@ -75,6 +80,9 @@ class CameraHandler:
         self.cameraConfigBindings: Dict[CameraID, CameraConfig] = {}
         self.onAddCamera: Callback[CameraID, CameraName, CameraHandle] = Callback()
         self.onRenameCamera: Callback[CameraID, CameraName] = Callback()
+        self.onCameraStreamChanged: Callback[CameraID, CameraHandle] = Callback()
+        self._streamListeners: Dict[CameraID, int] = {}
+        self._streamTopics: Dict[CameraID, str] = {}
         self.cameraUIDs: List[CameraUID] = []
         self.requestedCameraUIDs: Dict[CameraUID, CameraID] = {}
         self.cameraType: Type[SynapseCamera] = CameraFactory.kDefault
@@ -182,15 +190,38 @@ class CameraHandler:
         self.scanCameras()
 
     def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
-        if cameraID in self.cameraConfigBindings:
-            self.cameraConfigBindings[cameraID].name = newName
-            self.cameraHandles[cameraID].name = newName
-            log.info(f"Camera #{cameraID} renamed to {newName}")
-            self.onRenameCamera.call(cameraID, newName)
-        else:
+        if cameraID not in self.cameraConfigBindings:
             log.err(
                 f"Attempted to rename camera with ID {cameraID} but that camera does not exist!"
             )
+            return
+
+        handle = self.cameraHandles[cameraID]
+        oldSourceName = f"{NtClient.NT_TABLE}/{getCameraTableName(handle)}"
+        nameChanged = getCameraTableName(handle) != newName
+
+        self._unregisterStreamListener(cameraID)
+        self.cameraConfigBindings[cameraID].name = newName
+        handle.name = newName
+        invalidateCameraTable(handle)
+
+        if nameChanged:
+            # CSCore stream sources keep the name they were created with. Move
+            # the source to the new NT path so settings and streams stay together.
+            handle.stream = ""
+            try:
+                cs.CameraServer.removeCamera(oldSourceName)
+            except Exception as error:
+                log.warn(f"Failed to remove old stream source {oldSourceName}: {error}")
+            self.streamOutputs[cameraID] = self.createStreamOutput(cameraID)
+            frame = generateNoSignalFrame(handle.name, handle.cameraIndex)
+            if frame is not None:
+                self.streamOutputs[cameraID].putFrame(frame)
+
+        self._registerStreamListener(cameraID)
+
+        log.info(f"Camera #{cameraID} renamed to {newName}")
+        self.onRenameCamera.call(cameraID, newName)
 
     def scanCameras(self) -> None:
         self.usbCameraInfos = {
@@ -300,6 +331,95 @@ class CameraHandler:
             width=self.getStreamRes(cameraIndex)[0],
             height=self.getStreamRes(cameraIndex)[1],
         )
+
+    @staticmethod
+    def _streamTopicName(handle: CameraHandle) -> str:
+        """Topic CSCore publishes the camera's stream URLs to."""
+        return (
+            f"/CameraPublisher/{NtClient.NT_TABLE}/{getCameraTableName(handle)}/streams"
+        )
+
+    @staticmethod
+    def _parseStreamUrl(streams: Any) -> str:
+        """Extract a usable stream URL from a NetworkTables value.
+
+        CSCore publishes a string array and historically the second entry has
+        been used, but the array can be empty, short, or contain non-string
+        values while a camera is starting up. Malformed data is ignored rather
+        than raising out of the NT listener callback.
+        """
+        if not isinstance(streams, (list, tuple)):
+            return ""
+
+        candidates = list(streams)
+        if len(candidates) > 1:
+            candidates.insert(0, candidates[1])
+
+        for candidate in candidates:
+            if not isinstance(candidate, str):
+                continue
+            url = candidate.replace("mjpg:", "", 1)
+            if url.startswith(("http://", "https://")):
+                return url
+        return ""
+
+    def _getStreamsEntry(self, cameraIndex: CameraID) -> NetworkTableEntry:
+        handle = self.cameraHandles[cameraIndex]
+        return (
+            NetworkTableInstance.getDefault()
+            .getTable("CameraPublisher")
+            .getSubTable(NtClient.NT_TABLE)
+            .getSubTable(getCameraTableName(handle))
+            .getEntry("streams")
+        )
+
+    def _unregisterStreamListener(self, cameraIndex: CameraID) -> None:
+        listener = self._streamListeners.pop(cameraIndex, None)
+        self._streamTopics.pop(cameraIndex, None)
+        if listener is None:
+            return
+        try:
+            NetworkTableInstance.getDefault().removeListener(listener)
+        except Exception as error:
+            log.warn(
+                f"Failed to remove streams listener for camera #{cameraIndex}: {error}"
+            )
+
+    def _registerStreamListener(self, cameraIndex: CameraID) -> None:
+        """Watch the camera's streams topic without blocking camera setup."""
+        self._unregisterStreamListener(cameraIndex)
+
+        handle = self.cameraHandles[cameraIndex]
+        topicName = self._streamTopicName(handle)
+        self._streamTopics[cameraIndex] = topicName
+
+        def onStreamsChanged(event: Any, topicName=topicName) -> None:
+            # Ignore callbacks from a listener that was replaced by a rename.
+            if self._streamTopics.get(cameraIndex) != topicName:
+                return
+            try:
+                streams = event.data.value.getStringArray()
+            except Exception:
+                return
+            stream = self._parseStreamUrl(streams)
+            current = self.cameraHandles.get(cameraIndex)
+            if not stream or current is None or current.stream == stream:
+                return
+            current.stream = stream
+            self.onCameraStreamChanged.call(cameraIndex, current)
+
+        try:
+            listener = NetworkTableInstance.getDefault().addListener(
+                self._getStreamsEntry(cameraIndex),
+                EventFlags.VALUE_ALL | EventFlags.IMMEDIATE | EventFlags.PUBLISH,
+                onStreamsChanged,
+            )
+        except Exception as error:
+            log.warn(
+                f"Failed to watch streams topic for camera #{cameraIndex}: {error}"
+            )
+            return
+        self._streamListeners[cameraIndex] = listener
 
     def getOutput(self, cameraIndex: CameraID) -> cs.CvSource:
         """
@@ -534,16 +654,10 @@ class CameraHandler:
                 frame
             )  # NOTE: stream only appears after a frame has been posted, probably
 
-        stream = (
-            NetworkTableInstance.getDefault()
-            .getTable("CameraPublisher")
-            .getSubTable(NtClient.NT_TABLE)
-            .getSubTable(cameraConfig.name)
-            .getStringArray("streams", ["", ""])[1]
-            .replace("mjpg:", "")
-        )
-
-        handle.stream = stream
+        # The streams array is published asynchronously by CSCore. Watch the
+        # topic instead of reading it here so camera creation/hotplug never
+        # blocks on NetworkTables data that may not exist yet.
+        self._registerStreamListener(cameraIndex)
 
         self.setRecordingStatus(cameraIndex, False)
 
@@ -581,6 +695,8 @@ class CameraHandler:
         """Stop the camera scanner and release cameras, streams, and recordings."""
         log.info("Stopping camera scanner...")
         self.stopCameraScanEvent.set()
+        for cameraIndex in list(self._streamListeners):
+            self._unregisterStreamListener(cameraIndex)
         if joinThread(
             getattr(self, "cameraScanningThread", None),
             "Camera scanner",
