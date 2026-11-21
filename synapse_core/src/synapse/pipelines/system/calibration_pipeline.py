@@ -111,6 +111,20 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
         self.dist_coeffs = None
         self.calibrated = False
         self.imageSize: Optional[List] = None
+        self._lastPicturesLeft: Optional[str] = None
+        self._lastCanTakePicture: Optional[bool] = None
+
+    def _publishPicturesLeft(self, value: str) -> None:
+        if value == self._lastPicturesLeft:
+            return
+        self._lastPicturesLeft = value
+        self.setDataValue("Pictures Left", value)
+
+    def _publishCanTakePicture(self, value: bool) -> None:
+        if value == self._lastCanTakePicture:
+            return
+        self._lastCanTakePicture = value
+        self.setDataValue("Can Take Picture", value)
 
     def _update_board(self):
         squares_x = self.getSetting(self.settings.squares_x)
@@ -176,7 +190,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
             img, text, position, font, font_scale, color, thickness, cv2.LINE_AA
         )
 
-        self.setDataValue("Pictures Left", f"{pics_left} / {total_pics}")
+        self._publishPicturesLeft(f"{pics_left} / {total_pics}")
 
         img = cv2.aruco.drawDetectedMarkers(
             image=img,
@@ -219,7 +233,7 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
 
                 cv2.line(img, pt1, pt2, check_color, thickness)
                 cv2.line(img, pt2, pt3, check_color, thickness)
-                self.setDataValue("Can Take Picture", True)
+                self._publishCanTakePicture(True)
 
                 if self.getSetting(self.settings.take_picture):
                     self.all_corners.append(charuco_corners)
@@ -235,9 +249,9 @@ class CalibrationPipeline(Pipeline[CalibrationPipelineSettings, PipelineResult])
                 if not self.imageSize:
                     self.imageSize = gray.shape[::-1]
             else:
-                self.setDataValue("Can Take Picture", False)
+                self._publishCanTakePicture(False)
         else:
-            self.setDataValue("Can Take Picture", False)
+            self._publishCanTakePicture(False)
 
         if (
             self.all_imgs > self.getSetting(self.settings.calibration_images_count)

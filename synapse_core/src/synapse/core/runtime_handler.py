@@ -17,6 +17,7 @@ import numpy as np
 import synapse.__version__ as versionFile
 import synapse.log as log
 from ntcore import (
+    DoublePublisher,
     Event,
     EventFlags,
     NetworkTable,
@@ -105,6 +106,7 @@ class RuntimeManager:
         # the per-frame path does not have to read NetworkTables.
         self.cameraViewIDs: Dict[CameraID, str] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
+        self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
         self.frameQueues: Dict[CameraID, Queue] = {}
@@ -740,9 +742,19 @@ class RuntimeManager:
 
         self._lastLatencyReportTime[cameraIndex] = current_time
 
-        cameraTable = getCameraTable(self.cameraHandler.getCameraHandle(cameraIndex))
-        cameraTable.getEntry(NTKeys.kCaptureLatency.value).setDouble(captureLatency)
-        cameraTable.getEntry(NTKeys.kProcessLatency.value).setDouble(processingLatency)
+        for key, value in (
+            (NTKeys.kCaptureLatency.value, captureLatency),
+            (NTKeys.kProcessLatency.value, processingLatency),
+        ):
+            pubKey = (cameraIndex, key)
+            publisher = self._latencyPubs.get(pubKey)
+            if publisher is None:
+                cameraTable = getCameraTable(
+                    self.cameraHandler.getCameraHandle(cameraIndex)
+                )
+                publisher = cameraTable.getDoubleTopic(key).publish()
+                self._latencyPubs[pubKey] = publisher
+            publisher.set(value)
 
         if WebSocketServer.kInstance is not None:
             WebSocketServer.kInstance.sendToAllSync(
@@ -955,8 +967,10 @@ class RuntimeManager:
             log.info(f"Removing {listenerCount} NetworkTables listener(s)...")
         self._removeNtListeners()
 
-        publisherCount = len(self.propPubs) + (
-            1 if self.versionPublisher is not None else 0
+        publisherCount = (
+            len(self.propPubs)
+            + len(self._latencyPubs)
+            + (1 if self.versionPublisher is not None else 0)
         )
         if publisherCount:
             log.info(f"Closing {publisherCount} NetworkTables publisher(s)...")
@@ -966,6 +980,12 @@ class RuntimeManager:
             except Exception as error:
                 log.err(f"Failed to close publisher {key}: {error}")
         self.propPubs.clear()
+        for key, publisher in self._latencyPubs.items():
+            try:
+                publisher.close()
+            except Exception as error:
+                log.err(f"Failed to close latency publisher {key}: {error}")
+        self._latencyPubs.clear()
         if self.versionPublisher is not None:
             try:
                 self.versionPublisher.close()

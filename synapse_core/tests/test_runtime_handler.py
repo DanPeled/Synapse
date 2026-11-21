@@ -13,6 +13,7 @@ from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
 from synapse.core.runtime_handler import RuntimeManager
+from synapse_net.socketServer import WebSocketServer
 
 
 class DummyPipeline(Pipeline[PipelineSettings, PipelineResult]):
@@ -73,6 +74,30 @@ class TestRuntimeManager(unittest.TestCase):
             result = self.handler.getEventDataValue(mock_event)
             self.assertTrue(result)
 
+    def test_send_latency_reuses_publishers(self):
+        table = MagicMock()
+        publishers = {}
+
+        def getDoubleTopic(key):
+            topic = MagicMock()
+            topic.publish.return_value = publishers.setdefault(key, MagicMock())
+            return topic
+
+        table.getDoubleTopic.side_effect = getDoubleTopic
+        self.mock_camera_handler.getCameraHandle.return_value = "handle"
+
+        with (
+            patch("synapse.core.runtime_handler.getCameraTable", return_value=table),
+            patch.object(WebSocketServer, "kInstance", None),
+        ):
+            self.handler.sendLatency(0, 0.1, 0.2, 30)
+            self.handler._lastLatencyReportTime.clear()
+            self.handler.sendLatency(0, 0.1, 0.3, 30)
+
+        assert table.getDoubleTopic.call_count == 2
+        publishers["captureLatency"].set.assert_called_with(0.1)
+        assert publishers["processLatency"].set.call_args_list[-1].args == (0.3,)
+
     def test_setup_calls_all_components(self):
         with (
             patch.object(self.handler.pipelineHandler, "setup") as setup_loader,
@@ -126,8 +151,10 @@ class TestRuntimeManager(unittest.TestCase):
         self.handler.metricsThread = metricsThread
 
         publisher = MagicMock()
+        latencyPublisher = MagicMock()
         versionPublisher = MagicMock()
         self.handler.propPubs[(0, "setting")] = publisher
+        self.handler._latencyPubs[(0, "captureLatency")] = latencyPublisher
         self.handler.versionPublisher = versionPublisher
         self.handler._ntListeners = [10, 11]
 
@@ -145,6 +172,8 @@ class TestRuntimeManager(unittest.TestCase):
         self.assertEqual(self.handler.cameraManagementThreads, {})
         self.assertEqual(self.handler._ntListeners, [])
         self.assertEqual(self.handler.propPubs, {})
+        self.assertEqual(self.handler._latencyPubs, {})
+        latencyPublisher.close.assert_called_once()
         self.assertIsNone(self.handler.versionPublisher)
         nt.getDefault.return_value.removeListener.assert_any_call(10)
         nt.getDefault.return_value.removeListener.assert_any_call(11)
