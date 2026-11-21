@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
+import sys
 import threading
 import time
 import traceback
@@ -50,6 +51,40 @@ class FPSView:
     position = (10, 30)
 
 
+UsbCameraInfos = Dict[CameraUID, cs.UsbCameraInfo]
+UsbDeviceSignature = Tuple[Tuple[str, int, int], ...]
+UsbInfoSignature = Tuple[Tuple[CameraUID, str, str, Tuple[str, ...], int, int], ...]
+
+
+def _getUsbDeviceSignature() -> Optional[UsbDeviceSignature]:
+    """Reads a cheap signature of video device nodes, or None if unsupported.
+
+    Linux exposes USB hotplug as ``/dev/video*`` entries; watching their names
+    and identities detects add/remove events without enumerating cameras.
+    Other platforms have no equivalent portable signal and use the adaptive
+    enumeration-based fallback in ``CameraHandler._checkForCameraChanges``.
+    """
+    if not sys.platform.startswith("linux"):
+        return None
+
+    devices = []
+    try:
+        with os.scandir("/dev") as entries:
+            for entry in entries:
+                if not entry.name.startswith("video"):
+                    continue
+                try:
+                    stat = entry.stat(follow_symlinks=False)
+                except OSError:
+                    # A device can disappear between scandir and stat.
+                    continue
+                devices.append((entry.name, stat.st_rdev, stat.st_ino))
+    except OSError:
+        return None
+
+    return tuple(sorted(devices))
+
+
 class CameraHandler:
     """
     Handles the lifecycle and operations of multiple cameras, including initialization,
@@ -58,6 +93,15 @@ class CameraHandler:
 
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
     """Default resolution (width, height) used when no specific stream size is configured."""
+
+    DEFAULT_CHANGE_POLL_INTERVAL: Final[float] = 0.25
+    """How often platforms with a device-node signal check for hotplug changes."""
+
+    DEFAULT_SCAN_MIN_INTERVAL: Final[float] = 1.0
+    """Initial fallback probe interval on platforms without a device signal."""
+
+    DEFAULT_SCAN_MAX_INTERVAL: Final[float] = 30.0
+    """Upper bound for the adaptive fallback probe interval while stable."""
 
     def __init__(self) -> None:
         """
@@ -99,6 +143,16 @@ class CameraHandler:
         self.cameraScanningThread: threading.Thread
 
         self.stopCameraScanEvent = threading.Event()
+        self._cameraScanRequested = threading.Event()
+        self._pendingUsbCameraInfos: Optional[UsbCameraInfos] = None
+        self._lastDeviceSignature: Optional[UsbDeviceSignature] = None
+        self._lastUsbInfoSignature: UsbInfoSignature = ()
+
+        # Timing is instance state so tests can drive the scanner deterministically.
+        self.cameraChangePollInterval: float = self.DEFAULT_CHANGE_POLL_INTERVAL
+        self.cameraScanMinInterval: float = self.DEFAULT_SCAN_MIN_INTERVAL
+        self.cameraScanMaxInterval: float = self.DEFAULT_SCAN_MAX_INTERVAL
+        self._cameraProbeInterval: float = self.cameraScanMinInterval
 
     def setRecordingStatus(
         self, cameraIndex: CameraID, status: RecordingStatus
@@ -131,14 +185,92 @@ class CameraHandler:
             # Non-USB backends produce their cameras from configuration only.
             return
 
-        def cameraScanAction():
-            while not self.stopCameraScanEvent.wait(10):
-                self.scanCameras()
+        def cameraScanAction() -> None:
+            while not self.stopCameraScanEvent.is_set():
+                if not self._waitForCameraChange():
+                    break
+                if self.stopCameraScanEvent.is_set():
+                    break
+                usbCameraInfos = self._pendingUsbCameraInfos
+                self._pendingUsbCameraInfos = None
+                self.scanCameras(usbCameraInfos=usbCameraInfos)
 
         self.cameraScanningThread = threading.Thread(
-            target=cameraScanAction, daemon=True
+            target=cameraScanAction, daemon=True, name="Camera scanner"
         )
         self.cameraScanningThread.start()
+
+    def requestCameraScan(self) -> None:
+        """Wakes the scanner for one full rescan, e.g. after a config change."""
+        if self.cameraType is not CameraFactory.kDefault:
+            return
+        self._cameraScanRequested.set()
+
+    def _waitForCameraChange(self) -> bool:
+        """Waits for a detected camera change or an explicit scan request."""
+        while not self.stopCameraScanEvent.is_set():
+            if self._checkForCameraChanges():
+                return True
+            self._cameraScanRequested.wait(self._cameraProbeInterval)
+        return False
+
+    def _checkForCameraChanges(self) -> bool:
+        """Checks for hotplug changes without running a side-effecting rescan.
+
+        Returns True when ``scanCameras()`` should run. Platforms with a device
+        node signal need only compare that signature; other platforms compare
+        a lightweight camera enumeration and back off adaptively while stable.
+        """
+        if self._cameraScanRequested.is_set():
+            self._cameraScanRequested.clear()
+            self._pendingUsbCameraInfos = None
+            return True
+
+        deviceSignature = _getUsbDeviceSignature()
+        if deviceSignature is not None:
+            self._cameraProbeInterval = self.cameraChangePollInterval
+            if self._lastDeviceSignature is None:
+                self._lastDeviceSignature = deviceSignature
+            elif deviceSignature != self._lastDeviceSignature:
+                self._lastDeviceSignature = deviceSignature
+                return True
+            return False
+
+        usbCameraInfos = self._enumerateUsbCameras()
+        infoSignature = self._usbInfoSignature(usbCameraInfos)
+        if infoSignature != self._lastUsbInfoSignature:
+            self._lastUsbInfoSignature = infoSignature
+            self._pendingUsbCameraInfos = usbCameraInfos
+            self._cameraProbeInterval = self.cameraScanMinInterval
+            return True
+
+        self._cameraProbeInterval = min(
+            self._cameraProbeInterval * 2, self.cameraScanMaxInterval
+        )
+        return False
+
+    @staticmethod
+    def _enumerateUsbCameras() -> UsbCameraInfos:
+        return {
+            f"{info.name}_{info.productId}": info
+            for info in cs.UsbCamera.enumerateUsbCameras()
+        }
+
+    @staticmethod
+    def _usbInfoSignature(infos: UsbCameraInfos) -> UsbInfoSignature:
+        return tuple(
+            sorted(
+                (
+                    uid,
+                    str(info.dev),
+                    str(info.path),
+                    tuple(str(path) for path in getattr(info, "otherPaths", ()) or ()),
+                    int(info.productId),
+                    int(info.vendorId),
+                )
+                for uid, info in infos.items()
+            )
+        )
 
     def createCameras(self) -> None:
         """
@@ -154,10 +286,7 @@ class CameraHandler:
                 self.addCamera(cameraIndex, cameraConfig, cameraIndex)
             return
 
-        self.usbCameraInfos = {
-            f"{info.name}_{info.productId}": info
-            for info in cs.UsbCamera.enumerateUsbCameras()
-        }
+        self.usbCameraInfos = self._enumerateUsbCameras()
 
         for cameraIndex, cameraConfig in self.cameraConfigBindings.items():
             if len(cameraConfig.id) > 0 and cameraConfig.id not in self.cameraUIDs:
@@ -187,7 +316,9 @@ class CameraHandler:
                     )
                     continue
 
-        self.scanCameras()
+        # The initial scan reuses the map collected above; only changes or
+        # explicit requests trigger another enumeration after startup.
+        self.scanCameras(usbCameraInfos=self.usbCameraInfos)
 
     def renameCamera(self, cameraID: CameraID, newName: CameraName) -> None:
         if cameraID not in self.cameraConfigBindings:
@@ -223,11 +354,21 @@ class CameraHandler:
         log.info(f"Camera #{cameraID} renamed to {newName}")
         self.onRenameCamera.call(cameraID, newName)
 
-    def scanCameras(self) -> None:
-        self.usbCameraInfos = {
-            f"{info.name}_{info.productId}": info
-            for info in cs.UsbCamera.enumerateUsbCameras()
-        }
+    def scanCameras(self, usbCameraInfos: Optional[UsbCameraInfos] = None) -> None:
+        """Runs a full camera scan, optionally with a pre-collected camera map.
+
+        Args:
+            usbCameraInfos: USB camera map collected by the caller. When None,
+                cameras are enumerated here (e.g. for an explicit rescan).
+        """
+        if usbCameraInfos is None:
+            usbCameraInfos = self._enumerateUsbCameras()
+
+        self.usbCameraInfos = usbCameraInfos
+        self._lastUsbInfoSignature = self._usbInfoSignature(usbCameraInfos)
+        self._lastDeviceSignature = _getUsbDeviceSignature()
+        self._cameraProbeInterval = self.cameraScanMinInterval
+        self._pendingUsbCameraInfos = None
 
         found: List[int] = []
 
@@ -695,6 +836,8 @@ class CameraHandler:
         """Stop the camera scanner and release cameras, streams, and recordings."""
         log.info("Stopping camera scanner...")
         self.stopCameraScanEvent.set()
+        # Wake the scanner immediately so cleanup does not wait for a probe interval.
+        self._cameraScanRequested.set()
         for cameraIndex in list(self._streamListeners):
             self._unregisterStreamListener(cameraIndex)
         if joinThread(
