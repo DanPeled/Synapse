@@ -24,7 +24,7 @@ from .generated.messages.v1 import MessageProto, MessageTypeProto
 # overhead.
 _MESSAGE_FIELD_NAMES = frozenset(f.name for f in fields(MessageProto))
 
-# A coalesced result can be supplied as a factory so protobuf encoding happens
+# A coalesced message can be supplied as a factory so protobuf encoding happens
 # only if the value is actually sent. Non-coalesced messages are always ready.
 MessageData = Union[Data, Callable[[], Data]]
 
@@ -84,8 +84,8 @@ class WebSocketServer:
         self._sendQueue: Optional[asyncio.Queue] = None
         self._sendTask: Optional[asyncio.Task] = None
         # Coalesced messages are kept by key so a slow UI only ever receives
-        # the newest value for a given result topic. The queue holds a single
-        # wakeup for the whole map instead of one entry per frame.
+        # the newest value for a given topic. The queue holds a single wakeup
+        # for the whole map instead of one entry per update.
         self._coalesced: "OrderedDict[Hashable, MessageData]" = OrderedDict()
         self._wakeupPending = False
 
