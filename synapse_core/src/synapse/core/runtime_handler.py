@@ -102,6 +102,7 @@ class RuntimeManager:
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
         self._ntListeners: List[int] = []
+        self._ntListenerKeys: Dict[Tuple[CameraID, str, str], int] = {}
 
         # ``running`` is set while the runtime should keep going. ``stopped`` is
         # the inverse, so worker loops can block until shutdown is requested.
@@ -357,14 +358,22 @@ class RuntimeManager:
 
             self.onSettingChangedFromNT.call(prop, value, cameraIndex)
 
-        def addlistener(key: str) -> None:
+        def addlistener(settingKey: str) -> None:
             nt_table = getCameraTable(handle)
             if nt_table is not None:
-                entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(key)
+                entry = nt_table.getSubTable(NTKeys.kSettings.value).getEntry(
+                    settingKey
+                )
 
                 if NtClient.INSTANCE is not None:
                     self._addNtListener(
-                        entry, EventFlags.VALUE_REMOTE, updateSettingListener
+                        entry,
+                        EventFlags.VALUE_REMOTE,
+                        updateSettingListener,
+                        # Register each setting once per camera. Switching
+                        # pipelines previously stacked duplicate callbacks,
+                        # multiplying setting writes and UI traffic.
+                        key=(cameraIndex, NTKeys.kSettings.value, settingKey),
                     )
 
         for key in pipeline_config.getMap().keys():
@@ -764,7 +773,9 @@ class RuntimeManager:
                     CameraSettingsKeys.kPipeline.value
                 )
 
-            def updateNTPipelineListener(event: Event):
+            def updateNTPipelineListener(
+                event: Event, cameraIndex: CameraID = cameraIndex
+            ):
                 assert isinstance(event.data, ValueEventData)
 
                 pipelineIndex = event.data.value.getInteger()
@@ -776,7 +787,10 @@ class RuntimeManager:
                 )
 
             self._addNtListener(
-                entry, EventFlags.VALUE_REMOTE, updateNTPipelineListener
+                entry,
+                EventFlags.VALUE_REMOTE,
+                updateNTPipelineListener,
+                key=(cameraIndex, CameraSettingsKeys.kPipeline.value, ""),
             )
 
             entry.setInteger(self.pipelineHandler.defaultPipelineIndexes[cameraIndex])
@@ -992,11 +1006,20 @@ class RuntimeManager:
         entry: NetworkTableEntry,
         flags: int,
         callback: Any,
+        *,
+        key: Optional[Tuple[CameraID, str, str]] = None,
     ) -> None:
-        """Track a NetworkTables listener so it can be removed on shutdown."""
-        self._ntListeners.append(
-            NetworkTableInstance.getDefault().addListener(entry, flags, callback)
-        )
+        """Track a NetworkTables listener so it can be removed on shutdown.
+
+        ``key`` makes registration idempotent, which matters because switching
+        pipelines re-runs the settings setup for the same camera and topics.
+        """
+        if key is not None and key in self._ntListenerKeys:
+            return
+        listener = NetworkTableInstance.getDefault().addListener(entry, flags, callback)
+        self._ntListeners.append(listener)
+        if key is not None:
+            self._ntListenerKeys[key] = listener
 
     def _removeNtListeners(self) -> None:
         """Remove every NetworkTables listener registered by the runtime."""
@@ -1007,6 +1030,7 @@ class RuntimeManager:
             except Exception as error:
                 log.err(f"Failed to remove NetworkTables listener {listener}: {error}")
         self._ntListeners.clear()
+        self._ntListenerKeys.clear()
 
     def setupCallbacks(self):
         def onRemovePipeline(

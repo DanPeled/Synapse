@@ -124,6 +124,50 @@ class TestRuntimeManager(unittest.TestCase):
         self.assertFalse(self.handler.running.is_set())
         self.assertTrue(self.handler.stopped.is_set())
 
+    def test_add_nt_listener_is_idempotent_by_key(self):
+        entry = MagicMock()
+
+        with patch(
+            "synapse.core.runtime_handler.NetworkTableInstance.getDefault"
+        ) as nt:
+            nt.return_value.addListener.return_value = 10
+            self.handler._addNtListener(
+                entry, 1, lambda event: None, key=(0, "settings", "brightness")
+            )
+            self.handler._addNtListener(
+                entry, 1, lambda event: None, key=(0, "settings", "brightness")
+            )
+
+        assert self.handler._ntListeners == [10]
+        assert self.handler._ntListenerKeys == {(0, "settings", "brightness"): 10}
+
+    def test_pipeline_nt_listener_binds_each_camera_index(self):
+        self.mock_camera_handler.cameraHandles = {0: MagicMock(), 1: MagicMock()}
+        self.handler.pipelineHandler.defaultPipelineIndexes = {0: 0, 1: 1}
+        self.handler.setPipelineByIndex = MagicMock()
+        self.handler.onPipelineChangedFromNT = MagicMock()
+
+        with (
+            patch(
+                "synapse.core.runtime_handler.getCameraSettingEntry",
+                return_value=MagicMock(),
+            ),
+            patch.object(self.handler, "_addNtListener") as addListener,
+        ):
+            self.handler.setupNetworkTables()
+
+        callbacks = [call.args[2] for call in addListener.call_args_list]
+        assert len(callbacks) == 2
+
+        for cameraIndex, callback in enumerate(callbacks):
+            event = MagicMock()
+            event.data.__class__ = ValueEventData
+            event.data.value.getInteger.return_value = 7
+            callback(event)
+            self.handler.setPipelineByIndex.assert_any_call(
+                pipelineIndex=7, cameraIndex=cameraIndex
+            )
+
     def test_run_blocks_until_stop_requested(self):
         thread = threading.Thread(target=self.handler.run, daemon=True)
         thread.start()
