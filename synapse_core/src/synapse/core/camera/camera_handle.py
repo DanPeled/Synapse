@@ -286,6 +286,7 @@ class CameraHandle:
                 time.sleep(0.005)
                 continue
 
+            acquired: Optional[Tuple[int, int, List[np.ndarray]]] = None
             with self._bufferCondition:
                 acquired = self._acquireBufferLocked()
                 if acquired is None:
@@ -296,7 +297,6 @@ class CameraHandle:
                     shouldDrain = time.monotonic() - lastDrain >= 0.02
                     drainPool = self._bufferPool if shouldDrain else None
                 else:
-                    generation, index, pool = acquired
                     shouldDrain = False
                     drainPool = None
 
@@ -317,6 +317,7 @@ class CameraHandle:
                         pass
                 continue
 
+            generation, index, pool = acquired
             buffer = pool[index] if index < len(pool) else None
             if buffer is None:
                 with self._frameMutex:
