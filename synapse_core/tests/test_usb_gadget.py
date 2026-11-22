@@ -10,8 +10,9 @@ import tempfile
 import unittest
 from contextlib import ExitStack
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
+from synapse.hardware.metrics import Platform
 from synapse.hardware.usb_gadget import (
     GADGET_NAME,
     UsbGadgetConfig,
@@ -23,24 +24,6 @@ from synapse.hardware.usb_gadget import (
 
 def _completed() -> "subprocess.CompletedProcess[str]":
     return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-
-
-class FakePlatform:
-    @staticmethod
-    def isLinux() -> bool:
-        return True
-
-    @staticmethod
-    def supportsUsbGadget() -> bool:
-        return True
-
-    @staticmethod
-    def getUsbGadgetUdc() -> str:
-        return "fe980000.usb"
-
-    @staticmethod
-    def getPlatformName() -> str:
-        return "Linux Raspbian 64-bit"
 
 
 class TestUsbGadgetManager(unittest.TestCase):
@@ -57,11 +40,23 @@ class TestUsbGadgetManager(unittest.TestCase):
             path.mkdir(parents=True)
         (self.configfs / "functions" / "ecm.usb0" / "ifname").write_text("usb0\n")
 
+        # Patch the real Platform enum methods, which the manager calls as a
+        # class. Platform is an enum and cannot be subclassed.
+        self.stack.enter_context(
+            patch.object(Platform, "isLinux", staticmethod(lambda: True))
+        )
+        self.stack.enter_context(
+            patch.object(Platform, "supportsUsbGadget", staticmethod(lambda: True))
+        )
+        self.stack.enter_context(
+            patch.object(Platform, "getUsbGadgetUdc", staticmethod(lambda: "fe980000.usb"))
+        )
+
         self.commands = []
         self.manager = UsbGadgetManager(
             configfsRoot=self.configfs,
             storageDir=self.storage,
-            platform=FakePlatform,
+            platform=Platform,
             runCommand=lambda command: self.commands.append(list(command)) or _completed(),
             commandExists=lambda _name: True,
         )
@@ -135,18 +130,14 @@ class TestUsbGadgetManager(unittest.TestCase):
         self.assertIn(["ip", "link", "set", "usb0", "up"], self.commands)
 
     def test_start_fails_on_unsupported_platform(self):
-        self.manager.platform = MagicMock()
-        self.manager.platform.isLinux.return_value = False
-        with self.assertRaises(UsbGadgetError):
-            self.manager.start()
+        with patch.object(Platform, "isLinux", staticmethod(lambda: False)):
+            with self.assertRaises(UsbGadgetError):
+                self.manager.start()
 
     def test_start_fails_without_udc(self):
-        self.manager.platform = MagicMock()
-        self.manager.platform.isLinux.return_value = True
-        self.manager.platform.supportsUsbGadget.return_value = True
-        self.manager.platform.getUsbGadgetUdc.return_value = None
-        with self.assertRaises(UsbGadgetError):
-            self.manager.start()
+        with patch.object(Platform, "getUsbGadgetUdc", staticmethod(lambda: None)):
+            with self.assertRaises(UsbGadgetError):
+                self.manager.start()
 
     def test_stop_unbinds_gadget(self):
         gadget = self.configfs / GADGET_NAME

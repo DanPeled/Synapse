@@ -35,7 +35,10 @@ fn discover_devices_with_socket(socket: &UdpSocket) -> Vec<DiscoveryResponse> {
     // Both the global broadcast (router/robot network) and the link-local
     // broadcast (USB gadget direct connection) are covered. Sending to an
     // unused broadcast address is harmless.
-    let targets = [format!("255.255.255.255:{PORT}"), format!("{LINK_LOCAL_BROADCAST}:{PORT}")];
+    let targets = [
+        format!("255.255.255.255:{PORT}"),
+        format!("{LINK_LOCAL_BROADCAST}:{PORT}"),
+    ];
 
     for target in &targets {
         socket.send_to(PING.as_bytes(), target).ok();
