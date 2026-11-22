@@ -10,8 +10,9 @@ toolchain used by the 2027 robot projects in this repository.
 
 ## Apply the plugin
 
-The published plugin is available from JitPack. Add the repository to your
-robot project's `settings.gradle`:
+The published plugin is available from JitPack. JitPack publishes the module
+under the repository group, so map the plugin ID to that module in your robot
+project's `settings.gradle`:
 
 ```groovy
 pluginManagement {
@@ -19,15 +20,22 @@ pluginManagement {
         gradlePluginPortal()
         maven { url "https://jitpack.io" }
     }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "synapse.plugin") {
+                useModule("com.github.DanPeled.Synapse:plugin:synapse-gradle-plugin-2027.0.0a1")
+            }
+        }
+    }
 }
 ```
 
-Then apply it in the robot project's `build.gradle` using the plugin tag:
+Then apply it in the robot project's `build.gradle`:
 
 ```groovy
 plugins {
     id "org.wpilib.GradleRIO"
-    id "synapse.plugin" version "synapse-gradle-plugin-2027.0.0a1"
+    id "synapse.plugin"
 }
 ```
 
