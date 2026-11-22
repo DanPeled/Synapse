@@ -98,3 +98,48 @@ The multi-camera work therefore targets:
 
 This protocol makes the claim falsifiable on the target robot hardware without
 requiring four OV9782 cameras on the development machine.
+
+## Running the benchmark
+
+The benchmark starts a headless runtime from a Synapse project and reports JSON.
+Use one project config containing only the camera under test for the baseline,
+then a config containing all four cameras for the comparison.
+
+```bash
+# 1. Single-camera baseline, using the project's 1280x720 MJPEG settings.
+python scripts/benchmark_multi_camera.py \
+  --project /path/to/single-camera-project \
+  --warmup 10 --duration 60 \
+  --output baseline.json
+
+# 2. Four-camera run, checked against that baseline.
+python scripts/benchmark_multi_camera.py \
+  --project /path/to/four-camera-project \
+  --warmup 10 --duration 60 \
+  --baseline-json baseline.json \
+  --output four-cameras.json
+```
+
+The script exits non-zero when a baseline was supplied and any camera is below
+`threshold * baseline`. Without a baseline it still reports all measurements and
+exits zero. It starts only the runtime and camera pipelines; the UI, websocket
+server, and file server are not started, so they cannot skew the measurements.
+
+Each camera report includes:
+
+- configured resolution, target FPS, and pixel format;
+- `processed_fps` and `processed_frames` measured during the window;
+- `capture_frames`, `dropped_capture_frames`, and `stale_capture_frames`;
+- `dropped_stream_frames` from the bounded stream/record lane;
+- `capture_latency_ms`, `process_latency_ms`, and
+  `capture_to_result_latency_ms` at P50/P95/P99;
+- `frame_bytes`, the decoded frame size handled by the pipeline; and
+- `baseline_ratio` and `last_result_age_seconds`.
+
+The top-level report adds aggregate FPS, worst-camera FPS, the 83% target, pass
+status, process CPU/RSS, host details, and USB topology (`lsusb -t` where
+available). If aggregate FPS is high but one camera's FPS is low, that camera's
+drop counters and result age identify whether it is starvation, pipeline cost,
+or a bus-limited device. If all cameras drop together on one host controller,
+the USB topology and frame size usually indicate bus saturation rather than
+application serialization.

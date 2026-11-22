@@ -6,6 +6,7 @@
 import queue
 import threading
 import time
+from typing import Any, cast
 
 import numpy as np
 from synapse.core.camera.camera_handle import CameraHandle
@@ -90,7 +91,8 @@ def test_leased_buffer_is_not_overwritten_by_capture_thread() -> None:
     handle._freeBuffers = queue.Queue(maxsize=2)
     handle._freeBuffers.put_nowait(0)
     handle._freeBuffers.put_nowait(1)
-    handle.camera = _FakeCamera()
+    fakeCamera = _FakeCamera()
+    handle.camera = cast(Any, fakeCamera)
     handle.cameraIndex = 99
     handle._running = True
     handle._thread = threading.Thread(
@@ -99,7 +101,7 @@ def test_leased_buffer_is_not_overwritten_by_capture_thread() -> None:
     handle._thread.start()
 
     try:
-        assert handle.camera.progress.wait(1.0)
+        assert fakeCamera.progress.wait(1.0)
         ok, frame, _ = handle.grabFrame(timeout=1.0)
         assert ok is True
         assert frame is not None
@@ -110,8 +112,8 @@ def test_leased_buffer_is_not_overwritten_by_capture_thread() -> None:
         assert handle.getCaptureStats()["dropped"] >= 1
 
         handle.releaseFrame()
-        startCount = handle.camera.count
-        while handle.camera.count < startCount + 10:
+        startCount = fakeCamera.count
+        while fakeCamera.count < startCount + 10:
             time.sleep(0.001)
 
         ok2, nextFrame, _ = handle.grabFrame(timeout=1.0)
