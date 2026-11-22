@@ -2,6 +2,8 @@ name: Synapse Gradle Plugin
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "synapse_gradle_plugin/**"
       - ".github/workflows/synapse_gradle_plugin.yml"
@@ -43,6 +45,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build plugin
         working-directory: synapse_gradle_plugin
         run: |
@@ -75,6 +80,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Run plugin tests
         working-directory: synapse_gradle_plugin
         run: |
@@ -97,6 +105,9 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Run Spotless check
         working-directory: synapse_gradle_plugin

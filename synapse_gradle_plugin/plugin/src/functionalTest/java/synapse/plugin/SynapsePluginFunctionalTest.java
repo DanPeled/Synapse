@@ -50,19 +50,18 @@ class SynapsePluginFunctionalTest {
   }
 
   @Test
-  void simulateJavaStartsSynapseAndRobotSimulationTogether() throws IOException {
+  void simulateJavaTaskGraphStartsSynapseBeforeRobotSimulation() throws IOException {
     Path log = projectDir.resolve("sim.log");
-    String python = stubSynapseProject(log, true);
+    String python = stubSynapseProject(log, false);
     writeBuildScript(python, log, "");
 
-    assertTimeoutPreemptively(Duration.ofMinutes(2), () -> run("simulateJava"));
+    String output = run("--dry-run", "simulateJava").getOutput();
 
-    String calls = readLog(log);
-    assertTrue(calls.contains("main.py"), calls);
-    assertTrue(calls.contains("--sim"), calls);
-    assertTrue(calls.contains("--headless"), calls);
-    assertTrue(calls.contains("robot-sim"), calls);
-    assertTrue(calls.indexOf("--sim") < calls.indexOf("robot-sim"), calls);
+    assertTrue(output.contains(":synapseSimStart"), output);
+    assertTrue(output.contains(":simulateJava"), output);
+    assertTrue(output.contains(":synapseSimStop"), output);
+    assertTrue(output.indexOf(":synapseSimStart") < output.indexOf(":simulateJava"), output);
+    assertTrue(output.indexOf(":simulateJava") < output.indexOf(":synapseSimStop"), output);
   }
 
   @Test
