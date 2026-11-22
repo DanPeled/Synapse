@@ -8,11 +8,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, call, patch
 
+import cv2
 import numpy as np
 from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
 from synapse.core.runtime_handler import RuntimeManager
+from synapse.core.settings_api import CameraSettings
 from synapse_net.socketServer import WebSocketServer
 
 
@@ -95,6 +97,28 @@ class TestRuntimeManager(unittest.TestCase):
 
         mock_log.assert_called_once()
         assert "Camera 1" in mock_log.call_args.args[0]
+
+    def test_fixture_frame_reuses_rotation_destination(self):
+        camera = MagicMock()
+        self.mock_camera_handler.cameraHandles = {0: camera}
+        settings = MagicMock()
+        settings.getSetting.return_value = 90
+        pipeline = MagicMock()
+        pipeline.getCameraSettings.return_value = settings
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+
+        frame = np.arange(4 * 6 * 3, dtype=np.uint8).reshape(4, 6, 3)
+        first = self.handler.fixtureFrame(0, frame)
+        second = self.handler.fixtureFrame(0, frame)
+
+        settings.getSetting.assert_called_with(CameraSettings.orientation.key)
+        assert first is second
+        assert np.array_equal(first, cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE))
+
+        settings.getSetting.return_value = 180
+        rotatedAgain = self.handler.fixtureFrame(0, frame)
+        assert np.array_equal(rotatedAgain, cv2.rotate(frame, cv2.ROTATE_180))
 
     def test_get_event_data_value_bool(self):
         mock_event = MagicMock()
