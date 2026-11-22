@@ -48,6 +48,21 @@ def test_tracker_records_fps_and_end_to_end_latency() -> None:
     assert tracker.snapshot()["capture_to_result_latency_ms"]["p50"] is None
 
 
+def test_tracker_flushes_pending_samples_on_snapshot() -> None:
+    tracker = CameraPerformanceTracker(historySize=8, batchSize=100, flushInterval=60.0)
+    tracker.record(0.01, 0.02, 0.03, frameBytes=128)
+
+    assert len(tracker._pendingTimestamps) == 1
+    assert len(tracker._timestamps) == 0
+
+    stats = tracker.snapshot()
+
+    assert stats["processed_frames"] == 1
+    assert stats["capture_latency_ms"]["p50"] == pytest.approx(10.0)
+    assert len(tracker._pendingTimestamps) == 0
+    assert len(tracker._timestamps) == 1
+
+
 def test_summarize_cameras_uses_worst_camera_for_pass_condition() -> None:
     stats = {
         0: {"processed_fps": 120.0},
