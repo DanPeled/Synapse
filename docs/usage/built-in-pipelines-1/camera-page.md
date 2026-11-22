@@ -11,6 +11,8 @@ The Camera page shows the camera configuration and the calibration tools. Open i
 
 The **Camera Configuration** card shows one camera at a time. Use the **Camera** dropdown to switch cameras.
 
+Synapse checks for USB camera changes while the runtime is running. After you plug in a new camera, wait a few seconds and check the dropdown again. If it does not appear, check the cable and power, then restart the runtime.
+
 The card displays:
 
 | Field | Meaning |
@@ -35,7 +37,7 @@ The card displays:
 The camera name is the NetworkTables subtable name used by robot code. If you rename a camera, update `new SynapseCamera("<camera-name>", ...)` in your robot code.
 
 {% hint style="warning" %}
-Renaming a camera changes the NetworkTables key, not the camera index. Settings and calibration stay attached to the index, so they are preserved.
+Renaming a camera changes the NetworkTables key, not the camera index. Settings and calibration stay attached to the index, so they are preserved. The runtime also updates its NetworkTables path, but robot code must use the new camera name.
 {% endhint %}
 
 ### Remove a camera

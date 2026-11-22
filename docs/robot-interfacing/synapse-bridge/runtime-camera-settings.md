@@ -214,7 +214,7 @@ camera.setRecordStatus(True)
 recording = camera.getRecordingStatus()
 ```
 
-Capture latency is currently always `0.0`. Process latency is the time the pipeline spent on the last frame.
+Capture latency is the time from the camera timestamp until the runtime picked up the frame. Process latency is the time the pipeline spent on that frame.
 
 ## Next steps
 

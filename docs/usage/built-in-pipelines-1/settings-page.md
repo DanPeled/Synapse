@@ -124,6 +124,8 @@ The log viewer can filter by level:
 
 You can also open the log viewer with the tilde key (`~`) or backtick (`` ` ``).
 
+Repeated identical messages may be combined into one line with a count. This keeps a failing camera or pipeline from filling the log with thousands of copies of the same message.
+
 ## Danger zone
 
 {% hint style="danger" %}

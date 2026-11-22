@@ -13,6 +13,7 @@
   * [Selecting Hardware](getting-started/hardware-selection/selecting-hardware.md)
   * [Deploying on Custom Hardware](getting-started/hardware-selection/deploying-on-custom-hardware.md)
   * [Performance Matrix](getting-started/hardware-selection/performance-matrix.md)
+  * [Multi-Camera Performance](getting-started/hardware-selection/multi-camera-performance.md)
 * [Installing Software](getting-started/installing-software.md)
 * [How Synapse Works](getting-started/how-synapse-works.md)
 
@@ -20,6 +21,7 @@
 
 * [Project Management](usage/project-management/README.md)
   * [Synapse Manager](usage/project-management/synapse-manager.md)
+  * [Gradle Plugin](usage/project-management/gradle-plugin.md)
   * [Setting up CI for a Synapse Project using GitHub Actions](usage/project-management/setting-up-ci-for-a-synapse-project-using-github-actions.md)
 * [Built In Pipelines](usage/built-in-pipelines/README.md)
   * [Apriltag Pipeline](usage/built-in-pipelines/apriltag-pipeline/README.md)

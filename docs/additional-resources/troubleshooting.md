@@ -13,6 +13,8 @@ This page covers the problems teams hit most often. Start with the section that 
 3. Open **View Program Logs** (or press `~`) and look for errors.
 4. If the runtime starts from a terminal, read the terminal output. Python tracebacks appear there.
 
+The runtime combines repeated identical messages into one line with a count. That is normal. The count tells you how many times the same problem happened.
+
 For a bug report, include the runtime version, device hardware, the log output, and the steps that reproduce the problem.
 
 ## The dashboard will not load
@@ -39,7 +41,7 @@ ls /dev/video*
 ```
 
 3. If you use two identical cameras, give them distinct device names or UIDs.
-4. Restart the runtime after plugging in a camera.
+4. Wait a few seconds after plugging in a camera. Synapse checks for USB camera changes while it is running, but some drivers still need a restart.
 5. Check the camera is not already in use by another program.
 
 Camera detection depends on the OS and driver. Some cameras expose multiple device nodes; try each one.

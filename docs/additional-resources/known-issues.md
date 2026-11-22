@@ -88,14 +88,6 @@ The pipeline crops the frame before running the detector, so tag corners are mea
 
 **Workaround:** Leave the crop at `[-1, 1]` when you rely on field localization, or keep the crop centered on the image and generous enough that the offset is small. Cropping still works normally for detection-only use.
 
-## Capture latency is always zero
-
-**Affects:** `captureLatency` / `getCaptureLatency()`
-
-The runtime currently publishes `0.0` for capture latency. Process latency is measured correctly.
-
-**Workaround:** None. Use process latency and FPS for performance tuning.
-
 ## Import Settings accepts JSON but only handles ZIP
 
 **Affects:** Settings page → **Import Settings**
@@ -119,14 +111,6 @@ The **Remove Camera** action is visible but disabled. Cameras cannot be removed 
 Camera performance may be significantly worse on Windows than on Linux. The cause is not confirmed; it may be related to the CSCore version in use.
 
 **Workaround:** Use Linux for a coprocessor. Windows is fine for development and testing.
-
-## Camera stream does not load after a restart
-
-**Affects:** Dashboard camera stream
-
-The stream occasionally fails to attach after restarting the runtime, likely due to a UI lifecycle issue.
-
-**Workaround:** Refresh the browser tab. If that fails, navigate to the Camera page again.
 
 ## Next steps
 

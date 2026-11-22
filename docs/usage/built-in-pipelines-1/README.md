@@ -113,8 +113,8 @@ If the panel is empty, the current pipeline may not have produced a result yet, 
 ## Tips
 
 - Use the same browser window for tuning and robot code testing.
-- If the camera stream does not load, refresh the page. See [Known Issues](../../additional-resources/known-issues.md).
-- Latency shown in the UI is processing latency in milliseconds. NetworkTables publishes latency values in seconds.
+- If the camera stream does not load, refresh the page. If it still fails, check the selected camera and the runtime logs.
+- Latency shown in the UI is processing latency in milliseconds. NetworkTables publishes capture latency and processing latency in seconds.
 - Changes that affect network settings require a runtime restart.
 
 ## Next steps

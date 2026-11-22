@@ -67,11 +67,13 @@ Unsupported metrics report `0`, `-1`, or `0.0` depending on the platform. See th
 | `pipeline_type` | `string` | Pipeline type name, such as `ApriltagPipeline` or `MyPipeline` |
 | `record` | `bool` | Recording state. Write to start or stop recording. |
 | `view_id` | `string` | Dashboard view selector |
-| `captureLatency` | `double` | Capture latency in seconds. Currently always `0.0`. |
+| `captureLatency` | `double` | Time from the camera timestamp until the runtime picks up the frame, in seconds |
 | `processLatency` | `double` | Pipeline processing time in seconds |
 | `data/results` | `raw` | MessagePack-encoded final pipeline result |
 | `data/<key>` | Any | Auxiliary value published with `setDataValue` |
 | `settings/<key>` | Any | Setting value, only when settings publishing is enabled |
+
+`captureLatency` and `processLatency` are separate. Capture latency covers the wait between the camera capturing a frame and the runtime starting work on it. Process latency is only the time the pipeline spent on that frame. Add them for a rough idea of how old the result is when robot code reads it.
 
 Each camera subtable is created from the camera nickname. For example, a camera named `camera0` publishes under `Synapse/camera0`.
 

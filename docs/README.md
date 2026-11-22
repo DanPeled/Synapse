@@ -40,6 +40,7 @@ The current pre-release is `2027.0.0a1`, built for WPILib 2027 alpha 8. See the 
 | **Web UI** | Live camera feeds, pipeline management, settings, logs, and device controls | Any browser on the same network |
 | **SynapseLib** | A Java/Python library that reads results and changes settings from robot code | Robot controller |
 | **Synapse Manager** | A desktop app that finds devices, opens their dashboards, and deploys projects | Your development computer |
+| **Synapse Gradle Plugin** | An optional plugin that deploys coprocessor code with robot code and starts simulation with Gradle | Your robot code project |
 | **Synapse Sim** | Simulated cameras that render a 3D field, so you can test without hardware | Your development computer |
 
 ## Choose your path
@@ -54,7 +55,7 @@ The current pre-release is `2027.0.0a1`, built for WPILib 2027 alpha 8. See the 
 
 {% tab title="I have a coprocessor" %}
 1. Install the runtime in [Installing Software](getting-started/installing-software.md).
-2. Create and deploy a project with [Project Management](usage/project-management/README.md).
+2. Create and deploy a project with [Project Management](usage/project-management/README.md). You can also deploy with the [Gradle Plugin](usage/project-management/gradle-plugin.md).
 3. Open `http://<device-ip>:3000` and tune your pipeline in [UI Interaction](usage/built-in-pipelines-1/README.md).
 {% endtab %}
 

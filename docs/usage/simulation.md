@@ -42,6 +42,8 @@ http://localhost:3000
 Without `--server`, `--sim` connects to an existing NetworkTables server at `127.0.0.1`. That is what you want when you run the WPILib robot simulation, which hosts the server itself.
 {% endhint %}
 
+If you use GradleRIO, the [Gradle Plugin](project-management/gradle-plugin.md) can start and stop Synapse simulation with `./gradlew simulateJava`. It runs the equivalent of `python main.py --sim --headless`.
+
 ## What gets simulated
 
 - Every configured camera becomes a `SimCamera`. A default camera is created if the project has none.

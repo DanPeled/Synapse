@@ -247,12 +247,17 @@ python main.py --headless    # skip the terminal UI
 
 See [Working without a robot](../working-without-a-robot.md).
 
+## Using the Gradle plugin
+
+If your robot code uses GradleRIO, the optional [Gradle Plugin](gradle-plugin.md) can deploy the Synapse project after robot code. It can also start Synapse simulation with `./gradlew simulateJava`.
+
 ## Using Synapse Manager
 
 If you prefer a desktop app over the CLI, see [Synapse Manager](synapse-manager.md). It can discover devices, open dashboards, and deploy linked project folders.
 
 ## Next steps
 
+- [Gradle Plugin](gradle-plugin.md)
 - [Synapse Manager](synapse-manager.md)
 - [Custom Pipelines](../custom-pipelines/README.md)
 - [UI Interaction](../built-in-pipelines-1/README.md)
