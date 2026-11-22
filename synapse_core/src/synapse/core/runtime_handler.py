@@ -11,7 +11,7 @@ import time
 import traceback
 from asyncio import Queue
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, Iterable, List, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
@@ -47,6 +47,7 @@ from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .lifecycle import joinThread
 from .nt_keys import NTKeys
+from .performance import CameraPerformanceTracker
 from .pipeline import (
     FrameResult,
     Pipeline,
@@ -142,6 +143,8 @@ class RuntimeManager:
         self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
+        self._performanceLock = threading.Lock()
+        self._performanceTrackers: Dict[CameraID, CameraPerformanceTracker] = {}
         # Persistent pipeline failures must not format/log a full traceback on
         # every camera frame. This reports the first failure per camera, then
         # periodic counts.
@@ -750,6 +753,82 @@ class RuntimeManager:
             self.cameraHandler.publishFrame(processedFrame, handle, fps=int(cameraFps))
         except Exception:
             pass
+
+        try:
+            tracker = self._getPerformanceTracker(cameraIndex)
+            totalLatency = captureLatency + (time.perf_counter() - processStart)
+            tracker.record(
+                captureLatency,
+                processLatency,
+                totalLatency,
+                getattr(processedFrame, "nbytes", 0),
+            )
+        except Exception:
+            pass
+
+    def _getPerformanceTracker(self, cameraIndex: CameraID) -> CameraPerformanceTracker:
+        with self._performanceLock:
+            tracker = self._performanceTrackers.get(cameraIndex)
+            if tracker is None:
+                tracker = CameraPerformanceTracker()
+                self._performanceTrackers[cameraIndex] = tracker
+            return tracker
+
+    def getPerformanceStats(
+        self, cameraIndex: Optional[CameraID] = None
+    ) -> Dict[Any, Any]:
+        """Return latency/FPS counters for one camera or all cameras.
+
+        Capture and stream counters are merged from their owners so a benchmark
+        can report application drops alongside pipeline results.
+        """
+        indexes: Iterable[CameraID]
+        if cameraIndex is None:
+            indexes = sorted(self._performanceTrackers)
+        else:
+            indexes = (cameraIndex,)
+
+        results: Dict[Any, Any] = {}
+        for index in indexes:
+            stats = self._getPerformanceTracker(index).snapshot()
+            handle = self.cameraHandler.getCameraHandle(index)
+            if handle is not None and hasattr(handle, "getCaptureStats"):
+                capture = handle.getCaptureStats()
+                stats["capture_frames"] = capture["captured"]
+                stats["dropped_capture_frames"] = capture["dropped"]
+                stats["stale_capture_frames"] = capture["stale"]
+                stats["free_capture_buffers"] = capture["free"]
+                stats["capture_buffer_pool"] = capture["pool"]
+
+            stats["dropped_stream_frames"] = self.cameraHandler.getPublishStats(index)[
+                "dropped"
+            ]
+            if cameraIndex is None:
+                results[index] = stats
+            else:
+                return stats
+        return results
+
+    def resetPerformanceStats(self, cameraIndex: Optional[CameraID] = None) -> None:
+        """Clear measurement windows before a benchmark run."""
+        with self._performanceLock:
+            if cameraIndex is None:
+                for tracker in self._performanceTrackers.values():
+                    tracker.reset()
+            else:
+                tracker = self._performanceTrackers.get(cameraIndex)
+                if tracker is not None:
+                    tracker.reset()
+        if cameraIndex is None:
+            for handle in self.cameraHandler.cameraHandles.values():
+                if hasattr(handle, "resetCaptureStats"):
+                    handle.resetCaptureStats()
+            self.cameraHandler.resetPublishStats()
+        else:
+            handle = self.cameraHandler.getCameraHandle(cameraIndex)
+            if handle is not None and hasattr(handle, "resetCaptureStats"):
+                handle.resetCaptureStats()
+            self.cameraHandler.resetPublishStats(cameraIndex)
 
     def run(self):
         """

@@ -405,6 +405,15 @@ class CameraHandle:
                 "pool": len(self._bufferPool),
             }
 
+    def resetCaptureStats(self) -> None:
+        """Zero capture counters without disturbing buffer ownership."""
+        if not hasattr(self, "_freeBuffers"):
+            return
+        with self._frameMutex:
+            self._capturedFrames = 0
+            self._droppedFrames = 0
+            self._staleFrames = 0
+
     def close(self):
         self._running = False
         self._frameReady.set()
