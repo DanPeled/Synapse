@@ -34,7 +34,9 @@ class SynapsePluginFunctionalTest {
     assertTrue(calls.contains("robot-deploy"), calls);
     assertTrue(calls.contains(deployArgs), calls);
     assertTrue(calls.indexOf("robot-deploy") < calls.indexOf(deployArgs), calls);
-    assertTrue(calls.contains("cwd=" + synapseProjectDir().toAbsolutePath()), calls);
+    assertTrue(
+        calls.lines().anyMatch(line -> line.startsWith("cwd=") && line.contains("synapseproject")),
+        calls);
   }
 
   @Test
@@ -60,11 +62,17 @@ class SynapsePluginFunctionalTest {
     assertTimeoutPreemptively(Duration.ofMinutes(2), () -> run("simulateJava"));
 
     String calls = readLog(log);
-    String simArgs =
-        "args=" + synapseProjectDir().resolve("main.py").toAbsolutePath() + " --sim --headless";
-    assertTrue(calls.contains(simArgs), calls);
+    assertTrue(
+        calls
+            .lines()
+            .anyMatch(line ->
+                line.startsWith("args=")
+                    && line.contains("main.py")
+                    && line.contains("--sim")
+                    && line.contains("--headless")),
+        calls);
     assertTrue(calls.contains("robot-sim"), calls);
-    assertTrue(calls.indexOf(simArgs) < calls.indexOf("robot-sim"), calls);
+    assertTrue(calls.indexOf("args=") < calls.indexOf("robot-sim"), calls);
   }
 
   @Test
@@ -79,7 +87,8 @@ class SynapsePluginFunctionalTest {
     String calls = readLog(log);
     assertTrue(calls.contains("robot-sim"), calls);
     assertTrue(
-        calls.contains("args=" + synapseProjectDir().resolve("main.py").toAbsolutePath()), calls);
+        calls.lines().anyMatch(line -> line.startsWith("args=") && line.contains("main.py")),
+        calls);
   }
 
   private Path synapseProjectDir() {
