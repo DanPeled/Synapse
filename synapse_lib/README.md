@@ -1,25 +1,104 @@
-# WPILib Vendor Template
+# SynapseLib
 
-This is the base WPILib vendor template for 2025.
+Robot-side Java and Python clients for the Synapse vision runtime.
 
-## Layout
+SynapseLib reads camera settings and pipeline results over NetworkTables. It
+ships typed models for the built-in pipelines and lets teams define their own
+result types without modifying the library.
 
-The build is split into 3 libraries. A java library is built. This has access to all of wpilib, and also can JNI load the driver library.
+## Install
 
-A driver library is built. This should contain all low level code you want to access from both C++, Java and any other text based language. This will not work with LabVIEW. This library has access to the WPILib HAL and wpiutil. This library can only export C symbols. It cannot export C++ symbols at all, and all C symbols must be explicitly listed in the symbols.txt file in the driver folder. JNI symbols must be listed in this file as well. This library however can be written in C++. If you attempt to change this library to have access to all of wpilib, you will break JNI access and it will no longer work.
+- **Java:** add the SynapseLib vendor dependency to your robot project.
+- **Python:** `pip install synapsefrclib`
 
-A native C++ library is built. This has access to all of wpilib, and access to the driver library. This should implment the standard wpilib interfaces.
+## Quick start
 
-## Customizing
-For Java, the library name will be the folder name the build is started from, so rename the folder to the name of your choosing.
+### Python
 
-For the native impl, you need to change the library name in the exportsConfigs block of build.gradle, the components block of build.gradle, and the taskList input array name in publish.gradle.
+```python
+from synapselib import SynapseCamera, SynapsePipelineType
 
-For the driver, change the library name in privateExportsConfigs, the driver name in components, and the driverTaskList input array name. In addition, you'll need to change the `lib library` in the native C++ impl component, and the JNI library name in the JNI java class.
+camera = SynapseCamera("MyCamera")  # uses the "Synapse" coprocessor table
+camera.setPipeline(1)
+camera.setRecordStatus(True)
 
-For the maven artifact names, those are all in publish.gradle about 40 lines down.
+result = camera.getLatestResults(SynapsePipelineType.kColor)
+```
 
-## Building and editing
-This uses gradle, and uses the same base setup as a standard GradleRIO robot project. This means you build with `./gradlew build`, and can install the native toolchain with `./gradlew installRoboRIOToolchain`. If you open this project in VS Code with the wpilib extension installed, you will get intellisense set up for both C++ and Java.
+### Java
 
-By default, this template builds against the latest WPILib development build. To build against the last WPILib tagged release, build with `./gradlew build -PreleaseMode`.
+```java
+import synapse.SynapseCamera;
+import synapse.SynapsePipelineType;
+import synapse.pipelines.color.ColorResult;
+
+SynapseCamera camera = new SynapseCamera("MyCamera");
+camera.setPipeline(1);
+camera.setRecordStatus(true);
+
+camera
+    .getResults(SynapsePipelineType.kColor)
+    .ifPresent(result -> System.out.println(result.timestamp));
+```
+
+## Camera API
+
+`SynapseCamera` exposes the runtime's NetworkTables values:
+
+- `getPipeline()` / `setPipeline(int)`
+- `getPipelineType()`
+- `getRecordingStatus()` / `setRecordStatus(boolean)`
+- `getCaptureLatency()` / `getProcessLatency()` (seconds)
+- `getSetting(Setting<T>)` / `setSetting(Setting<T>, T)`
+- `getResults(...)` for a typed pipeline result
+
+Topics and settings are available as constants on
+`SynapseCamera.NetworkTableTopics` and `SynapseCamera.Setting`. The Python
+client exposes the same values on `SynapseCamera.NetworkTableTopics` and
+`Setting`.
+
+## Custom pipelines
+
+Custom result types are supported. Define a class that matches the payload
+your pipeline publishes, then construct a pipeline type with it:
+
+```python
+from dataclasses import dataclass
+from synapselib import SynapseCamera, SynapsePipelineType
+
+@dataclass
+class MyResult:
+    timestamp: float
+    label: str
+
+myPipeline = SynapsePipelineType(MyResult, "MyPipeline")
+camera.getLatestResults(myPipeline)
+```
+
+The Java equivalent accepts a Jackson `TypeReference`:
+
+```java
+SynapsePipelineType<MyResult> myPipeline =
+    new SynapsePipelineType<>(new TypeReference<MyResult>() {}, "MyPipeline");
+```
+
+## Generated sources
+
+NetworkTables paths, camera settings, and built-in pipeline type strings are
+derived from the `synapse_core` runtime source. The built-in result models live
+in `schema/synapse_lib.json` and are shared by the Java and Python generators.
+
+Regenerate after changing either side:
+
+```bash
+python tools/generate_synapse_lib.py
+```
+
+Check for drift without writing files:
+
+```bash
+python tools/generate_synapse_lib.py --check
+```
+
+Use `--no-runtime` to render from the committed schema without reading
+`synapse_core` (for example, when building the library on its own).

@@ -1,7 +1,7 @@
 package synapse.util.deserializers;
 
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import edu.wpi.first.math.geometry.*;
+import org.wpilib.math.geometry.*;
 
 /**
  * Jackson module that registers deserializers for WPILib geometry classes.

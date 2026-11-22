@@ -6,16 +6,60 @@
 from __future__ import annotations
 
 import http.server
+import json
 import shutil
 import socketserver
 import tempfile
 import threading
 import zipfile
 from pathlib import Path
-from typing import Optional
-from urllib.parse import parse_qs, urlparse
+from typing import Any, Optional
+from urllib.parse import parse_qs, unquote, urlparse
 
-from synapse.log import log
+from synapse.log import info
+
+PREVIEW_MAX_BYTES = 256 * 1024
+_TEXT_SAMPLE_BYTES = 8192
+
+
+class ReusableThreadingTCPServer(socketserver.ThreadingTCPServer):
+    """TCP server that handles file requests concurrently and restarts cleanly."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+    # Handler threads are daemons, so shutdown should not wait for slow clients.
+    block_on_close = False
+
+
+def _decode_text_preview(data: bytes, truncated: bool) -> Optional[str]:
+    """Return the file content as text when it looks like a text file."""
+    sample = data[:_TEXT_SAMPLE_BYTES]
+    if b"\x00" in sample:
+        return None
+
+    text: Optional[str] = None
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        if truncated:
+            # A multi-byte character may be split at the read boundary.
+            for cut in range(1, 4):
+                try:
+                    text = data[:-cut].decode("utf-8-sig")
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+    if text is None:
+        return None
+
+    controlChars = sum(
+        1 for char in text if ord(char) < 32 and char not in "\n\r\t\f\b"
+    )
+    if text and controlChars / len(text) > 0.1:
+        return None
+
+    return text
 
 
 class FileServerHandler(http.server.SimpleHTTPRequestHandler):
@@ -39,6 +83,119 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(200)
         self.end_headers()
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/list":
+            self._handle_list(parsed)
+        elif parsed.path == "/read":
+            self._handle_read(parsed)
+        else:
+            super().do_GET()
+
+    def _send_json(self, data: Any, status: int = 200) -> None:
+        body = json.dumps(data).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _handle_list(self, parsed) -> None:
+        params = parse_qs(parsed.query)
+        requested = params.get("path", [""])[0]
+
+        target = self._resolve_safe_path(requested)
+        if target is None:
+            self.send_error(403, "Invalid path")
+            return
+
+        if not target.exists():
+            self.send_error(404, "Path does not exist")
+            return
+        if not target.is_dir():
+            self.send_error(400, "Path is not a directory")
+            return
+
+        entries = []
+        try:
+            children = sorted(
+                target.iterdir(),
+                key=lambda child: (not child.is_dir(), child.name.lower()),
+            )
+            for child in children:
+                if child.is_symlink():
+                    continue
+                try:
+                    isDir = child.is_dir()
+                    size = 0 if isDir else child.stat().st_size
+                except OSError:
+                    continue
+                entries.append(
+                    {
+                        "name": child.name,
+                        "path": child.relative_to(self.files_dir).as_posix(),
+                        "is_dir": isDir,
+                        "size": size,
+                    }
+                )
+        except OSError as e:
+            self.send_error(500, f"Unable to list directory: {e}")
+            return
+
+        relativePath = (
+            "" if target == self.files_dir else target.relative_to(self.files_dir)
+        )
+        self._send_json(
+            {
+                "path": relativePath.as_posix() if relativePath else "",
+                "entries": entries,
+            }
+        )
+
+    def _handle_read(self, parsed) -> None:
+        params = parse_qs(parsed.query)
+        requested = params.get("path", [""])[0]
+
+        if not requested:
+            self.send_error(400, "Missing path")
+            return
+
+        target = self._resolve_safe_path(requested)
+        if target is None:
+            self.send_error(403, "Invalid path")
+            return
+
+        if not target.exists():
+            self.send_error(404, "Path does not exist")
+            return
+        if not target.is_file():
+            self.send_error(400, "Path is not a file")
+            return
+
+        try:
+            size = target.stat().st_size
+            with target.open("rb") as file:
+                data = file.read(PREVIEW_MAX_BYTES + 1)
+        except OSError as e:
+            self.send_error(500, f"Unable to read file: {e}")
+            return
+
+        truncated = len(data) > PREVIEW_MAX_BYTES
+        data = data[:PREVIEW_MAX_BYTES]
+        content = _decode_text_preview(data, truncated)
+
+        self._send_json(
+            {
+                "path": target.relative_to(self.files_dir).as_posix(),
+                "name": target.name,
+                "size": size,
+                "is_text": content is not None,
+                "content": content,
+                "truncated": truncated,
+                "max_bytes": PREVIEW_MAX_BYTES,
+            }
+        )
 
     def _resolve_safe_path(self, path: str) -> Optional[Path]:
         resolved = (self.files_dir / path.lstrip("/")).resolve()
@@ -70,7 +227,8 @@ class FileServerHandler(http.server.SimpleHTTPRequestHandler):
         return None
 
     def do_PUT(self) -> None:
-        target = self._resolve_safe_path(self.path)
+        parsed = urlparse(self.path)
+        target = self._resolve_safe_path(unquote(parsed.path))
         if target is None:
             self.send_error(403)
             return
@@ -196,7 +354,7 @@ class FileServer:
 
         self.host = host
         self.port = port
-        self._server: Optional[socketserver.TCPServer] = None
+        self._server: Optional[ReusableThreadingTCPServer] = None
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
@@ -206,12 +364,9 @@ class FileServer:
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=files_dir, **kwargs)
 
-        class ReusableTCPServer(socketserver.TCPServer):
-            allow_reuse_address = True
+        self._server = ReusableThreadingTCPServer((self.host, self.port), Handler)
 
-        self._server = ReusableTCPServer((self.host, self.port), Handler)
-
-        log(f"File server running at http://{self.host}:{self.port}/")
+        info(f"File server running at http://{self.host}:{self.port}/")
 
         self._thread = threading.Thread(
             target=self._server.serve_forever,

@@ -33,6 +33,7 @@ message MessageProto {
     messages.v1.SetConnectionInfoProto set_connection_info = 19; // Message to set connection information for the device
     messages.v1.PipelineResultProto pipeline_result = 21; // Result of a pipeline operation
     messages.v1.AlertProto alert = 22; // Alert message containing alert data
+    messages.v1.ImportCalibrationMessageProto import_calibration = 23; // Request to import an uploaded calibration JSON
   }
 
   repeated PipelineTypeProto pipeline_type_info = 20; // List of pipeline types available in the system
@@ -67,4 +68,5 @@ enum MessageTypeProto {
   MESSAGE_TYPE_PROTO_SET_DEVICE_CONNECTION_STATUS = 24;
   MESSAGE_TYPE_PROTO_SET_PIPELINE_RESULT = 25;
   MESSAGE_TYPE_PROTO_ALERT = 26;
+  MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION = 27;
 }

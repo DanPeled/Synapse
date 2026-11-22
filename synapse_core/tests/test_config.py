@@ -26,6 +26,84 @@ def test_network_config_from_json() -> None:
 
     assert config.teamNumber == 1234
     assert config.name == "TestTeam"
+    assert config.prefixLength == 24
+    assert config.ip is None
+    assert config.networkInterface is None
+
+
+def test_network_config_loads_static_address() -> None:
+    data: dict = {
+        "team_number": 1234,
+        "name": "TestTeam",
+        "hostname": "coprocessor",
+        "ip": "10.12.34.11",
+        "interface": "eth0",
+        "prefix_length": 16,
+    }
+    config = NetworkConfig.fromJson(data)
+
+    assert config.hostname == "coprocessor"
+    assert config.ip == "10.12.34.11"
+    assert config.networkInterface == "eth0"
+    assert config.prefixLength == 16
+
+
+def test_network_config_reads_legacy_interface_typo() -> None:
+    data: dict = {
+        "ip": "10.12.34.11",
+        "interfrace": "eth0",
+    }
+    config = NetworkConfig.fromJson(data)
+
+    assert config.networkInterface == "eth0"
+
+
+def test_network_config_round_trips_through_json() -> None:
+    config = NetworkConfig(
+        teamNumber=1234,
+        name="TestTeam",
+        hostname="coprocessor",
+        ip="10.12.34.11",
+        networkInterface="eth0",
+        prefixLength=24,
+    )
+
+    restored = NetworkConfig.fromJson(config.toJson())
+
+    assert restored == config
+
+
+def test_network_config_proto_includes_prefix() -> None:
+    config = NetworkConfig(
+        teamNumber=1234,
+        name="TestTeam",
+        hostname="coprocessor",
+        ip="10.12.34.11",
+        networkInterface="eth0",
+        prefixLength=16,
+    )
+
+    proto = config.toProto()
+
+    assert proto.ip == "10.12.34.11"
+    assert proto.network_interface == "eth0"
+    assert proto.prefix_length == 16
+
+
+def test_network_config_proto_uses_empty_strings_for_unset_values() -> None:
+    config = NetworkConfig(
+        teamNumber=1234,
+        name="TestTeam",
+        hostname="coprocessor",
+        ip=None,
+        networkInterface=None,
+        prefixLength=24,
+    )
+
+    proto = config.toProto()
+
+    assert proto.ip == ""
+    assert proto.network_interface == ""
 
 
 def test_config_load_and_get_instance() -> None:

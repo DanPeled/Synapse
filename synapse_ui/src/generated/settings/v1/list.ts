@@ -6,19 +6,31 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import {
+  ValueTypeProto,
+  valueTypeProtoFromJSON,
+  valueTypeProtoToJSON,
+} from "./value_type";
 
 export const protobufPackage = "settings.v1";
 
-/** Constraint defining allowed length boundaries for a list setting */
+/**
+ * Constraint defining the accepted contents and length boundaries of a list
+ * setting.
+ */
 export interface ListConstraintProto {
   /** Minimum number of elements required in the list (inclusive) */
   minLength: number;
   /** Maximum number of elements allowed in the list (inclusive) */
   maxLength: number;
+  /** Type of every item in the list. UNSPECIFIED accepts any non-nested value. */
+  itemType: ValueTypeProto;
+  /** Allowed level of list nesting. A depth of 1 means a flat list. */
+  depth: number;
 }
 
 function createBaseListConstraintProto(): ListConstraintProto {
-  return { minLength: 0, maxLength: 0 };
+  return { minLength: 0, maxLength: 0, itemType: 0, depth: 0 };
 }
 
 export const ListConstraintProto: MessageFns<ListConstraintProto> = {
@@ -31,6 +43,12 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
     }
     if (message.maxLength !== 0) {
       writer.uint32(24).int32(message.maxLength);
+    }
+    if (message.itemType !== 0) {
+      writer.uint32(32).int32(message.itemType);
+    }
+    if (message.depth !== 0) {
+      writer.uint32(40).int32(message.depth);
     }
     return writer;
   },
@@ -62,6 +80,22 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
           message.maxLength = reader.int32();
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.itemType = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.depth = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -79,6 +113,10 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
       maxLength: isSet(object.maxLength)
         ? globalThis.Number(object.maxLength)
         : 0,
+      itemType: isSet(object.itemType)
+        ? valueTypeProtoFromJSON(object.itemType)
+        : 0,
+      depth: isSet(object.depth) ? globalThis.Number(object.depth) : 0,
     };
   },
 
@@ -89,6 +127,12 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
     }
     if (message.maxLength !== 0) {
       obj.maxLength = Math.round(message.maxLength);
+    }
+    if (message.itemType !== 0) {
+      obj.itemType = valueTypeProtoToJSON(message.itemType);
+    }
+    if (message.depth !== 0) {
+      obj.depth = Math.round(message.depth);
     }
     return obj;
   },
@@ -104,6 +148,8 @@ export const ListConstraintProto: MessageFns<ListConstraintProto> = {
     const message = createBaseListConstraintProto();
     message.minLength = object.minLength ?? 0;
     message.maxLength = object.maxLength ?? 0;
+    message.itemType = object.itemType ?? 0;
+    message.depth = object.depth ?? 0;
     return message;
   },
 };

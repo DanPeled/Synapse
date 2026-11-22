@@ -8,32 +8,48 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import (Any, Dict, Generic, List, Optional, Set, TypeVar, Union,
-                    overload)
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from betterproto import which_one_of
 from cscore import VideoProperty
 from ntcore import NetworkTable, NetworkTableEntry
 from synapse_net.generated.messages.v1 import CameraProto
-from synapse_net.generated.settings.v1 import (BooleanConstraintProto,
-                                               ColorConstraintProto,
-                                               ColorFormatProto,
-                                               ConstraintConfigProto,
-                                               ConstraintProto,
-                                               ConstraintTypeProto,
-                                               EnumeratedConstraintProto,
-                                               EnumeratedOptionProto,
-                                               FileConstraintProto,
-                                               ListConstraintProto,
-                                               NumberConstraintProto,
-                                               SettingMetaProto,
-                                               SettingValueProto,
-                                               StringConstraintProto)
+from synapse_net.generated.settings.v1 import (
+    BooleanConstraintProto,
+    ColorConstraintProto,
+    ColorFormatProto,
+    ConstraintConfigProto,
+    ConstraintProto,
+    ConstraintTypeProto,
+    EnumeratedConstraintProto,
+    EnumeratedOptionProto,
+    FileConstraintProto,
+    ListConstraintProto,
+    NumberConstraintProto,
+    RangeConstraintProto,
+    SettingMetaProto,
+    SettingValueProto,
+    StringConstraintProto,
+    ValueTypeProto,
+)
 
 from ..bcolors import MarkupColors
 from ..log import err
-from ..stypes import CameraID, PipelineID
-from .camera_factory import CameraPropKeys, PropertyMetaDict, SynapseCamera
+from ..stypes import CameraID, PipelineID, PropertyMetaDict
+from .camera.synapse_camera import SynapseCamera
+from .camera_factory import CameraPropKeys
 
 SettingsValue = Any
 
@@ -69,6 +85,80 @@ class Constraint(ABC, Generic[TSettingValueType]):
     @abstractmethod
     def configToProto(self) -> ConstraintConfigProto:
         pass
+
+
+class RangeConstraint(Constraint[Union[List[float], List[int]]]):
+    """Constraint for numeric values inside a provided range"""
+
+    def __init__(
+        self,
+        minValue: Optional[float] = None,
+        maxValue: Optional[float] = None,
+        step: Optional[float] = None,
+    ):
+        """
+        Initialize a RangeConstraint instance.
+
+        Args:
+            minValue (Optional[Union[int, float]]): The minimum allowed value for the range.
+                If None, no minimum constraint is applied.
+            maxValue (Optional[Union[int, float]]): The maximum allowed value for the range.
+                If None, no maximum constraint is applied.
+            step (Optional[Union[int, float]]): The step size or increment within the range.
+                If None, any value within the range is allowed.
+
+        """
+        super().__init__(ConstraintTypeProto.RANGE)
+        self.minValue = minValue
+        self.maxValue = maxValue
+        self.step = step
+
+    def validate(
+        self, value: SettingsValue
+    ) -> ValidationResult[Union[List[float], List[int]]]:
+        try:
+            num_values = list(value)
+            normalized_values = []
+
+            for n in num_values:
+                if self.minValue is not None and n < self.minValue:
+                    return ValidationResult(
+                        False,
+                        f"Value {n} is less than minimum {self.minValue}",
+                    )
+
+                if self.maxValue is not None and n > self.maxValue:
+                    return ValidationResult(
+                        False,
+                        f"Value {n} is greater than maximum {self.maxValue}",
+                    )
+
+                normalized = n
+                if self.step and self.minValue is not None:
+                    steps = round((n - self.minValue) / self.step)
+                    normalized = self.minValue + (steps * self.step)
+
+                normalized_values.append(normalized)
+
+            return ValidationResult(True, None, normalized_values)
+
+        except (ValueError, TypeError):
+            return ValidationResult(False, f"Value {value} is not a valid number")
+
+    def toDict(self) -> Dict[str, Any]:
+        return {
+            "type": self.constraintType.value,
+            "minValue": self.minValue,
+            "maxValue": self.maxValue,
+            "step": self.step,
+        }
+
+    def configToProto(self) -> ConstraintConfigProto:
+        return ConstraintConfigProto(
+            range=RangeConstraintProto(
+                min=self.minValue, max=self.maxValue, step=self.step
+            )
+        )
 
 
 class NumberConstraint(Constraint[Union[float, int]]):
@@ -146,10 +236,33 @@ class EnumeratedOption(Generic[TEnumeratedType]):
     value: TEnumeratedType
 
 
+TEnum = TypeVar("TEnum", bound=Enum)
+
+
 class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]):
     """Constraint for selecting from predefined options"""
 
-    def __init__(self, options: Union[List[EnumeratedOption], List[TEnumeratedType]]):
+    @overload
+    def __init__(self, options: List[EnumeratedOption[TEnumeratedType]]) -> None: ...
+
+    @overload
+    def __init__(self, options: List[TEnumeratedType]) -> None: ...
+
+    @staticmethod
+    def fromEnum(
+        enum_type: type[TEnum],
+    ) -> "EnumeratedConstraint[TEnumeratedType]":
+        return EnumeratedConstraint(
+            [
+                EnumeratedOption(member.name, cast(TEnumeratedType, member.value))
+                for member in enum_type
+            ]
+        )
+
+    def __init__(
+        self,
+        options: Union[List[EnumeratedOption[TEnumeratedType]], List[TEnumeratedType]],
+    ):
         """
         Initialize a ListOptionsConstraint instance.
 
@@ -161,9 +274,12 @@ class EnumeratedConstraint(Constraint[TEnumeratedType], Generic[TEnumeratedType]
         """
         assert options
         if options and not isinstance(options[0], EnumeratedOption):
-            options = [EnumeratedOption(str(o), o) for o in options]
+            raw_options = cast(List[TEnumeratedType], options)
+            options = [EnumeratedOption(str(o), o) for o in raw_options]
         super().__init__(ConstraintTypeProto.ENUMERATED)
-        self.options: List[EnumeratedOption] = options  # pyright: ignore
+        self.options: List[EnumeratedOption[TEnumeratedType]] = cast(
+            List[EnumeratedOption[TEnumeratedType]], options
+        )
 
     def validate(self, value: SettingsValue) -> ValidationResult:
         expectedType = type(self.options[0].value)
@@ -342,11 +458,122 @@ class ColorConstraint(Constraint[Union[tuple, list]]):
         )
 
 
+def _valueTypeFromPython(value: Any) -> ValueTypeProto:
+    """Return the protobuf value type that matches a Python value."""
+    if isinstance(value, bool):
+        return ValueTypeProto.BOOL
+    if isinstance(value, int):
+        return ValueTypeProto.INT
+    if isinstance(value, float):
+        return ValueTypeProto.FLOAT
+    if isinstance(value, str):
+        return ValueTypeProto.STRING
+    if isinstance(value, bytes):
+        return ValueTypeProto.BYTES
+    if isinstance(value, list):
+        return ValueTypeProto.LIST
+    return ValueTypeProto.UNSPECIFIED
+
+
+def _valueTypeFromPythonType(valueType: Any) -> ValueTypeProto:
+    """Normalize a Python type (or ValueTypeProto) to a ValueTypeProto."""
+    if valueType is None:
+        return ValueTypeProto.UNSPECIFIED
+    if isinstance(valueType, ValueTypeProto):
+        return valueType
+
+    mapping = {
+        bool: ValueTypeProto.BOOL,
+        int: ValueTypeProto.INT,
+        float: ValueTypeProto.FLOAT,
+        str: ValueTypeProto.STRING,
+        bytes: ValueTypeProto.BYTES,
+        list: ValueTypeProto.LIST,
+    }
+    if valueType not in mapping:
+        raise TypeError(
+            "List item type must be one of "
+            f"{', '.join(t.__name__ for t in mapping)} or a ValueTypeProto"
+        )
+    return mapping[valueType]
+
+
+def _inferListItemType(value: SettingsValue) -> ValueTypeProto:
+    """Infer the leaf item type of a (possibly nested) list value."""
+    candidate = value
+    while isinstance(candidate, list):
+        if not candidate:
+            return ValueTypeProto.UNSPECIFIED
+        candidate = candidate[0]
+    return _valueTypeFromPython(candidate)
+
+
+def _validateTypedItem(
+    item: SettingsValue,
+    itemType: ValueTypeProto,
+    index: int,
+) -> ValidationResult:
+    """Validate and normalize a single list item against a value type."""
+    if itemType == ValueTypeProto.UNSPECIFIED:
+        return ValidationResult(True, None, item)
+
+    if itemType == ValueTypeProto.INT:
+        if isinstance(item, bool):
+            return ValidationResult(False, f"Item at index {index} must be an int")
+        if isinstance(item, int):
+            return ValidationResult(True, None, item)
+        if isinstance(item, float) and item.is_integer():
+            return ValidationResult(True, None, int(item))
+        return ValidationResult(False, f"Item at index {index} must be an int")
+
+    if itemType == ValueTypeProto.FLOAT:
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            return ValidationResult(False, f"Item at index {index} must be a float")
+        return ValidationResult(True, None, float(item))
+
+    if itemType == ValueTypeProto.STRING:
+        if not isinstance(item, str):
+            return ValidationResult(False, f"Item at index {index} must be a string")
+        return ValidationResult(True, None, item)
+
+    if itemType == ValueTypeProto.BOOL:
+        if isinstance(item, bool):
+            return ValidationResult(True, None, item)
+        if isinstance(item, (int, float)) and item in (0, 1):
+            return ValidationResult(True, None, bool(item))
+        if isinstance(item, str):
+            lowered = item.strip().lower()
+            if lowered in ("true", "1", "yes", "on"):
+                return ValidationResult(True, None, True)
+            if lowered in ("false", "0", "no", "off"):
+                return ValidationResult(True, None, False)
+        return ValidationResult(False, f"Item at index {index} must be a bool")
+
+    if itemType == ValueTypeProto.BYTES:
+        if not isinstance(item, bytes):
+            return ValidationResult(False, f"Item at index {index} must be bytes")
+        return ValidationResult(True, None, item)
+
+    if itemType == ValueTypeProto.LIST:
+        if not isinstance(item, list):
+            return ValidationResult(False, f"Item at index {index} must be a list")
+        return ValidationResult(True, None, item)
+
+    return ValidationResult(False, f"Unsupported list item type: {itemType}")
+
+
 class ListConstraint(Constraint[List]):
-    """Constraint for list values with optional item constraints and nested depth"""
+    """Constraint for homogeneous list values with an optional item type.
+
+    Lists may contain integers, floats, strings, booleans, bytes, or other
+    lists (controlled by ``depth``). Setting ``itemType`` restricts and
+    normalizes the leaf values, while leaving it unspecified preserves the
+    previous behavior of accepting any item type.
+    """
 
     def __init__(
         self,
+        itemType: Any = None,
         minLength: int = 0,
         maxLength: int = 0,
         depth: int = 1,
@@ -355,17 +582,18 @@ class ListConstraint(Constraint[List]):
         Initialize a ListConstraint instance.
 
         Args:
-            itemConstraint (Optional[Constraint]): A constraint that each item in the list must satisfy.
-                If None, no per-item constraint is applied.
-            minLength (Optional[int]): The minimum number of items allowed in the list.
-                If None, no minimum constraint is applied.
-            maxLength (Optional[int]): The maximum number of items allowed in the list.
-                If None, no maximum constraint is applied.
-            depth (int): The allowed level of list nesting. For example, a depth of 2 means a 2D list.
-                Defaults to 1.
+            itemType (Optional[Union[type, ValueTypeProto]]): The Python type
+                (``int``, ``float``, ``str``, ``bool``, ``bytes``, ``list``)
+                or ``ValueTypeProto`` that every leaf item must match. If
+                None, items are not type-checked.
+            minLength (int): The minimum number of items allowed in the list.
+            maxLength (int): The maximum number of items allowed in the list.
+            depth (int): The allowed level of list nesting. A depth of 2 means
+                a list of lists.
 
         """
         super().__init__(ConstraintTypeProto.LIST)
+        self.itemType = _valueTypeFromPythonType(itemType)
         self.minLength = minLength
         self.maxLength = maxLength
         self.depth = depth
@@ -391,7 +619,7 @@ class ListConstraint(Constraint[List]):
                 if depth > 1:
                     result = _validate_list(item, depth - 1)
                 else:
-                    result = ValidationResult(True, None, item)
+                    result = _validateTypedItem(item, self.itemType, i)
 
                 if not result.isValid:
                     return ValidationResult(
@@ -410,6 +638,7 @@ class ListConstraint(Constraint[List]):
     def toDict(self) -> Dict[str, Any]:
         return {
             "type": self.constraintType.value,
+            "itemType": self.itemType.value,
             "minLength": self.minLength,
             "maxLength": self.maxLength,
             "depth": self.depth,
@@ -420,6 +649,8 @@ class ListConstraint(Constraint[List]):
             list=ListConstraintProto(
                 min_length=self.minLength,
                 max_length=self.maxLength,
+                item_type=self.itemType,
+                depth=self.depth,
             )
         )
 
@@ -494,30 +725,119 @@ class StringConstraint(Constraint[str]):
         )
 
 
-class FileConstraint(Constraint[Optional[Path]]):
-    def __init__(self, fileTypes: Optional[Set[str]] = None):
-        super().__init__(ConstraintTypeProto.FILE)
-        self.fileTypes: Optional[Set[str]] = fileTypes
+def _getSettingsRoot() -> Path:
+    """Return the project root directory used to resolve file setting paths."""
+    try:
+        from .config import Config
 
-    def validate(self, value: SettingsValue) -> ValidationResult[Optional[Path]]:
+        return Config.getInstance().path.parent.parent.resolve()
+    except (AttributeError, TypeError, OSError):
+        return Path.cwd().resolve()
+
+
+def _normalizeFileTypes(fileTypes: Optional[Iterable[str]]) -> Optional[Set[str]]:
+    if not fileTypes:
+        return None
+
+    normalized: Set[str] = set()
+    for fileType in fileTypes:
+        cleaned = str(fileType).strip().lower()
+        if not cleaned:
+            continue
+        if not cleaned.startswith("."):
+            cleaned = f".{cleaned}"
+        normalized.add(cleaned)
+
+    return normalized or None
+
+
+class FileConstraint(Constraint[Optional[str]]):
+    """Constraint for settings whose value is a file on the processor.
+
+    The value is stored as a path relative to the Synapse project root, which is
+    also the root served by the file server. This makes the stored value usable
+    by both the runtime and the UI without leaking absolute paths from the
+    processor.
+
+    Args:
+        path (Union[str, Path]): Directory, relative to the project root, that
+            the UI should use as the starting point for browsing and uploading
+            files.
+        fileTypes (Optional[Iterable[str]]): Allowed file extensions. Both
+            ``json`` and ``.json`` are accepted and normalized to the latter.
+    """
+
+    def __init__(
+        self,
+        path: Union[str, Path] = "",
+        fileTypes: Optional[Iterable[str]] = None,
+    ):
+        super().__init__(ConstraintTypeProto.FILE)
+        self.path = str(path or "").replace("\\", "/").strip("/")
+        self.fileTypes = _normalizeFileTypes(fileTypes)
+
+    def _validateFileType(self, candidate: Path) -> Optional[str]:
+        if not self.fileTypes:
+            return None
+        if candidate.suffix.lower() not in self.fileTypes:
+            allowed = ", ".join(sorted(self.fileTypes))
+            return f"File type must be one of: {allowed}"
+        return None
+
+    def validate(self, value: SettingsValue) -> ValidationResult[Optional[str]]:
+        if value is None:
+            return ValidationResult(True, None, "")
+
         if isinstance(value, Path):
-            return ValidationResult(True, None, value.absolute())
+            valueStr = value.as_posix()
         elif isinstance(value, str):
-            if Path(value).exists():
-                return ValidationResult(True, None, Path(value))
-            return ValidationResult(False, "Path must exist")
-        return ValidationResult(False, "Path must be either Path or str")
+            valueStr = value.strip()
+        else:
+            return ValidationResult(False, "Path must be either a string or Path")
+
+        if not valueStr:
+            return ValidationResult(True, None, "")
+
+        root = _getSettingsRoot()
+        candidate = Path(valueStr).expanduser()
+        if not candidate.is_absolute():
+            candidate = root / candidate
+
+        try:
+            candidate = candidate.resolve()
+        except OSError as e:
+            return ValidationResult(False, f"Invalid path: {e}")
+
+        if not candidate.is_relative_to(root):
+            return ValidationResult(False, "File must be inside the project directory")
+        if not candidate.exists():
+            return ValidationResult(False, "File does not exist")
+        if not candidate.is_file():
+            return ValidationResult(False, "Path must point to a file")
+
+        typeError = self._validateFileType(candidate)
+        if typeError is not None:
+            return ValidationResult(False, typeError)
+
+        return ValidationResult(True, None, candidate.relative_to(root).as_posix())
 
     def toDict(self) -> Dict[str, Any]:
-        return {"type": self.constraintType.value, "file_types": self.fileTypes or None}
+        return {
+            "type": self.constraintType.value,
+            "path": self.path,
+            "file_types": sorted(self.fileTypes) if self.fileTypes else None,
+        }
 
     @classmethod
     def fromDict(cls, data: Dict[str, Any]) -> "FileConstraint":
-        return FileConstraint(data.get("file_types", None))
+        return cls(data.get("path", ""), data.get("file_types"))
 
     def configToProto(self) -> ConstraintConfigProto:
         return ConstraintConfigProto(
-            file=FileConstraintProto(file_types=list(self.fileTypes or []))
+            file=FileConstraintProto(
+                path=self.path,
+                file_types=sorted(self.fileTypes) if self.fileTypes else [],
+            )
         )
 
 
@@ -590,6 +910,15 @@ class Setting(Generic[TConstraintType, TSettingValueType]):
     def validate(self, value: SettingsValue) -> ValidationResult:
         return self.constraint.validate(value)
 
+    def valueToProto(self, value: SettingsValue) -> SettingValueProto:
+        """Serialize a value, using the constraint to describe empty lists."""
+        itemType = (
+            self.constraint.itemType
+            if isinstance(self.constraint, ListConstraint)
+            else ValueTypeProto.UNSPECIFIED
+        )
+        return settingValueToProto(value, itemType=itemType)
+
     def toDict(self) -> Dict[str, Any]:
         return {
             "key": self.key,
@@ -641,7 +970,9 @@ class SettingsAPI:
 
         result = self.settings[key].validate(value)
         if result.isValid:
-            self.values[key] = result.normalizedValue or value
+            self.values[key] = (
+                result.normalizedValue if result.normalizedValue is not None else value
+            )
 
         return result
 
@@ -751,7 +1082,10 @@ class SettingsCollection:
                     return 1
                 return 1 + max(getListDepth(item) for item in value)
 
-            constraint = ListConstraint(depth=getListDepth(value))
+            constraint = ListConstraint(
+                itemType=_inferListItemType(value),
+                depth=getListDepth(value),
+            )
         if constraint is not None:
             self._settingsApi.addSetting(
                 Setting(key=field, constraint=constraint, defaultValue=value)
@@ -781,7 +1115,7 @@ class SettingsCollection:
         elif prop.getKind().value == VideoProperty.Kind.kString.value:
             constraint = StringConstraint()
         elif prop.getKind().value == VideoProperty.Kind.kEnum.value:
-            options = []
+            options: List[EnumeratedOption] = []
             for i in range(len(prop.getChoices())):
                 if prop.getChoices()[i]:
                     options.append(EnumeratedOption(prop.getChoices()[i], i))
@@ -809,6 +1143,16 @@ class SettingsCollection:
         for field, value in settingsMap.items():
             if field not in prexistingKeys:
                 self.generateSetting(field, value)
+                continue
+
+            result = self._settingsApi.setValue(field, value)
+            if not result.isValid:
+                setting = self._settingsApi.settings[field]
+                err(
+                    f"Error loading {MarkupColors.bold(field)}"
+                    + f"\n\t\t{result.errorMessage}"
+                    + f"\n\tSetting {field} as default: {setting.defaultValue}"
+                )
 
     def sendSettings(self, nt_table: NetworkTable):
         """
@@ -1008,6 +1352,8 @@ def setEntryValue(entry: NetworkTableEntry, value):
         entry.setFloat(value)
     elif isinstance(value, bool):
         entry.setBoolean(value)
+    elif isinstance(value, Path):
+        entry.setString(value.as_posix())
     elif isinstance(value, str):
         entry.setString(value)
     elif isinstance(value, list):
@@ -1026,7 +1372,7 @@ def setEntryValue(entry: NetworkTableEntry, value):
 
 
 class CameraSettings(SettingsCollection):
-    kCameraPropsCategory = "Camera Properties"
+    kCameraPropsCategory = "<Camera/> Camera Properties"
 
     brightness = settingField(
         NumberConstraint(0, 100),
@@ -1133,49 +1479,130 @@ class PipelineSettings(SettingsCollection):
 
 def protoToSettingValue(proto: SettingValueProto) -> SettingsValue:
     scalar_field = which_one_of(proto, "scalar_value")
+    arrayType = proto.array_type
 
-    if scalar_field is not None:
-        return scalar_field[1]
-    if proto.int_array_value:
+    # array_type is set for every array, including empty ones. Older clients do
+    # not send it, so fall back to detecting non-empty arrays below.
+    if arrayType != ValueTypeProto.UNSPECIFIED:
+        if arrayType == ValueTypeProto.INT:
+            return list(proto.int_array_value)
+        if arrayType == ValueTypeProto.FLOAT:
+            return list(proto.float_array_value)
+        if arrayType == ValueTypeProto.STRING:
+            return list(proto.string_array_value)
+        if arrayType == ValueTypeProto.BOOL:
+            return list(proto.bool_array_value)
+        if arrayType == ValueTypeProto.BYTES:
+            return list(proto.bytes_array_value)
+        if arrayType == ValueTypeProto.LIST:
+            # LIST is used as a marker for an empty list whose item type is
+            # unknown. Non-empty nested lists are not representable.
+            if (
+                len(proto.int_array_value) > 0
+                or len(proto.string_array_value) > 0
+                or len(proto.bool_array_value) > 0
+                or len(proto.float_array_value) > 0
+                or len(proto.bytes_array_value) > 0
+            ):
+                raise ValueError("Nested lists are not supported")
+            return []
+        raise ValueError(f"Unsupported array type: {arrayType}")
+
+    if len(proto.int_array_value) > 0:
         return list(proto.int_array_value)
     elif proto.string_array_value:
         return list(proto.string_array_value)
     elif proto.bool_array_value:
         return list(proto.bool_array_value)
-    elif proto.float_array_value:
+    elif len(proto.float_array_value) > 0:
         return list(proto.float_array_value)
     elif proto.bytes_array_value:
         return list(proto.bytes_array_value)
+    if scalar_field is not None:
+        return scalar_field[1]
 
     raise ValueError("No value set in SettingValueProto")
 
 
-def settingValueToProto(val: SettingsValue) -> SettingValueProto:
+def _inferProtoArrayType(val: List[Any]) -> ValueTypeProto:
+    if not val:
+        return ValueTypeProto.UNSPECIFIED
+    if all(isinstance(v, bool) for v in val):
+        return ValueTypeProto.BOOL
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in val):
+        return ValueTypeProto.INT
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in val):
+        return ValueTypeProto.FLOAT
+    if all(isinstance(v, str) for v in val):
+        return ValueTypeProto.STRING
+    if all(isinstance(v, bytes) for v in val):
+        return ValueTypeProto.BYTES
+    if all(isinstance(v, list) for v in val):
+        return ValueTypeProto.LIST
+    raise TypeError("Unsupported list element type")
+
+
+def settingValueToProto(
+    val: SettingsValue,
+    itemType: ValueTypeProto = ValueTypeProto.UNSPECIFIED,
+) -> SettingValueProto:
     proto = SettingValueProto()
 
-    if isinstance(val, int):
+    if isinstance(val, Path):
+        proto.string_value = val.as_posix()
+    elif isinstance(val, bool):
+        proto.bool_value = val
+    elif isinstance(val, int):
         proto.int_value = val
     elif isinstance(val, str):
         proto.string_value = val
-    elif isinstance(val, bool):
-        proto.bool_value = val
     elif isinstance(val, float):
         proto.float_value = val
     elif isinstance(val, bytes):
         proto.bytes_value = val
     elif isinstance(val, list):
-        if all(isinstance(v, int) for v in val):
+        # The constraint's item type is authoritative; otherwise infer it.
+        resolvedType = itemType
+        if resolvedType == ValueTypeProto.UNSPECIFIED:
+            resolvedType = _inferProtoArrayType(val)
+
+        if resolvedType == ValueTypeProto.UNSPECIFIED:
+            # An empty list with no known item type still needs a marker so it
+            # does not look like an unset value on the wire.
+            resolvedType = ValueTypeProto.LIST
+
+        if resolvedType == ValueTypeProto.INT:
+            if not all(isinstance(v, int) and not isinstance(v, bool) for v in val):
+                raise TypeError("List contains non-integer values")
             proto.int_array_value = val
-        elif all(isinstance(v, str) for v in val):
+        elif resolvedType == ValueTypeProto.FLOAT:
+            if not all(
+                isinstance(v, (int, float)) and not isinstance(v, bool) for v in val
+            ):
+                raise TypeError("List contains non-numeric values")
+            proto.float_array_value = [float(v) for v in val]
+        elif resolvedType == ValueTypeProto.STRING:
+            if not all(isinstance(v, str) for v in val):
+                raise TypeError("List contains non-string values")
             proto.string_array_value = val
-        elif all(isinstance(v, bool) for v in val):
+        elif resolvedType == ValueTypeProto.BOOL:
+            if not all(isinstance(v, bool) for v in val):
+                raise TypeError("List contains non-boolean values")
             proto.bool_array_value = val
-        elif all(isinstance(v, float) for v in val):
-            proto.float_array_value = val
-        elif all(isinstance(v, bytes) for v in val):
+        elif resolvedType == ValueTypeProto.BYTES:
+            if not all(isinstance(v, bytes) for v in val):
+                raise TypeError("List contains non-bytes values")
             proto.bytes_array_value = val
+        elif resolvedType == ValueTypeProto.LIST:
+            if val:
+                raise TypeError(
+                    "Nested lists are not supported by SettingValueProto; "
+                    "use a flat list or encode the value as a string"
+                )
         else:
-            raise TypeError("Unsupported list element type")
+            raise TypeError(f"Unsupported list item type: {resolvedType}")
+
+        proto.array_type = resolvedType
     else:
         raise TypeError(f"Unsupported type: {type(val)}")
 
@@ -1194,7 +1621,7 @@ def settingToProto(setting: Setting, defaultCategory: str) -> SettingMetaProto:
         description=setting.description or "",
         category=setting.category or defaultCategory,
         constraint=constraintToProto(setting.constraint),
-        default=settingValueToProto(setting.defaultValue),
+        default=setting.valueToProto(setting.defaultValue),
     )
 
 
@@ -1217,6 +1644,7 @@ def cameraToProto(
     camera: SynapseCamera,
     pipelineIndex: PipelineID,
     defaultPipeline: PipelineID,
+    stream: str,
     kind: str,
 ) -> CameraProto:
     cameraSettingsMetaValue = CameraSettings()
@@ -1224,12 +1652,13 @@ def cameraToProto(
     return CameraProto(
         name=name,
         index=camid,
-        stream_path=camera.stream,
+        stream_path=stream,
         kind=kind,
         pipeline_index=pipelineIndex,
         default_pipeline=defaultPipeline,
         max_fps=int(camera.getMaxFPS()),
         settings=settingsToProto(
-            typename="Camera Props", settings=cameraSettingsMetaValue
+            typename=CameraSettings.kCameraPropsCategory,
+            settings=cameraSettingsMetaValue,
         ),
     )

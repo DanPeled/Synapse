@@ -4,4 +4,5 @@ export type DiscoveryResponse = {
   nickname: string;
   team_number: number;
   version: string;
+  username: string;
 };

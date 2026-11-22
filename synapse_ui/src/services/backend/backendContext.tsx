@@ -33,6 +33,15 @@ import {
 } from "@/generated/messages/v1/device";
 import { AlertTypeProto } from "@/generated/messages/v1/alert";
 import { SettingValueProto } from "@/generated/settings/v1/value";
+import { ValueTypeProto } from "@/generated/settings/v1/value_type";
+import {
+  applyPendingSettings,
+  LogTimestampIndex,
+  mergeLogsInOrder,
+  recordPendingSetting,
+  type PendingSettings,
+} from "./stateBatching";
+import { scheduleFrame, type CancelScheduledFrame } from "./frameScheduler";
 
 export function hasSettingValue(val: SettingValueProto): boolean {
   return (
@@ -41,6 +50,8 @@ export function hasSettingValue(val: SettingValueProto): boolean {
     val.boolValue !== undefined ||
     val.floatValue !== undefined ||
     val.bytesValue !== undefined ||
+    (val.arrayType !== undefined &&
+      val.arrayType !== ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED) ||
     (val.intArrayValue && val.intArrayValue.length > 0) ||
     (val.stringArrayValue && val.stringArrayValue.length > 0) ||
     (val.boolArrayValue && val.boolArrayValue.length > 0) ||
@@ -83,9 +94,10 @@ const initialState: BackendStateSystem.State = {
   networksettings: SetNetworkSettingsProto.create({
     teamNumber: 0,
     hostname: "hostname",
-    ip: "localhost",
-    networkInterface: "interface",
+    ip: "",
+    networkInterface: "",
     networkTable: "Synapse",
+    prefixLength: 24,
   }),
 };
 
@@ -136,7 +148,16 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
     stateRef.current = state;
   }, [state]);
 
-  // Create setters that both dispatch to the reducer and mirror into stateRef
+  // Batches are filled by websocket handlers and flushed once per frame.
+  const pendingLogsRef = useRef<LogMessageProto[]>([]);
+  const seenLogTimestampsRef = useRef(new LogTimestampIndex(initialState.logs));
+  const pendingSettingsRef = useRef<PendingSettings>(new Map());
+  const cancelLogFlushRef = useRef<CancelScheduledFrame | null>(null);
+  const cancelSettingsFlushRef = useRef<CancelScheduledFrame | null>(null);
+
+  // Stable setters read functional updates from the live ref instead of a
+  // value captured by an earlier render. Callers supply immutable values, so
+  // mirroring into the ref does not clone maps/arrays on every message.
   const setters = React.useMemo(() => {
     return Object.keys(initialState).reduce((acc, key) => {
       const functionName =
@@ -144,53 +165,43 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
 
       acc[functionName] = (value: unknown | ((prev: unknown) => unknown)) => {
         const keyLower = key.toLowerCase() as keyof BackendStateSystem.State;
+        const resolved =
+          typeof value === "function"
+            ? (value as (prev: unknown) => unknown)(stateRef.current[keyLower])
+            : value;
 
-        if (typeof value === "function") {
-          // compute new value using current state slice
-          const currentSlice = state[keyLower];
-          const newValue = (value as Function)(currentSlice);
-
-          dispatch({ type: `SET_${key.toUpperCase()}`, payload: newValue });
-
-          // Mirror into the ref immediately so any async handlers see it
-          if (stateRef && stateRef.current) {
-            // clone Maps/Objects where helpful to avoid accidental mutations
-            if (newValue instanceof Map) {
-              stateRef.current[keyLower] = new Map(newValue) as any;
-            } else if (Array.isArray(newValue)) {
-              stateRef.current[keyLower] = [...newValue] as any;
-            } else if (typeof newValue === "object" && newValue !== null) {
-              stateRef.current[keyLower] = { ...(newValue as object) } as any;
-            } else {
-              stateRef.current[keyLower] = newValue as any;
-            }
-          }
-        } else {
-          // Direct value update
-          dispatch({ type: `SET_${key.toUpperCase()}`, payload: value });
-
-          if (stateRef && stateRef.current) {
-            if (value instanceof Map) {
-              stateRef.current[keyLower] = new Map(value) as any;
-            } else if (Array.isArray(value)) {
-              stateRef.current[keyLower] = [...value] as any;
-            } else if (typeof value === "object" && value !== null) {
-              stateRef.current[keyLower] = { ...(value as object) } as any;
-            } else {
-              stateRef.current[keyLower] = value as any;
-            }
-          }
-        }
+        stateRef.current[keyLower] = resolved as any;
+        dispatch({ type: `SET_${key.toUpperCase()}`, payload: resolved });
       };
 
       return acc;
     }, {} as BackendStateSystem.StateSetter);
-  }, [dispatch, state]);
+  }, []);
 
   const socket = useRef<WebSocketWrapper | undefined>(undefined);
   let wasConnected: boolean = false;
 
   useEffect(() => {
+    const flushLogs = () => {
+      cancelLogFlushRef.current = null;
+      const pending = pendingLogsRef.current;
+      if (pending.length === 0) return;
+      pendingLogsRef.current = [];
+      setters.setLogs(mergeLogsInOrder(stateRef.current.logs, pending));
+    };
+
+    const flushSettings = () => {
+      cancelSettingsFlushRef.current = null;
+      const nextPipelines = applyPendingSettings(
+        stateRef.current.pipelines,
+        pendingSettingsRef.current,
+      );
+      pendingSettingsRef.current.clear();
+      if (nextPipelines !== stateRef.current.pipelines) {
+        setters.setPipelines(nextPipelines);
+      }
+    };
+
     const ws = new WebSocketWrapper(`ws://${window.location.hostname}:8765`, {
       onOpen: () => {
         wasConnected = true;
@@ -342,11 +353,11 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const pipeline: PipelineProto = messageObj.pipelineInfo!;
             const pipelinesMap = new Map(stateRef.current.pipelines);
 
-            if (!pipelinesMap.has(pipeline.cameraid)) {
-              pipelinesMap.set(pipeline.cameraid, new Map());
-            }
-
-            pipelinesMap.get(pipeline.cameraid)!.set(pipeline.index, pipeline);
+            const cameraPipelines = new Map(
+              pipelinesMap.get(pipeline.cameraid) ?? [],
+            );
+            cameraPipelines.set(pipeline.index, pipeline);
+            pipelinesMap.set(pipeline.cameraid, cameraPipelines);
             setters.setPipelines(pipelinesMap);
 
             const results = new Map(stateRef.current.pipelineresults);
@@ -373,9 +384,11 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const camera = stateRef.current.cameras.get(msg.cameraIndex);
 
             if (camera) {
-              camera.pipelineIndex = msg.pipelineIndex;
               const newCamerasList = new Map(stateRef.current.cameras);
-              newCamerasList.set(camera.index, camera);
+              newCamerasList.set(camera.index, {
+                ...camera,
+                pipelineIndex: msg.pipelineIndex,
+              });
               setters.setCameras(newCamerasList);
             }
             break;
@@ -384,41 +397,36 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
             const setPipelineNameMSG: SetPipelineNameMessageProto =
               messageObj.setPipelineName!;
 
-            if (!stateRef.current.pipelines.has(setPipelineNameMSG.cameraid)) {
-              stateRef.current.pipelines.set(
-                setPipelineNameMSG.cameraid,
-                new Map(),
-              );
-            }
+            const cameraPipelines = stateRef.current.pipelines.get(
+              setPipelineNameMSG.cameraid,
+            );
+            const pipeline = cameraPipelines?.get(
+              setPipelineNameMSG.pipelineIndex,
+            );
 
-            const pipeline = stateRef.current.pipelines
-              .get(setPipelineNameMSG.cameraid)!
-              .get(setPipelineNameMSG.pipelineIndex);
+            if (cameraPipelines && pipeline) {
+              const nextCameraPipelines = new Map(cameraPipelines);
+              nextCameraPipelines.set(setPipelineNameMSG.pipelineIndex, {
+                ...pipeline,
+                name: setPipelineNameMSG.name,
+              });
 
-            if (pipeline) {
-              pipeline.name = setPipelineNameMSG.name;
               const newPipelines = new Map(stateRef.current.pipelines);
-              newPipelines
-                .get(setPipelineNameMSG.cameraid)!
-                .set(setPipelineNameMSG.pipelineIndex, pipeline);
-
-              // Use setter so reducer + ref are kept in sync
+              newPipelines.set(
+                setPipelineNameMSG.cameraid,
+                nextCameraPipelines,
+              );
               setters.setPipelines(newPipelines);
             }
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_LOG: {
             const logMsg: LogMessageProto = messageObj.log!;
-            const logs = [...stateRef.current.logs];
+            if (!seenLogTimestampsRef.current.add(logMsg.timestamp)) break;
 
-            const exists = logs.some(
-              (log) => log.timestamp === logMsg.timestamp,
-            );
-
-            if (!exists) {
-              logs.push(logMsg);
-              logs.sort((a, b) => a.timestamp - b.timestamp);
-              setters.setLogs(logs);
+            pendingLogsRef.current.push(logMsg);
+            if (!cancelLogFlushRef.current) {
+              cancelLogFlushRef.current = scheduleFrame(flushLogs);
             }
             break;
           }
@@ -456,27 +464,13 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_SETTING: {
             assert(messageObj.setPipelineSetting !== undefined);
-            const setSettingMsg = messageObj.setPipelineSetting!;
-            const newPipelines = new Map(stateRef.current.pipelines);
-
-            if (!newPipelines.has(setSettingMsg.cameraid)) {
-              newPipelines.set(setSettingMsg.cameraid, new Map());
+            recordPendingSetting(
+              pendingSettingsRef.current,
+              messageObj.setPipelineSetting!,
+            );
+            if (!cancelSettingsFlushRef.current) {
+              cancelSettingsFlushRef.current = scheduleFrame(flushSettings);
             }
-
-            const pipeline = newPipelines
-              .get(setSettingMsg.cameraid)!
-              .get(setSettingMsg.pipelineIndex);
-
-            if (pipeline && setSettingMsg.value) {
-              pipeline.settingsValues[setSettingMsg.setting] =
-                setSettingMsg.value;
-              newPipelines
-                .get(setSettingMsg.cameraid)!
-                .set(pipeline?.index, pipeline);
-              // Use setter to keep reducer + ref in sync
-              setters.setPipelines(newPipelines);
-            }
-
             break;
           }
           case MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS: {
@@ -529,6 +523,10 @@ export const BackendContextProvider: React.FC<BackendContextProviderProps> = ({
     setters.setSocket?.(ws);
 
     return () => {
+      cancelLogFlushRef.current?.();
+      cancelSettingsFlushRef.current?.();
+      cancelLogFlushRef.current = null;
+      cancelSettingsFlushRef.current = null;
       socket.current?.close(); // Close connection on unmount
     };
   }, []);

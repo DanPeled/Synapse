@@ -1,3 +1,11 @@
 {
-  "include": ["."]
+  "include": ["."],
+  "exclude": [
+    "build",
+    ".venv",
+    "py/.venv",
+    "py/build",
+    "py/dist",
+    "py/src/*.egg-info"
+  ]
 }

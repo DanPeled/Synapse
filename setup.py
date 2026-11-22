@@ -6,16 +6,23 @@
 from setuptools import find_packages, setup
 
 version_vars = {}
-with open("synapse_core/src/synapse/__version__.py") as f:
-    exec(f.read(), version_vars)
+with open("versions.properties", encoding="utf-8") as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith(("#", "!")):
+            continue
+        key, separator, value = line.partition("=")
+        if separator:
+            version_vars[key.strip()] = value.strip()
 
-SYNAPSE_VERSION = version_vars["SYNAPSE_VERSION"]
-WPILIB_VERSION = version_vars["WPILIB_VERSION"]
+SYNAPSE_VERSION = version_vars["synapsePythonVersion"]
+WPILIB_VERSION = version_vars["wpilibPythonVersion"]
 
 
 modules = {
     "synapse_net": "synapse_net/src",
     "synapse_installer": "synapse_installer/src",
+    "synapse_sim": "synapse_sim/src",
     "synapse": "synapse_core/src",
     "synapse_ui": "synapse_ui/out",
 }
@@ -76,6 +83,7 @@ setup(
         wpilibDep("pyntcore"),
         visionProcessingDep("opencv_python==4.8.0.74"),
         visionProcessingDep("opencv_contrib_python==4.8.0.74"),
+        visionProcessingDep("napa-vision==0.5.1"),
         deviceAccessDep("PyYAML"),
         deviceAccessDep("pathspec"),
         synapseInstallerDep("paramiko"),
@@ -89,21 +97,34 @@ setup(
         synapseNetDep("websockets"),
     ],
     extras_require={
+        "yolo": [
+            "torch>=2.1",
+            "ultralytics>=8.0.200",
+        ],
         "dev": [
             "wheel",
             "setuptools",
             "pytest",
             "pytest-asyncio",
             "pytest-mock",
-            "ruff",
+            "ruff==0.15.20",
             "isort",
             "pyright",
             "build",
             "reuse",
             "requests",
-        ]
+        ],
     },
     include_package_data=True,
+    package_data={
+        "synapse_sim": [
+            "assets/*.glb",
+            "assets/*.json",
+            "assets/*.js",
+            "assets/*.html",
+            "assets/apriltags/*.png",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "synapse_installer=synapse_installer.__main__:main",

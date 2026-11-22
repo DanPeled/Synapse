@@ -3,13 +3,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import time
+import threading
 from functools import lru_cache
 from typing import Optional
 
 from ntcore import ConnectionInfo, Event, EventFlags, NetworkTableInstance
 from synapse.callback import Callback
-from synapse.log import log, warn
+from synapse.log import info, warn
 
 RemoteConnectionIP = str
 
@@ -61,35 +61,36 @@ class NtClient:
                 self.nt_inst.setServerTeam(teamNumber)
 
         # Start client
-        self.nt_inst.startClient4(name)
+        self.nt_inst.startClient(name)
 
         timeout = 10
-        start_time = time.time()
+        connected = threading.Event()
 
         # Connection listener accepts any IP
         def connectionListener(event: Event):
             if isinstance(event.data, ConnectionInfo):
                 ip = event.data.remote_ip
-                if event.is_(EventFlags.kConnected):
-                    log(f"Connected to NetworkTables server ({ip})")
+                if event.is_(EventFlags.CONNECTED):
+                    connected.set()
+                    info(f"Connected to NetworkTables server ({ip})")
                     NtClient.onConnect.call(ip)
-                elif event.is_(EventFlags.kDisconnected):
-                    log(f"Disconnected from NetworkTables server ({ip})")
+                elif event.is_(EventFlags.DISCONNECTED):
+                    info(f"Disconnected from NetworkTables server ({ip})")
                     NtClient.onDisconnect.call(ip)
 
         self.nt_inst.addConnectionListener(True, connectionListener)
         if self.server:
             self.server.addConnectionListener(True, connectionListener)
 
-        # Low-latency wait loop (non-blocking, short sleeps)
-        while not self.nt_inst.isConnected():
-            elapsed = time.time() - start_time
-            if elapsed > timeout:
-                warn(
-                    f"Connection timed out after {elapsed:.2f}s (server: {'127.0.0.1' if isServer else teamNumber}, client: {name})"
-                )
-                break
-            time.sleep(0.02)  # 20ms interval for faster reaction
+        # The listener also covers connections that already exist, but check
+        # explicitly so setup never waits on an event that cannot be delivered.
+        if self.nt_inst.isConnected():
+            connected.set()
+
+        if not connected.wait(timeout):
+            warn(
+                f"Connection timed out after {timeout:.2f}s (server: {'127.0.0.1' if isServer else teamNumber}, client: {name})"
+            )
 
         return True
 
@@ -102,3 +103,5 @@ class NtClient:
             self.server.stopServer()
             NetworkTableInstance.destroy(self.server)
             self.server = None
+        if NtClient.INSTANCE is self:
+            NtClient.INSTANCE = None

@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from dataclasses import fields, is_dataclass
-from typing import Any
+from functools import lru_cache
+from typing import Any, Callable, cast
 
 import msgpack
-from wpimath import geometry
+import wpimath as geometry
 
 
 class PipelineResult: ...
@@ -83,38 +84,37 @@ def parsePipelineResult(result: Any, _cache: dict[int, Any] | None = None) -> An
     if isinstance(result, (int, float, str, bool, type(None))):
         return result
 
-    # --- Geometry types ---
-    import wpimath.geometry as geom
-
-    if isinstance(result, geom.Translation2d):
-        out = serializeTranslation2d(result)
-    elif isinstance(result, geom.Translation3d):
-        out = serializeTranslation3d(result)
-    elif isinstance(result, geom.Rotation2d):
-        out = serializeRotation2d(result)
-    elif isinstance(result, geom.Rotation3d):
-        out = serializeRotation3d(result)
-    elif isinstance(result, geom.Pose2d):
-        out = serializePose2d(result)
-    elif isinstance(result, geom.Pose3d):
-        out = serializePose3d(result)
-    elif isinstance(result, geom.Transform2d):
-        out = serializeTransform2d(result)
-    elif isinstance(result, geom.Transform3d):
-        out = serializeTransform3d(result)
-    elif isinstance(result, geom.Twist2d):
-        out = serializeTwist2d(result)
-    elif isinstance(result, geom.Twist3d):
-        out = serializeTwist3d(result)
-
-    # --- Containers ---
-    elif isinstance(result, (list, tuple, set)):
+    # --- Containers (checked before geometry: they are the most common result
+    # shape and would otherwise pay for every geometry isinstance check) ---
+    if isinstance(result, (list, tuple, set)):
         out = [parsePipelineResult(v, _cache) for v in result]
     elif isinstance(result, dict):
         out = {
             parsePipelineResult(k, _cache): parsePipelineResult(v, _cache)
             for k, v in result.items()
         }
+
+    # --- Geometry types ---
+    elif isinstance(result, geometry.Translation2d):
+        out = serializeTranslation2d(result)
+    elif isinstance(result, geometry.Translation3d):
+        out = serializeTranslation3d(result)
+    elif isinstance(result, geometry.Rotation2d):
+        out = serializeRotation2d(result)
+    elif isinstance(result, geometry.Rotation3d):
+        out = serializeRotation3d(result)
+    elif isinstance(result, geometry.Pose2d):
+        out = serializePose2d(result)
+    elif isinstance(result, geometry.Pose3d):
+        out = serializePose3d(result)
+    elif isinstance(result, geometry.Transform2d):
+        out = serializeTransform2d(result)
+    elif isinstance(result, geometry.Transform3d):
+        out = serializeTransform3d(result)
+    elif isinstance(result, geometry.Twist2d):
+        out = serializeTwist2d(result)
+    elif isinstance(result, geometry.Twist3d):
+        out = serializeTwist3d(result)
 
     # --- Dataclasses ---
     elif is_dataclass(result):
@@ -143,5 +143,80 @@ def parsePipelineResult(result: Any, _cache: dict[int, Any] | None = None) -> An
     return out
 
 
-def serializePipelineResult(result: PipelineResult):
-    return msgpack.packb(parsePipelineResult(result), use_bin_type=True)
+# -------------------
+# Fast msgpack encoding
+# -------------------
+
+# Resolving the same types repeatedly for every frame is expensive. Cache one
+# small, shallow conversion callable per result type instead.
+_GEOMETRY_SERIALIZERS: tuple[tuple[type, Callable[[Any], Any]], ...] = (
+    (geometry.Translation2d, serializeTranslation2d),
+    (geometry.Translation3d, serializeTranslation3d),
+    (geometry.Rotation2d, serializeRotation2d),
+    (geometry.Rotation3d, serializeRotation3d),
+    (geometry.Pose2d, serializePose2d),
+    (geometry.Pose3d, serializePose3d),
+    (geometry.Transform2d, serializeTransform2d),
+    (geometry.Transform3d, serializeTransform3d),
+    (geometry.Twist2d, serializeTwist2d),
+    (geometry.Twist3d, serializeTwist3d),
+)
+
+
+def _objectToMapping(obj: Any) -> Any:
+    """Fallback used for non-dataclass result objects (including pybind types)."""
+    out: dict[str, Any] = {}
+    for attrName in dir(obj):
+        if attrName.startswith("_"):
+            continue
+        try:
+            attrVal = getattr(obj, attrName)
+            if callable(attrVal):
+                continue
+            out[attrName] = attrVal
+        except Exception:
+            continue
+    return out or str(obj)
+
+
+@lru_cache(maxsize=512)
+def _serializerForType(cls: type) -> Callable[[Any], Any]:
+    for base, serializer in _GEOMETRY_SERIALIZERS:
+        if issubclass(cls, base):
+            return serializer
+
+    if is_dataclass(cls):
+        fieldNames = tuple(f.name for f in fields(cls))
+        return lambda obj: {name: getattr(obj, name) for name in fieldNames}
+
+    return _objectToMapping
+
+
+def _toMsgpackable(obj: Any) -> Any:
+    """Shallow conversion hook used by msgpack's C encoder.
+
+    Returning a plain dict/list/value here lets msgpack walk nested fields in C
+    instead of building an entire intermediate object tree in Python first.
+    """
+    # msgpack's C encoder handles primitives, bytes, tuples, lists, and dicts
+    # directly, including subclasses. Sets are the only builtin container it
+    # cannot pack, so everything else here is a result/geometry object.
+    if isinstance(obj, (set, frozenset)):
+        return list(obj)
+
+    return _serializerForType(type(obj))(obj)
+
+
+def serializePipelineResult(result: PipelineResult) -> bytes:
+    """Serialize a pipeline result to msgpack without building a parse tree.
+
+    The wire format is identical to ``msgpack.packb(parsePipelineResult(...))``:
+    dataclasses become maps keyed by field name, geometry becomes arrays, and
+    dynamic result objects keep their public attributes. Builtin containers are
+    encoded directly by msgpack, so only result objects are converted in Python.
+    Raw ``bytes`` fields are now sent as msgpack binary instead of being
+    stringified; no shipped result type uses them, and both Python and Java
+    clients decode binary values natively. All existing NetworkTables and
+    WebSocket consumers are unaffected.
+    """
+    return cast(bytes, msgpack.packb(result, default=_toMsgpackable, use_bin_type=True))

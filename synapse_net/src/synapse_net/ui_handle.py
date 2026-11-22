@@ -4,12 +4,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import importlib.util
-from http.server import SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from socketserver import TCPServer
 from threading import Thread
 
-from synapse.log import log
+from synapse.log import info
 from synapse.util import getIP
 
 
@@ -54,6 +53,15 @@ class MultiHTMLHandler(SimpleHTTPRequestHandler):
         return super().send_error(404)
 
 
+class ReusableThreadingHTTPServer(ThreadingHTTPServer):
+    """HTTP server that serves UI assets concurrently and restarts cleanly."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+    # Handler threads are daemons, so shutdown should not wait for slow assets.
+    block_on_close = False
+
+
 class UIHandle:
     """
     Handles launching the Synapse UI (Next.js compatible) HTTP server.
@@ -71,28 +79,24 @@ class UIHandle:
         # Find the synapse_ui module to determine the serve directory
         spec = importlib.util.find_spec("synapse_ui")
         if not spec or not spec.origin:
-            log("Error: synapse_ui module not found!")
+            info("Error: synapse_ui module not found!")
             return
 
         serve_dir = Path(spec.origin).parent
 
-        # Custom TCPServer that allows address reuse (helps restart server quickly)
-        class ReusableTCPServer(TCPServer):
-            allow_reuse_address = True
-
         def serve():
             try:
-                with ReusableTCPServer(
+                with ReusableThreadingHTTPServer(
                     ("", port),
                     lambda *args, **kwargs: MultiHTMLHandler(
                         *args, directory=str(serve_dir), **kwargs
                     ),
                 ) as httpd:
                     actual_port = httpd.server_address[1]
-                    log(f"UI available at: https://{getIP()}:{actual_port}")
+                    info(f"UI available at: https://{getIP()}:{actual_port}")
                     httpd.serve_forever()
             except OSError as e:
-                log(f"Failed to start server on port {port}: {e}")
+                info(f"Failed to start server on port {port}: {e}")
 
         # Run server in a daemon thread (will stop automatically when app exits)
         thread = Thread(target=serve, daemon=True)

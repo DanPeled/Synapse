@@ -5,31 +5,43 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from functools import cache, lru_cache
-from typing import Any, Dict, Final, List, Optional, Set
+from functools import cache
+from typing import Any, Dict, Final, Iterable, List, Optional, Set, Tuple, cast
 
 import cv2
 import numpy as np
-from synapse.core.pipeline import (FrameResult, Pipeline, PipelineSettings,
-                                   Setting, SettingsValue, SynapseCamera,
-                                   pipelineResult)
-from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, settingField)
+from synapse.core.pipeline import (
+    FrameResult,
+    Pipeline,
+    PipelineSettings,
+    Setting,
+    SettingsValue,
+    SynapseCamera,
+    pipelineResult,
+)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    EnumeratedConstraint,
+    ListConstraint,
+    NumberConstraint,
+    RangeConstraint,
+    SettingsMap,
+    settingField,
+)
 from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
-    AprilTagDetection, AprilTagDetector, ApriltagPoseEstimate,
-    ApriltagPoseEstimator, CameraPoseEstimate,
-    ICombinedApriltagCameraPoseEstimator, drawTagDetectionMarker, opencvToWPI,
-    tagToCameraPose)
-from synapse.pipelines.apriltag.apriltag_robotpy import (
-    RobotpyApriltagDetector, RobotpyApriltagPoseEstimator)
+    AprilTagDetection,
+    AprilTagDetector,
+    CameraPoseEstimate,
+    drawTagDetectionMarker,
+)
+from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
-from synapse.pipelines.apriltag.multi_tag_estimator import \
-    WeightedAverageMultiTagEstimator
+from synapse.pipelines.apriltag.pnp_pose_estimator import PnPPoseEstimator
 from synapse.stypes import CameraID
-from wpimath import units
-from wpimath.geometry import Pose3d, Transform3d
+from typing_extensions import Buffer
+from wpimath import Pose3d, Rotation3d, Translation3d, units
 
 
 class ApriltagVerbosity(Enum):
@@ -71,56 +83,178 @@ def getIgnoredDataByVerbosity(verbosity: ApriltagVerbosity) -> Optional[Set[str]
     return ignored
 
 
+def filterTagsByIds(
+    tags: List[AprilTagDetection],
+    tagIds: Optional[Iterable[int]],
+) -> List[AprilTagDetection]:
+    """Return only tags whose IDs are in tagIds.
+
+    An empty or None tagIds collection means no filtering, so every tag is
+    accepted. This keeps the default configuration backwards compatible.
+    """
+    if not tagIds:
+        return tags
+
+    allowedIds = set(tagIds)
+    return [tag for tag in tags if tag.tagID in allowedIds]
+
+
 class ApriltagPipelineSettings(PipelineSettings):
+    # WPILib detector options are no longer exposed. They are kept in the
+    # detector implementation but are ignored when loading older configs.
+    _retiredSettings = frozenset(
+        {
+            "detector_type",
+            "num_threads",
+            "refine_edges",
+            "quad_decimate",
+            "quad_sigma",
+            "min_cluster_pixels",
+            "max_num_maxima",
+            "critical_angle",
+            "max_line_fit_mse",
+            "min_white_black_diff",
+            "deglitch",
+        }
+    )
+    _renamedSettings = {
+        "napa_min_tag_px": "min_tag_px",
+        "napa_max_hamming": "max_hamming",
+        "napa_min_contrast": "min_contrast",
+        "napa_min_border_cells": "min_border_cells",
+        "napa_sharpening": "sharpening",
+        "napa_max_detections": "max_detections",
+    }
+
+    def generateSettingsFromMap(self, settingsMap: SettingsMap) -> None:
+        migrated = {
+            self._renamedSettings[key]: value
+            for key, value in settingsMap.items()
+            if key in self._renamedSettings
+            and self._renamedSettings[key] not in settingsMap
+        }
+        migrated.update(
+            (key, value)
+            for key, value in settingsMap.items()
+            if key not in self._retiredSettings and key not in self._renamedSettings
+        )
+        super().generateSettingsFromMap(migrated)
+
+    # ==================== Target ====================
+
     tag_size = settingField(
         NumberConstraint(minValue=0, maxValue=None),
         default=units.meters(0.1651),
         description="Physical size of the AprilTag in meters.",
+        category="<Toolbox/> Target",
     )
     tag_family = settingField(
         EnumeratedConstraint(["tag36h11", "tag16h5"]),
         default="tag36h11",
         description="AprilTag family to detect.",
+        category="<Toolbox/> Target",
     )
+
+    # ==================== Detection ====================
+
+    min_tag_px = settingField(
+        NumberConstraint(minValue=8, maxValue=30000, step=1),
+        default=32,
+        description=(
+            "Smallest tag side, in pixels, that is guaranteed to be sampled. "
+            "Lower values find smaller/farther tags but cost more."
+        ),
+        category="<Toolbox/> Detection",
+    )
+    max_hamming = settingField(
+        NumberConstraint(minValue=-1, maxValue=3, step=1),
+        default=-1,
+        description=(
+            "Payload bits that may be corrected. -1 uses the tag family's default."
+        ),
+        category="<Toolbox/> Detection",
+    )
+    min_contrast = settingField(
+        NumberConstraint(minValue=1, maxValue=255, step=1),
+        default=20,
+        description=(
+            "Minimum grey-level difference between the tag and its white margin."
+        ),
+        category="<Toolbox/> Detection",
+    )
+    min_border_cells = settingField(
+        NumberConstraint(minValue=0, maxValue=28, step=1),
+        default=22,
+        description=(
+            "Border cells that must read dark before decoding, scaled for the "
+            "selected family."
+        ),
+        category="<Toolbox/> Detection",
+    )
+    sharpening = settingField(
+        NumberConstraint(minValue=0.0, maxValue=1.0),
+        default=0.25,
+        description="Cell sharpening applied before decoding.",
+        category="<Toolbox/> Detection",
+    )
+    max_detections = settingField(
+        NumberConstraint(minValue=1, maxValue=None, step=1),
+        default=64,
+        description="Maximum number of tags returned per frame.",
+        category="<Toolbox/> Detection",
+    )
+
+    # ==================== Filtering ====================
+
+    crop_x = settingField(
+        RangeConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=[-1, 1],
+        category="<Funnel/> Filtering",
+    )
+    crop_y = settingField(
+        RangeConstraint(minValue=-1, maxValue=1, step=0.01),
+        default=[-1, 1],
+        category="<Funnel/> Filtering",
+    )
+    tag_filter = settingField(
+        ListConstraint(itemType=int),
+        default=[],
+        description=(
+            "Only report detections for these tag IDs. Leave empty to target every tag."
+        ),
+        category="<Funnel/> Filtering",
+    )
+
+    # ==================== Results ====================
+
+    # iteration_count = settingField(
+    #     NumberConstraint(minValue=1, maxValue=None, step=1),
+    #     default=4,
+    #     description="Number of iterations for pose estimation refinement.",
+    #     category="<Activity/> Results",
+    # )
     stick_to_ground = settingField(
         BooleanConstraint(),
         default=False,
         description="If True, the detected pose will be constrained to the ground plane.",
+        category="<Activity/> Results",
     )
-    fieldpose = settingField(
+    publish_camera_field_pose = settingField(
         BooleanConstraint(),
         default=True,
-        description="If True, estimate the tag's pose relative to the field coordinate frame.",
+        description="If True, estimate the camera's pose relative to the field coordinate frame.",
+        category="<Activity/> Results",
+    )
+    publish_tag_pose_3d = settingField(
+        BooleanConstraint(),
+        default=False,
+        category="<Activity/> Results",
     )
     verbosity = settingField(
-        EnumeratedConstraint(options=[ver.value for ver in ApriltagVerbosity]),
+        EnumeratedConstraint.fromEnum(ApriltagVerbosity),
         default=ApriltagVerbosity.kPoseOnly.value,
         description="Level of logging and debug output.",
-    )
-    num_threads = settingField(
-        NumberConstraint(minValue=1, maxValue=6, step=1),
-        default=1,
-        description="Number of CPU threads used for AprilTag detection.",
-    )
-    refine_edges = settingField(
-        BooleanConstraint(renderAsButton=False),
-        default=True,
-        description="If True, perform edge refinement to improve detection accuracy.",
-    )
-    quad_decimate = settingField(
-        NumberConstraint(minValue=0.0, maxValue=None),
-        default=2.0,
-        description="Decimation factor for the input image to speed up detection.",
-    )
-    quad_sigma = settingField(
-        NumberConstraint(minValue=0.0, maxValue=None),
-        default=0.0,
-        description="Gaussian blur sigma applied to the input image before detection.",
-    )
-    iteration_count = settingField(
-        NumberConstraint(minValue=1, maxValue=None, step=1),
-        default=4,
-        description="Number of iterations for pose estimation refinement.",
+        category="<Activity/> Results",
     )
 
 
@@ -128,13 +262,11 @@ class ApriltagPipelineSettings(PipelineSettings):
 class ApriltagDetectionResult:
     detection: AprilTagDetection
     timestamp: float
-    cameraPoseEstimate: CameraPoseEstimate
-    tagPoseEstimate: ApriltagPoseEstimate
 
 
 @pipelineResult
 class ApriltagResult:
-    cameraPoseEstimate: Optional[Pose3d]
+    cameraPoseEstimate: Optional[CameraPoseEstimate]
     tagDetections: List[ApriltagDetectionResult]
 
 
@@ -145,187 +277,289 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
     kCameraPoseFieldSpaceKey: Final[str] = "cameraPose_fieldSpace"
     kCameraPoseTagSpaceKey: Final[str] = "cameraPose_tagSpace"
     kTagPoseEstimateKey: Final[str] = "tag_estimate"
+    kTagAmbiguityKey: Final[str] = "ambiguity"
     kTagPoseEstimateErrorKey: Final[str] = "tag_error"
     kTagPoseFieldSpaceKey: Final[str] = "tagPose_fieldSpace"
     kTagCenterKey: Final[str] = "tagPose_screenSpace"
     kCameraPoseEstimateKey: Final[str] = "cameraEstimate_fieldSpace"
     kTagDetectionsKey: Final[str] = "tags"
+    kReprojectionErrorKey: Final[str] = "reprojection_error"
 
     def __init__(self, settings: ApriltagPipelineSettings):
         super().__init__(settings)
         self.settings: ApriltagPipelineSettings = settings
-        self.combinedApriltagPoseEstimator: ICombinedApriltagCameraPoseEstimator = (
-            WeightedAverageMultiTagEstimator()
-        )
-        self.setConfig(self.cameraIndex)
-
-        ApriltagPipeline.fmap = ApriltagFieldJson.loadField(
-            DeployDirectory.getDir() / "fmap.json"
-        )
-
-    def setConfig(self, cameraIndex: CameraID) -> None:
-        self.cameraMatrix = self.getCameraMatrix(cameraIndex) or np.eye(3).tolist()
-
-        self.distCoeffs = self.getDistCoeffs(cameraIndex)
-        self.apriltagDetector = RobotpyApriltagDetector()
-
-        detectorConfig: AprilTagDetector.Config = AprilTagDetector.Config()
-
-        detectorConfig.numThreads = int(self.getSetting(self.settings.num_threads))
-        detectorConfig.quadDecimate = self.getSetting(self.settings.quad_decimate)
-        detectorConfig.quadSigma = self.getSetting(self.settings.quad_sigma)
-        detectorConfig.refineEdges = self.getSetting(self.settings.refine_edges)
-
-        self.apriltagDetector.setConfig(detectorConfig)
-
+        self.cameraMatrix = self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
+        self.apriltagDetector: AprilTagDetector = NapaApriltagDetector()
+        self.setDetectorConfig(self.cameraIndex)
         self.apriltagDetector.setFamily(
             self.settings.getSetting(self.settings.tag_family)
         )
 
-        self.poseEstimator: ApriltagPoseEstimator = RobotpyApriltagPoseEstimator(
-            config=ApriltagPoseEstimator.Config(
-                tagSize=(self.settings.getSetting(ApriltagPipelineSettings.tag_size)),
-                fx=self.cameraMatrix[0][0],
-                fy=self.cameraMatrix[1][1],
-                cx=self.cameraMatrix[0][2],
-                cy=self.cameraMatrix[1][2],
+        ApriltagPipeline.fmap = ApriltagFieldJson.loadFieldCached(
+            DeployDirectory.getDir() / "fmap.json"
+        )
+
+        self.__hadResults: bool = False
+        self.__lastTagID: Optional[int] = None
+        self.__cropSignature: Optional[Tuple[int, int, Tuple, Tuple]] = None
+        self.__cropBounds: Optional[Tuple[int, int, int, int]] = None
+        self.__grayscaleBuffer: Optional[np.ndarray] = None
+        self.tagEstimates: List[ApriltagDetectionResult] = []
+        self.poseEstimator: PnPPoseEstimator = PnPPoseEstimator(
+            PnPPoseEstimator.Config(
+                self.getSetting(self.settings.tag_size),
+                np.array(self.cameraMatrix, dtype=np.float64),
+                np.array(
+                    self.getDistCoeffs(self.cameraIndex) or [0] * 5, dtype=np.float64
+                ),
             )
         )
 
-        self.distCoeffs = self.getDistCoeffs(cameraIndex)
+    def close(self) -> None:
+        """Release the native AprilTag detector."""
+        self.apriltagDetector.close()
+        super().close()
+
+    def setDetectorConfig(self, cameraIndex: CameraID) -> None:
+        detectorConfig = self.apriltagDetector.getConfig()
+
+        maxHamming = int(self.getSetting(self.settings.max_hamming))
+        detectorConfig.minTagPx = int(self.getSetting(self.settings.min_tag_px))
+        detectorConfig.maxHamming = None if maxHamming < 0 else maxHamming
+        detectorConfig.minContrast = int(self.getSetting(self.settings.min_contrast))
+        detectorConfig.minBorderCells = int(
+            self.getSetting(self.settings.min_border_cells)
+        )
+        detectorConfig.sharpening = float(self.getSetting(self.settings.sharpening))
+        detectorConfig.maxDetections = int(
+            self.getSetting(self.settings.max_detections)
+        )
+
+        self.apriltagDetector.setConfig(detectorConfig)
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         super().bind(cameraIndex, camera)
-        self.setConfig(cameraIndex)
+
+        self.setDetectorConfig(cameraIndex)
+        self.apriltagDetector.setFamily(self.getSetting(self.settings.tag_family))
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
         if setting.key in [
-            self.settings.num_threads.key,
-            self.settings.quad_decimate.key,
-            self.settings.quad_sigma.key,
+            self.settings.crop_x,
+            self.settings.crop_y,
+        ]:
+            self.cameraMatrix = (
+                self.getCameraMatrix(self.cameraIndex) or np.eye(3).tolist()
+            )
+            cx = self.cameraMatrix[0][2]
+            cy = self.cameraMatrix[1][2]
+            h, w = self.getResolution()
+
+            crop_x1 = self.getSetting(self.settings.crop_x)[0]
+            crop_y1 = self.getSetting(self.settings.crop_y)[0]
+
+            offset_x = int((crop_x1 + 1) * 0.5 * w)
+            offset_y = int((crop_y1 + 1) * 0.5 * h)
+
+            self.poseEstimator.config.cameraMatrix[0, 2] = cx - offset_x
+            self.poseEstimator.config.cameraMatrix[1, 2] = cy - offset_y
+        if setting.key in [
+            self.settings.min_tag_px.key,
+            self.settings.max_hamming.key,
+            self.settings.min_contrast.key,
+            self.settings.min_border_cells.key,
+            self.settings.sharpening.key,
+            self.settings.max_detections.key,
             self.settings.tag_family.key,
         ]:
-            config = self.apriltagDetector.getConfig()
-
-            config.numThreads = int(self.getSetting(self.settings.num_threads))
-            config.quadDecimate = self.getSetting(self.settings.quad_decimate)
-            config.quadSigma = self.getSetting(self.settings.quad_sigma)
-            config.refineEdges = self.getSetting(self.settings.refine_edges)
-
-            self.apriltagDetector.setConfig(config)
-
+            self.setDetectorConfig(self.cameraIndex)
             self.apriltagDetector.setFamily(
                 self.settings.getSetting(self.settings.tag_family)
             )
         elif setting.key == self.settings.tag_size.key:
-            config = self.poseEstimator.getConfig()
-            config.tagSize = value
-            self.poseEstimator.setConfig(config)
+            self.poseEstimator.config.tagSize = value
 
-    @lru_cache(maxsize=100)
-    def estimateTagPose(self, tag: AprilTagDetection) -> ApriltagPoseEstimate:
-        return self.poseEstimator.estimate(
-            tag,
-            nIters=int(self.getSetting(self.settings.iteration_count)),
+    def __calculateCropBounds(
+        self, width: int, height: int, crop_x, crop_y
+    ) -> Optional[Tuple[int, int, int, int]]:
+        if (
+            crop_x == self.settings.crop_x.defaultValue
+            and crop_y == self.settings.crop_y.defaultValue
+        ):  # No Crop needed
+            return None
+
+        x1 = min(crop_x)
+        x2 = max(crop_x)
+        y1 = min(crop_y)
+        y2 = max(crop_y)
+
+        x1 = int((x1 + 1) * 0.5 * width)
+        x2 = int((x2 + 1) * 0.5 * width)
+        y1 = int((y1 + 1) * 0.5 * height)
+        y2 = int((y2 + 1) * 0.5 * height)
+
+        # Clamp
+        x1 = max(0, min(x1, width))
+        x2 = max(0, min(x2, width))
+        y1 = max(0, min(y1, height))
+        y2 = max(0, min(y2, height))
+
+        # Fix corner ordering
+        left = min(x1, x2)
+        right = max(x1, x2)
+        top = min(y1, y2)
+        bottom = max(y1, y2)
+
+        return (left, top, right, bottom)
+
+    def cropImageToFit(self, img, drawOn):
+        h, w = img.shape[:2]
+
+        crop_x = self.getSetting(self.settings.crop_x)
+        crop_y = self.getSetting(self.settings.crop_y)
+
+        # The crop rectangle only depends on the image size and the crop
+        # settings, so only recompute it when one of those changes.
+        signature = (w, h, tuple(crop_x), tuple(crop_y))
+        if signature != self.__cropSignature:
+            self.__cropSignature = signature
+            self.__cropBounds = self.__calculateCropBounds(w, h, crop_x, crop_y)
+
+        bounds = self.__cropBounds
+        if bounds is None:  # No Crop needed, return original image
+            return img
+
+        left, top, right, bottom = bounds
+
+        cv2.rectangle(
+            drawOn,
+            (left, top),
+            (right - 1, bottom - 1),
+            (0, 255, 0),
+            2,
         )
+
+        return img[top:bottom, left:right]
+
+    def __toGrayscale(self, img: np.ndarray) -> np.ndarray:
+        height, width = img.shape[:2]
+
+        buffer = self.__grayscaleBuffer
+        if buffer is None or buffer.shape[0] != height or buffer.shape[1] != width:
+            buffer = np.empty((height, width), dtype=np.uint8)
+            self.__grayscaleBuffer = buffer
+
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY, dst=buffer)
 
     def processFrame(self, img, timestamp: float) -> FrameResult:
         # Convert image to grayscale for detection
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        #
+        # TODO: Check equalizing histogram (white and black levels)
+        cropped_color = self.cropImageToFit(img, img)
+        cropped = self.__toGrayscale(cropped_color)
 
-        tags = self.apriltagDetector.detect(gray)
-        tagEstimates: List[ApriltagDetectionResult] = []
+        tags = self.apriltagDetector.detect(cast(Buffer, cropped))
+        tags = filterTagsByIds(
+            tags,
+            self.getSetting(self.settings.tag_filter),
+        )
 
         if not tags:
-            self.setDataValue("hasResults", False)
-            self.setResults(None)
-            return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+            if self.__hadResults:
+                self.__hadResults = False
+                self.setDataValue("hasResults", False)
+                self.setResults(None)
+            return img
+
+        self.tagEstimates.clear()
 
         for tag in tags:
-            if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap.keys():
-                warn(f"Invalid tagID: {tag.tagID}")
-                return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-            tagPoseEstimate: ApriltagPoseEstimate = self.estimateTagPose(tag)
-
-            self.setDataValue(self.kTagIDKey, tag.tagID)
-
-            tagRelativePose: Transform3d = (
-                tagPoseEstimate.acceptedPose
-            )  # TODO: check if needs to switch with pose2 sometimes
+            self.processTag(
+                tag,
+                timestamp,
+            )
 
             drawTagDetectionMarker(
                 tag=tag,
-                img=gray,
+                img=img,
             )
 
-            tagRelativePose = opencvToWPI(tagRelativePose)
+        fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
+        stickToGround = self.getSetting(self.settings.stick_to_ground)
+        # estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
 
-            self.setDataValue(self.kTagPoseEstimateKey, tagRelativePose)
-            self.setDataValue(
-                self.kTagPoseEstimateErrorKey, tagPoseEstimate.acceptedError
-            )
-
-            if self.getSetting(ApriltagPipelineSettings.fieldpose):
-                tagFieldPose = self.fmap.getTagPose(tag.tagID)
-
-                if tagFieldPose:
-                    cameraPoseEstimate = tagToCameraPose(
-                        tagFieldPose=tagFieldPose,
-                        cameraToTagTransform=Transform3d(
-                            translation=tagRelativePose.translation(),
-                            rotation=tagRelativePose.rotation(),
-                        ),
-                    )
-
-                    self.setDataValue(
-                        self.kCameraPoseFieldSpaceKey,
-                        cameraPoseEstimate.cameraPose_fieldSpace,
-                    )
-
-                    tagEstimates.append(
-                        ApriltagDetectionResult(
-                            detection=tag,
-                            timestamp=timestamp,
-                            cameraPoseEstimate=cameraPoseEstimate,
-                            tagPoseEstimate=tagPoseEstimate,
-                        )
-                    )
-
-        self.setDataValue("hasResults", True)
-        result = ApriltagResult(
-            self.combinedApriltagPoseEstimator.estimate(
-                map(
-                    lambda estimate: estimate.cameraPoseEstimate,
-                    tagEstimates,
-                )
-            ),
-            tagEstimates,
+        cameraPoseEstimate: Optional[CameraPoseEstimate] = (
+            self.poseEstimator.estimate(tags, self.fmap.getTagPose)
+            if fieldposeEnabled
+            else None
         )
-        self.setResults(ApriltagsJson.toJsonString(result))
 
-        return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        if stickToGround:
+            if cameraPoseEstimate is not None:
+                cameraPoseEstimate.cameraPoseEstimate = Pose3d(
+                    Translation3d(
+                        cameraPoseEstimate.cameraPoseEstimate.X(),
+                        cameraPoseEstimate.cameraPoseEstimate.Y(),
+                        0,
+                    ),
+                    Rotation3d(
+                        0, 0, cameraPoseEstimate.cameraPoseEstimate.rotation().Z()
+                    ),
+                )
+
+        if not self.__hadResults:
+            self.__hadResults = True
+            self.setDataValue("hasResults", True)
+        result = ApriltagResult(
+            cameraPoseEstimate,
+            self.tagEstimates,
+        )
+        self.setResults(ApriltagsJson.toDict(result))  # TODO: Rate Limit NT
+
+        return img
+
+    def processTag(
+        self,
+        tag: AprilTagDetection,
+        timestamp: float,
+    ) -> None:
+        if tag.tagID < 0 or tag.tagID not in self.fmap.fieldMap:
+            warn(f"Invalid tagID: {tag.tagID}")
+            return
+
+        self.tagEstimates.append(ApriltagDetectionResult(tag, timestamp))
+
+        # Only publish when the value actually changes; this key would otherwise
+        # be re-sent (and serialized to NetworkTables + the UI) for every tag on
+        # every frame.
+        if tag.tagID != self.__lastTagID:
+            self.__lastTagID = tag.tagID
+            self.setDataValue(self.kTagIDKey, tag.tagID)
 
 
 class ApriltagsJson:
     @classmethod
-    def toJsonString(cls, result: ApriltagResult) -> Dict[str, Any]:
+    def toDict(cls, result: ApriltagResult) -> Dict[str, Any]:
         tags: List[dict] = []
 
         for tag in result.tagDetections:
             tag: ApriltagDetectionResult = tag
-            tags.append(
+            tags.append(  # TODO: Expose settings to choose what values to send
                 {
                     ApriltagPipeline.kTagIDKey: tag.detection.tagID,
                     ApriltagPipeline.kHammingKey: tag.detection.hamming,
-                    ApriltagPipeline.kCameraPoseFieldSpaceKey: tag.cameraPoseEstimate.cameraPose_fieldSpace,
-                    ApriltagPipeline.kTagPoseEstimateKey: tag.tagPoseEstimate,
                     ApriltagPipeline.kTagCenterKey: tag.detection.center,
                 }
             )
 
         return {
-            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate,
+            ApriltagPipeline.kCameraPoseEstimateKey: result.cameraPoseEstimate.cameraPoseEstimate
+            if result.cameraPoseEstimate is not None
+            else None,
             ApriltagPipeline.kTagDetectionsKey: tags,
+            ApriltagPipeline.kReprojectionErrorKey: result.cameraPoseEstimate.reprojectionError
+            if result.cameraPoseEstimate is not None
+            else 0.0,
         }
 
     @classmethod

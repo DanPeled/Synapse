@@ -8,12 +8,24 @@ on:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - "synapse_imager/**"
+      - "synapse_sim/**"
+      - "setup.py"
+      - "MANIFEST.in"
+      - "pyproject.toml"
+      - "versions.properties"
       - ".github/workflows/synapse_ci.yml"
   pull_request:
     paths:
       - "synapse_core/**"
       - "synapse_net/**"
       - "synapse_installer/**"
+      - "synapse_imager/**"
+      - "synapse_sim/**"
+      - "setup.py"
+      - "MANIFEST.in"
+      - "pyproject.toml"
+      - "versions.properties"
       - ".github/workflows/synapse_ci.yml"
 
 jobs:
@@ -43,12 +55,17 @@ jobs:
             ~/.npm
             synapse_ui/node_modules
             synapse_ui/.next/cache
-          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+            synapse_sim/node_modules
+          key: ${{ runner.os }}-node-20-${{ hashFiles('synapse_ui/package-lock.json', 'synapse_sim/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-20-
 
-      - name: Install Node.js dependencies
+      - name: Install UI Node.js dependencies
         working-directory: synapse_ui
+        run: npm ci
+
+      - name: Install simulator Node.js dependencies
+        working-directory: synapse_sim
         run: npm ci
 
       - name: Install Python dependencies
@@ -66,15 +83,32 @@ jobs:
         run: |
           pip install wheel
           python - <<'EOF'
-          import sys, glob, zipfile, re
+          import sys, glob, zipfile
           wheel_files = glob.glob('dist/*.whl')
           if not wheel_files:
               sys.exit("No wheel file found")
-          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          required = [
+              'synapse_sim/assets/field.glb',
+              'synapse_sim/assets/apriltag-config.json',
+              'synapse_sim/assets/viewer.bundle.js',
+              'synapse_sim/assets/index.html',
+          ]
           with zipfile.ZipFile(wheel_files[0]) as zf:
-              for info in zf.infolist():
-                  if pattern.search(info.filename):
-                      print(info.filename)
+              names = zf.namelist()
+              missing = [path for path in required if path not in names]
+              if missing:
+                  sys.exit("Wheel is missing simulator assets: " + ", ".join(missing))
+              if not any(
+                  name.startswith('synapse_sim/assets/apriltags/')
+                  and name.endswith('.png')
+                  for name in names
+              ):
+                  sys.exit("Wheel is missing simulator AprilTag textures")
+              if 'synapse_sim/assets/field.png' in names:
+                  sys.exit("Wheel contains the retired baked field.png")
+              for name in sorted(names):
+                  if name.startswith('synapse_sim/assets/'):
+                      print(name)
           EOF
 
   # ARM64 builds for Jetson, Orange Pi 5, Raspberry Pi 5
@@ -82,16 +116,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: bookworm-arm64-3.11
-            container: python:3.11-bookworm
+          - name: trixie-arm64-3.11
+            container: python:3.11-trixie
             platform: linux/arm64
             python_version: "3.11"
-          - name: bookworm-arm64-3.12
-            container: python:3.12-bookworm
+          - name: trixie-arm64-3.12
+            container: python:3.12-trixie
             platform: linux/arm64
             python_version: "3.12"
-          - name: bookworm-arm64-3.13
-            container: python:3.13-bookworm
+          - name: trixie-arm64-3.13
+            container: python:3.13-trixie
             platform: linux/arm64
             python_version: "3.13"
           #
@@ -122,12 +156,16 @@ jobs:
             ~/.npm
             synapse_ui/node_modules
             synapse_ui/.next/cache
-          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+            synapse_sim/node_modules
+          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json', 'synapse_sim/package-lock.json') }}
           restore-keys: |
             ubuntu-node-20-
 
       - run: npm ci
         working-directory: synapse_ui
+
+      - run: npm ci
+        working-directory: synapse_sim
 
       - name: Create Python venv
         shell: bash
@@ -156,15 +194,32 @@ jobs:
         run: |
           source .venv/bin/activate
           python - <<'EOF'
-          import sys, glob, zipfile, re
+          import sys, glob, zipfile
           wheel_files = glob.glob('dist/*.whl')
           if not wheel_files:
               sys.exit("No wheel file found")
-          pattern = re.compile(r'synapse/|synapse_net/|synapse_installer/|synapse_ui/')
+          required = [
+              'synapse_sim/assets/field.glb',
+              'synapse_sim/assets/apriltag-config.json',
+              'synapse_sim/assets/viewer.bundle.js',
+              'synapse_sim/assets/index.html',
+          ]
           with zipfile.ZipFile(wheel_files[0]) as zf:
-              for info in zf.infolist():
-                  if pattern.search(info.filename):
-                      print(info.filename)
+              names = zf.namelist()
+              missing = [path for path in required if path not in names]
+              if missing:
+                  sys.exit("Wheel is missing simulator assets: " + ", ".join(missing))
+              if not any(
+                  name.startswith('synapse_sim/assets/apriltags/')
+                  and name.endswith('.png')
+                  for name in names
+              ):
+                  sys.exit("Wheel is missing simulator AprilTag textures")
+              if 'synapse_sim/assets/field.png' in names:
+                  sys.exit("Wheel contains the retired baked field.png")
+              for name in sorted(names):
+                  if name.startswith('synapse_sim/assets/'):
+                      print(name)
           EOF
 
   # Lint
@@ -176,7 +231,7 @@ jobs:
         with:
           cache: pip
           python-version: "3.12"
-      - run: pip install ruff isort
+      - run: pip install ".[dev]"
       - run: ruff check .
       - run: isort --check-only --diff .
 
@@ -190,25 +245,7 @@ jobs:
           cache: pip
           python-version: "3.12"
 
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "20.9.0"
-
-      - name: Cache npm + Next.js
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            synapse_ui/node_modules
-            synapse_ui/.next/cache
-          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
-          restore-keys: |
-            ubuntu-node-20-
-      - run: npm ci
-        working-directory: synapse_ui
-
       - run: |
-          make install
           pip install ".[dev]"
       - run: pip install pyright
       - run: pyright
@@ -221,26 +258,36 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "20.9.0"
-
-      - name: Cache npm + Next.js
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            synapse_ui/node_modules
-            synapse_ui/.next/cache
-          key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
-          restore-keys: |
-            ubuntu-node-20-
-
-      - run: npm ci
-        working-directory: synapse_ui
+      # - uses: actions/setup-node@v3
+      #   with:
+      #     node-version: "20.9.0"
+      #
+      # - name: Cache npm + Next.js
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.npm
+      #       synapse_ui/node_modules
+      #       synapse_ui/.next/cache
+      #     key: ubuntu-node-20-${{ hashFiles('synapse_ui/package-lock.json') }}
+      #     restore-keys: |
+      #       ubuntu-node-20-
+      #
+      # - run: npm ci
+      #   working-directory: synapse_ui
 
       - run: |
-          make install
+          # make install
           pip install ".[dev]"
       - run: pip install pytest
-      - run: make test
+
+      - name: Check Chrome
+        run: google-chrome --version
+
+      - name: Run tests
+        env:
+          # Exercise the headless simulator renderer in CI.
+          SYNAPSE_TEST_SIM_BROWSER: "1"
+          # GitHub runners have no GPU, so render through SwiftShader.
+          SYNAPSE_SIM_ANGLE: swiftshader
+        run: make test

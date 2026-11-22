@@ -2,28 +2,50 @@ package synapse;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.networktables.FloatSubscriber;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableEntry;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.NetworkTableType;
-import edu.wpi.first.networktables.PubSubOption;
-import edu.wpi.first.networktables.RawSubscriber;
-import edu.wpi.first.networktables.StringSubscriber;
-import edu.wpi.first.wpilibj.DriverStation;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
+import org.wpilib.driverstation.DriverStationErrors;
+import org.wpilib.math.geometry.Pose3d;
+import org.wpilib.math.geometry.Transform3d;
+import org.wpilib.networktables.BooleanSubscriber;
+import org.wpilib.networktables.DoubleSubscriber;
+import org.wpilib.networktables.GenericSubscriber;
+import org.wpilib.networktables.IntegerSubscriber;
+import org.wpilib.networktables.NetworkTable;
+import org.wpilib.networktables.NetworkTableEntry;
+import org.wpilib.networktables.NetworkTableInstance;
+import org.wpilib.networktables.NetworkTableType;
+import org.wpilib.networktables.NetworkTableValue;
+import org.wpilib.networktables.RawSubscriber;
+import org.wpilib.networktables.StringSubscriber;
+import synapse.generated.SynapseApi;
+import synapse.util.deserializers.WPILibGeometryModule;
 
 /**
  * Represents a Synapse camera with fully cached NetworkTables entries, type-safe settings, and
  * methods for retrieving results and metrics.
  */
 public class SynapseCamera implements AutoCloseable {
+
+  /** Immutable snapshot of a setting topic's latest value. */
+  record SettingValue(boolean valid, NetworkTableType type, Object value) {
+    static SettingValue invalid() {
+      return new SettingValue(false, null, null);
+    }
+  }
+
+  /** Testable reader for a setting topic's latest value. */
+  interface SettingReader extends AutoCloseable {
+    SettingValue read();
+
+    @Override
+    void close();
+  }
 
   /** Camera name */
   protected final String m_cameraName;
@@ -37,14 +59,30 @@ public class SynapseCamera implements AutoCloseable {
   /** Subtable containing camera settings */
   protected NetworkTable m_settingsTable;
 
+  /** Full path of the settings subtable, usable without touching NetworkTables in tests. */
+  protected String m_settingsTablePath;
+
   /** Subtable containing camera data/results */
   protected NetworkTable m_dataTable;
 
-  /** Cache of all NetworkTableEntries for quick access */
+  /** Cache of NetworkTableEntries, keyed by full topic path to avoid cross-subtable collisions */
   protected final Map<String, NetworkTableEntry> m_entryCache = new ConcurrentHashMap<>();
 
-  /** Cached entry for the current pipeline ID */
+  /** Latest-value readers for settings, keyed by full topic path */
+  protected final Map<String, SettingReader> m_settingReaders = new ConcurrentHashMap<>();
+
+  /** Setting keys for which a type mismatch has already been reported */
+  protected final Set<String> m_warnedSettingKeys = ConcurrentHashMap.newKeySet();
+
+  /** Reporter for setting type mismatches; overridable in tests. */
+  protected Consumer<String> m_warningReporter =
+      message -> DriverStationErrors.reportWarning(message, false);
+
+  /** Entry used to publish the current pipeline ID */
   protected NetworkTableEntry m_pipelineEntry;
+
+  /** Latest-value subscriber for the current pipeline ID */
+  protected IntegerSubscriber m_pipelineSubscriber;
 
   /** Entry for storing or retrieving the camera's current pipeline type */
   protected StringSubscriber m_pipelineTypeSubscriber;
@@ -52,17 +90,26 @@ public class SynapseCamera implements AutoCloseable {
   /** Entry for storing the latest processing results from the camera */
   protected RawSubscriber m_resultsSubscriber;
 
-  /** Entry that indicates whether recording is currently active */
+  /** Entry used to publish the recording state */
   protected NetworkTableEntry m_recordStateEntry;
 
-  /** Entry for tracking the latency of frame capture (in milliseconds) */
-  protected FloatSubscriber m_captureLatencySubscriber;
+  /** Latest-value subscriber for the recording state */
+  protected BooleanSubscriber m_recordStateSubscriber;
 
-  /** Entry for tracking the latency of frame processing (in milliseconds) */
-  protected FloatSubscriber m_processLatencySubscriber;
+  /** Entry for tracking the latency of frame capture (in seconds) */
+  protected DoubleSubscriber m_captureLatencySubscriber;
 
-  /** ObjectMapper configured for MessagePack serialization/deserialization */
-  protected static final ObjectMapper s_ObjectMapper = new ObjectMapper(new MessagePackFactory());
+  /** Entry for tracking the latency of frame processing (in seconds) */
+  protected DoubleSubscriber m_processLatencySubscriber;
+
+  /**
+   * ObjectMapper configured for MessagePack serialization/deserialization.
+   *
+   * <p>The WPILib geometry module lets custom result classes declare {@link Pose3d}, {@link
+   * Transform3d}, and other geometry fields. Synapse sends those as plain arrays.
+   */
+  protected static final ObjectMapper s_ObjectMapper =
+      new ObjectMapper(new MessagePackFactory()).registerModule(new WPILibGeometryModule());
 
   /**
    * Transform representing the physical offset between the robot's coordinate frame and the
@@ -96,31 +143,27 @@ public class SynapseCamera implements AutoCloseable {
       m_table =
           NetworkTableInstance.getDefault().getTable(synapseTableName).getSubTable(m_cameraName);
 
+      m_settingsTable = m_table.getSubTable(SynapseApi.SETTINGS_TABLE);
+      m_settingsTablePath = m_settingsTable.getPath();
+      m_dataTable = m_table.getSubTable(SynapseApi.DATA_TABLE);
+
       m_pipelineEntry = getCachedEntry(NetworkTableTopics.kPipelineTopic, m_table);
       m_recordStateEntry = getCachedEntry(NetworkTableTopics.kRecordStatusTopic, m_table);
+      // Reads use latest-value subscribers so hot loops never call exists() or
+      // getType() on an entry. Entries above remain for the setters only.
+      m_pipelineSubscriber =
+          m_table.getIntegerTopic(NetworkTableTopics.kPipelineTopic).subscribe(-1);
+      m_recordStateSubscriber =
+          m_table.getBooleanTopic(NetworkTableTopics.kRecordStatusTopic).subscribe(false);
       m_pipelineTypeSubscriber =
-          m_table
-              .getStringTopic(NetworkTableTopics.kPipelineTypeTopic)
-              .subscribe(
-                  "Unknown", PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+          m_table.getStringTopic(NetworkTableTopics.kPipelineTypeTopic).subscribe("Unknown");
       m_captureLatencySubscriber =
-          m_table
-              .getFloatTopic(NetworkTableTopics.kCaptureLatencyTopic)
-              .subscribe(0, PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+          m_table.getDoubleTopic(NetworkTableTopics.kCaptureLatencyTopic).subscribe(0.0);
       m_processLatencySubscriber =
-          m_table
-              .getFloatTopic(NetworkTableTopics.kProcessLatencyTopic)
-              .subscribe(0, PubSubOption.keepDuplicates(true), PubSubOption.pollStorage(10));
+          m_table.getDoubleTopic(NetworkTableTopics.kProcessLatencyTopic).subscribe(0.0);
+      // The runtime publishes pipeline results under <camera>/data/results.
       m_resultsSubscriber =
-          m_table
-              .getRawTopic(NetworkTableTopics.kResultsTopic)
-              .subscribe(
-                  "raw",
-                  new byte[0],
-                  PubSubOption.keepDuplicates(true),
-                  PubSubOption.pollStorage(10));
-      m_settingsTable = m_table.getSubTable("settings");
-      m_dataTable = m_table.getSubTable("data");
+          m_dataTable.getRawTopic(NetworkTableTopics.kResultsTopic).subscribe("raw", new byte[0]);
     }
   }
 
@@ -194,12 +237,58 @@ public class SynapseCamera implements AutoCloseable {
   /**
    * Retrieves a cached NetworkTableEntry for a given key.
    *
+   * <p>The cache key includes the table path so identically named settings in different subtables
+   * cannot share an entry.
+   *
    * @param key the entry key
    * @param table the table to fetch the entry from
    * @return the cached or newly fetched NetworkTableEntry
    */
   public NetworkTableEntry getCachedEntry(String key, NetworkTable table) {
-    return m_entryCache.computeIfAbsent(key, table::getEntry);
+    return m_entryCache.computeIfAbsent(
+        cacheKey(table.getPath(), key), ignored -> table.getEntry(key));
+  }
+
+  /**
+   * Returns a latest-value reader for a setting topic, creating it once.
+   *
+   * @param key the setting key
+   * @return the cached or newly created setting reader
+   */
+  protected SettingReader getSettingReader(String key) {
+    return m_settingReaders.computeIfAbsent(
+        cacheKey(settingsPath(), key),
+        ignored ->
+            new NetworkTablesSettingReader(getSettingsTable().getTopic(key).genericSubscribe()));
+  }
+
+  static String cacheKey(String tablePath, String key) {
+    return tablePath + "/" + key;
+  }
+
+  private String settingsPath() {
+    return m_settingsTablePath != null ? m_settingsTablePath : getSettingsTable().getPath();
+  }
+
+  /** Adapts a generic NetworkTables subscriber to a testable setting reader. */
+  private static final class NetworkTablesSettingReader implements SettingReader {
+    private final GenericSubscriber m_subscriber;
+
+    private NetworkTablesSettingReader(GenericSubscriber subscriber) {
+      m_subscriber = subscriber;
+    }
+
+    @Override
+    public SettingValue read() {
+      NetworkTableValue value = m_subscriber.get();
+      if (!value.isValid()) return SettingValue.invalid();
+      return new SettingValue(true, value.getType(), toObject(value));
+    }
+
+    @Override
+    public void close() {
+      m_subscriber.close();
+    }
   }
 
   /**
@@ -208,7 +297,7 @@ public class SynapseCamera implements AutoCloseable {
    * @return the pipeline index
    */
   public long getPipeline() {
-    return m_pipelineEntry.getInteger(-1);
+    return m_pipelineSubscriber.get(-1);
   }
 
   /**
@@ -235,7 +324,7 @@ public class SynapseCamera implements AutoCloseable {
    * @return true if recording, false otherwise
    */
   public boolean getRecordingStatus() {
-    return m_recordStateEntry.getBoolean(false);
+    return m_recordStateSubscriber.get(false);
   }
 
   /**
@@ -248,18 +337,18 @@ public class SynapseCamera implements AutoCloseable {
   }
 
   /**
-   * Returns the latest capture latency in milliseconds.
+   * Returns the latest capture latency in seconds.
    *
-   * @return capture latency
+   * @return capture latency in seconds, or 0 if it has not been published
    */
   public double getCaptureLatency() {
     return m_captureLatencySubscriber.get(0);
   }
 
   /**
-   * Returns the latest processing latency in milliseconds.
+   * Returns the latest processing latency in seconds.
    *
-   * @return processing latency
+   * @return processing latency in seconds, or 0 if it has not been published
    */
   public double getProcessLatency() {
     return m_processLatencySubscriber.get(0);
@@ -273,20 +362,9 @@ public class SynapseCamera implements AutoCloseable {
    */
   @Deprecated(forRemoval = true, since = "2025.0.1")
   public Optional<Object> getSetting(String key) {
-    NetworkTableEntry entry = getCachedEntry(key, getSettingsTable());
-    if (!entry.exists()) return Optional.empty();
-
-    return switch (entry.getType()) {
-      case kDouble -> Optional.of(entry.getDouble(0.0));
-      case kDoubleArray -> Optional.of(entry.getDoubleArray(new double[0]));
-      case kString -> Optional.of(entry.getString(""));
-      case kStringArray -> Optional.of(entry.getStringArray(new String[0]));
-      case kInteger -> Optional.of(entry.getInteger(0));
-      case kIntegerArray -> Optional.of(entry.getIntegerArray(new long[0]));
-      case kBoolean -> Optional.of(entry.getBoolean(false));
-      case kBooleanArray -> Optional.of(entry.getBooleanArray(new boolean[0]));
-      default -> Optional.empty();
-    };
+    SettingValue value = getSettingReader(key).read();
+    if (!value.valid()) return Optional.empty();
+    return Optional.ofNullable(value.value());
   }
 
   /**
@@ -297,44 +375,56 @@ public class SynapseCamera implements AutoCloseable {
    * @return Optional containing value if present and type matches
    */
   public <T> Optional<T> getSetting(Setting<T> setting) {
-    NetworkTableEntry entry = getCachedEntry(setting.getKey(), getSettingsTable());
+    SettingValue value = getSettingReader(setting.getKey()).read();
+    if (!value.valid()) return Optional.empty();
 
-    if (!entry.exists()) return Optional.empty();
+    Object converted = value.value();
+    if (converted == null || value.type() != setting.getNtType()) {
+      warnMismatchOnce(setting, value.type(), converted);
+      return Optional.empty();
+    }
 
-    Object value =
-        switch (entry.getType()) {
-          case kDouble -> entry.getDouble(0.0);
-          case kDoubleArray -> entry.getDoubleArray(new double[0]);
-          case kString -> entry.getString("");
-          case kStringArray -> entry.getStringArray(new String[0]);
-          case kInteger -> entry.getInteger(0);
-          case kIntegerArray -> entry.getIntegerArray(new long[0]);
-          case kBoolean -> entry.getBoolean(false);
-          case kBooleanArray -> entry.getBooleanArray(new boolean[0]);
-          default -> {
-            DriverStation.reportWarning(
-                "[SynapseCamera] Unsupported NT type for key '" + setting.getKey() + "'", false);
-            yield null;
-          }
-        };
-
-    if (value == null
-        || !setting.getValueType().isInstance(value)
-        || !setting.getNtType().equals(entry.getType())) {
-      DriverStation.reportWarning(
-          "[SynapseCamera] Type mismatch for key '"
-              + setting.getKey()
-              + "', expected "
-              + setting.getValueType().getSimpleName()
-              + " but received "
-              + (value == null ? "null" : value.getClass().getSimpleName()),
-          false);
+    if (!setting.getValueType().isInstance(converted)) {
+      warnMismatchOnce(setting, value.type(), converted);
       return Optional.empty();
     }
 
     @SuppressWarnings("unchecked")
-    T casted = (T) value;
+    T casted = (T) converted;
     return Optional.of(casted);
+  }
+
+  /** Converts a NetworkTables value to the Java type used by {@link Setting}. */
+  static Object toObject(NetworkTableValue value) {
+    return switch (value.getType()) {
+      case DOUBLE -> value.getDouble();
+      case DOUBLE_ARRAY -> value.getDoubleArray();
+      case STRING -> value.getString();
+      case STRING_ARRAY -> value.getStringArray();
+      case INTEGER -> value.getInteger();
+      case INTEGER_ARRAY -> value.getIntegerArray();
+      case BOOLEAN -> value.getBoolean();
+      case BOOLEAN_ARRAY -> value.getBooleanArray();
+      default -> null;
+    };
+  }
+
+  private <T> void warnMismatchOnce(Setting<T> setting, NetworkTableType actualType, Object value) {
+    String warningKey = cacheKey(settingsPath(), setting.getKey());
+    if (!m_warnedSettingKeys.add(warningKey)) return;
+
+    m_warningReporter.accept(
+        "[SynapseCamera] Type mismatch for key '"
+            + setting.getKey()
+            + "', expected "
+            + setting.getNtType()
+            + " ("
+            + setting.getValueType().getSimpleName()
+            + ") but received "
+            + actualType
+            + " ("
+            + (value == null ? "null" : value.getClass().getSimpleName())
+            + ")");
   }
 
   /**
@@ -441,7 +531,7 @@ public class SynapseCamera implements AutoCloseable {
     /** The Java class of the value type for this setting. */
     protected final Class<T> valueType;
 
-    /** The NetworkTableType corresponding to this setting (e.g., kDouble, kString). */
+    /** The NetworkTableType corresponding to this setting (e.g., DOUBLE, STRING). */
     protected final NetworkTableType ntType;
 
     /**
@@ -485,7 +575,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for Double values
      */
     public static Setting<Double> doubleSetting(String key) {
-      return new Setting<>(key, Double.class, NetworkTableType.kDouble);
+      return new Setting<>(key, Double.class, NetworkTableType.DOUBLE);
     }
 
     /**
@@ -495,7 +585,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for Long values
      */
     public static Setting<Long> integerSetting(String key) {
-      return new Setting<>(key, Long.class, NetworkTableType.kInteger);
+      return new Setting<>(key, Long.class, NetworkTableType.INTEGER);
     }
 
     /**
@@ -505,7 +595,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for String values
      */
     public static Setting<String> stringSetting(String key) {
-      return new Setting<>(key, String.class, NetworkTableType.kString);
+      return new Setting<>(key, String.class, NetworkTableType.STRING);
     }
 
     /**
@@ -515,7 +605,7 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for double array values
      */
     public static Setting<double[]> doubleArraySetting(String key) {
-      return new Setting<>(key, double[].class, NetworkTableType.kDoubleArray);
+      return new Setting<>(key, double[].class, NetworkTableType.DOUBLE_ARRAY);
     }
 
     /**
@@ -525,7 +615,37 @@ public class SynapseCamera implements AutoCloseable {
      * @return A new Setting instance for string array values
      */
     public static Setting<String[]> stringArraySetting(String key) {
-      return new Setting<>(key, String[].class, NetworkTableType.kStringArray);
+      return new Setting<>(key, String[].class, NetworkTableType.STRING_ARRAY);
+    }
+
+    /**
+     * Creates a Setting representing a boolean value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for Boolean values
+     */
+    public static Setting<Boolean> booleanSetting(String key) {
+      return new Setting<>(key, Boolean.class, NetworkTableType.BOOLEAN);
+    }
+
+    /**
+     * Creates a Setting representing a long array value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for long array values
+     */
+    public static Setting<long[]> integerArraySetting(String key) {
+      return new Setting<>(key, long[].class, NetworkTableType.INTEGER_ARRAY);
+    }
+
+    /**
+     * Creates a Setting representing a boolean array value.
+     *
+     * @param key The key to use for this setting
+     * @return A new Setting instance for boolean array values
+     */
+    public static Setting<boolean[]> booleanArraySetting(String key) {
+      return new Setting<>(key, boolean[].class, NetworkTableType.BOOLEAN_ARRAY);
     }
 
     /**
@@ -542,38 +662,57 @@ public class SynapseCamera implements AutoCloseable {
     }
 
     /** Predefined setting for camera brightness */
-    public static final Setting<Double> kBrightness = doubleSetting("brightness");
+    public static final Setting<Double> kBrightness = doubleSetting(SynapseApi.BRIGHTNESS_SETTING);
 
     /** Predefined setting for camera gain */
-    public static final Setting<Double> kGain = doubleSetting("gain");
+    public static final Setting<Double> kGain = doubleSetting(SynapseApi.GAIN_SETTING);
 
     /** Predefined setting for camera exposure */
-    public static final Setting<Double> kExposure = doubleSetting("exposure");
+    public static final Setting<Double> kExposure = doubleSetting(SynapseApi.EXPOSURE_SETTING);
 
-    /** Predefined setting for camera orientation */
-    public static final Setting<String> kOrientation = stringSetting("orientation");
+    /** Predefined setting for camera orientation, in degrees (0, 90, 180, 270) */
+    public static final Setting<Long> kOrientation = integerSetting(SynapseApi.ORIENTATION_SETTING);
+
+    /** Predefined setting for camera contrast */
+    public static final Setting<Double> kContrast = doubleSetting(SynapseApi.CONTRAST_SETTING);
+
+    /** Predefined setting for camera saturation */
+    public static final Setting<Double> kSaturation = doubleSetting(SynapseApi.SATURATION_SETTING);
+
+    /** Predefined setting for camera hue */
+    public static final Setting<Double> kHue = doubleSetting(SynapseApi.HUE_SETTING);
+
+    /** Predefined setting for camera white balance temperature */
+    public static final Setting<Double> kWhiteBalanceTemperature =
+        doubleSetting(SynapseApi.WHITE_BALANCE_TEMPERATURE_SETTING);
+
+    /** Predefined setting for camera sharpness */
+    public static final Setting<Double> kSharpness = doubleSetting(SynapseApi.SHARPNESS_SETTING);
   }
 
   /** Standardized NetworkTables topic keys for pipelines, results, recording, and latency. */
   public static final class NetworkTableTopics {
 
     /** Topic for the current pipeline ID */
-    public static final String kPipelineTopic = "pipeline";
+    public static final String kPipelineTopic = SynapseApi.PIPELINE;
 
     /** Topic for recording state */
-    public static final String kRecordStatusTopic = "record";
+    public static final String kRecordStatusTopic = SynapseApi.RECORD;
 
     /** Topic for the pipeline type string */
-    public static final String kPipelineTypeTopic = "pipeline_type";
+    public static final String kPipelineTypeTopic = SynapseApi.PIPELINE_TYPE;
+
+    /** Topic for the camera view ID */
+    public static final String kViewIDTopic = SynapseApi.VIEW_ID;
 
     /** Topic for results data */
-    public static final String kResultsTopic = "results";
+    public static final String kResultsTopic = SynapseApi.RESULTS;
 
-    /** Topic for camera capture latency (ms) */
-    public static final String kCaptureLatencyTopic = "captureLatency";
+    /** Topic for camera capture latency (seconds) */
+    public static final String kCaptureLatencyTopic = SynapseApi.CAPTURE_LATENCY;
 
-    /** Topic for camera processing latency (ms) */
-    public static final String kProcessLatencyTopic = "processLatency";
+    /** Topic for camera processing latency (seconds) */
+    public static final String kProcessLatencyTopic = SynapseApi.PROCESS_LATENCY;
 
     /** Prevent instantiation */
     protected NetworkTableTopics() {}
@@ -584,6 +723,11 @@ public class SynapseCamera implements AutoCloseable {
     m_captureLatencySubscriber.close();
     m_processLatencySubscriber.close();
     m_pipelineTypeSubscriber.close();
+    m_pipelineSubscriber.close();
+    m_recordStateSubscriber.close();
     m_resultsSubscriber.close();
+    m_settingReaders.values().forEach(SettingReader::close);
+    m_settingReaders.clear();
+    m_warnedSettingKeys.clear();
   }
 }

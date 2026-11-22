@@ -1,0 +1,73 @@
+name: Synapse Sim
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "synapse_sim/**"
+      - "setup.py"
+      - "MANIFEST.in"
+      - ".github/workflows/synapse_sim.yml"
+  pull_request:
+    paths:
+      - "synapse_sim/**"
+      - "setup.py"
+      - "MANIFEST.in"
+      - ".github/workflows/synapse_sim.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: synapse_sim
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: synapse_sim/package-lock.json
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Build interactive viewer
+        run: npm run build
+
+      - name: Build headless simulator renderer
+        run: npm run build:headless
+
+      - name: Verify committed simulator renderer bundle
+        working-directory: .
+        run: |
+          git diff --exit-code -- \
+            synapse_sim/src/synapse_sim/assets/viewer.bundle.js \
+            synapse_sim/src/synapse_sim/assets/index.html
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Synapse
+        run: pip install ".[dev]"
+
+      - name: Check Chrome
+        run: google-chrome --version
+
+      - name: Verify headless camera rendering
+        env:
+          SYNAPSE_TEST_SIM_BROWSER: "1"
+          # GitHub runners have no GPU, so render through SwiftShader.
+          SYNAPSE_SIM_ANGLE: swiftshader
+        run: pytest synapse_sim/tests -q

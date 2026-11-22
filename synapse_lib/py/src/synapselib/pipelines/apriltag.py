@@ -2,103 +2,93 @@
 # SPDX-FileCopyrightText: 2026 Dan Peled
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Generated from schema/synapse_lib.json. Do not edit by hand.
+# Run `python tools/generate_synapse_lib.py` to regenerate.
 
+from __future__ import annotations
+
+import math
 from dataclasses import dataclass
-from typing import List
+from typing import Any, List, Optional
+
+from wpimath import Pose3d, Rotation3d, Translation3d
 
 
-@dataclass(frozen=True)
-class ApriltagPoseEstimate:
-    """
-    Represents the candidate 3D pose estimates of an AprilTag detection.
-
-    When estimating the pose of an AprilTag, the algorithm may return two possible
-    solutions due to perspective ambiguity. This class stores both candidate poses
-    along with their associated error metrics, allowing downstream logic to
-    determine which pose is more reliable.
-
-    Each pose is represented as a 6-element tuple of floats:
-    (x, y, z, roll, pitch, yaw).
-    """
-
-    acceptedError: float
-    """The error metric associated with `acceptedPose`. Lower values indicate higher confidence."""
-
-    rejectedError: float
-    """The error metric associated with `rejectedPose`. Lower values indicate higher confidence."""
-
-    acceptedPose: List[float]
-    """The first possible 3D pose of the AprilTag relative to the camera frame."""
-
-    rejectedPose: List[float]
-    """The second possible 3D pose, typically the ambiguous alternative."""
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.acceptedError,
-                self.rejectedError,
-                tuple(self.acceptedPose),
-                tuple(self.rejectedPose),
-            )
-        )
+def _hashable(value: Any) -> Any:
+    if isinstance(value, (list, tuple)):
+        return tuple(_hashable(item) for item in value)
+    if isinstance(value, dict):
+        return tuple(sorted((_hashable(k), _hashable(v)) for k, v in value.items()))
+    return value
 
 
 @dataclass(frozen=True)
 class ApriltagDetection:
-    """
-    Represents a single detected AprilTag along with its associated metadata and pose estimates.
-
-    This class contains the tag's ID, detection accuracy metrics, and the estimated
-    poses of the camera and tag in multiple coordinate systems. It is typically
-    produced by an AprilTag detection pipeline.
-    """
+    """Represents a single detected AprilTag, including its screen-space position."""
 
     tag_id: int
     """The unique ID of the detected AprilTag."""
 
-    hamming: float
-    """The Hamming distance of the detected tag. Lower values indicate a more accurate detection."""
-
-    cameraPose_fieldSpace: List[float]
-    """The estimated pose of the camera in the field coordinate system."""
-
-    cameraPose_tagSpace: List[float]
-    """The estimated pose of the camera relative to the detected tag."""
+    hamming: int
+    """The Hamming distance of the detection. Lower values are more accurate."""
 
     tagPose_screenSpace: List[float]
-    """The estimated pose of the tag in screen coordinates."""
-
-    tag_estimate: ApriltagPoseEstimate
-    """The estimated pose(s) of the detected AprilTag, including multiple hypotheses."""
+    """The center of the tag in screen space, as [x, y] pixels."""
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self.tag_id,
-                self.hamming,
-                tuple(self.cameraPose_fieldSpace),
-                tuple(self.cameraPose_tagSpace),
-                tuple(self.tagPose_screenSpace),
-                self.tag_estimate,
-            )
-        )
+        return hash((self.tag_id, self.hamming, _hashable(self.tagPose_screenSpace)))
+
+    @property
+    def tx(self) -> float:
+        """Returns the tag's horizontal position in screen space."""
+        return self.tagPose_screenSpace[0]
+
+    @property
+    def ty(self) -> float:
+        """Returns the tag's vertical position in screen space."""
+        return self.tagPose_screenSpace[1]
 
 
 @dataclass(frozen=True)
 class ApriltagResult:
-    """
-    Represents the result of detecting AprilTags in a single frame or input source.
-
-    This class contains the list of detected tags and an estimate of the camera's
-    pose in field space. It is typically produced by an AprilTag pipeline.
-    """
+    """Represents the result of detecting AprilTags in a single frame."""
 
     tags: List[ApriltagDetection]
-    """The detected AprilTags with their associated detection data."""
+    """The detected AprilTags."""
 
-    cameraEstimate_fieldSpace: List[float]
-    """The estimated camera pose in field space, format (x, y, z, roll, pitch, yaw)."""
+    cameraEstimate_fieldSpace: Optional[List[float]]
+    """The camera pose as [x, y, z, roll, pitch, yaw] in degrees, or null when unavailable."""
+
+    reprojection_error: float
+    """The reprojection error of the camera pose estimate. 0.0 when unavailable."""
 
     def __hash__(self) -> int:
-        return hash((tuple(self.tags), tuple(self.cameraEstimate_fieldSpace)))
+        return hash(
+            (
+                _hashable(self.tags),
+                _hashable(self.cameraEstimate_fieldSpace),
+                self.reprojection_error,
+            )
+        )
+
+    @property
+    def cameraEstimate_fieldSpace3d(self) -> Optional[Pose3d]:
+        """Returns the camera's estimated pose in field space as a 3D pose."""
+        estimate = self.cameraEstimate_fieldSpace
+        if estimate is None:
+            return None
+        if len(estimate) < 6:
+            raise ValueError(
+                "cameraEstimate_fieldSpace must contain [x, y, z, roll, pitch, yaw]"
+            )
+        return Pose3d(
+            translation=Translation3d(estimate[0], estimate[1], estimate[2]),
+            # The runtime serializes roll/pitch/yaw in degrees, but the
+            # Rotation3d constructor expects radians.
+            rotation=Rotation3d(
+                math.radians(estimate[3]),
+                math.radians(estimate[4]),
+                math.radians(estimate[5]),
+            ),
+        )

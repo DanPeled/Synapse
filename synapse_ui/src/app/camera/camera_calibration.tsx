@@ -21,9 +21,23 @@ import { CalibrationDialog } from "./calibration_dialog";
 import {
   CalibrationDataProto,
   CameraProto,
+  ImportCalibrationMessageProto,
 } from "@/generated/messages/v1/camera";
+import {
+  MessageProto,
+  MessageTypeProto,
+} from "@/generated/messages/v1/message";
 import { WebSocketWrapper } from "@/services/websocket";
 import { useBackendContext } from "@/services/backend/backendContext";
+import { uploadFileReplace } from "@/services/backend/fileServer";
+import { useFilePicker } from "@/services/useFilePicker";
+import { toast } from "sonner";
+
+const importToastStyle = {
+  color: teamColor,
+  backgroundColor: "rgb(30, 30, 30)",
+  border: "none",
+};
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -38,7 +52,67 @@ const getStatusColor = (status: string) => {
   }
 };
 
-function CalibrationHeader() {
+function CalibrationHeader({
+  selectedCamera,
+  socket,
+}: {
+  selectedCamera?: CameraProto;
+  socket?: WebSocketWrapper;
+}) {
+  const { deviceinfo } = useBackendContext();
+  const [importing, setImporting] = useState(false);
+
+  const importCalibration = async (file: File) => {
+    if (!selectedCamera) {
+      toast.error("Select a camera before importing calibration data", {
+        style: importToastStyle,
+      });
+      return;
+    }
+
+    if (!socket?.isConnected()) {
+      toast.error(
+        "Cannot import calibration while disconnected from the backend",
+        {
+          style: importToastStyle,
+        },
+      );
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const filePath = `.calibration_import/camera_${selectedCamera.index}.json`;
+      await uploadFileReplace(deviceinfo, file, filePath);
+
+      const payload = MessageProto.create({
+        type: MessageTypeProto.MESSAGE_TYPE_PROTO_IMPORT_CALIBRATION,
+        importCalibration: ImportCalibrationMessageProto.create({
+          cameraIndex: selectedCamera.index,
+          filePath,
+        }),
+      });
+      socket.sendBinary(MessageProto.encode(payload).finish());
+
+      toast.success("Calibration file uploaded. Importing...", {
+        style: importToastStyle,
+      });
+    } catch (error) {
+      toast.error(
+        `Failed to upload calibration file: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { style: importToastStyle },
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const { open, input } = useFilePicker((file) => {
+    void importCalibration(file);
+  }, ".json,application/json");
+
   return (
     <div
       className="flex items-center justify-between"
@@ -58,10 +132,13 @@ function CalibrationHeader() {
           size="sm"
           style={{ color: teamColor }}
           className="hover:bg-zinc-700 cursor-pointer"
+          onClick={open}
+          disabled={!selectedCamera || importing}
         >
           <Download className="w-4 h-4 mr-2" />
-          Import Results
+          {importing ? "Importing..." : "Import Results"}
         </Button>
+        {input}
       </Row>
     </div>
   );
@@ -299,7 +376,7 @@ export function CameraCalibrationModule({
           padding: "24px",
         }}
       >
-        <CalibrationHeader />
+        <CalibrationHeader selectedCamera={selectedCamera} socket={socket} />
 
         <ResolutionSelector
           resolutions={resolutions ?? []}

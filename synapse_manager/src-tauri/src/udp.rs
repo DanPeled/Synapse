@@ -9,6 +9,7 @@ pub struct DiscoveryResponse {
     pub nickname: String,
     pub team_number: u32,
     pub version: String,
+    pub username: String,
 }
 
 const PORT: u16 = 45454;

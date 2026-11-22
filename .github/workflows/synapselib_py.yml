@@ -6,9 +6,15 @@ on:
       - main
     paths:
       - "synapse_lib/py/**"
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
+      - "versions.properties"
   pull_request:
     paths:
       - "synapse_lib/py/**"
+      - "synapse_lib/schema/**"
+      - "synapse_lib/tools/**"
+      - "versions.properties"
 
 jobs:
   build:
@@ -23,13 +29,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           cache: pip
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Install Python dependencies
         run: |
@@ -66,15 +72,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Install Ruff and isort
-        run: pip install ruff isort
+        run: |
+          pip install ruff==0.15.20
+          pip install isort
 
       - name: Run Ruff linting
         run: ruff check .
@@ -91,18 +99,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Install Python dependencies
         run: pip install .
 
-      - name: Install Pyright
-        run: pip install pyright
+      - name: Install Pyright and test dependencies
+        run: |
+          pip install pyright pytest
 
       - name: Run Pyright type checks
         run: pyright
@@ -116,12 +125,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10.7"
+          python-version: "3.12"
 
       - name: Install Python dependencies
         run: pip install .

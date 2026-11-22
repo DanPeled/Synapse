@@ -12,4 +12,4 @@ from pathlib import Path
 from synapse.core.synapse import Synapse
 
 if __name__ == "__main__":
-    Synapse.createAndRunRuntime(root=Path(os.getcwd()))
+    Synapse.createAndRunRuntime(root=Path(os.getcwd()), sendSettingsInNT=False)

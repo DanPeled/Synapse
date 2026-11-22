@@ -7,7 +7,7 @@ ext.licenseFile = files("$rootDir/LICENSE.txt")
 
 def templateVendorFile = "SynapseLib.json"
 
-def pubVersion = '2026.0.1'
+def pubVersion = versions.synapseVersion
 
 def outputsFolder = file("$buildDir/outputs")
 
@@ -145,7 +145,10 @@ task vendordepJson() {
         into "$buildDir/../vendordep/"
         expand(version: pubVersion,
         groupId: artifactGroupId,
-        artifactId: baseArtifactId)
+        artifactId: baseArtifactId,
+        frcYear: versions.frcYear,
+        jacksonVersion: versions.jacksonVersion,
+        msgpackVersion: versions.msgpackVersion)
     }
 }
 

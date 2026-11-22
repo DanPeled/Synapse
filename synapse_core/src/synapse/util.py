@@ -7,9 +7,16 @@ import socket
 import typing
 from typing import Any, List, Optional, Type, Union
 
-from ntcore import (BooleanArrayPublisher, BooleanPublisher,
-                    DoubleArrayPublisher, DoublePublisher, NetworkTable,
-                    RawPublisher, StringArrayPublisher, StringPublisher)
+from ntcore import (
+    BooleanArrayPublisher,
+    BooleanPublisher,
+    DoubleArrayPublisher,
+    DoublePublisher,
+    NetworkTable,
+    RawPublisher,
+    StringArrayPublisher,
+    StringPublisher,
+)
 
 from .core.pipeline import Pipeline
 

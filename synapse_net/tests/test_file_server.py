@@ -4,15 +4,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import io
+import socketserver
 import tempfile
 import threading
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import quote
 
 import pytest
 import requests
-from synapse_net.file_server import FileServer
+from synapse_net.file_server import (
+    PREVIEW_MAX_BYTES,
+    FileServer,
+    FileServerHandler,
+    ReusableThreadingTCPServer,
+)
 
 
 @pytest.fixture
@@ -29,6 +36,38 @@ def server():
 def server_url(srv: FileServer) -> str:
     host, port = srv._server.server_address  # pyright: ignore
     return f"http://{host}:{port}"
+
+
+def test_file_server_is_threaded_with_daemon_threads():
+    assert issubclass(ReusableThreadingTCPServer, socketserver.ThreadingTCPServer)
+    assert ReusableThreadingTCPServer.allow_reuse_address is True
+    assert ReusableThreadingTCPServer.daemon_threads is True
+    assert ReusableThreadingTCPServer.block_on_close is False
+
+
+def test_file_server_uses_reusable_threading_server(server):
+    assert isinstance(server._server, ReusableThreadingTCPServer)
+
+
+def test_file_server_handles_concurrent_requests(monkeypatch, server):
+    barrier = threading.Barrier(2, timeout=3)
+
+    def slow_get(handler):
+        barrier.wait()
+        handler.send_response(200)
+        handler.end_headers()
+        handler.wfile.write(b"ok")
+
+    monkeypatch.setattr(FileServerHandler, "do_GET", slow_get)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(requests.get, server_url(server) + f"/file{index}.txt")
+            for index in range(2)
+        ]
+        responses = [future.result(timeout=5) for future in futures]
+
+    assert [response.status_code for response in responses] == [200, 200]
 
 
 # -------------------------
@@ -192,6 +231,72 @@ def test_zip_path_traversal(server):
 
 
 # -------------------------
+# Directory listing
+# -------------------------
+def test_list_root(server):
+    (server.files_dir / "b.txt").write_bytes(b"bee")
+    (server.files_dir / "a_dir").mkdir()
+    (server.files_dir / "a_dir" / "nested.txt").write_bytes(b"nested")
+
+    resp = requests.get(server_url(server) + "/list")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == ""
+    assert [entry["name"] for entry in data["entries"]] == ["a_dir", "b.txt"]
+
+    dirEntry = data["entries"][0]
+    assert dirEntry == {
+        "name": "a_dir",
+        "path": "a_dir",
+        "is_dir": True,
+        "size": 0,
+    }
+
+    fileEntry = data["entries"][1]
+    assert fileEntry == {
+        "name": "b.txt",
+        "path": "b.txt",
+        "is_dir": False,
+        "size": 3,
+    }
+
+
+def test_list_subdirectory(server):
+    nested = server.files_dir / "config" / "calibrations"
+    nested.mkdir(parents=True)
+    (nested / "camera.json").write_text("{}")
+
+    resp = requests.get(server_url(server) + "/list?path=config%2Fcalibrations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "config/calibrations"
+    assert data["entries"] == [
+        {
+            "name": "camera.json",
+            "path": "config/calibrations/camera.json",
+            "is_dir": False,
+            "size": 2,
+        }
+    ]
+
+
+def test_list_missing_directory(server):
+    resp = requests.get(server_url(server) + "/list?path=does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_list_file_is_not_directory(server):
+    (server.files_dir / "file.txt").write_bytes(b"data")
+    resp = requests.get(server_url(server) + "/list?path=file.txt")
+    assert resp.status_code == 400
+
+
+def test_list_path_traversal(server):
+    resp = requests.get(server_url(server) + "/list?path=..%2F..")
+    assert resp.status_code == 403
+
+
+# -------------------------
 # PUT atomic write
 # -------------------------
 def test_put_atomic_write(server):
@@ -206,3 +311,90 @@ def test_put_atomic_write(server):
     resp = requests.put(url, data=b"new content")
     assert resp.status_code == 200
     assert saved_file.read_bytes() == b"new content"
+
+
+def test_put_percent_encoded_filename(server):
+    url = server_url(server) + "/file%20with%20space.txt"
+    resp = requests.put(url, data=b"spaced")
+    assert resp.status_code == 200
+
+    saved_file = server.files_dir / "file with space.txt"
+    assert saved_file.exists()
+    assert saved_file.read_bytes() == b"spaced"
+
+
+# -------------------------
+# File preview
+# -------------------------
+def test_read_text_file(server):
+    target = server.files_dir / "config" / "targets.json"
+    target.parent.mkdir()
+    target.write_text('{"targets": []}')
+
+    resp = requests.get(server_url(server) + "/read?path=config%2Ftargets.json")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "config/targets.json"
+    assert data["name"] == "targets.json"
+    assert data["size"] == len('{"targets": []}')
+    assert data["is_text"] is True
+    assert data["content"] == '{"targets": []}'
+    assert data["truncated"] is False
+    assert data["max_bytes"] == PREVIEW_MAX_BYTES
+
+
+def test_read_binary_file(server):
+    target = server.files_dir / "image.png"
+    target.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00binary")
+
+    resp = requests.get(server_url(server) + "/read?path=image.png")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_text"] is False
+    assert data["content"] is None
+    assert data["truncated"] is False
+
+
+def test_read_invalid_utf8_file(server):
+    target = server.files_dir / "invalid.bin"
+    target.write_bytes(b"\xff\xfe\xfd")
+
+    resp = requests.get(server_url(server) + "/read?path=invalid.bin")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_text"] is False
+    assert data["content"] is None
+
+
+def test_read_truncates_large_file(server):
+    target = server.files_dir / "large.txt"
+    target.write_bytes(b"a" * (PREVIEW_MAX_BYTES + 100))
+
+    resp = requests.get(server_url(server) + "/read?path=large.txt")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_text"] is True
+    assert data["truncated"] is True
+    assert len(data["content"]) == PREVIEW_MAX_BYTES
+    assert data["size"] == PREVIEW_MAX_BYTES + 100
+
+
+def test_read_missing_path(server):
+    resp = requests.get(server_url(server) + "/read")
+    assert resp.status_code == 400
+
+
+def test_read_missing_file(server):
+    resp = requests.get(server_url(server) + "/read?path=missing.txt")
+    assert resp.status_code == 404
+
+
+def test_read_directory_is_not_file(server):
+    (server.files_dir / "config").mkdir()
+    resp = requests.get(server_url(server) + "/read?path=config")
+    assert resp.status_code == 400
+
+
+def test_read_path_traversal(server):
+    resp = requests.get(server_url(server) + "/read?path=..%2F..%2Fetc%2Fpasswd")
+    assert resp.status_code == 403

@@ -112,6 +112,10 @@ class Platform(Enum):
         )
 
     @classmethod
+    def getThreadCount(cls) -> int:
+        return psutil.cpu_count(logical=True) or 1
+
+    @classmethod
     def getNativeLibraryFolderName(cls) -> str:
         return Platform.getCurrentPlatform().__nativeLibraryFolderName
 
@@ -271,9 +275,22 @@ class ShellExec:
 
 
 class MetricsManager:
-    def __init__(self):
+    """Collect hardware metrics without blocking the calling thread.
+
+    ``psutil.cpu_percent(interval=None)`` reports the usage since the previous
+    call, so it must be sampled on a predictable cadence. Samples that arrive
+    before ``cpuSampleInterval`` has elapsed reuse the last value instead of
+    asking psutil for a meaningless short-interval reading.
+    """
+
+    DEFAULT_CPU_SAMPLE_INTERVAL: Final[float] = 1.0
+
+    def __init__(self, cpuSampleInterval: float = DEFAULT_CPU_SAMPLE_INTERVAL):
         self.cpuMemSave: Optional[int] = None
         self.gpuMemSave: Optional[int] = None
+        self._cpuSampleInterval = cpuSampleInterval
+        self._lastCpuSampleTime: Optional[float] = None
+        self._lastCpuUtilization = 0.0
 
     def getMemory(self) -> int:
         if self.cpuMemSave is None:
@@ -283,8 +300,36 @@ class MetricsManager:
     def getUsedRam(self) -> int:
         return psutil.virtual_memory().used // (1024 * 1024)
 
+    def sampleCpuUtilization(self, now: Optional[float] = None) -> float:
+        """Return CPU usage since the last sample without blocking.
+
+        Args:
+            now: Monotonic timestamp for this sample. Callers with a scheduled
+                cycle can pass their cycle start so sampling stays on cadence.
+        """
+        sampleTime = time.monotonic() if now is None else now
+        previousTime = self._lastCpuSampleTime
+
+        if (
+            previousTime is not None
+            and (sampleTime - previousTime) < self._cpuSampleInterval
+        ):
+            return self._lastCpuUtilization
+
+        reading = float(psutil.cpu_percent(interval=None))
+        self._lastCpuSampleTime = sampleTime
+
+        if previousTime is None:
+            # The first psutil reading has no previous snapshot to compare to.
+            self._lastCpuUtilization = 0.0
+        else:
+            self._lastCpuUtilization = reading
+
+        return self._lastCpuUtilization
+
     def getCpuUtilization(self) -> float:
-        return psutil.cpu_percent(interval=0.5)
+        """Return the latest non-blocking CPU utilization reading."""
+        return self.sampleCpuUtilization()
 
     def getUptime(self) -> float:
         return time.time() - psutil.boot_time()

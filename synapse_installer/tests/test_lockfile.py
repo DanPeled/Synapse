@@ -8,11 +8,16 @@ import json
 from pathlib import Path
 
 import pytest
-from synapse_installer.lockfile import (LOCK_FILE, OUTPUT_ZIP,
-                                        calculateFileHashesFromPaths,
-                                        createDirectoryZIP, getFileHash,
-                                        loadExistingHashes, saveHashes,
-                                        zipFiles)
+from synapse_installer.lockfile import (
+    LOCK_FILE,
+    OUTPUT_ZIP,
+    calculateFileHashesFromPaths,
+    createDirectoryZIP,
+    getFileHash,
+    loadExistingHashes,
+    saveHashes,
+    zipFiles,
+)
 
 
 def create_temp_file_with_content(tmp_path, name: str, content: bytes):

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { ConstraintTypeProto } from "@/generated/settings/v1/constraint_type";
 import { SettingMetaProto } from "@/generated/settings/v1/settings";
 import { SettingValueProto } from "@/generated/settings/v1/value";
@@ -14,17 +15,18 @@ import { RefreshCcw } from "lucide-react";
 import assert from "assert";
 import { hasSettingValue } from "./backend/backendContext";
 import { PipelineProto } from "@/generated/messages/v1/pipeline";
-import { PipelineID } from "./backend/dataStractures";
-import { FileDropzone } from "@/widgets/file_upload";
+import {
+  CameraPipelinesMap,
+  CameraPipelinesSetter,
+} from "./backend/dataStractures";
+import { patchCameraPipelinesSetting } from "./backend/stateBatching";
+import { createSettingSendThrottle } from "./settingThrottle";
+import { FileSettingControl } from "@/widgets/fileSetting";
+import { RangeSlider } from "@/widgets/range";
+import { ListSettingControl } from "@/widgets/listSetting";
+import { ValueTypeProto } from "@/generated/settings/v1/value_type";
 
-export function generateControlFromSettingMeta({
-  setting,
-  selectedPipeline,
-  pipelines,
-  setPipelines,
-  setSetting,
-  locked,
-}: {
+interface GeneratedSettingControlProps {
   setting: SettingMetaProto;
   selectedPipeline?: PipelineProto;
   setSetting: (
@@ -32,41 +34,57 @@ export function generateControlFromSettingMeta({
     setting: string,
     pipeline: PipelineProto,
   ) => void;
-  setPipelines: (val: Map<PipelineID, PipelineProto>) => void;
-  pipelines: Map<number, PipelineProto>;
+  setPipelines: CameraPipelinesSetter;
+  pipelines: CameraPipelinesMap;
   locked: boolean;
-}) {
+}
+
+function GeneratedSettingControl({
+  setting,
+  selectedPipeline,
+  setPipelines,
+  setSetting,
+  locked,
+}: GeneratedSettingControlProps) {
+  const setSettingRef = useRef(setSetting);
+  setSettingRef.current = setSetting;
+  const selectedPipelineRef = useRef(selectedPipeline);
+  selectedPipelineRef.current = selectedPipeline;
+
+  const throttleRef = useRef<ReturnType<
+    typeof createSettingSendThrottle
+  > | null>(null);
+  let throttle = throttleRef.current;
+  if (throttle === null) {
+    throttle = createSettingSendThrottle((pending) => {
+      setSettingRef.current(pending.value, pending.setting, pending.pipeline!);
+    });
+    throttleRef.current = throttle;
+  }
+
+  // Make sure the last value of a drag reaches the backend on unmount.
+  useEffect(() => () => throttle?.flush(), []);
+
+  const setValue = (val: SettingValueProto) => {
+    if (!hasSettingValue(val)) return;
+
+    const pipeline = selectedPipelineRef.current;
+    if (pipeline) {
+      setPipelines((prev) =>
+        patchCameraPipelinesSetting(prev, pipeline, setting.name, val),
+      );
+    }
+    throttle.enqueue({
+      value: val,
+      setting: setting.name,
+      pipeline,
+    });
+  };
+
   return (
     <GenerateControl
-      key={setting.name + setting.category}
       setting={setting}
-      setValue={(val) => {
-        if (hasSettingValue(val)) {
-          setTimeout(() => {
-            if (selectedPipeline !== undefined) {
-              const oldPipelines = pipelines;
-
-              const newSettingsValues = {
-                ...selectedPipeline.settingsValues,
-                [setting.name]: val,
-              };
-
-              const updatedPipeline = {
-                ...selectedPipeline,
-                settingsValues: newSettingsValues,
-              };
-
-              const newPipelines = new Map(oldPipelines);
-              newPipelines.set(selectedPipeline.index, updatedPipeline);
-              setPipelines(newPipelines);
-            }
-          }, 0);
-
-          setTimeout(() => {
-            setSetting(val, setting.name, selectedPipeline!);
-          }, 0);
-        }
-      }}
+      setValue={setValue}
       value={
         selectedPipeline?.settingsValues[setting.name] ??
         setting.default ??
@@ -74,6 +92,19 @@ export function generateControlFromSettingMeta({
       }
       defaultValue={setting.default}
       locked={locked}
+    />
+  );
+}
+
+export function generateControlFromSettingMeta({
+  setting,
+  ...props
+}: GeneratedSettingControlProps) {
+  return (
+    <GeneratedSettingControl
+      key={setting.name + setting.category}
+      setting={setting}
+      {...props}
     />
   );
 }
@@ -95,12 +126,29 @@ export function toNumber(val: unknown | undefined): number | undefined {
 export function protoToSettingValue(proto: SettingValueProto): unknown {
   if (proto === undefined) return undefined;
 
+  switch (proto.arrayType) {
+    case ValueTypeProto.VALUE_TYPE_PROTO_INT:
+      return proto.intArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_STRING:
+      return proto.stringArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_BOOL:
+      return proto.boolArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_FLOAT:
+      return proto.floatArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_BYTES:
+      return proto.bytesArrayValue;
+    case ValueTypeProto.VALUE_TYPE_PROTO_LIST:
+      // LIST marks an empty list whose item type is unknown.
+      return [];
+  }
+
   if (proto.intValue !== undefined) return proto.intValue;
   if (proto.stringValue !== undefined) return proto.stringValue;
   if (proto.boolValue !== undefined) return proto.boolValue;
   if (proto.floatValue !== undefined) return proto.floatValue;
   if (proto.bytesValue !== undefined && proto.bytesValue.length > 0)
     return proto.bytesValue;
+  // Fall back to arrays from older senders that do not set arrayType.
   if (proto.intArrayValue.length > 0) return proto.intArrayValue;
   if (proto.stringArrayValue.length > 0) return proto.stringArrayValue;
   if (proto.boolArrayValue.length > 0) return proto.boolArrayValue;
@@ -134,33 +182,73 @@ function ResetToDefaultButton({
   ) : null;
 }
 
-export function settingValueToProto(val: unknown): SettingValueProto {
+export function settingValueToProto(
+  val: unknown,
+  itemType: ValueTypeProto = ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED,
+): SettingValueProto {
   const proto = SettingValueProto.create();
 
-  if (typeof val === "number" && Number.isInteger(val)) {
+  if (typeof val === "boolean") {
+    proto.boolValue = val;
+  } else if (typeof val === "number" && Number.isInteger(val)) {
     proto.intValue = val;
   } else if (typeof val === "number") {
     proto.floatValue = val;
   } else if (typeof val === "string") {
     proto.stringValue = val;
-  } else if (typeof val === "boolean") {
-    proto.boolValue = val;
   } else if (val instanceof Uint8Array) {
     proto.bytesValue = val;
   } else if (Array.isArray(val)) {
-    if (val.every((v) => typeof v === "number" && Number.isInteger(v))) {
-      proto.intArrayValue = val as number[];
-    } else if (val.every((v) => typeof v === "number")) {
-      proto.floatArrayValue = val as number[];
-    } else if (val.every((v) => typeof v === "string")) {
-      proto.stringArrayValue = val as string[];
-    } else if (val.every((v) => typeof v === "boolean")) {
-      proto.boolArrayValue = val as boolean[];
-    } else if (val.every((v) => v instanceof Uint8Array)) {
-      proto.bytesArrayValue = val as Uint8Array[];
-    } else {
-      throw new TypeError("Unsupported array element type");
+    let resolvedType = itemType;
+    if (resolvedType === ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED) {
+      if (val.every((v) => typeof v === "boolean")) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_BOOL;
+      } else if (
+        val.every((v) => typeof v === "number" && Number.isInteger(v))
+      ) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_INT;
+      } else if (val.every((v) => typeof v === "number")) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_FLOAT;
+      } else if (val.every((v) => typeof v === "string")) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_STRING;
+      } else if (val.every((v) => v instanceof Uint8Array)) {
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_BYTES;
+      } else if (val.length > 0) {
+        throw new TypeError("Unsupported array element type");
+      } else {
+        // An empty array with no item type still needs a marker so it does
+        // not look like an unset value on the wire.
+        resolvedType = ValueTypeProto.VALUE_TYPE_PROTO_LIST;
+      }
     }
+
+    switch (resolvedType) {
+      case ValueTypeProto.VALUE_TYPE_PROTO_INT:
+        proto.intArrayValue = val as number[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_FLOAT:
+        proto.floatArrayValue = val as number[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_STRING:
+        proto.stringArrayValue = val as string[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_BOOL:
+        proto.boolArrayValue = val as boolean[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_BYTES:
+        proto.bytesArrayValue = val as Uint8Array[];
+        break;
+      case ValueTypeProto.VALUE_TYPE_PROTO_LIST:
+        if (val.length > 0) {
+          throw new TypeError("Nested arrays are not supported");
+        }
+        break;
+      default:
+        throw new TypeError("Unsupported array element type");
+    }
+
+    // arrayType marks the value as an array so empty lists survive the wire.
+    proto.arrayType = resolvedType;
   } else {
     throw new TypeError("Unsupported setting value type");
   }
@@ -231,6 +319,27 @@ export function GenerateControl({
         </LabeledControl>
       );
     }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_RANGE:
+      const arr = val as number[];
+      const tuple = arr as [number, number];
+      return (
+        <LabeledControl label={settingName}>
+          <RangeSlider
+            step={setting.constraint.constraint?.range?.step ?? 1}
+            value={tuple}
+            onChange={([l, u]) => {
+              setValue(SettingValueProto.create({ floatArrayValue: [l, u] }));
+            }}
+            min={setting.constraint.constraint?.range?.min}
+            max={setting.constraint.constraint?.range?.max}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+            disabled={locked}
+          />
+        </LabeledControl>
+      );
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_NUMBER:
       if (setting.constraint.constraint?.numeric?.max) {
         return (
@@ -273,17 +382,23 @@ export function GenerateControl({
         );
       }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_FILE: {
-      // TODO: Future feature
-      // return (
-      //   <LabeledControl label={settingName}>
-      //     <FileDropzone
-      //       onChangeAction={(f) => {}}
-      //       value={[File(val)]}
-      //       className="pl-10"
-      //       maxFiles={1}
-      //     />
-      //   </LabeledControl>
-      // );
+      const fileConstraint = setting.constraint.constraint?.file;
+      return (
+        <LabeledControl label={settingName}>
+          <FileSettingControl
+            value={typeof val === "string" ? val : ""}
+            onChange={(path) => setValue(settingValueToProto(path))}
+            basePath={fileConstraint?.path ?? ""}
+            fileTypes={fileConstraint?.fileTypes ?? []}
+            disabled={locked}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+            disabled={locked}
+          />
+        </LabeledControl>
+      );
     }
     case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_ENUMERATED: {
       const options =
@@ -328,6 +443,33 @@ export function GenerateControl({
             options={sortedOptions as DropdownOption<string>[]}
             value={val}
             onValueChange={(val) => setValue(settingValueToProto(val))}
+            disabled={locked}
+          />
+          <ResetToDefaultButton
+            defaultValue={defaultValue}
+            setValue={setValue}
+            disabled={locked}
+          />
+        </LabeledControl>
+      );
+    }
+    case ConstraintTypeProto.CONSTRAINT_TYPE_PROTO_LIST: {
+      const listConstraint = setting.constraint.constraint?.list;
+      const depth = listConstraint?.depth ?? 1;
+      if (depth > 1) {
+        // Nested list values cannot be represented by SettingValueProto yet.
+        return null;
+      }
+      const itemType =
+        listConstraint?.itemType ?? ValueTypeProto.VALUE_TYPE_PROTO_UNSPECIFIED;
+      return (
+        <LabeledControl label={settingName}>
+          <ListSettingControl
+            value={Array.isArray(val) ? val : []}
+            itemType={itemType}
+            onChange={(values) =>
+              setValue(settingValueToProto(values, itemType))
+            }
             disabled={locked}
           />
           <ResetToDefaultButton

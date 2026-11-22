@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from cv2 import Mat
 from numpy import ndarray
@@ -32,6 +32,12 @@ PipelineName = str
 PipelineTypeName = str
 
 Resolution = Tuple[int, int]
+
+
+Size = Tuple[int, int]
+PropName = str
+PropertyMetaDict = Dict[PropName, Dict[str, Union[int, float]]]
+ResolutionString = str
 
 RecordingFilename = str
 RecordingStatus = bool

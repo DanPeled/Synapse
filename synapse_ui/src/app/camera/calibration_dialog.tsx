@@ -19,7 +19,7 @@ import {
   hasSettingValue,
   useBackendContext,
 } from "@/services/backend/backendContext";
-import { PipelineID } from "@/services/backend/dataStractures";
+import { CameraPipelinesSetter } from "@/services/backend/dataStractures";
 import { generateControlFromSettingMeta } from "@/services/controls_generator";
 import { baseCardColor, teamColor } from "@/services/style";
 import { WebSocketWrapper } from "@/services/websocket";
@@ -179,17 +179,18 @@ export function CalibrationDialog({
     }
   }
 
-  function setPipelinesOfSelectedCamera(
-    newpipelines: Map<PipelineID, PipelineProto>,
-  ) {
-    if (camera !== undefined) {
-      setPipelines((prev) => {
-        const copy = new Map(prev);
-        copy.set(camera?.index ?? 0, newpipelines);
-        return copy;
-      });
-    }
-  }
+  const setPipelinesOfSelectedCamera: CameraPipelinesSetter = (update) => {
+    if (camera === undefined) return;
+    setPipelines((prev) => {
+      const current = prev.get(camera.index) ?? new Map();
+      const next = typeof update === "function" ? update(current) : update;
+      if (next === current) return prev;
+
+      const copy = new Map(prev);
+      copy.set(camera.index, next);
+      return copy;
+    });
+  };
 
   function generateControls() {
     if (!selectedPipelineType || !connection.backend) {
@@ -330,10 +331,10 @@ export function CalibrationDialog({
       </Row>
 
       <Row className="mt-4 w-full" gap="gap-2" style={{ color: teamColor }}>
-        <Column className="flex-1" style={{ color: teamColor }}>
+        <Column className="flex-1 min-h-0" style={{ color: teamColor }}>
           <Tabs
             defaultValue="input"
-            className="w-full"
+            className="w-full h-[75vh]"
             style={{ color: teamColor }}
           >
             <TabsList
@@ -363,7 +364,10 @@ export function CalibrationDialog({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="input" className="p-6 space-y-6">
+            <TabsContent
+              value="input"
+              className="flex-1 min-h-0 overflow-y-auto p-6 h-full"
+            >
               <div style={{ color: teamColor }}>
                 {cameraControls.length > 0 ? (
                   <div className="space-y-2">{cameraControls}</div>
@@ -394,16 +398,6 @@ export function CalibrationDialog({
                 )}
               </div>
             </TabsContent>
-
-            {/* <TabsContent value="output" className="p-6"> */}
-            {/*   <div className="text-center" style={{ color: teamColor }}> */}
-            {/*     <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" /> */}
-            {/*     <p className="select-none">Output Configuration</p> */}
-            {/*     <p className="text-sm select-none"> */}
-            {/*       Configure output streams and data */}
-            {/*     </p> */}
-            {/*   </div> */}
-            {/* </TabsContent> */}
           </Tabs>
         </Column>
 

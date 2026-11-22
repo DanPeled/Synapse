@@ -3,10 +3,25 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from synapse.core.settings_api import (BooleanConstraint, ColorConstraint,
-                                       ColorFormat, ConstraintTypeProto,
-                                       EnumeratedConstraint, ListConstraint,
-                                       NumberConstraint, StringConstraint)
+from pathlib import Path
+
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    ColorConstraint,
+    ColorFormat,
+    ConstraintTypeProto,
+    EnumeratedConstraint,
+    FileConstraint,
+    ListConstraint,
+    NumberConstraint,
+    PipelineSettings,
+    StringConstraint,
+    ValueTypeProto,
+    protoToSettingValue,
+    settingField,
+    settingToProto,
+    settingValueToProto,
+)
 
 
 # ------------------ NumberConstraint ------------------
@@ -195,7 +210,7 @@ def test_list_constraint_too_long():
     assert not result.isValid
 
 
-def test_list_constraint_with_itemConstraint():
+def test_list_constraint_untyped_accepts_any_values():
     c = ListConstraint()
     result = c.validate([5, 8])
     assert result.isValid
@@ -227,6 +242,123 @@ def test_list_constraint_invalid_nested_depth_3_structure():
     assert not result.isValid
     assert result.errorMessage is not None
     assert "depth" in result.errorMessage
+
+
+def test_list_constraint_int_items():
+    c = ListConstraint(itemType=int)
+    result = c.validate([1, 2, 3])
+    assert result.isValid
+    assert result.normalizedValue == [1, 2, 3]
+
+
+def test_list_constraint_int_items_rejects_other_types():
+    c = ListConstraint(itemType=int)
+    for value in ([1, "2"], [1, 2.5], [True]):
+        result = c.validate(value)
+        assert not result.isValid
+
+
+def test_list_constraint_int_items_normalizes_integral_floats():
+    c = ListConstraint(itemType=int)
+    result = c.validate([1.0, 2.0])
+    assert result.isValid
+    assert result.normalizedValue == [1, 2]
+    assert result.normalizedValue is not None
+    assert all(isinstance(value, int) for value in result.normalizedValue)
+
+
+def test_list_constraint_float_items():
+    c = ListConstraint(itemType=float)
+    result = c.validate([1, 2.5])
+    assert result.isValid
+    assert result.normalizedValue == [1.0, 2.5]
+
+
+def test_list_constraint_string_items():
+    c = ListConstraint(itemType=str)
+    result = c.validate(["alpha", "beta"])
+    assert result.isValid
+    assert not c.validate(["alpha", 2]).isValid
+
+
+def test_list_constraint_bool_items():
+    c = ListConstraint(itemType=bool)
+    result = c.validate([True, "false", 0, "on"])
+    assert result.isValid
+    assert result.normalizedValue == [True, False, False, True]
+
+
+def test_list_constraint_typed_nested_depth():
+    c = ListConstraint(itemType=int, depth=2)
+    assert c.validate([[1, 2], [3]]).isValid
+    assert not c.validate([[1, "two"]]).isValid
+
+
+def test_list_constraint_serialization():
+    c = ListConstraint(itemType=int, minLength=1, maxLength=5, depth=2)
+
+    data = c.toDict()
+    assert data["type"] == ConstraintTypeProto.LIST
+    assert data["itemType"] == ValueTypeProto.INT.value
+    assert data["depth"] == 2
+
+    proto = c.configToProto()
+    assert proto.list is not None
+    assert proto.list.item_type == ValueTypeProto.INT
+    assert proto.list.depth == 2
+
+
+def test_setting_value_to_proto_typed_empty_list():
+    proto = settingValueToProto([], itemType=ValueTypeProto.INT)
+    assert proto.array_type == ValueTypeProto.INT
+    assert list(proto.int_array_value) == []
+
+    assert protoToSettingValue(proto) == []
+
+
+def test_setting_value_to_proto_empty_untyped_list():
+    proto = settingValueToProto([])
+    assert proto.array_type == ValueTypeProto.LIST
+    assert protoToSettingValue(proto) == []
+
+
+def test_setting_value_to_proto_rejects_nested_lists():
+    try:
+        settingValueToProto([[1, 2], [3, 4]])
+    except TypeError as error:
+        assert "Nested lists" in str(error)
+    else:
+        raise AssertionError("Nested lists should not be serializable")
+
+
+def test_setting_value_to_proto_infers_list_type():
+    proto = settingValueToProto([1, 2, 3])
+    assert proto.array_type == ValueTypeProto.INT
+
+    boolProto = settingValueToProto([True, False])
+    assert boolProto.array_type == ValueTypeProto.BOOL
+    assert list(boolProto.bool_array_value) == [True, False]
+
+    floatProto = settingValueToProto([1, 2.5])
+    assert floatProto.array_type == ValueTypeProto.FLOAT
+    assert list(floatProto.float_array_value) == [1.0, 2.5]
+
+
+def test_proto_to_setting_value_supports_legacy_arrays():
+    legacy = settingValueToProto([1, 2, 3])
+    legacy.array_type = ValueTypeProto.UNSPECIFIED
+    assert protoToSettingValue(legacy) == [1, 2, 3]
+
+
+class _ListSettings(PipelineSettings):
+    ids = settingField(ListConstraint(itemType=int), default=[])
+
+
+def test_setting_to_proto_preserves_empty_typed_list():
+    meta = settingToProto(_ListSettings.ids, "<Test/> Test")
+    assert meta.default is not None
+    assert meta.default.array_type == ValueTypeProto.INT
+    assert protoToSettingValue(meta.default) == []
 
 
 # ------------------ StringConstraint ------------------
@@ -275,3 +407,147 @@ def test_boolean_constraint_invalid():
     c = BooleanConstraint()
     result = c.validate("maybe")
     assert not result.isValid
+
+
+# ------------------ FileConstraint ------------------
+def _useFileRoot(monkeypatch, root: Path) -> None:
+    monkeypatch.setattr(
+        "synapse.core.settings_api._getSettingsRoot", lambda: root.resolve()
+    )
+
+
+def test_file_constraint_valid_relative_path(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "file.json").write_text("{}")
+
+    c = FileConstraint(path="config", fileTypes=["json"])
+    result = c.validate("config/file.json")
+
+    assert result.isValid
+    assert result.normalizedValue == "config/file.json"
+
+
+def test_file_constraint_normalizes_absolute_path(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    target = tmp_path / "config" / "file.json"
+    target.parent.mkdir()
+    target.write_text("{}")
+
+    c = FileConstraint(fileTypes={".JSON"})
+    result = c.validate(target)
+
+    assert result.isValid
+    assert result.normalizedValue == "config/file.json"
+
+
+def test_file_constraint_allows_empty_and_none_values(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    c = FileConstraint()
+
+    empty_result = c.validate("")
+    assert empty_result.isValid
+    assert empty_result.normalizedValue == ""
+
+    none_result = c.validate(None)
+    assert none_result.isValid
+    assert none_result.normalizedValue == ""
+
+
+def test_file_constraint_rejects_missing_file(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    c = FileConstraint()
+    result = c.validate("config/missing.json")
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "does not exist" in result.errorMessage
+
+
+def test_file_constraint_rejects_directory(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    (tmp_path / "config").mkdir()
+    c = FileConstraint()
+    result = c.validate("config")
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "file" in result.errorMessage
+
+
+def test_file_constraint_rejects_outside_project_root(tmp_path: Path, monkeypatch):
+    root = tmp_path / "project"
+    root.mkdir()
+    _useFileRoot(monkeypatch, root)
+    outside = tmp_path / "outside.json"
+    outside.write_text("{}")
+
+    c = FileConstraint()
+    result = c.validate(outside)
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert "project" in result.errorMessage
+
+
+def test_file_constraint_rejects_wrong_file_type(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    (tmp_path / "file.txt").write_text("data")
+
+    c = FileConstraint(fileTypes=["json"])
+    result = c.validate("file.txt")
+
+    assert not result.isValid
+    assert result.errorMessage is not None
+    assert ".json" in result.errorMessage
+
+
+def test_file_constraint_serialization(tmp_path: Path, monkeypatch):
+    c = FileConstraint(path="config/files", fileTypes=["json", ".yaml"])
+
+    data = c.toDict()
+    assert data["type"] == ConstraintTypeProto.FILE
+    assert data["path"] == "config/files"
+    assert data["file_types"] == [".json", ".yaml"]
+
+    restored = FileConstraint.fromDict(data)
+    assert restored.path == c.path
+    assert restored.fileTypes == c.fileTypes
+
+    proto = c.configToProto()
+    assert proto.file is not None
+    assert proto.file.path == "config/files"
+    assert proto.file.file_types == [".json", ".yaml"]
+
+
+def test_setting_value_to_proto_path(tmp_path: Path):
+    proto = settingValueToProto(tmp_path / "config" / "file.json")
+    assert proto.string_value == (tmp_path / "config" / "file.json").as_posix()
+
+
+# ------------------ Loading settings ------------------
+class _LoadedSettings(PipelineSettings):
+    x = settingField(NumberConstraint(0, 10), default=5)
+    file = settingField(FileConstraint(fileTypes=["json"]), default="")
+
+
+def test_loaded_settings_values_are_applied(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+    target = tmp_path / "config" / "file.json"
+    target.parent.mkdir()
+    target.write_text("{}")
+
+    settings = _LoadedSettings({"x": 8, "file": "config/file.json"})
+
+    assert settings.getSetting("x") == 8.0
+    assert settings.getSetting("file") == "config/file.json"
+
+
+def test_invalid_loaded_setting_keeps_default(tmp_path: Path, monkeypatch):
+    _useFileRoot(monkeypatch, tmp_path)
+
+    settings = _LoadedSettings({"x": 99, "file": "config/missing.json"})
+
+    assert settings.getSetting("x") == 5
+    assert settings.getSetting("file") == ""

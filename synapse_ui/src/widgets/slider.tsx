@@ -113,7 +113,7 @@ export function Slider({
         >
           <span className="select-none">&minus;</span>
         </Button>
-
+        <p className="italic">{min}</p>
         <input
           type="range"
           min={min}
@@ -138,6 +138,7 @@ export function Slider({
             } as React.CSSProperties & Record<string, string>
           }
         />
+        <p className="italic">{max}</p>
 
         <Button
           variant="outline"

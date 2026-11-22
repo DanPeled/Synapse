@@ -5,15 +5,17 @@ on:
     branches: [main]
     paths:
       - "examples/**"
+      - "versions.properties"
   pull_request:
     paths:
       - "examples/**"
+      - "versions.properties"
 
 jobs:
   build_robot_example:
     name: Build Robot - ${{ matrix.example }}
     runs-on: ubuntu-22.04
-    container: wpilib/roborio-cross-ubuntu:2025-22.04
+    container: wpilib/systemcore-cross-ubuntu:2027-24.04
     strategy:
       matrix:
         example: [aimAtTarget]
@@ -27,7 +29,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
           cache: gradle
 
       - name: Grant execute permission for gradlew
@@ -44,7 +46,7 @@ jobs:
 
   build_synapse:
     name: "Build Synapse Processor - ${{ matrix.example }}"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         example: [synapseproject, bullseye_project]
@@ -61,7 +63,7 @@ jobs:
         run: pip install .
 
       - name: Install tools
-        run: pip install pyright ruff
+        run: pip install pyright ruff==0.15.20
 
       - name: Type-check Synapse project
         working-directory: examples/${{ matrix.example }}

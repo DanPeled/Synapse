@@ -1,0 +1,58 @@
+{
+  "name": "2026 Field",
+  "isFTC": false,
+  "coordinateSystem": "wall-blue",
+  "rotations": [
+    {
+      "axis": "x",
+      "degrees": 90
+    }
+  ],
+  "widthInches": 651.220,
+  "heightInches": 317.677,
+  "driverStations": [
+    [8.2775425, -3.07975],
+    [8.2775425, -1.25095],
+    [8.2775425, 1.8288],
+    [-8.2775425, 3.07975],
+    [-8.2775425, 1.25095],
+    [-8.2775425, -1.8288]
+  ],
+  "aprilTags": [
+    {"variant": "36h11-6.5in", "id": 1, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-3.607, -3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 2, "rotations": [{"axis": "z", "degrees": 270.0}], "position": [-3.645, -0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 3, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-3.041, -0.356, 1.124]},
+    {"variant": "36h11-6.5in", "id": 4, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-3.041, -0.0, 1.124]},
+    {"variant": "36h11-6.5in", "id": 5, "rotations": [{"axis": "z", "degrees": 90.0}], "position": [-3.645, 0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 6, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-3.607, 3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 7, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [-3.683, 3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 8, "rotations": [{"axis": "z", "degrees": 90.0}], "position": [-4.001, 0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 9, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [-4.249, 0.355, 1.124]},
+    {"variant": "36h11-6.5in", "id": 10, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [-4.249, -0.0, 1.124]},
+    {"variant": "36h11-6.5in", "id": 11, "rotations": [{"axis": "z", "degrees": 270.0}], "position": [-4.001, -0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 12, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [-3.683, -3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 13, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-8.262, -3.369, 0.552]},
+    {"variant": "36h11-6.5in", "id": 14, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-8.262, -2.937, 0.552]},
+    {"variant": "36h11-6.5in", "id": 15, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-8.262, -0.289, 0.552]},
+    {"variant": "36h11-6.5in", "id": 16, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [-8.262, 0.143, 0.552]},
+    {"variant": "36h11-6.5in", "id": 17, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [3.607, 3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 18, "rotations": [{"axis": "z", "degrees": 90.0}], "position": [3.645, 0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 19, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [3.041, 0.355, 1.124]},
+    {"variant": "36h11-6.5in", "id": 20, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [3.041, -0.0, 1.124]},
+    {"variant": "36h11-6.5in", "id": 21, "rotations": [{"axis": "z", "degrees": 270.0}], "position": [3.645, -0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 22, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [3.607, -3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 23, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [3.683, -3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 24, "rotations": [{"axis": "z", "degrees": 270.0}], "position": [4.0, -0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 25, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [4.249, -0.356, 1.124]},
+    {"variant": "36h11-6.5in", "id": 26, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [4.249, -0.0, 1.124]},
+    {"variant": "36h11-6.5in", "id": 27, "rotations": [{"axis": "z", "degrees": 90.0}], "position": [4.0, 0.604, 1.124]},
+    {"variant": "36h11-6.5in", "id": 28, "rotations": [{"axis": "z", "degrees": 0.0}], "position": [3.683, 3.39, 0.889]},
+    {"variant": "36h11-6.5in", "id": 29, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [8.262, 3.369, 0.552]},
+    {"variant": "36h11-6.5in", "id": 30, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [8.262, 2.937, 0.552]},
+    {"variant": "36h11-6.5in", "id": 31, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [8.262, 0.289, 0.552]},
+    {"variant": "36h11-6.5in", "id": 32, "rotations": [{"axis": "z", "degrees": 180.0}], "position": [8.262, -0.143, 0.552]}
+  ],
+  "gamePieces": [
+    {"name": "Fuel", "rotations": [], "position": [0, 0, 0], "stagedObjects": []}
+  ]
+}

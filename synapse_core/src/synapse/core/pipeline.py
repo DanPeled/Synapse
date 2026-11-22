@@ -6,23 +6,44 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import (Any, Callable, Dict, Generic, Iterable, List, Optional,
-                    Type, TypeVar, Union, overload)
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from ntcore import GenericPublisher, NetworkTable, Value
-from synapse_net.generated.messages.v1 import (MessageTypeProto, PipelineProto,
-                                               PipelineResultProto)
+from synapse_net.generated.messages.v1 import (
+    MessageTypeProto,
+    PipelineProto,
+    PipelineResultProto,
+)
 from synapse_net.socketServer import WebSocketServer
 
 from ..log import createMessage, err, warn
 from ..stypes import CameraID, Frame, PipelineID, Resolution
-from .camera_factory import SynapseCamera
+from .camera.synapse_camera import SynapseCamera
 from .global_settings import GlobalSettings
-from .results_api import (PipelineResult, parsePipelineResult,
-                          serializePipelineResult)
-from .settings_api import (CameraSettings, PipelineSettings, Setting,
-                           SettingsAPI, SettingsValue, TConstraintType,
-                           TSettingValueType, settingValueToProto)
+from .results_api import PipelineResult, parsePipelineResult, serializePipelineResult
+from .settings_api import (
+    CameraSettings,
+    PipelineSettings,
+    Setting,
+    SettingsAPI,
+    SettingsValue,
+    TConstraintType,
+    TSettingValueType,
+    settingValueToProto,
+)
 
 FrameResult = Optional[Frame]
 
@@ -75,8 +96,8 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     __is_enabled__ = True
     ntTable: Optional[NetworkTable] = None
 
-    _ntDataTable: Optional[NetworkTable]
-    _ntPublishers: Dict[str, GenericPublisher]
+    _ntDataTable: Optional[NetworkTable] = None
+    _ntPublishers: Dict[str, GenericPublisher] = {}
 
     @abstractmethod
     def __init__(self, settings: TSettingsType):
@@ -88,6 +109,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
         self._ntDataTable = None
         self._ntPublishers = {}
+        self._wsCoalesceKeys: Dict[str, tuple[int, int, Hashable]] = {}
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         self.invalidateCachedEntries()
@@ -99,10 +121,22 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     def processFrame(self, img, timestamp: float) -> PipelineProcessFrameResult:
         pass
 
+    def close(self) -> None:
+        """Release resources owned by this pipeline.
+
+        Pipelines that hold native resources should override this method and
+        call ``super().close()`` after releasing them.
+        """
+        self.invalidateCachedEntries()
+
     def invalidateCachedEntries(self) -> None:
         for pub in self._ntPublishers.values():
             try:
-                del pub
+                close = getattr(pub, "close", None)
+                if close is not None:
+                    close()
+                else:
+                    del pub
             except Exception:
                 pass
         self._ntPublishers.clear()
@@ -168,20 +202,55 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         if pub:
             pub.set(_makeNtValue(parsed, isMsgpack=isMsgpack))
 
-        if WebSocketServer.kInstance:
-            WebSocketServer.kInstance.sendToAllSync(
-                createMessage(
-                    MessageTypeProto.SET_PIPELINE_RESULT,
-                    PipelineResultProto(
-                        is_msgpack=isMsgpack,
-                        key=key,
-                        value=settingValueToProto(parsed),
-                        pipeline_index=self.pipelineIndex,
-                    ),
-                )
-            )
+        ws = WebSocketServer.kInstance
+        if ws and ws.hasClients:
+            try:
+                cameraid = max(self.cameraIndex, 0)
+                pipelineIndex = self.pipelineIndex
+                coalesceKey: Hashable
+                cachedKey = self._wsCoalesceKeys.get(key)
+                if (
+                    cachedKey is not None
+                    and cachedKey[0] == cameraid
+                    and cachedKey[1] == pipelineIndex
+                ):
+                    coalesceKey = cachedKey[2]
+                else:
+                    coalesceKey = (
+                        MessageTypeProto.SET_PIPELINE_RESULT,
+                        cameraid,
+                        pipelineIndex,
+                        key,
+                    )
+                    self._wsCoalesceKeys[key] = (cameraid, pipelineIndex, coalesceKey)
+
+                # Build the protobuf only if this value survives coalescing.
+                # Results can be produced much faster than the UI can consume
+                # them; serializing every superseded value would burn CPU without
+                # changing what the UI displays.
+                def buildMessage() -> bytes:
+                    return createMessage(
+                        MessageTypeProto.SET_PIPELINE_RESULT,
+                        PipelineResultProto(
+                            is_msgpack=isMsgpack,
+                            key=key,
+                            value=settingValueToProto(parsed),
+                            pipeline_index=pipelineIndex,
+                            cameraid=cameraid,
+                        ),
+                    )
+
+                ws.sendToAllSync(buildMessage, coalesce_key=coalesceKey)
+            except Exception:
+                pass
 
     def setResults(self, value: TResultType | None) -> None:
+        """Publish the newest result immediately.
+
+        NetworkTables already keeps only the latest value per topic, so every
+        completed result is handed to it as soon as it is available. Adding an
+        application-level interval here would only delay fresh vision data.
+        """
         self.setDataValue(
             ResultsTopicKey,
             serializePipelineResult(value) if value is not None else bytes(),
@@ -328,8 +397,8 @@ def disabled(cls):
 def pipelineToProto(inst: Pipeline, index: int, cameraId: CameraID) -> PipelineProto:
     api: SettingsAPI = inst.settings.getAPI()
     settingsValues = {
-        key: settingValueToProto(api.getValue(key))
-        for key in api.getSettingsSchema().keys()
+        key: setting.valueToProto(api.getValue(key))
+        for key, setting in api.settings.items()
     }
 
     cameraSettings = inst.getCameraSettings()
@@ -337,8 +406,8 @@ def pipelineToProto(inst: Pipeline, index: int, cameraId: CameraID) -> PipelineP
         cameraAPI = cameraSettings.getAPI()
         settingsValues.update(
             {
-                key: settingValueToProto(cameraAPI.getValue(key))
-                for key in cameraAPI.getSettingsSchema().keys()
+                key: setting.valueToProto(cameraAPI.getValue(key))
+                for key, setting in cameraAPI.settings.items()
             }
         )
 

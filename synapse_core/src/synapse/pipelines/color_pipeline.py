@@ -4,14 +4,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 from synapse.core.pipeline import Pipeline, PipelineResult
-from synapse.core.settings_api import (BooleanConstraint, EnumeratedConstraint,
-                                       NumberConstraint, PipelineSettings,
-                                       settingField)
+from synapse.core.settings_api import (
+    BooleanConstraint,
+    EnumeratedConstraint,
+    NumberConstraint,
+    PipelineSettings,
+    RangeConstraint,
+    settingField,
+)
 from synapse.stypes import Frame
 
 
@@ -28,61 +33,47 @@ class ColorDetectSettings(PipelineSettings):
         publish_all_detections: Whether to send all detections or only the main one.
     """
 
-    h_lower = settingField(
-        NumberConstraint(minValue=0, maxValue=179),
-        default=0,
+    h = settingField(
+        RangeConstraint(0, 179),
+        default=[0, 120],
         description="Lower bound for hue (0-179)",
+        category="<Funnel/> Target",
     )
-    s_lower = settingField(
-        NumberConstraint(minValue=0, maxValue=255),
-        default=100,
-        description="Lower bound for saturation (0-255)",
+    s = settingField(
+        RangeConstraint(0, 255),
+        default=[0, 100],
+        category="<Funnel/> Target",
     )
-    v_lower = settingField(
-        NumberConstraint(minValue=0, maxValue=255),
-        default=100,
-        description="Lower bound for value (0-255)",
+    v = settingField(
+        RangeConstraint(0, 255),
+        default=[100, 255],
+        category="<Funnel/> Target",
     )
-
-    h_upper = settingField(
-        NumberConstraint(minValue=0, maxValue=179),
-        default=10,
-        description="Upper bound for hue (0-179)",
-    )
-    s_upper = settingField(
-        NumberConstraint(minValue=0, maxValue=255),
-        default=255,
-        description="Upper bound for saturation (0-255)",
-    )
-    v_upper = settingField(
-        NumberConstraint(minValue=0, maxValue=255),
-        default=255,
-        description="Upper bound for value (0-255)",
-    )
-
     morph_kernel = settingField(
         NumberConstraint(minValue=1, maxValue=20, step=1),
         default=5,
         description="Kernel size for morphological opening and closing",
+        category="<Funnel/> Target",
     )
     min_area = settingField(
         NumberConstraint(minValue=0, maxValue=None),
         default=500,
         description="Minimum contour area to be considered a valid detection",
+        category="<Funnel/> Filtering",
     )
-
     result_strategy = settingField(
         EnumeratedConstraint(
             options=["largest_area", "closest_to_center", "first_detected"]
         ),
         default="largest_area",
         description="Strategy to select the primary detection from all detections",
+        category="<Funnel/> Filtering",
     )
-
     publish_all_detections = settingField(
         BooleanConstraint(),
         default=True,
         description="If True, all detections will be sent; otherwise, only the main detection is sent.",
+        category="Results",
     )
 
 
@@ -124,32 +115,45 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
 
     def __init__(self, settings: ColorDetectSettings):
         super().__init__(settings)
+        self._scratchShape: Optional[Tuple[int, ...]] = None
+        self._hsv: Optional[np.ndarray] = None
+        self._mask: Optional[np.ndarray] = None
+        self._output: Optional[np.ndarray] = None
+        self._kernels: Dict[int, np.ndarray] = {}
+
+    def _ensureScratch(self, img: Frame) -> None:
+        shape = img.shape
+        if self._scratchShape == shape and self._output is not None:
+            return
+        self._scratchShape = shape
+        self._hsv = np.empty(shape, dtype=np.uint8)
+        self._mask = np.empty(shape[:2], dtype=np.uint8)
+        self._output = np.empty(shape, dtype=img.dtype)
 
     def _createMask(self, hsv: np.ndarray) -> np.ndarray:
         """Apply HSV thresholding and morphological operations to generate a mask."""
+        h = self.getSetting(self.settings.h)
+        s = self.getSetting(self.settings.s)
+        v = self.getSetting(self.settings.v)
         lower = np.array(
-            [
-                self.getSetting(self.settings.h_lower),
-                self.getSetting(self.settings.s_lower),
-                self.getSetting(self.settings.v_lower),
-            ],
+            [min(h), min(s), min(v)],
             dtype=np.uint8,
         )
 
         upper = np.array(
-            [
-                self.getSetting(self.settings.h_upper),
-                self.getSetting(self.settings.s_upper),
-                self.getSetting(self.settings.v_upper),
-            ],
+            [max(h), max(s), max(v)],
             dtype=np.uint8,
         )
 
-        mask = cv2.inRange(hsv, lower, upper)
+        assert self._mask is not None
+        mask = cv2.inRange(hsv, lower, upper, dst=self._mask)
         k = int(self.getSetting(self.settings.morph_kernel))
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        kernel = self._kernels.get(k)
+        if kernel is None:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+            self._kernels[k] = kernel
+        cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, dst=mask)
+        cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, dst=mask)
         return mask
 
     def _findDetections(self, mask: np.ndarray) -> List[ColorDetection]:
@@ -184,8 +188,10 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
             frame_center = (frame_shape[1] / 2, frame_shape[0] / 2)
             return min(
                 detections,
-                key=lambda d: (d.center[0] - frame_center[0]) ** 2
-                + (d.center[1] - frame_center[1]) ** 2,
+                key=lambda d: (
+                    (d.center[0] - frame_center[0]) ** 2
+                    + (d.center[1] - frame_center[1]) ** 2
+                ),
             )
         elif strategy == "first_detected":
             return detections[0]
@@ -203,19 +209,23 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
         Returns:
             Annotated frame with bounding boxes.
         """
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        mask = self._createMask(hsv)
+        self._ensureScratch(img)
+        assert self._hsv is not None and self._output is not None
+        cv2.cvtColor(img, cv2.COLOR_BGR2HSV, dst=self._hsv)
+        mask = self._createMask(self._hsv)
         detections = self._findDetections(mask)
         main_detection = self._selectMainDetection(detections, img.shape)
 
-        # Draw detections
-        output = img.copy()
+        # Draw detections into a reusable destination instead of allocating a
+        # full frame copy per result.
+        np.copyto(self._output, img)
+        output = self._output
         publish_all = self.getSetting(self.settings.publish_all_detections)
         for det in detections:
             if det == main_detection:
-                color = (0, 0, 255)  # Red for main
+                color = (0, 255, 0)  # Green for main
             else:
-                color = (0, 255, 0)  # Green for others
+                color = (0, 0, 255)  # Red for others
             if publish_all or det == main_detection:
                 x, y, w, h = det.bbox
                 cv2.rectangle(

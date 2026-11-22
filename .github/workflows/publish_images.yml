@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Dan Peled
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Attach artifacts from an already-completed image build to an existing release.
+# Downloading multi-gigabyte images through a developer machine is slow; this
+# keeps the artifact transfer and the release upload inside GitHub's network.
+
+name: Publish Built Images to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Build Synapse Device Images run id to publish"
+        required: true
+        type: string
+      release_tag:
+        description: "Existing release tag to attach the images to"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Attach image artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download artifacts from image build
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+
+      - name: Verify artifacts
+        run: find dist -type f -printf '%p %s bytes\n'
+
+      - name: Attach artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: dist/**/*
+          fail_on_unmatched_files: true

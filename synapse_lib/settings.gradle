@@ -1,6 +1,37 @@
 pluginManagement {
+    def versions = new Properties()
+    file('../versions.properties').withInputStream { versions.load(it) }
+
     repositories {
         mavenLocal()
         gradlePluginPortal()
+        mavenCentral()
+        // Fallbacks for intermittent Maven Central resolution failures in CI.
+        maven { url = uri('https://repo1.maven.org/maven2') }
+        maven {
+            url = uri('https://maven-central.storage-download.googleapis.com/maven2')
+        }
+    }
+
+    resolutionStrategy {
+        eachPlugin {
+            switch (requested.id.id) {
+                case 'org.wpilib.GradleRIO':
+                    useVersion(versions.gradleRioVersion)
+                    break
+                case 'org.wpilib.NativeUtils':
+                    useVersion(versions.nativeUtilsVersion)
+                    break
+                case 'org.wpilib.GradleJni':
+                    useVersion(versions.gradleJniVersion)
+                    break
+                case 'org.wpilib.GradleVsCode':
+                    useVersion(versions.gradleVsCodeVersion)
+                    break
+                case 'com.diffplug.spotless':
+                    useVersion(versions.spotlessVersion)
+                    break
+            }
+        }
     }
 }

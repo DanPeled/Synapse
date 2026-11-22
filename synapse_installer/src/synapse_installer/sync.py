@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import re
+import shlex
 import sys
 import traceback
 from pathlib import Path
@@ -13,12 +15,14 @@ from rich import print as fprint
 from synapse import __version__ as synapseVersion
 from synapse import log
 from synapse_installer.deploy import addDeviceConfig
-from synapse_installer.util import (NOT_IN_SYNAPSE_PROJECT_ERR,
-                                    SYNAPSE_PROJECT_FILE, getDistRequirements,
-                                    getUserRequirements)
+from synapse_installer.util import (
+    NOT_IN_SYNAPSE_PROJECT_ERR,
+    SYNAPSE_PROJECT_FILE,
+    getDistRequirements,
+    getUserRequirements,
+)
 
-from .command_executor import (CommandExecutor, LocalCommandExecutor,
-                               SSHCommandExecutor)
+from .command_executor import CommandExecutor, LocalCommandExecutor, SSHCommandExecutor
 
 PackageManager = str
 CheckInstalledCmd = str
@@ -32,20 +36,26 @@ InstallCmd = str
 
 def setupSudoers(
     executor: CommandExecutor, hostname: str, username: str, password: str
-) -> None:
+) -> bool:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
+        fprint(f"[red]Invalid username `{username}`; refusing to edit sudoers.[/red]")
+        return False
+
     sudoers_line = f"{username} ALL=(ALL) NOPASSWD:ALL"
     sudoers_file = f"/etc/sudoers.d/{username}-nopasswd"
-
-    cmd = (
-        f"echo '{password}' | sudo -S bash -c "
-        f"\"echo '{sudoers_line}' > {sudoers_file} && chmod 440 {sudoers_file}\""
+    script = (
+        f"printf '%s\\n' {shlex.quote(sudoers_line)} > {shlex.quote(sudoers_file)} "
+        f"&& chmod 440 {shlex.quote(sudoers_file)}"
     )
+    cmd = f"sudo -S -p '' bash -c {shlex.quote(script)}"
 
-    _, stderr, exitCode = executor.execCommand(cmd)
-    if exitCode != 0 or stderr.strip():
+    _, stderr, exitCode = executor.execCommand(cmd, stdinData=f"{password}\n")
+    if exitCode != 0:
         fprint(f"[red]Failed to setup sudoers on {hostname}:\n{stderr}[/red]")
-    else:
-        fprint(f"[green]Passwordless sudo added for {hostname}[/green]")
+        return False
+
+    fprint(f"[green]Passwordless sudo added for {hostname}[/green]")
+    return True
 
 
 def installSystemPackage(
@@ -79,7 +89,12 @@ def installSystemPackage(
             _, _, installed = executor.execCommand(checkCmd)
             if installed == 0:
                 return
-            executor.execCommand(installCmd)
+
+            _, stderr, exitCode = executor.execCommand(installCmd)
+            if exitCode != 0:
+                raise RuntimeError(
+                    f"Failed to install system package `{package}`:\n{stderr}"
+                )
             return
 
     raise RuntimeError("No supported package manager found")
@@ -182,6 +197,8 @@ def installPipRequirements(
         )
     }
 
+    failures: List[str] = []
+
     for i, req in enumerate(requirements, 1):
         pkg, _, ver = req.partition("==")
         pkg_l = pkg.lower()
@@ -198,9 +215,15 @@ def installPipRequirements(
             )
         cmd += " --upgrade-strategy only-if-needed"
 
-        _, stderr, _ = executor.execCommand(cmd)
-        if stderr.strip():
+        _, stderr, exitCode = executor.execCommand(cmd)
+        if exitCode != 0:
+            failures.append(f"{pkg}: {stderr.strip()}")
             fprint(f"[red]Install failed for {pkg}:\n{stderr}[/red]")
+
+    if failures:
+        raise RuntimeError(
+            "Some Python requirements could not be installed:\n" + "\n".join(failures)
+        )
 
 
 # ============================================================
@@ -215,9 +238,11 @@ def syncRequirements(
     password: str,
     requirements: List[str],
     wplibYear: Optional[str] = None,
-) -> None:
+) -> bool:
     try:
-        setupSudoers(executor, hostname, username, password)
+        _, _, canSudo = executor.execCommand("sudo -n true")
+        if canSudo != 0 and not setupSudoers(executor, hostname, username, password):
+            return False
 
         for pkg in ("libopencv-dev", "unzip", "isc-dhcp-client"):
             installSystemPackage(executor, pkg)
@@ -229,8 +254,10 @@ def syncRequirements(
         installPipRequirements(executor, requirements, venv_python, wplibYear)
 
         fprint(f"[green]Sync completed on {hostname}[/green]")
+        return True
     except Exception as e:
         fprint(f"[red]{e}\n{traceback.format_exc()}[/red]")
+        return False
     finally:
         executor.close()
 
@@ -244,30 +271,43 @@ def sync(argv: Optional[List[str]] = None) -> int:
     cwd = Path.cwd()
     if not (cwd / SYNAPSE_PROJECT_FILE).exists():
         fprint(log.MarkupColors.fail(NOT_IN_SYNAPSE_PROJECT_ERR))
-        return 0
+        return 1
 
     with open(cwd / SYNAPSE_PROJECT_FILE, "r") as f:
         data = yaml.full_load(f) or {}
 
-    if "deploy" not in data:
+    if not isinstance(data, dict):
+        fprint(log.MarkupColors.fail("The project config must be a YAML mapping."))
+        return 1
+
+    deploys = data.get("deploy") or {}
+    if not isinstance(deploys, dict) or not deploys:
         addDeviceConfig(cwd / SYNAPSE_PROJECT_FILE)
         with open(cwd / SYNAPSE_PROJECT_FILE, "r") as f:
-            data = yaml.full_load(f) or {"deploy": {}}
+            data = yaml.full_load(f) or {}
+        deploys = data.get("deploy") or {}
 
-    argv = argv or sys.argv
+    if not isinstance(deploys, dict) or not deploys:
+        fprint(log.MarkupColors.fail("No devices are configured. Run `device add`."))
+        return 1
+
+    requested = [arg for arg in (argv or []) if not arg.startswith("-")]
+    targets = requested or list(deploys)
+
+    missing = [host for host in targets if host not in deploys]
+    for host in missing:
+        fprint(log.MarkupColors.fail(f"No device named `{host}` found"))
+    if missing:
+        return 1
+
     any_failure = False
 
-    for host in argv:
-        if host not in data["deploy"]:
-            fprint(log.MarkupColors.fail(f"No device named `{host}` found"))
-            any_failure = True
-            continue
-
-        dev = data["deploy"][host]
+    for host in targets:
+        dev = deploys[host]
         try:
             fprint(f"Syncing {host}@{dev['ip']}")
-            reqs = getDistRequirements()
-            reqs.extend(getUserRequirements(Path("pyproject.toml")))
+            reqs = list(getDistRequirements())
+            reqs.extend(getUserRequirements(cwd / "pyproject.toml"))
 
             executor = SSHCommandExecutor(
                 hostname=dev["ip"],
@@ -275,14 +315,15 @@ def sync(argv: Optional[List[str]] = None) -> int:
                 password=dev["password"],
             )
 
-            syncRequirements(
+            if not syncRequirements(
                 executor,
                 host,
                 dev["hostname"],
                 dev["password"],
                 reqs,
                 synapseVersion.WPILIB_YEAR,
-            )
+            ):
+                any_failure = True
         except Exception as e:
             fprint(log.MarkupColors.fail(f"Failed to sync {host}: {e}"))
             any_failure = True

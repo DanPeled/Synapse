@@ -39,7 +39,11 @@ import { AddPipelineDialog } from "./addPipelineDialog";
 import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
 import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
 import { teamColor, baseCardColor, borderColor } from "@/services/style";
-import { CameraID } from "@/services/backend/dataStractures";
+import {
+  CameraID,
+  CameraPipelinesMap,
+  CameraPipelinesSetter,
+} from "@/services/backend/dataStractures";
 import { WebSocketWrapper } from "@/services/websocket";
 
 interface CameraAndPipelineControlsProps {
@@ -50,9 +54,9 @@ interface CameraAndPipelineControlsProps {
   selectedPipelineType?: PipelineTypeProto;
   setSelectedPipelineTypeAction: (val?: PipelineTypeProto) => void;
   cameras: Map<CameraID, CameraProto>;
-  pipelines: Map<number, PipelineProto>;
+  pipelines: CameraPipelinesMap;
   pipelinetypes: Map<string, PipelineTypeProto>;
-  setpipelinesAction: (pipeline: Map<number, PipelineProto>) => void;
+  setpipelinesAction: CameraPipelinesSetter;
   socket?: WebSocketWrapper;
 }
 
@@ -122,7 +126,7 @@ export function CameraAndPipelineControls({
     <>
       <Card
         style={{ backgroundColor: baseCardColor, color: teamColor }}
-        className="border-gray-700"
+        className="border-gray-700 w-full"
       >
         {" "}
         <CardContent className="space-y-3">
@@ -169,8 +173,9 @@ export function CameraAndPipelineControls({
                   label="Pipeline"
                   value={selectedPipelineIndex}
                   onValueChange={(val) => setSelectedPipelineIndex(val)}
-                  options={Array.from(pipelines.entries()).map(
-                    ([index, pipeline]) => ({
+                  options={Array.from(pipelines.entries())
+                    .filter(([index]) => index !== 9999)
+                    .map(([index, pipeline]) => ({
                       label: (
                         <span className="inline-flex items-center gap-2">
                           {pipeline.name} (#{index}){" "}
@@ -185,8 +190,7 @@ export function CameraAndPipelineControls({
                       ),
                       value: index,
                       key: index.toString(),
-                    }),
-                  )}
+                    }))}
                 />
 
                 {/* Pipeline actions */}
