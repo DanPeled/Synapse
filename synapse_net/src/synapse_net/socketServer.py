@@ -5,6 +5,7 @@
 
 import asyncio
 import inspect
+import threading
 import traceback
 from collections import OrderedDict
 from dataclasses import fields
@@ -88,11 +89,33 @@ class WebSocketServer:
         # for the whole map instead of one entry per update.
         self._coalesced: "OrderedDict[Hashable, MessageData]" = OrderedDict()
         self._wakeupPending = False
+        # Producers coalesce before crossing into the loop. At 4 cameras x 120
+        # FPS that turns hundreds of cross-thread wakeups per second into at
+        # most one per loop tick.
+        self._pending: "OrderedDict[Hashable, MessageData]" = OrderedDict()
+        self._pendingLock = threading.Lock()
+        self._pendingFlushScheduled = False
+        self._clientLock = threading.Lock()
+        self._openClientCount = 0
 
     @property
     def hasClients(self) -> bool:
         """Whether at least one websocket client is currently open."""
-        return any(getattr(client, "open", False) for client in tuple(self.clients))
+        with self._clientLock:
+            return self._openClientCount > 0
+
+    def registerClient(self, client: WebSocketServerProtocol) -> None:
+        """Track a client without scanning the mutable client set per result."""
+        with self._clientLock:
+            self.clients.add(client)
+            if getattr(client, "open", False):
+                self._openClientCount += 1
+
+    def unregisterClient(self, client: WebSocketServerProtocol) -> None:
+        with self._clientLock:
+            self.clients.discard(client)
+            if getattr(client, "open", False):
+                self._openClientCount = max(0, self._openClientCount - 1)
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable[..., Coroutine]):
@@ -106,7 +129,7 @@ class WebSocketServer:
             await self.callbacks[event](*args, **kwargs)
 
     async def handler(self, websocket: WebSocketServerProtocol, path: str):
-        self.clients.add(websocket)
+        self.registerClient(websocket)
         await self._emit(SocketEvent.kConnect, websocket)
 
         try:
@@ -120,7 +143,7 @@ class WebSocketServer:
             )
             await self._emit(SocketEvent.kError, websocket, errString)
         finally:
-            self.clients.remove(websocket)
+            self.unregisterClient(websocket)
             await self._emit(SocketEvent.kDisconnect, websocket)
 
     async def sendToAll(self, message: Data):
@@ -142,15 +165,73 @@ class WebSocketServer:
     ):
         try:
             if self.loop and self.loop.is_running():
-                # Hand the message to the background send loop. Running the
-                # enqueue on the websocket loop keeps the queue and the send
-                # task bound to the loop that actually performs the I/O.
-                self.loop.call_soon_threadsafe(self._enqueue, message, coalesce_key)
+                if coalesce_key is None:
+                    # Control messages must not be hidden by a pending result.
+                    # Flush the producer-side map first so ordering is kept.
+                    with self._pendingLock:
+                        pending, self._pending = self._pending, OrderedDict()
+                        self._pendingFlushScheduled = False
+                    self.loop.call_soon_threadsafe(self._enqueueBatch, pending, message)
+                    return
+
+                shouldSchedule = False
+                with self._pendingLock:
+                    self._pending[coalesce_key] = message
+                    if not self._pendingFlushScheduled:
+                        self._pendingFlushScheduled = True
+                        shouldSchedule = True
+                if shouldSchedule:
+                    try:
+                        self.loop.call_soon_threadsafe(self._enqueuePending)
+                    except Exception:
+                        with self._pendingLock:
+                            self._pendingFlushScheduled = False
+                        raise
                 return
             # Run in a temporary event loop (e.g. during test or before full setup)
             asyncio.run(self.sendToAll(_resolveMessage(message)))
         except Exception:
             pass
+
+    def _enqueuePending(self) -> None:
+        """Move producer-side coalesced values into the loop-side map."""
+        with self._pendingLock:
+            pending, self._pending = self._pending, OrderedDict()
+            self._pendingFlushScheduled = False
+        if not pending:
+            return
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+
+        for key, message in pending.items():
+            self._coalesced[key] = message
+        if not self._wakeupPending:
+            self._wakeupPending = True
+            self._sendQueue.put_nowait((None, None, True))
+        self._ensureSendTask()
+
+    def _enqueueBatch(
+        self, pending: "OrderedDict[Hashable, MessageData]", unkeyed: MessageData
+    ) -> None:
+        """Flush coalesced results followed by an ordered control message."""
+        self._enqueuePendingValues(pending)
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+        self._sendQueue.put_nowait((None, _resolveMessage(unkeyed), False))
+        self._ensureSendTask()
+
+    def _enqueuePendingValues(
+        self, pending: "OrderedDict[Hashable, MessageData]"
+    ) -> None:
+        if not pending:
+            return
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+        for key, message in pending.items():
+            self._coalesced[key] = message
+        if not self._wakeupPending:
+            self._wakeupPending = True
+            self._sendQueue.put_nowait((None, None, True))
 
     def _enqueue(self, message: MessageData, coalesce_key: Optional[Hashable]):
         """Queue a message for the background sender (must run on the loop)."""
@@ -160,13 +241,13 @@ class WebSocketServer:
         if coalesce_key is None:
             self._sendQueue.put_nowait((None, _resolveMessage(message), False))
         else:
-            # Replacing the value for an existing key is enough: the original
-            # wakeup is still queued and will pick up this newer message.
             self._coalesced[coalesce_key] = message
             if not self._wakeupPending:
                 self._wakeupPending = True
                 self._sendQueue.put_nowait((None, None, True))
+        self._ensureSendTask()
 
+    def _ensureSendTask(self) -> None:
         if self._sendTask is None or self._sendTask.done():
             self._sendTask = asyncio.get_running_loop().create_task(self._sendLoop())
 
@@ -212,6 +293,9 @@ class WebSocketServer:
                 pass
         self._sendTask = None
         self._sendQueue = None
+        with self._pendingLock:
+            self._pending.clear()
+            self._pendingFlushScheduled = False
         self._coalesced.clear()
         self._wakeupPending = False
         if self._server:

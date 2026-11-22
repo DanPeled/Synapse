@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
+import queue
 import sys
 import threading
 import time
@@ -54,6 +55,123 @@ class FPSView:
 UsbCameraInfos = Dict[CameraUID, cs.UsbCameraInfo]
 UsbDeviceSignature = Tuple[Tuple[str, int, int], ...]
 UsbInfoSignature = Tuple[Tuple[CameraUID, str, str, Tuple[str, ...], int, int], ...]
+
+
+class _PublishLane:
+    """Bounded, newest-first handoff from a camera loop to its stream sink."""
+
+    def __init__(self, cameraIndex: CameraID, publish) -> None:
+        self.cameraIndex = cameraIndex
+        self._publish = publish
+        self.frames: "queue.Queue[Tuple[np.ndarray, bool, int, Optional[int]]]" = (
+            queue.Queue(maxsize=1)
+        )
+        self.stopEvent = threading.Event()
+        self._frameReady = threading.Event()
+        self.thread = threading.Thread(
+            target=self._run,
+            daemon=True,
+            name=f"StreamPublisher-{cameraIndex}",
+        )
+
+        self._lock = threading.Lock()
+        self._free: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=2)
+        self._buffers: List[np.ndarray] = []
+        self._shape: Optional[Tuple[int, ...]] = None
+        self._dtype: Optional[np.dtype] = None
+        self._generation = 0
+        self.dropped = 0
+
+    def start(self) -> None:
+        self.thread.start()
+
+    def stop(self) -> None:
+        self.stopEvent.set()
+        self._frameReady.set()
+        self.thread.join(timeout=1.0)
+
+    def _acquire(self, frame: Frame) -> Tuple[np.ndarray, bool, int]:
+        shape = tuple(frame.shape)
+        dtype = frame.dtype
+        with self._lock:
+            if shape != self._shape or dtype != self._dtype:
+                self._generation += 1
+                self._shape = shape
+                self._dtype = dtype
+                self._buffers = [np.empty(shape, dtype=dtype) for _ in range(2)]
+                while not self._free.empty():
+                    self._free.get_nowait()
+                for buffer in self._buffers:
+                    self._free.put_nowait(buffer)
+
+            generation = self._generation
+            try:
+                return self._free.get_nowait(), True, generation
+            except queue.Empty:
+                # A resize can leave both pooled buffers in flight. A one-off
+                # copy is cheaper than blocking the camera loop.
+                return frame.copy(), False, generation
+
+    def _release(self, buffer: np.ndarray, pooled: bool, generation: int) -> None:
+        if not pooled:
+            return
+        with self._lock:
+            if generation == self._generation:
+                try:
+                    self._free.put_nowait(buffer)
+                except queue.Full:
+                    pass
+
+    def enqueue(self, frame: Frame, fps: Optional[int]) -> None:
+        buffer, pooled, generation = self._acquire(frame)
+        np.copyto(buffer, frame)
+        item = (buffer, pooled, generation, fps)
+
+        if self.frames.full():
+            try:
+                stale, stalePooled, staleGeneration, _ = self.frames.get_nowait()
+                self._release(stale, stalePooled, staleGeneration)
+                with self._lock:
+                    self.dropped += 1
+            except queue.Empty:
+                pass
+
+        try:
+            self.frames.put_nowait(item)
+            self._frameReady.set()
+        except queue.Full:
+            self._release(buffer, pooled, generation)
+            with self._lock:
+                self.dropped += 1
+
+    def stats(self) -> Dict[str, int]:
+        with self._lock:
+            dropped = self.dropped
+        return {"queued": self.frames.qsize(), "dropped": dropped}
+
+    def resetStats(self) -> None:
+        with self._lock:
+            self.dropped = 0
+
+    def _run(self) -> None:
+        while not self.stopEvent.is_set():
+            # Event wait avoids the 200 ms idle wakeup while still draining every
+            # frame already queued when the lane was busy.
+            self._frameReady.wait(0.2)
+            self._frameReady.clear()
+
+            while not self.stopEvent.is_set():
+                try:
+                    buffer, pooled, generation, fps = self.frames.get_nowait()
+                except queue.Empty:
+                    break
+
+                try:
+                    self._publish(buffer, fps)
+                except Exception:
+                    pass
+                finally:
+                    self._release(buffer, pooled, generation)
 
 
 def _getUsbDeviceSignature() -> Optional[UsbDeviceSignature]:
@@ -139,6 +257,11 @@ class CameraHandler:
         # profiles; these buffers let `cv2.resize` write in place instead.
         self._streamFrameBuffers: Dict[CameraID, np.ndarray] = {}
         self._recordFrameBuffers: Dict[CameraID, np.ndarray] = {}
+
+        # Stream and recording writers run on their own bounded lane per camera.
+        # A slow CvSource or VideoWriter must never stall pipeline throughput.
+        self._publishLanes: Dict[CameraID, _PublishLane] = {}
+        self._publishingEnabled = True
 
         self.cameraScanningThread: threading.Thread
 
@@ -668,29 +791,54 @@ class CameraHandler:
             interpolation=cv2.INTER_AREA,
         )
 
+    def _startPublishLane(self, cameraIndex: CameraID) -> _PublishLane:
+        lane = _PublishLane(
+            cameraIndex,
+            lambda frame, fps, index=cameraIndex: self._publishFrameSync(
+                frame, self.cameraHandles[index], fps
+            ),
+        )
+        self._publishLanes[cameraIndex] = lane
+        lane.start()
+        return lane
+
+    def setPublishingEnabled(self, enabled: bool) -> None:
+        """Enable or disable stream/record publication without stopping cameras."""
+        self._publishingEnabled = bool(enabled)
+
     def publishFrame(
         self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
     ) -> None:
-        """
-        Publishes a frame to the output stream and optionally writes it to the recording output
-        if recording is enabled.
+        """Hand a throttled frame to the camera's stream/record lane.
 
-        Args:
-            frame (Frame): The image frame to publish.
-            camera (CameraHandle): The camera that produced the frame.
-            fps: Optional camera FPS to draw on frames that are actually streamed.
+        The camera processing thread only copies into a pooled buffer and never
+        waits on ``CvSource.putFrame`` or ``VideoWriter.write``. When the lane
+        is behind, the stale queued frame is replaced so latency stays bounded.
         """
         assert frame is not None
+        if not self._publishingEnabled:
+            return
 
         now = time.perf_counter()
         cameraIndex = handle.cameraIndex
 
         lastTime = self.lastPublishTime.get(cameraIndex, 0.0)
-
         if now - lastTime < self.publishInterval:
             return
-
         self.lastPublishTime[cameraIndex] = now
+
+        lane = self._publishLanes.get(cameraIndex)
+        if lane is None:
+            # Tests and headless callers can publish without a managed camera.
+            self._publishFrameSync(frame, handle, fps)
+            return
+        lane.enqueue(frame, fps)
+
+    def _publishFrameSync(
+        self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
+    ) -> None:
+        """Resize and write a frame; called on the per-camera publication lane."""
+        cameraIndex = handle.cameraIndex
 
         # Draw only on frames that survive the stream throttle. At higher camera
         # FPS this avoids full-frame text draws on frames nobody will see.
@@ -738,6 +886,28 @@ class CameraHandler:
             videoWriter = self.recordingOutputs.pop(cameraIndex)
             videoWriter.release()
             self._recordFrameBuffers.pop(cameraIndex, None)
+
+    def getPublishStats(self, cameraIndex: Optional[CameraID] = None) -> Dict[str, int]:
+        """Return bounded-lane queue depth and dropped-frame counters."""
+        if cameraIndex is not None:
+            lane = self._publishLanes.get(cameraIndex)
+            return {"queued": 0, "dropped": 0} if lane is None else lane.stats()
+
+        totals = {"queued": 0, "dropped": 0}
+        for lane in self._publishLanes.values():
+            stats = lane.stats()
+            totals["queued"] += stats["queued"]
+            totals["dropped"] += stats["dropped"]
+        return totals
+
+    def resetPublishStats(self, cameraIndex: Optional[CameraID] = None) -> None:
+        if cameraIndex is not None:
+            lane = self._publishLanes.get(cameraIndex)
+            if lane is not None:
+                lane.resetStats()
+            return
+        for lane in self._publishLanes.values():
+            lane.resetStats()
 
     def addCamera(
         self,
@@ -802,6 +972,8 @@ class CameraHandler:
 
         self.setRecordingStatus(cameraIndex, False)
 
+        self._startPublishLane(cameraIndex)
+
         self.onAddCamera.call(cameraIndex, cameraConfig.name, handle)
 
         log.info(
@@ -846,6 +1018,10 @@ class CameraHandler:
             timeout=2.0,
         ):
             log.info("Camera scanner stopped.")
+
+        for cameraIndex, lane in list(self._publishLanes.items()):
+            lane.stop()
+        self._publishLanes.clear()
 
         recordingCount = len(self.recordingOutputs)
         if recordingCount:

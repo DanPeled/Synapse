@@ -11,7 +11,7 @@ import time
 import traceback
 from asyncio import Queue
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, Iterable, List, Optional, Tuple, TypeAlias
 
 import cv2
 import numpy as np
@@ -47,6 +47,7 @@ from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .lifecycle import joinThread
 from .nt_keys import NTKeys
+from .performance import CameraPerformanceTracker
 from .pipeline import (
     FrameResult,
     Pipeline,
@@ -68,6 +69,11 @@ def sendWebUIIP():
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
 DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
 METRICS_INTERVAL_SECONDS: Final[float] = 1.0
+_ROTATIONS: Final[dict[int, int]] = {
+    90: cv2.ROTATE_90_CLOCKWISE,
+    180: cv2.ROTATE_180,
+    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+}
 
 # UI changes often arrive in bursts. Wait for a short quiet period before
 # writing, but bound the wait so a continuous stream still produces saves.
@@ -142,6 +148,11 @@ class RuntimeManager:
         self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
         self._lastFrameTime: dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
+        self._performanceLock = threading.Lock()
+        self._performanceTrackers: Dict[CameraID, CameraPerformanceTracker] = {}
+        self._frameFixtureCache: Dict[
+            CameraID, Tuple[Any, int, Tuple[int, int], int, np.ndarray]
+        ] = {}
         # Persistent pipeline failures must not format/log a full traceback on
         # every camera frame. This reports the first failure per camera, then
         # periodic counts.
@@ -195,6 +206,12 @@ class RuntimeManager:
         self._saveDebounceSeconds = SAVE_DEBOUNCE_SECONDS
 
         def onAddCamera(cameraID: CameraID, name: str, handle: CameraHandle):
+            # Trackers are long-lived, so create them before the process thread
+            # starts. The hot path can then record without a global lock.
+            with self._performanceLock:
+                self._performanceTrackers.setdefault(
+                    cameraID, CameraPerformanceTracker()
+                )
             if cameraID not in self.pipelineBindings:
                 self.pipelineBindings[cameraID] = DEFAULT_PIPELINE_FOR_NEW_CAMERA
             if (
@@ -653,35 +670,32 @@ class RuntimeManager:
             pass
 
         while self.running.is_set():
-            cam = handle.camera
             try:
-                if not cam.isConnected():
-                    # Avoid spinning while a camera is disconnected. The frame
-                    # producer already has its own short retry delay.
-                    time.sleep(0.01)
-                    continue
-
+                # CameraHandle's producer owns connection checks and its own
+                # bounded retry delay. Checking again here only adds a native
+                # call per frame and can discard frames that are already ready.
                 ret, frame, captureLatency = handle.grabFrame()
-                if not ret or frame is None:
-                    continue
+                try:
+                    if not ret or frame is None:
+                        continue
 
-                # If we just switched resolution, sometimes the first frame might be bad
-                try:
-                    h, w = frame.shape[:2]
-                    if h == 0 or w == 0:
-                        raise ValueError("bad frame")
-                except Exception:
-                    # Try again quickly without going to no-signal
-                    time.sleep(0.002)
-                    continue
-                try:
-                    frame = self.fixtureFrame(cameraIndex, frame)
-                except Exception:
-                    pass
-                try:
-                    self._processAndPublishFrame(cameraIndex, frame, captureLatency)
-                except Exception:
-                    pass
+                    # If we just switched resolution, sometimes the first frame might be bad
+                    try:
+                        h, w = frame.shape[:2]
+                        if h == 0 or w == 0:
+                            raise ValueError("bad frame")
+                    except Exception:
+                        # Try again quickly without going to no-signal
+                        time.sleep(0.002)
+                        continue
+                    try:
+                        self._processAndPublishFrame(cameraIndex, frame, captureLatency)
+                    except Exception:
+                        pass
+                finally:
+                    # Always return the buffer so a slow pipeline cannot cause
+                    # the capture thread to overwrite the frame in use.
+                    handle.releaseFrame()
             except Exception:
                 time.sleep(0.002)
 
@@ -706,12 +720,16 @@ class RuntimeManager:
         self._lastFrameTime[cameraIndex] = now
 
         # ---- Processing latency ----
-        processStart = time.perf_counter()
+        processStart = now
 
         pipeline_bindings = self.pipelineBindings
         pipeline = self.pipelineHandler.getPipeline(
             pipeline_bindings.get(cameraIndex, -1), cameraIndex
         )
+        try:
+            frame = self._fixtureFrameForPipeline(cameraIndex, frame, pipeline)
+        except Exception:
+            pass
 
         processedFrame = frame
         if pipeline is not None:
@@ -729,7 +747,8 @@ class RuntimeManager:
                         f"Pipeline error for camera {getattr(handle, 'name', cameraIndex)}: {detail}"
                     )
 
-        processLatency = time.perf_counter() - processStart
+        processEnd = time.perf_counter()
+        processLatency = processEnd - processStart
 
         try:
             self.sendLatency(
@@ -745,6 +764,84 @@ class RuntimeManager:
             self.cameraHandler.publishFrame(processedFrame, handle, fps=int(cameraFps))
         except Exception:
             pass
+
+        try:
+            tracker = self._performanceTrackers.get(cameraIndex)
+            if tracker is None:
+                tracker = self._getPerformanceTracker(cameraIndex)
+            totalLatency = captureLatency + (time.perf_counter() - processStart)
+            tracker.record(
+                captureLatency,
+                processLatency,
+                totalLatency,
+                getattr(processedFrame, "nbytes", 0),
+            )
+        except Exception:
+            pass
+
+    def _getPerformanceTracker(self, cameraIndex: CameraID) -> CameraPerformanceTracker:
+        with self._performanceLock:
+            tracker = self._performanceTrackers.get(cameraIndex)
+            if tracker is None:
+                tracker = CameraPerformanceTracker()
+                self._performanceTrackers[cameraIndex] = tracker
+            return tracker
+
+    def getPerformanceStats(
+        self, cameraIndex: Optional[CameraID] = None
+    ) -> Dict[Any, Any]:
+        """Return latency/FPS counters for one camera or all cameras.
+
+        Capture and stream counters are merged from their owners so a benchmark
+        can report application drops alongside pipeline results.
+        """
+        indexes: Iterable[CameraID]
+        if cameraIndex is None:
+            indexes = sorted(self._performanceTrackers)
+        else:
+            indexes = (cameraIndex,)
+
+        results: Dict[Any, Any] = {}
+        for index in indexes:
+            stats = self._getPerformanceTracker(index).snapshot()
+            handle = self.cameraHandler.getCameraHandle(index)
+            if handle is not None and hasattr(handle, "getCaptureStats"):
+                capture = handle.getCaptureStats()
+                stats["capture_frames"] = capture["captured"]
+                stats["dropped_capture_frames"] = capture["dropped"]
+                stats["stale_capture_frames"] = capture["stale"]
+                stats["free_capture_buffers"] = capture["free"]
+                stats["capture_buffer_pool"] = capture["pool"]
+
+            stats["dropped_stream_frames"] = self.cameraHandler.getPublishStats(index)[
+                "dropped"
+            ]
+            if cameraIndex is None:
+                results[index] = stats
+            else:
+                return stats
+        return results
+
+    def resetPerformanceStats(self, cameraIndex: Optional[CameraID] = None) -> None:
+        """Clear measurement windows before a benchmark run."""
+        with self._performanceLock:
+            if cameraIndex is None:
+                for tracker in self._performanceTrackers.values():
+                    tracker.reset()
+            else:
+                tracker = self._performanceTrackers.get(cameraIndex)
+                if tracker is not None:
+                    tracker.reset()
+        if cameraIndex is None:
+            for handle in self.cameraHandler.cameraHandles.values():
+                if hasattr(handle, "resetCaptureStats"):
+                    handle.resetCaptureStats()
+            self.cameraHandler.resetPublishStats()
+        else:
+            handle = self.cameraHandler.getCameraHandle(cameraIndex)
+            if handle is not None and hasattr(handle, "resetCaptureStats"):
+                handle.resetCaptureStats()
+            self.cameraHandler.resetPublishStats(cameraIndex)
 
     def run(self):
         """
@@ -812,7 +909,9 @@ class RuntimeManager:
         processingLatency: seconds,
         fps: float,
     ) -> None:
-        current_time = time.time()
+        # Use the monotonic clock for cadence so NTP adjustments cannot stretch
+        # or skip latency report intervals.
+        current_time = time.monotonic()
         last_report_time = self._lastLatencyReportTime.get(cameraIndex, 0.0)
         if current_time - last_report_time < 1.0:
             return  # Skip sending
@@ -834,7 +933,7 @@ class RuntimeManager:
             publisher.set(value)
 
         ws = WebSocketServer.kInstance
-        if ws is not None:
+        if ws is not None and ws.hasClients:
 
             def buildMessage() -> bytes:
                 return createMessage(
@@ -941,23 +1040,56 @@ class RuntimeManager:
         return (image * 255).astype(np.uint8)
 
     def fixtureFrame(self, cameraIndex: CameraID, frame: Frame) -> Frame:
+        """Public helper for tests and callers that do not already have a pipeline."""
         pipelineIndex = self.pipelineBindings.get(cameraIndex)
         if pipelineIndex is None:
             return frame
         pipeline = self.pipelineHandler.getPipeline(pipelineIndex, cameraIndex)
+        return self._fixtureFrameForPipeline(cameraIndex, frame, pipeline)
+
+    def _fixtureFrameForPipeline(
+        self, cameraIndex: CameraID, frame: Frame, pipeline: Optional[Any]
+    ) -> Frame:
+        """Apply cached per-camera settings to a frame without repeat lookups."""
         if pipeline is None:
             return frame
         settings = pipeline.getCameraSettings()
-        if settings is not None:
-            orientation = settings.getSetting(CameraSettings.orientation.key)
-            if orientation in (90, 180, 270):
-                rotations = {
-                    90: cv2.ROTATE_90_CLOCKWISE,
-                    180: cv2.ROTATE_180,
-                    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
-                }
-                frame = cv2.rotate(frame, rotations[orientation])
-        return frame
+        if settings is None:
+            return frame
+
+        orientation = settings.getSetting(CameraSettings.orientation.key)
+        rotation = _ROTATIONS.get(orientation)
+        if rotation is None:
+            self._frameFixtureCache.pop(cameraIndex, None)
+            return frame
+
+        height, width = frame.shape[:2]
+        shape = (height, width)
+        cached = self._frameFixtureCache.get(cameraIndex)
+        if (
+            cached is not None
+            and cached[0] is pipeline
+            and cached[1] == orientation
+            and cached[2] == shape
+        ):
+            destination = cached[4]
+        else:
+            rotatedShape = (
+                (width, height, frame.shape[2])
+                if rotation != cv2.ROTATE_180
+                else frame.shape
+            )
+            destination = np.empty(rotatedShape, dtype=frame.dtype)
+            self._frameFixtureCache[cameraIndex] = (
+                pipeline,
+                orientation,
+                shape,
+                rotation,
+                destination,
+            )
+
+        cv2.rotate(frame, rotation, dst=destination)
+        return destination
 
     def toDict(self) -> Dict:
         return {

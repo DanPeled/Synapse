@@ -240,9 +240,9 @@ class SimCamera(SynapseCamera):
                 buffer[:] = resized
             else:
                 buffer[:] = frame
-            return time.time(), buffer
+            return time.monotonic_ns() // 1000, buffer
 
-        return time.time(), frame
+        return time.monotonic_ns() // 1000, frame
 
     @staticmethod
     def _decodeFrame(payload: bytes, width: int, height: int) -> np.ndarray:

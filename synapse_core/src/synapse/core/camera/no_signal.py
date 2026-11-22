@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from time import time
+from time import monotonic_ns
 from typing import List, Optional, Tuple, Union
 
 import cv2
@@ -33,9 +33,7 @@ class NoSignalCamera(SynapseCamera):
         return inst
 
     def getVideoMode(self) -> VideoMode:
-        return VideoMode(
-            PixelFormat.MJPEG, self.resolution[0], self.resolution[1], 30
-        )
+        return VideoMode(PixelFormat.MJPEG, self.resolution[0], self.resolution[1], 30)
 
     def enumerateVideoModes(self) -> List[VideoMode]:
         return [
@@ -56,14 +54,14 @@ class NoSignalCamera(SynapseCamera):
                 bh, bw = buffer.shape[:2]
                 if h == bh and w == bw:
                     buffer[:] = frame
-                    return time(), buffer
+                    return monotonic_ns() // 1000, buffer
                 # Resize if needed
                 resized = cv2.resize(frame, (bw, bh), interpolation=cv2.INTER_AREA)
                 buffer[:] = resized
-                return time(), buffer
-            return time(), frame
+                return monotonic_ns() // 1000, buffer
+            return monotonic_ns() // 1000, frame
         except Exception:
-            return time(), None
+            return monotonic_ns() // 1000, None
 
     def isConnected(self) -> bool:
         # Pretend the camera is never connected

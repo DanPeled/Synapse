@@ -24,7 +24,13 @@ class SynapseCamera(ABC):
     ) -> "SynapseCamera": ...
 
     @abstractmethod
-    def grabFrame(self, buffer: np.ndarray) -> Tuple[float, Optional[Frame]]: ...
+    def grabFrame(self, buffer: np.ndarray) -> Tuple[float, Optional[Frame]]:
+        """Capture into ``buffer`` and return ``(timestampUs, frame)``.
+
+        The timestamp must be monotonic microseconds comparable with
+        ``time.monotonic()`` so ``CameraHandle`` can compute capture latency.
+        """
+        ...
 
     @abstractmethod
     def close(self) -> None: ...
