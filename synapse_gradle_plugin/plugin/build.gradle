@@ -1,0 +1,115 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+    id 'com.diffplug.spotless'
+}
+
+def versions = new Properties()
+file('../../versions.properties').withInputStream { versions.load(it) }
+
+def jitpack = System.getenv('JITPACK') != null
+group = jitpack ? 'com.github.DanPeled.Synapse' : 'synapse.vision'
+version =
+        jitpack ? (System.getenv('VERSION') ?: versions.synapseVersion) : versions.synapseVersion
+
+java {
+    sourceCompatibility = JavaVersion.toVersion(versions.javaVersion)
+    targetCompatibility = JavaVersion.toVersion(versions.javaVersion)
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation libs.junit.jupiter
+    testImplementation gradleApi()
+    testImplementation gradleTestKit()
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+gradlePlugin {
+    plugins {
+        synapse {
+            id = 'synapse.plugin'
+            implementationClass = 'synapse.plugin.SynapsePlugin'
+        }
+        legacy {
+            id = 'synapse.plugin.greeting'
+            implementationClass = 'synapse.plugin.SynapsePlugin'
+        }
+    }
+}
+
+sourceSets {
+    functionalTest {
+    }
+}
+
+configurations.functionalTestImplementation.extendsFrom(configurations.testImplementation)
+configurations.functionalTestRuntimeOnly.extendsFrom(configurations.testRuntimeOnly)
+
+tasks.register('functionalTest', Test) {
+    description = 'Runs the Gradle TestKit integration tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.functionalTest.output.classesDirs
+    classpath = sourceSets.functionalTest.runtimeClasspath
+    useJUnitPlatform()
+    testLogging {
+        exceptionFormat = 'full'
+    }
+    shouldRunAfter(tasks.test)
+}
+
+gradlePlugin.testSourceSets.add(sourceSets.functionalTest)
+
+tasks.named('check') {
+    dependsOn(tasks.functionalTest)
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+spotless {
+    java {
+        target fileTree('.') {
+            include '**/*.java'
+            exclude '**/build/**', '**/build-*/**', '**/bin/**'
+        }
+        toggleOffOn()
+        googleJavaFormat()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    groovyGradle {
+        target fileTree('.') {
+            include '**/*.gradle'
+            exclude '**/build/**', '**/build-*/**'
+        }
+        greclipse()
+        indentWithSpaces(4)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format 'xml', {
+        target fileTree('.') {
+            include '**/*.xml'
+            exclude '**/build/**', '**/build-*/**'
+        }
+        eclipseWtp('xml')
+        trimTrailingWhitespace()
+        indentWithSpaces(2)
+        endWithNewline()
+    }
+    format 'misc', {
+        target fileTree('.') {
+            include '**/*.md', '**/.gitignore'
+            exclude '**/build/**', '**/build-*/**'
+        }
+        trimTrailingWhitespace()
+        indentWithSpaces(2)
+        endWithNewline()
+    }
+}

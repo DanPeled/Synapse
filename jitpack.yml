@@ -1,0 +1,4 @@
+jdk:
+  - openjdk25
+install:
+  - cd synapse_gradle_plugin && ./gradlew --no-daemon clean build publishToMavenLocal -x functionalTest

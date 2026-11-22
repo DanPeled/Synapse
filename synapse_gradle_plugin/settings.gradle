@@ -1,0 +1,20 @@
+pluginManagement {
+    def versions = new Properties()
+    file('../versions.properties').withInputStream { versions.load(it) }
+
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == 'com.diffplug.spotless') {
+                useVersion(versions.spotlessVersion)
+            }
+        }
+    }
+}
+
+rootProject.name = 'synapse_gradle_plugin'
+include(':plugin')
