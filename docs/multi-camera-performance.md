@@ -123,7 +123,10 @@ python scripts/benchmark_multi_camera.py \
 The script exits non-zero when a baseline was supplied and any camera is below
 `threshold * baseline`. Without a baseline it still reports all measurements and
 exits zero. It starts only the runtime and camera pipelines; the UI, websocket
-server, and file server are not started, so they cannot skew the measurements.
+server, and file server are not started. Stream and recording publication is
+disabled by default so no full-frame MJPEG encoding competes with vision work;
+pass `--streams` to measure that cost explicitly. The report records which mode
+was used in `measurement.stream_publication`.
 
 Each camera report includes:
 
@@ -136,9 +139,13 @@ Each camera report includes:
 - `frame_bytes`, the decoded frame size handled by the pipeline; and
 - `baseline_ratio` and `last_result_age_seconds`.
 
-The top-level report adds aggregate FPS, worst-camera FPS, the 83% target, pass
-status, process CPU/RSS, host details, and USB topology (`lsusb -t` where
-available). If aggregate FPS is high but one camera's FPS is low, that camera's
+The top-level report adds aggregate FPS, mean FPS, worst/best camera FPS, FPS
+spread, the 83% target, pass status, process CPU/RSS, host details, and USB
+topology (`lsusb -t` where available). `mean_baseline_ratio` (also reported as
+`aggregate_efficiency`) shows how close the whole set is to the single-camera
+baseline: `1.0` means every camera matches the baseline. `fps_spread` and
+`slowest_camera_index` show whether one camera is dragging the group down. If
+aggregate FPS is high but one camera's FPS is low, that camera's
 drop counters and result age identify whether it is starvation, pipeline cost,
 or a bus-limited device. If all cameras drop together on one host controller,
 the USB topology and frame size usually indicate bus saturation rather than

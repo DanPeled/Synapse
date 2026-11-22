@@ -130,19 +130,46 @@ def summarizeCameras(
         cameras.append(stats)
 
     minFps = min(fpsValues, default=0.0)
+    maxFps = max(fpsValues, default=0.0)
+    aggregateFps = sum(fpsValues)
+    meanFps = aggregateFps / len(fpsValues) if fpsValues else 0.0
     targetFps = None if baselineFps is None else baselineFps * threshold
+    ratios = [
+        float(stats["baseline_ratio"])
+        for stats in cameras
+        if stats["baseline_ratio"] is not None
+    ]
+    meanRatio = sum(ratios) / len(ratios) if ratios else None
     if baselineFps is None:
         meetsTarget: Optional[bool] = None
     else:
         meetsTarget = minFps >= (targetFps or 0.0)
 
+    slowestIndex = None
+    fastestIndex = None
+    if cameras:
+        slowest = min(cameras, key=lambda camera: camera["processed_fps"])
+        fastest = max(cameras, key=lambda camera: camera["processed_fps"])
+        slowestIndex = slowest["camera_index"]
+        fastestIndex = fastest["camera_index"]
+
     return {
         "camera_count": len(cameras),
         "cameras": cameras,
-        "aggregate_fps": sum(fpsValues),
+        "aggregate_fps": aggregateFps,
+        "mean_camera_fps": meanFps,
         "min_camera_fps": minFps,
+        "max_camera_fps": maxFps,
+        "fps_spread": maxFps - minFps,
+        "slowest_camera_index": slowestIndex,
+        "fastest_camera_index": fastestIndex,
         "baseline_fps": baselineFps,
         "target_fps_per_camera": targetFps,
+        "target_fps_aggregate": (
+            None if targetFps is None else targetFps * len(cameras)
+        ),
         "threshold": threshold,
+        "mean_baseline_ratio": meanRatio,
+        "aggregate_efficiency": meanRatio,
         "meets_target": meetsTarget,
     }

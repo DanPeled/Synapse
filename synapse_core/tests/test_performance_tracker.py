@@ -59,8 +59,16 @@ def test_summarize_cameras_uses_worst_camera_for_pass_condition() -> None:
     report = summarizeCameras(stats, baselineFps=120.0, threshold=0.83)
 
     assert report["aggregate_fps"] == pytest.approx(435.0)
+    assert report["mean_camera_fps"] == pytest.approx(108.75)
     assert report["min_camera_fps"] == 100.0
+    assert report["max_camera_fps"] == 120.0
+    assert report["fps_spread"] == 20.0
+    assert report["slowest_camera_index"] == 1
+    assert report["fastest_camera_index"] == 0
     assert report["target_fps_per_camera"] == pytest.approx(99.6)
+    assert report["target_fps_aggregate"] == pytest.approx(398.4)
+    assert report["mean_baseline_ratio"] == pytest.approx(108.75 / 120.0)
+    assert report["aggregate_efficiency"] == pytest.approx(108.75 / 120.0)
     assert report["meets_target"] is True
 
     failing = summarizeCameras(stats, baselineFps=130.0, threshold=0.83)
