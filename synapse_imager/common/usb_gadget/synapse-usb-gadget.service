@@ -1,0 +1,17 @@
+[Unit]
+Description=Synapse USB Gadget (direct USB connection)
+Documentation=https://github.com/DanPeled/Synapse/issues/229
+Before=synapse-runtime.service
+Wants=synapse-runtime.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=PYTHONUNBUFFERED=1
+# The runtime virtualenv contains synapse.hardware.usb_gadget. The service
+# user must be able to read configfs paths; root is required to write them.
+ExecStart=/bin/bash /usr/local/sbin/synapse-usb-gadget.sh start
+ExecStop=/bin/bash /usr/local/sbin/synapse-usb-gadget.sh stop
+
+[Install]
+WantedBy=multi-user.target
