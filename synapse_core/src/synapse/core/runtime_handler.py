@@ -662,26 +662,31 @@ class RuntimeManager:
                     continue
 
                 ret, frame, captureLatency = handle.grabFrame()
-                if not ret or frame is None:
-                    continue
+                try:
+                    if not ret or frame is None:
+                        continue
 
-                # If we just switched resolution, sometimes the first frame might be bad
-                try:
-                    h, w = frame.shape[:2]
-                    if h == 0 or w == 0:
-                        raise ValueError("bad frame")
-                except Exception:
-                    # Try again quickly without going to no-signal
-                    time.sleep(0.002)
-                    continue
-                try:
-                    frame = self.fixtureFrame(cameraIndex, frame)
-                except Exception:
-                    pass
-                try:
-                    self._processAndPublishFrame(cameraIndex, frame, captureLatency)
-                except Exception:
-                    pass
+                    # If we just switched resolution, sometimes the first frame might be bad
+                    try:
+                        h, w = frame.shape[:2]
+                        if h == 0 or w == 0:
+                            raise ValueError("bad frame")
+                    except Exception:
+                        # Try again quickly without going to no-signal
+                        time.sleep(0.002)
+                        continue
+                    try:
+                        frame = self.fixtureFrame(cameraIndex, frame)
+                    except Exception:
+                        pass
+                    try:
+                        self._processAndPublishFrame(cameraIndex, frame, captureLatency)
+                    except Exception:
+                        pass
+                finally:
+                    # Always return the buffer so a slow pipeline cannot cause
+                    # the capture thread to overwrite the frame in use.
+                    handle.releaseFrame()
             except Exception:
                 time.sleep(0.002)
 
