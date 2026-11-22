@@ -5,11 +5,13 @@ on:
     paths:
       - "synapse_gradle_plugin/**"
       - ".github/workflows/synapse_gradle_plugin.yml"
+      - "jitpack.yml"
       - "versions.properties"
   pull_request:
     paths:
       - "synapse_gradle_plugin/**"
       - ".github/workflows/synapse_gradle_plugin.yml"
+      - "jitpack.yml"
       - "versions.properties"
 
 permissions:

@@ -1,5 +1,7 @@
 # Synapse Gradle Plugin
 
+[![Release](https://jitpack.io/v/DanPeled/Synapse.svg)](https://jitpack.io/#DanPeled/Synapse)
+
 Wires a Synapse coprocessor project into a GradleRIO robot project.
 
 The plugin uses the current `synapse_installer` CLI and the current simulated
@@ -8,7 +10,29 @@ toolchain used by the 2027 robot projects in this repository.
 
 ## Apply the plugin
 
-Add the included build to `settings.gradle`:
+The published plugin is available from JitPack. Add the repository to your
+robot project's `settings.gradle`:
+
+```groovy
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url "https://jitpack.io" }
+    }
+}
+```
+
+Then apply it in the robot project's `build.gradle` using the plugin tag:
+
+```groovy
+plugins {
+    id "org.wpilib.GradleRIO"
+    id "synapse.plugin" version "synapse-gradle-plugin-2027.0.0a1"
+}
+```
+
+To use the plugin directly from a Synapse checkout, add the included build to
+`settings.gradle` instead:
 
 ```groovy
 pluginManagement {
@@ -23,7 +47,7 @@ pluginManagement {
 }
 ```
 
-Then apply it in the robot project's `build.gradle`:
+and apply it without a version:
 
 ```groovy
 plugins {
@@ -71,7 +95,7 @@ The simulator connects to NetworkTables on `127.0.0.1`, which is where WPILib
 robot simulation publishes its server. A JVM shutdown hook stops the simulator
 if Gradle is interrupted.
 
-## Building this plugin
+## Building and publishing this plugin
 
 ```sh
 cd synapse_gradle_plugin
@@ -79,4 +103,14 @@ cd synapse_gradle_plugin
 ```
 
 The build runs unit tests and Gradle TestKit functional tests that exercise the
-deploy and simulation lifecycles with a stub Python executable.
+deploy and simulation lifecycles with a stub Python project. To publish all
+plugin publications to your local Maven repository, run:
+
+```sh
+./gradlew publishToMavenLocal
+```
+
+JitPack uses the root `jitpack.yml` to build with JDK 25 and publish both the
+`synapse.plugin` plugin marker and the implementation artifact. Request the
+tagged version (`synapse-gradle-plugin-<synapseVersion>`) on
+[JitPack](https://jitpack.io/#DanPeled/Synapse) to trigger a publication.

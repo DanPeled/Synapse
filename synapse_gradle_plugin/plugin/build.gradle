@@ -1,13 +1,16 @@
 plugins {
     id 'java-gradle-plugin'
+    id 'maven-publish'
     id 'com.diffplug.spotless'
 }
 
 def versions = new Properties()
 file('../../versions.properties').withInputStream { versions.load(it) }
 
-group = 'synapse.vision'
-version = versions.synapseVersion
+def jitpack = System.getenv('JITPACK') != null
+group = jitpack ? 'com.github.DanPeled.Synapse' : 'synapse.vision'
+version =
+        jitpack ? (System.getenv('VERSION') ?: versions.synapseVersion) : versions.synapseVersion
 
 java {
     sourceCompatibility = JavaVersion.toVersion(versions.javaVersion)
@@ -52,6 +55,9 @@ tasks.register('functionalTest', Test) {
     testClassesDirs = sourceSets.functionalTest.output.classesDirs
     classpath = sourceSets.functionalTest.runtimeClasspath
     useJUnitPlatform()
+    testLogging {
+        exceptionFormat = 'full'
+    }
     shouldRunAfter(tasks.test)
 }
 

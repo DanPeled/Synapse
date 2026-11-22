@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Locale;
 import org.gradle.testkit.runner.BuildResult;
@@ -22,8 +21,7 @@ class SynapsePluginFunctionalTest {
   @Test
   void deployRunsAfterRobotDeployWithCurrentInstallerArguments() throws IOException {
     Path log = projectDir.resolve("deploy.log");
-    Path python = writePythonStub(log, false);
-    writeSynapseProject();
+    String python = stubSynapseProject(log, false);
     writeBuildScript(python, log, "");
 
     BuildResult result = run("deploy");
@@ -42,8 +40,7 @@ class SynapsePluginFunctionalTest {
   @Test
   void deployCanBeDisabled() throws IOException {
     Path log = projectDir.resolve("disabled.log");
-    Path python = writePythonStub(log, false);
-    writeSynapseProject();
+    String python = stubSynapseProject(log, false);
     writeBuildScript(python, log, "enabled = false");
 
     BuildResult result = run("synapseDeploy");
@@ -55,40 +52,30 @@ class SynapsePluginFunctionalTest {
   @Test
   void simulateJavaStartsSynapseAndRobotSimulationTogether() throws IOException {
     Path log = projectDir.resolve("sim.log");
-    Path python = writePythonStub(log, true);
-    writeSynapseProject();
+    String python = stubSynapseProject(log, true);
     writeBuildScript(python, log, "");
 
     assertTimeoutPreemptively(Duration.ofMinutes(2), () -> run("simulateJava"));
 
     String calls = readLog(log);
-    assertTrue(
-        calls
-            .lines()
-            .anyMatch(line ->
-                line.startsWith("args=")
-                    && line.contains("main.py")
-                    && line.contains("--sim")
-                    && line.contains("--headless")),
-        calls);
+    assertTrue(calls.contains("main.py"), calls);
+    assertTrue(calls.contains("--sim"), calls);
+    assertTrue(calls.contains("--headless"), calls);
     assertTrue(calls.contains("robot-sim"), calls);
-    assertTrue(calls.indexOf("args=") < calls.indexOf("robot-sim"), calls);
+    assertTrue(calls.indexOf("--sim") < calls.indexOf("robot-sim"), calls);
   }
 
   @Test
   void synapseSimLifecycleStartsRobotSimulation() throws IOException {
     Path log = projectDir.resolve("lifecycle.log");
-    Path python = writePythonStub(log, true);
-    writeSynapseProject();
+    String python = stubSynapseProject(log, true);
     writeBuildScript(python, log, "");
 
     assertTimeoutPreemptively(Duration.ofMinutes(2), () -> run("synapseSim"));
 
     String calls = readLog(log);
     assertTrue(calls.contains("robot-sim"), calls);
-    assertTrue(
-        calls.lines().anyMatch(line -> line.startsWith("args=") && line.contains("main.py")),
-        calls);
+    assertTrue(calls.contains("main.py"), calls);
   }
 
   private Path synapseProjectDir() {
@@ -107,15 +94,26 @@ class SynapsePluginFunctionalTest {
         .build();
   }
 
-  private void writeSynapseProject() throws IOException {
-    Files.createDirectories(synapseProjectDir());
-    Files.writeString(synapseProjectDir().resolve(".synapseproject"), "name: test\n");
+  /**
+   * Creates a real Python project that behaves like Synapse. Using Python modules instead of a
+   * platform-specific executable wrapper keeps the functional tests identical on Linux, macOS and
+   * Windows.
+   */
+  private String stubSynapseProject(Path log, boolean blockInSimulation) throws IOException {
+    Path dir = synapseProjectDir();
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".synapseproject"), "name: test\n");
+    Files.writeString(dir.resolve("main.py"), pythonLogScript(log, blockInSimulation, "main.py "));
+
+    Path installer = Files.createDirectories(dir.resolve("synapse_installer"));
+    Files.writeString(installer.resolve("__init__.py"), "");
     Files.writeString(
-        synapseProjectDir().resolve("main.py"),
-        "from synapse.core.synapse import Synapse\n" + "Synapse.createAndRunRuntime()\n");
+        installer.resolve("__main__.py"), pythonLogScript(log, false, "-m synapse_installer "));
+
+    return isWindows() ? "python" : "python3";
   }
 
-  private void writeBuildScript(Path python, Path log, String extraConfig) throws IOException {
+  private void writeBuildScript(String python, Path log, String extraConfig) throws IOException {
     String build =
         "plugins {\n"
             + "    id 'java'\n"
@@ -151,52 +149,25 @@ class SynapsePluginFunctionalTest {
     Files.writeString(projectDir.resolve("settings.gradle"), "rootProject.name = 'test-robot'\n");
   }
 
-  private Path writePythonStub(Path log, boolean blockInSimulation) throws IOException {
-    String python = isWindows() ? "python" : "python3";
-    Path script = projectDir.resolve("fake_synapse.py");
+  private static String pythonLogScript(
+      Path log, boolean blockInSimulation, String argumentPrefix) {
     String body =
         "import pathlib\n"
-            + "import signal\n"
             + "import sys\n"
             + "import time\n"
             + "\n"
-            + "log = pathlib.Path(\""
+            + "log = pathlib.Path("
             + pythonString(log)
-            + "\")\n"
+            + ")\n"
             + "with log.open('a', encoding='utf-8') as stream:\n"
             + "    stream.write('cwd=' + str(pathlib.Path.cwd()) + '\\n')\n"
-            + "    stream.write('args=' + ' '.join(sys.argv[1:]) + '\\n')\n";
+            + "    stream.write('args="
+            + argumentPrefix
+            + "' + ' '.join(sys.argv[1:]) + '\\n')\n";
     if (blockInSimulation) {
-      body +=
-          "\n"
-              + "if '--sim' in sys.argv:\n"
-              + "    def stop(*_):\n"
-              + "        with log.open('a', encoding='utf-8') as stream:\n"
-              + "            stream.write('sim-stopped\\n')\n"
-              + "        raise SystemExit(0)\n"
-              + "\n"
-              + "    signal.signal(signal.SIGTERM, stop)\n"
-              + "    while True:\n"
-              + "        time.sleep(0.05)\n";
+      body += "\nif '--sim' in sys.argv:\n    while True:\n        time.sleep(0.05)\n";
     }
-    Files.writeString(script, body, StandardCharsets.UTF_8);
-
-    if (isWindows()) {
-      Path wrapper = projectDir.resolve("fake_python.bat");
-      Files.writeString(
-          wrapper,
-          "@echo off\r\n\"" + python + "\" \"" + script.toString().replace('\\', '/') + "\" %*\r\n",
-          StandardCharsets.UTF_8);
-      return wrapper;
-    }
-
-    Path wrapper = projectDir.resolve("fake_python");
-    Files.writeString(
-        wrapper,
-        "#!/bin/sh\nexec " + python + " " + shellQuote(script.toString()) + " \"$@\"\n",
-        StandardCharsets.UTF_8);
-    Files.setPosixFilePermissions(wrapper, PosixFilePermissions.fromString("rwxr-xr-x"));
-    return wrapper;
+    return body;
   }
 
   private String readLog(Path log) throws IOException {
@@ -208,14 +179,14 @@ class SynapsePluginFunctionalTest {
   }
 
   private static String groovyString(Path path) {
-    return path.toString().replace("\\", "/").replace("'", "\\'");
+    return groovyString(path.toString());
+  }
+
+  private static String groovyString(String value) {
+    return value.replace("\\", "/").replace("'", "\\'");
   }
 
   private static String pythonString(Path path) {
-    return path.toString().replace("\\", "\\\\").replace("\"", "\\\"");
-  }
-
-  private static String shellQuote(String value) {
-    return "'" + value.replace("'", "'\\''") + "'";
+    return "\"" + path.toString().replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
   }
 }
