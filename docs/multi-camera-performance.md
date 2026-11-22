@@ -1,0 +1,100 @@
+# Multi-camera performance target: OV9782
+
+## Goal
+
+Run four OV9782 cameras simultaneously at their maximum UVC resolution while each
+camera sustains at least **83% of the maximum single-camera throughput** measured
+with the same pipeline. Higher throughput is always better; 83% is a floor, not a
+ceiling.
+
+The primary metrics are:
+
+- **Per-camera processed FPS**: successful pipeline results per second, measured
+  independently for each camera.
+- **Aggregate processed FPS**: the sum of the four per-camera rates.
+- **Capture-to-result latency**: P50/P95/P99 from the frame's capture timestamp to
+  the completed result becoming available to consumers.
+- **Frame freshness**: how many frames were captured but never processed, and the
+  age of the newest result.
+- **Host cost**: CPU utilization and peak RSS during a sustained run.
+
+The pass condition is:
+
+```text
+min(FPS_1, FPS_2, FPS_3, FPS_4) >= 0.83 * baseline_single_camera_fps
+```
+
+## Why 1280x720 MJPEG is the benchmark mode
+
+The OV9782 itself is a 1/4-inch global-shutter sensor capable of 1280x800 at 120
+FPS over 2-lane MIPI or DVP, and it lists 1280x720 as a supported image size
+([OmniVision](https://www.ovt.com/products/ov9782/)). The USB UVC modules used in
+FRC vision setups advertise 1280x720 at 120 FPS in **MJPG only** over USB 2.0;
+they explicitly warn that YUY2 does not reach that frame rate
+([CM Technology CMT-1MP-OV9782-R352](http://www.camera-module.com/product/others/color-global-shutter-camera-module-120fps-ov9782.html)).
+
+Therefore the benchmark uses 1280x720 MJPEG as the maximum practical UVC mode.
+
+## USB bandwidth envelope
+
+USB 2.0 High Speed has a 480 Mbit/s signaling rate and a maximum theoretical data
+throughput of about 53 MB/s per bus
+([USB overview](https://en.wikipedia.org/wiki/USB#USB_2.0)). All devices behind
+the same host controller share that budget, and real payload throughput is lower
+after protocol overhead.
+
+If one camera reaches the advertised 120 FPS, the 83% target is 99.6 FPS per
+camera, or 398.4 FPS aggregate. The average compressed frame size that fits on
+one USB 2.0 bus is therefore:
+
+```text
+max_bytes_per_frame = bus_bytes_per_second / (4 * target_fps_per_camera)
+```
+
+Using the theoretical 53 MB/s ceiling gives about 133 kB/frame. Using a more
+realistic 35-40 MB/s payload budget gives roughly 88-100 kB/frame. If the scene
+makes the camera emit larger MJPEG frames, four cameras cannot all reach the
+target on a single shared USB 2.0 bus regardless of application optimizations.
+
+Uncompressed video is not viable: four 1280x720 YUY2 streams at 120 FPS would
+need about 884 MB/s before protocol overhead. MJPEG compression is mandatory for
+this target.
+
+Some UVC cameras also over-report the bandwidth they require, causing Linux's
+UVC driver to reject additional cameras on the same bus
+([Arducam forum report](https://forum.arducam.com/t/linux-uvc-driver-bandwidth-issues/6731)).
+The benchmark must record the host-controller/bus topology; four cameras on four
+independent buses are a materially different test from four cameras behind one
+hub.
+
+## What software can and cannot fix
+
+Software can remove application-side serialization: per-camera capture, decode,
+processing, and publication should not wait on a single global worker or on
+socket/NetworkTables I/O. Software cannot increase the shared USB 2.0 payload
+budget. If the bus is saturated, the honest outcomes are to report the measured
+shortfall or reduce resolution/frame rate; they are not to hide dropped frames.
+
+The multi-camera work therefore targets:
+
+1. one independent capture/processing lane per camera;
+2. newest-frame selection with bounded queues instead of unbounded stale frames;
+3. no global locks or single worker in the per-frame path;
+4. off-loop publication for results, streams, and diagnostics; and
+5. a runnable benchmark that reports whether the limit is host CPU, application
+   serialization, or USB bandwidth.
+
+## Benchmark protocol
+
+1. Warm up all cameras and the pipeline for at least 10 seconds.
+2. Measure a single camera at 1280x720 MJPEG for 60 seconds; record achieved
+   processed FPS and latency percentiles as the baseline.
+3. Measure four cameras at the same settings for 60 seconds.
+4. Record per-camera processed FPS, capture FPS, dropped/stale frames, MJPEG
+   bytes per frame, latency percentiles, CPU, and peak RSS.
+5. Record USB topology (`lsusb -t` on Linux, or equivalent platform information).
+6. Pass only when every camera meets `0.83 * baseline`; otherwise report the
+   bottleneck and the measured per-camera ratios.
+
+This protocol makes the claim falsifiable on the target robot hardware without
+requiring four OV9782 cameras on the development machine.
