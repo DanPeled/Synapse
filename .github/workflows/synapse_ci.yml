@@ -28,6 +28,14 @@ on:
       - "versions.properties"
       - ".github/workflows/synapse_ci.yml"
 
+env:
+  # npm's default retry budget is too small for flaky CI networks. These make
+  # transient ECONNRESET/ETIMEDOUT failures recover instead of failing the job.
+  NPM_CONFIG_FETCH_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
+  NPM_CONFIG_FETCH_RETRY_FACTOR: "2"
+
 jobs:
   # x86 builds (matrix)
   build:
@@ -62,11 +70,25 @@ jobs:
 
       - name: Install UI Node.js dependencies
         working-directory: synapse_ui
-        run: npm ci
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && exit 0
+            echo "::warning::npm ci failed (attempt ${attempt}/3); retrying in $((attempt * 10))s"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
       - name: Install simulator Node.js dependencies
         working-directory: synapse_sim
-        run: npm ci
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && exit 0
+            echo "::warning::npm ci failed (attempt ${attempt}/3); retrying in $((attempt * 10))s"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
       - name: Install Python dependencies
         run: |
@@ -161,11 +183,27 @@ jobs:
           restore-keys: |
             ubuntu-node-20-
 
-      - run: npm ci
+      - name: Install UI Node.js dependencies
         working-directory: synapse_ui
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && exit 0
+            echo "::warning::npm ci failed (attempt ${attempt}/3); retrying in $((attempt * 10))s"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
-      - run: npm ci
+      - name: Install simulator Node.js dependencies
         working-directory: synapse_sim
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && exit 0
+            echo "::warning::npm ci failed (attempt ${attempt}/3); retrying in $((attempt * 10))s"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
       - name: Create Python venv
         shell: bash
