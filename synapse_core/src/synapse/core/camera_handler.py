@@ -67,6 +67,7 @@ class _PublishLane:
             queue.Queue(maxsize=1)
         )
         self.stopEvent = threading.Event()
+        self._frameReady = threading.Event()
         self.thread = threading.Thread(
             target=self._run,
             daemon=True,
@@ -86,6 +87,7 @@ class _PublishLane:
 
     def stop(self) -> None:
         self.stopEvent.set()
+        self._frameReady.set()
         self.thread.join(timeout=1.0)
 
     def _acquire(self, frame: Frame) -> Tuple[np.ndarray, bool, int]:
@@ -136,6 +138,7 @@ class _PublishLane:
 
         try:
             self.frames.put_nowait(item)
+            self._frameReady.set()
         except queue.Full:
             self._release(buffer, pooled, generation)
             with self._lock:
@@ -152,17 +155,23 @@ class _PublishLane:
 
     def _run(self) -> None:
         while not self.stopEvent.is_set():
-            try:
-                buffer, pooled, generation, fps = self.frames.get(timeout=0.2)
-            except queue.Empty:
-                continue
+            # Event wait avoids the 200 ms idle wakeup while still draining every
+            # frame already queued when the lane was busy.
+            self._frameReady.wait(0.2)
+            self._frameReady.clear()
 
-            try:
-                self._publish(buffer, fps)
-            except Exception:
-                pass
-            finally:
-                self._release(buffer, pooled, generation)
+            while not self.stopEvent.is_set():
+                try:
+                    buffer, pooled, generation, fps = self.frames.get_nowait()
+                except queue.Empty:
+                    break
+
+                try:
+                    self._publish(buffer, fps)
+                except Exception:
+                    pass
+                finally:
+                    self._release(buffer, pooled, generation)
 
 
 def _getUsbDeviceSignature() -> Optional[UsbDeviceSignature]:
@@ -252,6 +261,7 @@ class CameraHandler:
         # Stream and recording writers run on their own bounded lane per camera.
         # A slow CvSource or VideoWriter must never stall pipeline throughput.
         self._publishLanes: Dict[CameraID, _PublishLane] = {}
+        self._publishingEnabled = True
 
         self.cameraScanningThread: threading.Thread
 
@@ -792,6 +802,10 @@ class CameraHandler:
         lane.start()
         return lane
 
+    def setPublishingEnabled(self, enabled: bool) -> None:
+        """Enable or disable stream/record publication without stopping cameras."""
+        self._publishingEnabled = bool(enabled)
+
     def publishFrame(
         self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
     ) -> None:
@@ -802,6 +816,8 @@ class CameraHandler:
         is behind, the stale queued frame is replaced so latency stays bounded.
         """
         assert frame is not None
+        if not self._publishingEnabled:
+            return
 
         now = time.perf_counter()
         cameraIndex = handle.cameraIndex

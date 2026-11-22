@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -115,6 +115,20 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
 
     def __init__(self, settings: ColorDetectSettings):
         super().__init__(settings)
+        self._scratchShape: Optional[Tuple[int, ...]] = None
+        self._hsv: Optional[np.ndarray] = None
+        self._mask: Optional[np.ndarray] = None
+        self._output: Optional[np.ndarray] = None
+        self._kernels: Dict[int, np.ndarray] = {}
+
+    def _ensureScratch(self, img: Frame) -> None:
+        shape = img.shape
+        if self._scratchShape == shape and self._output is not None:
+            return
+        self._scratchShape = shape
+        self._hsv = np.empty(shape, dtype=np.uint8)
+        self._mask = np.empty(shape[:2], dtype=np.uint8)
+        self._output = np.empty(shape, dtype=img.dtype)
 
     def _createMask(self, hsv: np.ndarray) -> np.ndarray:
         """Apply HSV thresholding and morphological operations to generate a mask."""
@@ -131,11 +145,15 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
             dtype=np.uint8,
         )
 
-        mask = cv2.inRange(hsv, lower, upper)
+        assert self._mask is not None
+        mask = cv2.inRange(hsv, lower, upper, dst=self._mask)
         k = int(self.getSetting(self.settings.morph_kernel))
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        kernel = self._kernels.get(k)
+        if kernel is None:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+            self._kernels[k] = kernel
+        cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, dst=mask)
+        cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, dst=mask)
         return mask
 
     def _findDetections(self, mask: np.ndarray) -> List[ColorDetection]:
@@ -191,13 +209,17 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
         Returns:
             Annotated frame with bounding boxes.
         """
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        mask = self._createMask(hsv)
+        self._ensureScratch(img)
+        assert self._hsv is not None and self._output is not None
+        cv2.cvtColor(img, cv2.COLOR_BGR2HSV, dst=self._hsv)
+        mask = self._createMask(self._hsv)
         detections = self._findDetections(mask)
         main_detection = self._selectMainDetection(detections, img.shape)
 
-        # Draw detections
-        output = img.copy()
+        # Draw detections into a reusable destination instead of allocating a
+        # full frame copy per result.
+        np.copyto(self._output, img)
+        output = self._output
         publish_all = self.getSetting(self.settings.publish_all_detections)
         for det in detections:
             if det == main_detection:

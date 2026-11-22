@@ -89,7 +89,7 @@ def readBaselineFps(path: Path) -> float:
     return float(cameras[0]["processed_fps"])
 
 
-def createRuntime(project: Path) -> RuntimeManager:
+def createRuntime(project: Path, publishStreams: bool = False) -> RuntimeManager:
     """Configure and start a runtime without UI, websocket, or network setup."""
     configPath = project / "config" / "settings.yml"
     if not configPath.exists():
@@ -103,6 +103,9 @@ def createRuntime(project: Path) -> RuntimeManager:
 
     runtime = RuntimeManager(project)
     runtime.setup(project, sendSettingsInNT=False)
+    # Headless measurements should not spend memory bandwidth encoding MJPEG
+    # streams nobody is watching. Recording stays available in normal runs.
+    runtime.cameraHandler.setPublishingEnabled(publishStreams)
     return runtime
 
 
@@ -156,6 +159,7 @@ def buildReport(
     durationSeconds: float,
     baselineFps: Optional[float],
     threshold: float,
+    publishStreams: bool,
     topology: Dict[str, Any],
     hostSample: Dict[str, Any],
     startedAt: datetime,
@@ -176,6 +180,7 @@ def buildReport(
         "started_at": startedAt.isoformat(),
         "warmup_seconds": warmupSeconds,
         "duration_seconds": durationSeconds,
+        "stream_publication": "enabled" if publishStreams else "disabled",
     }
     summary["host"] = {
         "platform": platform.platform(),
@@ -227,6 +232,11 @@ def parseArgs(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Required fraction of baseline FPS (default: 0.83)",
     )
     parser.add_argument(
+        "--streams",
+        action="store_true",
+        help="Keep stream/record publication enabled during measurement",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -244,7 +254,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.baseline_json is not None:
         baselineFps = readBaselineFps(args.baseline_json)
 
-    runtime = createRuntime(args.project.resolve())
+    runtime = createRuntime(args.project.resolve(), publishStreams=args.streams)
     try:
         if args.warmup:
             time.sleep(args.warmup)
@@ -257,6 +267,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             durationSeconds=args.duration,
             baselineFps=baselineFps,
             threshold=args.threshold,
+            publishStreams=args.streams,
             topology=collectUsbTopology(),
             hostSample=hostSample,
             startedAt=startedAt,

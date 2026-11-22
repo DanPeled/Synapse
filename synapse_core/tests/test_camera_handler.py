@@ -60,6 +60,15 @@ class TestPublishFrame(unittest.TestCase):
         resize.assert_not_called()
         self.output.putFrame.assert_called_once_with(frame)
 
+    def test_publication_can_be_disabled_for_headless_benchmarks(self):
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        self.handler.setPublishingEnabled(False)
+
+        self.handler.publishFrame(frame, self.handle)
+
+        self.output.putFrame.assert_not_called()
+        self.assertEqual(self.handler.getPublishStats(), {"queued": 0, "dropped": 0})
+
     def test_resizes_and_reuses_destination_buffer(self):
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
@@ -95,6 +104,26 @@ class TestPublishFrame(unittest.TestCase):
             assert self.handler.getPublishStats(0)["dropped"] >= 1
         finally:
             release.set()
+            lane.stop()
+
+    def test_publish_lane_wakes_immediately_after_idle(self):
+        self.handler.cameraHandles[0] = self.handle
+        lane = self.handler._startPublishLane(0)
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        try:
+            # Let the lane settle into its idle wait before publishing.
+            time.sleep(0.05)
+            startedAt = time.perf_counter()
+            self.handler.publishFrame(frame, self.handle)
+
+            deadline = startedAt + 0.2
+            while not self.output.putFrame.called and time.perf_counter() < deadline:
+                time.sleep(0.005)
+
+            assert self.output.putFrame.called
+            assert time.perf_counter() - startedAt < 0.2
+        finally:
             lane.stop()
 
     def test_recording_resizes_and_releases_buffer(self):
