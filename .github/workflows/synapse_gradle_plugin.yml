@@ -1,0 +1,116 @@
+name: Synapse Gradle Plugin
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "synapse_gradle_plugin/**"
+      - ".github/workflows/synapse_gradle_plugin.yml"
+      - "jitpack.yml"
+      - "versions.properties"
+  pull_request:
+    paths:
+      - "synapse_gradle_plugin/**"
+      - ".github/workflows/synapse_gradle_plugin.yml"
+      - "jitpack.yml"
+      - "versions.properties"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "25"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin
+        working-directory: synapse_gradle_plugin
+        run: |
+          chmod +x gradlew
+          ./gradlew build --no-configuration-cache
+
+  test:
+    needs: build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "25"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run plugin tests
+        working-directory: synapse_gradle_plugin
+        run: |
+          chmod +x gradlew
+          ./gradlew test functionalTest --no-configuration-cache
+
+  spotless-check:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Spotless check
+        working-directory: synapse_gradle_plugin
+        run: |
+          chmod +x gradlew
+          ./gradlew spotlessCheck --no-configuration-cache

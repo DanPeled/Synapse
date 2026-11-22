@@ -22,6 +22,15 @@ PREVIEW_MAX_BYTES = 256 * 1024
 _TEXT_SAMPLE_BYTES = 8192
 
 
+class ReusableThreadingTCPServer(socketserver.ThreadingTCPServer):
+    """TCP server that handles file requests concurrently and restarts cleanly."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+    # Handler threads are daemons, so shutdown should not wait for slow clients.
+    block_on_close = False
+
+
 def _decode_text_preview(data: bytes, truncated: bool) -> Optional[str]:
     """Return the file content as text when it looks like a text file."""
     sample = data[:_TEXT_SAMPLE_BYTES]
@@ -345,7 +354,7 @@ class FileServer:
 
         self.host = host
         self.port = port
-        self._server: Optional[socketserver.TCPServer] = None
+        self._server: Optional[ReusableThreadingTCPServer] = None
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
@@ -355,10 +364,7 @@ class FileServer:
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=files_dir, **kwargs)
 
-        class ReusableTCPServer(socketserver.TCPServer):
-            allow_reuse_address = True
-
-        self._server = ReusableTCPServer((self.host, self.port), Handler)
+        self._server = ReusableThreadingTCPServer((self.host, self.port), Handler)
 
         info(f"File server running at http://{self.host}:{self.port}/")
 

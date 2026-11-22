@@ -39,7 +39,11 @@ import { AddPipelineDialog } from "./addPipelineDialog";
 import { ChangePipelineTypeDialog } from "./change_pipeline_type_dialog";
 import { ConfirmDeletePipelineDialog } from "./confirm_delete_pipeline_dialog";
 import { teamColor, baseCardColor, borderColor } from "@/services/style";
-import { CameraID } from "@/services/backend/dataStractures";
+import {
+  CameraID,
+  CameraPipelinesMap,
+  CameraPipelinesSetter,
+} from "@/services/backend/dataStractures";
 import { WebSocketWrapper } from "@/services/websocket";
 
 interface CameraAndPipelineControlsProps {
@@ -50,9 +54,9 @@ interface CameraAndPipelineControlsProps {
   selectedPipelineType?: PipelineTypeProto;
   setSelectedPipelineTypeAction: (val?: PipelineTypeProto) => void;
   cameras: Map<CameraID, CameraProto>;
-  pipelines: Map<number, PipelineProto>;
+  pipelines: CameraPipelinesMap;
   pipelinetypes: Map<string, PipelineTypeProto>;
-  setpipelinesAction: (pipeline: Map<number, PipelineProto>) => void;
+  setpipelinesAction: CameraPipelinesSetter;
   socket?: WebSocketWrapper;
 }
 

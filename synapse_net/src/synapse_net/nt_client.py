@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import time
+import threading
 from functools import lru_cache
 from typing import Optional
 
@@ -64,13 +64,14 @@ class NtClient:
         self.nt_inst.startClient(name)
 
         timeout = 10
-        start_time = time.time()
+        connected = threading.Event()
 
         # Connection listener accepts any IP
         def connectionListener(event: Event):
             if isinstance(event.data, ConnectionInfo):
                 ip = event.data.remote_ip
                 if event.is_(EventFlags.CONNECTED):
+                    connected.set()
                     info(f"Connected to NetworkTables server ({ip})")
                     NtClient.onConnect.call(ip)
                 elif event.is_(EventFlags.DISCONNECTED):
@@ -81,15 +82,15 @@ class NtClient:
         if self.server:
             self.server.addConnectionListener(True, connectionListener)
 
-        # Low-latency wait loop (non-blocking, short sleeps)
-        while not self.nt_inst.isConnected():
-            elapsed = time.time() - start_time
-            if elapsed > timeout:
-                warn(
-                    f"Connection timed out after {elapsed:.2f}s (server: {'127.0.0.1' if isServer else teamNumber}, client: {name})"
-                )
-                break
-            time.sleep(0.02)  # 20ms interval for faster reaction
+        # The listener also covers connections that already exist, but check
+        # explicitly so setup never waits on an event that cannot be delivered.
+        if self.nt_inst.isConnected():
+            connected.set()
+
+        if not connected.wait(timeout):
+            warn(
+                f"Connection timed out after {timeout:.2f}s (server: {'127.0.0.1' if isServer else teamNumber}, client: {name})"
+            )
 
         return True
 

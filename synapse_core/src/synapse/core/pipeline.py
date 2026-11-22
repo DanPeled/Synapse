@@ -11,6 +11,7 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Hashable,
     Iterable,
     List,
     Optional,
@@ -108,6 +109,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
         self._ntDataTable = None
         self._ntPublishers = {}
+        self._wsCoalesceKeys: Dict[str, tuple[int, int, Hashable]] = {}
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         self.invalidateCachedEntries()
@@ -130,7 +132,11 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
     def invalidateCachedEntries(self) -> None:
         for pub in self._ntPublishers.values():
             try:
-                del pub
+                close = getattr(pub, "close", None)
+                if close is not None:
+                    close()
+                else:
+                    del pub
             except Exception:
                 pass
         self._ntPublishers.clear()
@@ -197,23 +203,54 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             pub.set(_makeNtValue(parsed, isMsgpack=isMsgpack))
 
         ws = WebSocketServer.kInstance
-        if ws:
+        if ws and ws.hasClients:
             try:
-                ws.sendToAllSync(
-                    createMessage(
+                cameraid = max(self.cameraIndex, 0)
+                pipelineIndex = self.pipelineIndex
+                coalesceKey: Hashable
+                cachedKey = self._wsCoalesceKeys.get(key)
+                if (
+                    cachedKey is not None
+                    and cachedKey[0] == cameraid
+                    and cachedKey[1] == pipelineIndex
+                ):
+                    coalesceKey = cachedKey[2]
+                else:
+                    coalesceKey = (
+                        MessageTypeProto.SET_PIPELINE_RESULT,
+                        cameraid,
+                        pipelineIndex,
+                        key,
+                    )
+                    self._wsCoalesceKeys[key] = (cameraid, pipelineIndex, coalesceKey)
+
+                # Build the protobuf only if this value survives coalescing.
+                # Results can be produced much faster than the UI can consume
+                # them; serializing every superseded value would burn CPU without
+                # changing what the UI displays.
+                def buildMessage() -> bytes:
+                    return createMessage(
                         MessageTypeProto.SET_PIPELINE_RESULT,
                         PipelineResultProto(
                             is_msgpack=isMsgpack,
                             key=key,
                             value=settingValueToProto(parsed),
-                            pipeline_index=self.pipelineIndex,
+                            pipeline_index=pipelineIndex,
+                            cameraid=cameraid,
                         ),
                     )
-                )
+
+                ws.sendToAllSync(buildMessage, coalesce_key=coalesceKey)
             except Exception:
                 pass
 
     def setResults(self, value: TResultType | None) -> None:
+        """Publish the newest result immediately.
+
+        NetworkTables already keeps only the latest value per topic, so every
+        completed result is handed to it as soon as it is available. Adding an
+        application-level interval here would only delay fresh vision data.
+        """
         self.setDataValue(
             ResultsTopicKey,
             serializePipelineResult(value) if value is not None else bytes(),

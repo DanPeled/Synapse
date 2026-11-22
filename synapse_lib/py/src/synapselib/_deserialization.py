@@ -7,6 +7,7 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import MISSING, fields, is_dataclass
+from functools import lru_cache
 from types import UnionType
 from typing import (
     Any,
@@ -123,37 +124,161 @@ def _convertValue(value: Any, annotation: Any) -> Any:
     return value
 
 
+# -------------------
+# Cached conversion metadata
+# -------------------
+
+# get_type_hints() evaluates annotations with eval() and was being called for
+# every result object (including every item in a list). Cache it per class; on
+# failure fall back to raw annotations and retry next time in case the forward
+# reference becomes resolvable.
+_TYPE_HINTS_CACHE: dict[Type[Any], dict[str, Any]] = {}
+_FIELD_SPECS_CACHE: dict[Type[Any], tuple[tuple[str, Any, Any, Any], ...]] = {}
+
+
+def _typeHints(cls: Type[Any]) -> dict[str, Any]:
+    try:
+        return _TYPE_HINTS_CACHE[cls]
+    except KeyError:
+        pass
+
+    try:
+        typeHints = get_type_hints(cls)
+    except Exception:
+        return {}
+
+    _TYPE_HINTS_CACHE[cls] = typeHints
+    return typeHints
+
+
+def _fieldSpecs(cls: Type[Any]) -> tuple[tuple[str, Any, Any, Any], ...]:
+    try:
+        return _FIELD_SPECS_CACHE[cls]
+    except KeyError:
+        pass
+
+    typeHints = _typeHints(cls)
+    specs = tuple(
+        (
+            field.name,
+            typeHints.get(field.name, field.type),
+            field.default,
+            field.default_factory,
+        )
+        for field in fields(cls)
+    )
+    if typeHints:
+        _FIELD_SPECS_CACHE[cls] = specs
+    return specs
+
+
+def _identity(value: Any) -> Any:
+    return value
+
+
+def _toFloat(value: Any) -> Any:
+    return float(value) if isinstance(value, int) else value
+
+
+def _toInt(value: Any) -> Any:
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+@lru_cache(maxsize=2048)
+def _converterForAnnotation(annotation: Any) -> Callable[[Any], Any]:
+    """Build (and cache) a converter callable for an evaluated annotation."""
+    geometryConverter = _GEOMETRY_CONVERTERS.get(annotation)
+    if geometryConverter is not None:
+        return geometryConverter
+
+    if annotation is Any or annotation is None:
+        return _identity
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin is Union or origin is UnionType:
+        options = tuple(
+            _converterForAnnotation(option)
+            for option in args
+            if option is not type(None)
+        )
+
+        def convertUnion(value: Any) -> Any:
+            for option in options:
+                try:
+                    return option(value)
+                except (TypeError, ValueError):
+                    continue
+            return value
+
+        return convertUnion
+
+    if origin in (list, List, tuple, set):
+        itemConverter = _converterForAnnotation(args[0] if args else Any)
+        if origin is tuple:
+            return lambda value: tuple(itemConverter(item) for item in value)
+        if origin is set:
+            return lambda value: set(itemConverter(item) for item in value)
+        return lambda value: [itemConverter(item) for item in value]
+
+    if origin is dict:
+        keyConverter = _converterForAnnotation(args[0] if len(args) > 0 else Any)
+        valueConverter = _converterForAnnotation(args[1] if len(args) > 1 else Any)
+        return lambda value: {
+            keyConverter(key): valueConverter(item) for key, item in value.items()
+        }
+
+    if is_dataclass(annotation):
+        return lambda value: from_dict(cast(Type[Any], annotation), value)
+
+    if annotation is float:
+        return _toFloat
+    if annotation is int:
+        return _toInt
+
+    return _identity
+
+
+def _converter(annotation: Any) -> Callable[[Any], Any]:
+    try:
+        return _converterForAnnotation(annotation)
+    except TypeError:
+        # Rare unhashable annotation: fall back to recursive inspection.
+        return lambda value: _convertValue(value, annotation)
+
+
+def _convert(value: Any, annotation: Any) -> Any:
+    """Fast path for a single field, preserving the original None/Any rules."""
+    if value is None or annotation is Any or annotation is None:
+        return value
+    return _converter(annotation)(value)
+
+
 def from_dict(cls: Type[Any], data: Dict[str, Any]) -> Any:
     """Convert a mapping into a dataclass instance of type *cls*.
 
     Nested dataclasses, lists, tuples, dictionaries, and optionals are handled
     recursively. Unknown keys are ignored, and fields missing from *data* fall
     back to their dataclass default (or ``None``) so that a client built for an
-    older runtime keeps working with a newer one.
+    older runtime keeps working with a newer one. Type hints and converters are
+    cached between calls because results arrive once per frame.
     """
     if not is_dataclass(cls):
         raise ValueError(f"{cls} is not a dataclass")
     if not isinstance(data, dict):
         raise ValueError(f"Expected a mapping for {cls.__name__}, got {type(data)}")
 
-    try:
-        typeHints = get_type_hints(cls)
-    except Exception:
-        # Forward references may not be resolvable in every environment. The
-        # raw field annotations are still good enough for the common cases.
-        typeHints = {}
-
     initKwargs = {}
-    for field in fields(cls):
-        annotation = typeHints.get(field.name, field.type)
-        if field.name in data:
-            initKwargs[field.name] = _convertValue(data[field.name], annotation)
-        elif field.default is not MISSING:
-            initKwargs[field.name] = field.default
-        elif field.default_factory is not MISSING:  # pyright: ignore[reportAttributeAccessIssue]
-            initKwargs[field.name] = field.default_factory()  # pyright: ignore[reportAttributeAccessIssue]
+    for name, annotation, default, defaultFactory in _fieldSpecs(cls):
+        if name in data:
+            initKwargs[name] = _convert(data[name], annotation)
+        elif default is not MISSING:
+            initKwargs[name] = default
+        elif defaultFactory is not MISSING:  # pyright: ignore[reportAttributeAccessIssue]
+            initKwargs[name] = defaultFactory()  # pyright: ignore[reportAttributeAccessIssue]
         else:
-            initKwargs[field.name] = None
+            initKwargs[name] = None
 
     return cls(**initKwargs)
 

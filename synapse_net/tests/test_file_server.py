@@ -4,15 +4,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import io
+import socketserver
 import tempfile
 import threading
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import quote
 
 import pytest
 import requests
-from synapse_net.file_server import PREVIEW_MAX_BYTES, FileServer
+from synapse_net.file_server import (
+    PREVIEW_MAX_BYTES,
+    FileServer,
+    FileServerHandler,
+    ReusableThreadingTCPServer,
+)
 
 
 @pytest.fixture
@@ -29,6 +36,38 @@ def server():
 def server_url(srv: FileServer) -> str:
     host, port = srv._server.server_address  # pyright: ignore
     return f"http://{host}:{port}"
+
+
+def test_file_server_is_threaded_with_daemon_threads():
+    assert issubclass(ReusableThreadingTCPServer, socketserver.ThreadingTCPServer)
+    assert ReusableThreadingTCPServer.allow_reuse_address is True
+    assert ReusableThreadingTCPServer.daemon_threads is True
+    assert ReusableThreadingTCPServer.block_on_close is False
+
+
+def test_file_server_uses_reusable_threading_server(server):
+    assert isinstance(server._server, ReusableThreadingTCPServer)
+
+
+def test_file_server_handles_concurrent_requests(monkeypatch, server):
+    barrier = threading.Barrier(2, timeout=3)
+
+    def slow_get(handler):
+        barrier.wait()
+        handler.send_response(200)
+        handler.end_headers()
+        handler.wfile.write(b"ok")
+
+    monkeypatch.setattr(FileServerHandler, "do_GET", slow_get)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(requests.get, server_url(server) + f"/file{index}.txt")
+            for index in range(2)
+        ]
+        responses = [future.result(timeout=5) for future in futures]
+
+    assert [response.status_code for response in responses] == [200, 200]
 
 
 # -------------------------

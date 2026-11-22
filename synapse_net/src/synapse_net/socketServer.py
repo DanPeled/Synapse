@@ -5,11 +5,13 @@
 
 import asyncio
 import inspect
+import threading
 import traceback
+from collections import OrderedDict
 from dataclasses import fields
 from enum import Enum
 from functools import lru_cache
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Union
+from typing import Any, Callable, Coroutine, Dict, Hashable, List, Optional, Set, Union
 
 import betterproto
 from websockets.exceptions import ConnectionClosed
@@ -22,6 +24,14 @@ from .generated.messages.v1 import MessageProto, MessageTypeProto
 # result and metric sent to the UI, so rebuilding this set per message is pure
 # overhead.
 _MESSAGE_FIELD_NAMES = frozenset(f.name for f in fields(MessageProto))
+
+# A coalesced message can be supplied as a factory so protobuf encoding happens
+# only if the value is actually sent. Non-coalesced messages are always ready.
+MessageData = Union[Data, Callable[[], Data]]
+
+
+def _resolveMessage(message: MessageData) -> Data:
+    return message() if callable(message) else message
 
 
 class SocketEvent(Enum):
@@ -74,6 +84,38 @@ class WebSocketServer:
         # creating a Task per frame.
         self._sendQueue: Optional[asyncio.Queue] = None
         self._sendTask: Optional[asyncio.Task] = None
+        # Coalesced messages are kept by key so a slow UI only ever receives
+        # the newest value for a given topic. The queue holds a single wakeup
+        # for the whole map instead of one entry per update.
+        self._coalesced: "OrderedDict[Hashable, MessageData]" = OrderedDict()
+        self._wakeupPending = False
+        # Producers coalesce before crossing into the loop. At 4 cameras x 120
+        # FPS that turns hundreds of cross-thread wakeups per second into at
+        # most one per loop tick.
+        self._pending: "OrderedDict[Hashable, MessageData]" = OrderedDict()
+        self._pendingLock = threading.Lock()
+        self._pendingFlushScheduled = False
+        self._clientLock = threading.Lock()
+        self._openClientCount = 0
+
+    @property
+    def hasClients(self) -> bool:
+        """Whether at least one websocket client is currently open."""
+        with self._clientLock:
+            return self._openClientCount > 0
+
+    def registerClient(self, client: WebSocketServerProtocol) -> None:
+        """Track a client without scanning the mutable client set per result."""
+        with self._clientLock:
+            self.clients.add(client)
+            if getattr(client, "open", False):
+                self._openClientCount += 1
+
+    def unregisterClient(self, client: WebSocketServerProtocol) -> None:
+        with self._clientLock:
+            self.clients.discard(client)
+            if getattr(client, "open", False):
+                self._openClientCount = max(0, self._openClientCount - 1)
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable[..., Coroutine]):
@@ -87,7 +129,7 @@ class WebSocketServer:
             await self.callbacks[event](*args, **kwargs)
 
     async def handler(self, websocket: WebSocketServerProtocol, path: str):
-        self.clients.add(websocket)
+        self.registerClient(websocket)
         await self._emit(SocketEvent.kConnect, websocket)
 
         try:
@@ -101,7 +143,7 @@ class WebSocketServer:
             )
             await self._emit(SocketEvent.kError, websocket, errString)
         finally:
-            self.clients.remove(websocket)
+            self.unregisterClient(websocket)
             await self._emit(SocketEvent.kDisconnect, websocket)
 
     async def sendToAll(self, message: Data):
@@ -118,24 +160,94 @@ class WebSocketServer:
         if coros:
             await asyncio.gather(*coros, return_exceptions=True)
 
-    def sendToAllSync(self, message: Data):
+    def sendToAllSync(
+        self, message: MessageData, *, coalesce_key: Optional[Hashable] = None
+    ):
         try:
             if self.loop and self.loop.is_running():
-                # Hand the message to the background send loop. Running the
-                # enqueue on the websocket loop keeps the queue and the send
-                # task bound to the loop that actually performs the I/O.
-                self.loop.call_soon_threadsafe(self._enqueue, message)
+                if coalesce_key is None:
+                    # Control messages must not be hidden by a pending result.
+                    # Flush the producer-side map first so ordering is kept.
+                    with self._pendingLock:
+                        pending, self._pending = self._pending, OrderedDict()
+                        self._pendingFlushScheduled = False
+                    self.loop.call_soon_threadsafe(self._enqueueBatch, pending, message)
+                    return
+
+                shouldSchedule = False
+                with self._pendingLock:
+                    self._pending[coalesce_key] = message
+                    if not self._pendingFlushScheduled:
+                        self._pendingFlushScheduled = True
+                        shouldSchedule = True
+                if shouldSchedule:
+                    try:
+                        self.loop.call_soon_threadsafe(self._enqueuePending)
+                    except Exception:
+                        with self._pendingLock:
+                            self._pendingFlushScheduled = False
+                        raise
                 return
             # Run in a temporary event loop (e.g. during test or before full setup)
-            asyncio.run(self.sendToAll(message))
+            asyncio.run(self.sendToAll(_resolveMessage(message)))
         except Exception:
             pass
 
-    def _enqueue(self, message: Data):
+    def _enqueuePending(self) -> None:
+        """Move producer-side coalesced values into the loop-side map."""
+        with self._pendingLock:
+            pending, self._pending = self._pending, OrderedDict()
+            self._pendingFlushScheduled = False
+        if not pending:
+            return
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+
+        for key, message in pending.items():
+            self._coalesced[key] = message
+        if not self._wakeupPending:
+            self._wakeupPending = True
+            self._sendQueue.put_nowait((None, None, True))
+        self._ensureSendTask()
+
+    def _enqueueBatch(
+        self, pending: "OrderedDict[Hashable, MessageData]", unkeyed: MessageData
+    ) -> None:
+        """Flush coalesced results followed by an ordered control message."""
+        self._enqueuePendingValues(pending)
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+        self._sendQueue.put_nowait((None, _resolveMessage(unkeyed), False))
+        self._ensureSendTask()
+
+    def _enqueuePendingValues(
+        self, pending: "OrderedDict[Hashable, MessageData]"
+    ) -> None:
+        if not pending:
+            return
+        if self._sendQueue is None:
+            self._sendQueue = asyncio.Queue()
+        for key, message in pending.items():
+            self._coalesced[key] = message
+        if not self._wakeupPending:
+            self._wakeupPending = True
+            self._sendQueue.put_nowait((None, None, True))
+
+    def _enqueue(self, message: MessageData, coalesce_key: Optional[Hashable]):
         """Queue a message for the background sender (must run on the loop)."""
         if self._sendQueue is None:
             self._sendQueue = asyncio.Queue()
-        self._sendQueue.put_nowait(message)
+
+        if coalesce_key is None:
+            self._sendQueue.put_nowait((None, _resolveMessage(message), False))
+        else:
+            self._coalesced[coalesce_key] = message
+            if not self._wakeupPending:
+                self._wakeupPending = True
+                self._sendQueue.put_nowait((None, None, True))
+        self._ensureSendTask()
+
+    def _ensureSendTask(self) -> None:
         if self._sendTask is None or self._sendTask.done():
             self._sendTask = asyncio.get_running_loop().create_task(self._sendLoop())
 
@@ -143,9 +255,18 @@ class WebSocketServer:
         """Drain the send queue sequentially, one message at a time."""
         assert self._sendQueue is not None
         while True:
-            message = await self._sendQueue.get()
+            _, message, isWakeup = await self._sendQueue.get()
             try:
-                await self.sendToAll(message)
+                if isWakeup:
+                    if self._coalesced:
+                        _, coalescedMessage = self._coalesced.popitem(last=False)
+                        await self.sendToAll(_resolveMessage(coalescedMessage))
+                    if self._coalesced:
+                        self._sendQueue.put_nowait((None, None, True))
+                    else:
+                        self._wakeupPending = False
+                elif message is not None:
+                    await self.sendToAll(message)
             except Exception:
                 pass
             finally:
@@ -172,6 +293,11 @@ class WebSocketServer:
                 pass
         self._sendTask = None
         self._sendQueue = None
+        with self._pendingLock:
+            self._pending.clear()
+            self._pendingFlushScheduled = False
+        self._coalesced.clear()
+        self._wakeupPending = False
         if self._server:
             # If _server is a coroutine, await it first
             if asyncio.iscoroutine(self._server):
