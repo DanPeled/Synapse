@@ -110,7 +110,8 @@ async def test_sendToAll_and_sendToClient():
     client2 = AsyncMock()
     client2.open = False
 
-    server.clients.update({client1, client2})
+    server.registerClient(client1)
+    server.registerClient(client2)
 
     message = b"test"
     await server.sendToAll(message)
@@ -158,7 +159,7 @@ async def test_sendToAllSync_queues_messages_when_loop_running():
 
     client = AsyncMock()
     client.open = True
-    server.clients.add(client)
+    server.registerClient(client)
 
     messages = [b"one", b"two", b"three"]
     for message in messages:
@@ -188,7 +189,7 @@ async def test_coalesces_pending_messages_by_key():
 
     client = AsyncMock()
     client.open = True
-    server.clients.add(client)
+    server.registerClient(client)
 
     server.sendToAllSync(b"stale", coalesce_key=("results", 0, 0))
     server.sendToAllSync(b"newest", coalesce_key=("results", 0, 0))
@@ -215,13 +216,55 @@ async def test_coalesces_pending_messages_by_key():
 
 
 @pytest.mark.asyncio
+async def test_producer_coalescing_schedules_one_loop_callback():
+    server = WebSocketServer("localhost", 8765)
+    server.loop = asyncio.get_running_loop()
+
+    client = AsyncMock()
+    client.open = True
+    server.registerClient(client)
+
+    wakeups = 0
+    originalCallSoon = server.loop.call_soon_threadsafe
+
+    def countWakeups(callback, *args, **kwargs):
+        nonlocal wakeups
+        wakeups += 1
+        return originalCallSoon(callback, *args, **kwargs)
+
+    server.loop.call_soon_threadsafe = countWakeups
+
+    built = []
+
+    def factory(value: bytes):
+        def build() -> bytes:
+            built.append(value)
+            return value
+
+        return build
+
+    for index in range(20):
+        server.sendToAllSync(factory(str(index).encode()), coalesce_key=("results",))
+
+    await asyncio.sleep(0)
+    assert wakeups == 1
+
+    assert server._sendQueue is not None
+    await asyncio.wait_for(server._sendQueue.join(), timeout=1)
+    assert built == [b"19"]
+    assert [call.args[0] for call in client.send.await_args_list] == [b"19"]
+
+    await server.close()
+
+
+@pytest.mark.asyncio
 async def test_control_message_is_not_dropped_while_coalescing():
     server = WebSocketServer("localhost", 8765)
     server.loop = asyncio.get_running_loop()
 
     client = AsyncMock()
     client.open = True
-    server.clients.add(client)
+    server.registerClient(client)
 
     firstSendStarted = asyncio.Event()
     releaseFirstSend = asyncio.Event()
@@ -266,7 +309,7 @@ async def test_lazy_coalesced_message_is_built_only_for_newest():
 
     client = AsyncMock()
     client.open = True
-    server.clients.add(client)
+    server.registerClient(client)
 
     built = []
 
@@ -302,7 +345,8 @@ def test_has_clients_only_counts_open_clients():
     openClient.open = True
     closedClient = AsyncMock()
     closedClient.open = False
-    server.clients.update({openClient, closedClient})
+    server.registerClient(openClient)
+    server.registerClient(closedClient)
 
     assert server.hasClients is True
 
