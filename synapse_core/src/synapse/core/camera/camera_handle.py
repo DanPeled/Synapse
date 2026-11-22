@@ -18,6 +18,11 @@ from .synapse_camera import SynapseCamera
 
 
 class CameraHandle:
+    # Native camera connection checks are cheap individually but scale with
+    # camera count. Re-checking every 50 ms keeps disconnect handling responsive
+    # without adding a native call to every captured frame.
+    _CONNECTION_CHECK_INTERVAL: Final[float] = 0.05
+
     def __init__(self, camera: SynapseCamera, name: str, index: int) -> None:
         self.camera: SynapseCamera = camera
         self.name = name
@@ -244,13 +249,19 @@ class CameraHandle:
     def _frameGrabberLoop(self) -> None:
         scratch: Optional[np.ndarray] = None
         lastDrain = 0.0
+        lastConnectionCheck = 0.0
+        connected = False
 
         while self._running:
-            try:
-                if not self.camera.isConnected():
-                    time.sleep(0.005)
-                    continue
-            except Exception:
+            now = time.monotonic()
+            if now - lastConnectionCheck >= self._CONNECTION_CHECK_INTERVAL:
+                lastConnectionCheck = now
+                try:
+                    connected = bool(self.camera.isConnected())
+                except Exception:
+                    connected = False
+
+            if not connected:
                 time.sleep(0.005)
                 continue
 

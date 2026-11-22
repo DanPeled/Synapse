@@ -66,12 +66,54 @@ def test_grab_frame_wakes_on_frame_event() -> None:
     assert elapsed < 0.25
 
 
+def test_connection_checks_are_throttled() -> None:
+    handle = makeHandle()
+    handle._bufferPool = [
+        np.zeros((2, 2, 3), dtype=np.uint8),
+        np.zeros((2, 2, 3), dtype=np.uint8),
+    ]
+    handle._freeBuffers = queue.Queue(maxsize=2)
+    handle._freeBuffers.put_nowait(0)
+    handle._freeBuffers.put_nowait(1)
+    fakeCamera = _FakeCamera()
+    handle.camera = cast(Any, fakeCamera)
+    handle.cameraIndex = 98
+    handle._running = True
+    handle._thread = threading.Thread(
+        target=handle._frameGrabberLoop, daemon=True, name="test-throttled-checks"
+    )
+
+    stopConsumer = threading.Event()
+
+    def consume() -> None:
+        while not stopConsumer.is_set():
+            ok, _, _ = handle.grabFrame(timeout=0.01)
+            if ok:
+                handle.releaseFrame()
+
+    consumer = threading.Thread(target=consume, daemon=True, name="test-consumer")
+    handle._thread.start()
+    consumer.start()
+
+    try:
+        assert fakeCamera.progress.wait(1.0)
+        time.sleep(0.2)
+        assert fakeCamera.count > 20
+        assert fakeCamera.connectionChecks <= max(3, fakeCamera.count // 5)
+    finally:
+        stopConsumer.set()
+        handle.close()
+        consumer.join(timeout=1.0)
+
+
 class _FakeCamera:
     def __init__(self) -> None:
         self.count = 0
+        self.connectionChecks = 0
         self.progress = threading.Event()
 
     def isConnected(self) -> bool:
+        self.connectionChecks += 1
         return True
 
     def grabFrame(self, buffer):
