@@ -5,6 +5,14 @@ on:
     tags:
       - "v*"
 
+env:
+  # npm's default retry budget is too small for flaky CI networks. These make
+  # transient ECONNRESET/ETIMEDOUT failures recover instead of failing the job.
+  NPM_CONFIG_FETCH_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
+  NPM_CONFIG_FETCH_RETRY_FACTOR: "2"
+
 jobs:
   build:
     name: Build (${{ matrix.os }})
