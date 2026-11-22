@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 import time
 import unittest
 from unittest.mock import MagicMock, patch
@@ -70,6 +71,31 @@ class TestPublishFrame(unittest.TestCase):
 
         self.assertEqual(first.shape, (240, 320, 3))
         self.assertIs(first, second)
+
+    def test_publish_lane_replaces_stale_frames_without_blocking(self):
+        self.handler.cameraHandles[0] = self.handle
+        started = threading.Event()
+        release = threading.Event()
+        self.output.putFrame.side_effect = lambda *_: (
+            started.set(),
+            release.wait(1.0),
+        )
+        lane = self.handler._startPublishLane(0)
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        try:
+            self.handler.publishFrame(frame, self.handle)
+            assert started.wait(1.0)
+
+            startedAt = time.perf_counter()
+            self.handler.publishFrame(frame.copy(), self.handle)
+            self.handler.publishFrame(frame.copy(), self.handle)
+            assert time.perf_counter() - startedAt < 0.1
+
+            assert self.handler.getPublishStats(0)["dropped"] >= 1
+        finally:
+            release.set()
+            lane.stop()
 
     def test_recording_resizes_and_releases_buffer(self):
         self.handler.recordingStatus[0] = True
