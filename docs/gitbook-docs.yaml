@@ -1,0 +1,13 @@
+$schema: https://api.gitbook.com/gitbook-docs.yaml
+version: 1
+site:
+  title: Synapse
+  structure:
+    - type: space
+      key: space-synapse
+      title: Synapse
+      path: synapse
+      default: true
+      content:
+        directory: ./
+        language: en
