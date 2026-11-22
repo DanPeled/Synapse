@@ -66,6 +66,7 @@ class CameraHandle:
         # timeout, which previously added up to 20 ms of pickup jitter.
         self._frameQueue: "queue.Queue[Tuple[int, int]]" = queue.Queue(maxsize=1)
         self._frameReady = threading.Event()
+        self._bufferReturned = threading.Event()
         self._frameMutex = threading.Lock()
 
         # Buffers are leased to the consumer. The producer may only fill a
@@ -143,6 +144,7 @@ class CameraHandle:
                     for index in range(self._poolSize):
                         self._freeBuffers.put_nowait(index)
                     self._leasedIndex = None
+                    self._bufferReturned.set()
         except Exception:
             return
 
@@ -241,6 +243,7 @@ class CameraHandle:
 
     def _frameGrabberLoop(self) -> None:
         scratch: Optional[np.ndarray] = None
+        lastDrain = 0.0
 
         while self._running:
             try:
@@ -251,33 +254,51 @@ class CameraHandle:
                 time.sleep(0.005)
                 continue
 
-            pool = self._bufferPool
+            # Snapshot the pool, generation, and free queue as one atomic handoff.
+            # Otherwise a video-mode change between reading the generation and
+            # taking an index can return an old index to the new queue.
+            with self._frameMutex:
+                pool = self._bufferPool
+                generation = self._bufferGeneration
+                freeBuffers = self._freeBuffers
+                try:
+                    index: Optional[int] = freeBuffers.get_nowait()
+                except queue.Empty:
+                    index = None
+
             if not pool:
+                if index is not None:
+                    self._returnBufferTo(freeBuffers, index)
                 time.sleep(0.01)
                 continue
 
-            generation = self._bufferGeneration
-            try:
-                index = self._freeBuffers.get_nowait()
-            except queue.Empty:
+            if index is None:
                 # No free buffer means the consumer is still processing the
-                # previous frame. Drain the camera into a scratch buffer and
-                # discard the result instead of overwriting a leased buffer.
-                try:
-                    if scratch is None or scratch.shape != pool[0].shape:
-                        scratch = np.empty_like(pool[0])
-                    timestamp, _ = self.camera.grabFrame(scratch)
-                    if timestamp and timestamp > 0:
-                        with self._frameMutex:
-                            self._droppedFrames += 1
-                            self._staleFrames += 1
-                except Exception:
-                    pass
-                time.sleep(0.002)
+                # previous frame. Wait for the lease to return instead of
+                # decoding every discarded frame. A periodic scratch drain keeps
+                # the sink moving and the drop counters honest if the pipeline
+                # stays behind for a long time.
+                self._bufferReturned.wait(0.005)
+                self._bufferReturned.clear()
+
+                now = time.monotonic()
+                if now - lastDrain >= 0.02:
+                    lastDrain = now
+                    try:
+                        if scratch is None or scratch.shape != pool[0].shape:
+                            scratch = np.empty_like(pool[0])
+                        timestamp, _ = self.camera.grabFrame(scratch)
+                        if timestamp and timestamp > 0:
+                            with self._frameMutex:
+                                self._droppedFrames += 1
+                                self._staleFrames += 1
+                    except Exception:
+                        pass
                 continue
 
             buffer = pool[index] if index < len(pool) else None
             if buffer is None:
+                self._returnBufferTo(freeBuffers, index)
                 continue
 
             # IMPORTANT: no frame mutex while grabbing. CSCore's CvSink is
@@ -285,7 +306,7 @@ class CameraHandle:
             try:
                 (timestamp, _) = self.camera.grabFrame(buffer)
             except Exception:
-                self._returnBuffer(index)
+                self._returnBufferTo(freeBuffers, index)
                 time.sleep(0.002)
                 continue
 
@@ -295,12 +316,16 @@ class CameraHandle:
                 with self._frameMutex:
                     if generation != self._bufferGeneration:
                         # A video-mode change rebuilt the pool while this grab
-                        # was in flight. Drop the stale frame and its index.
+                        # was in flight. Return the index to the queue it came
+                        # from so the new pool cannot receive a stale index.
+                        self._returnBufferTo(freeBuffers, index)
+                        self._droppedFrames += 1
                         continue
                     if self._frameQueue.full():
                         try:
-                            staleIndex, _ = self._frameQueue.get_nowait()
-                            self._freeBuffers.put_nowait(staleIndex)
+                            _, staleIndex = self._frameQueue.get_nowait()
+                            freeBuffers.put_nowait(staleIndex)
+                            self._bufferReturned.set()
                             self._droppedFrames += 1
                             self._staleFrames += 1
                         except queue.Empty:
@@ -310,16 +335,21 @@ class CameraHandle:
                         self._frameReady.set()
                         self._capturedFrames += 1
                     except queue.Full:
-                        self._freeBuffers.put_nowait(index)
+                        freeBuffers.put_nowait(index)
+                        self._bufferReturned.set()
                         self._droppedFrames += 1
             else:
-                self._returnBuffer(index)
+                self._returnBufferTo(freeBuffers, index)
                 # small yield only on failure (prevents CPU spin)
                 time.sleep(0.002)
 
     def _returnBuffer(self, index: int) -> None:
+        self._returnBufferTo(self._freeBuffers, index)
+
+    def _returnBufferTo(self, freeBuffers: "queue.Queue[int]", index: int) -> None:
         try:
-            self._freeBuffers.put_nowait(index)
+            freeBuffers.put_nowait(index)
+            self._bufferReturned.set()
         except queue.Full:
             pass
 
@@ -349,15 +379,6 @@ class CameraHandle:
 
         try:
             with self._frameMutex:
-                if not hasattr(self, "_freeBuffers"):
-                    self._freeBuffers = queue.Queue(maxsize=len(self._bufferPool))
-                    for index in range(len(self._bufferPool)):
-                        self._freeBuffers.put_nowait(index)
-                if not hasattr(self, "_leasedIndex"):
-                    self._leasedIndex = None
-                if not hasattr(self, "_bufferGeneration"):
-                    self._bufferGeneration = 0
-
                 try:
                     timestampUs, index = self._frameQueue.get_nowait()
                 except queue.Empty:
@@ -387,8 +408,6 @@ class CameraHandle:
 
     def releaseFrame(self) -> None:
         """Return the most recently grabbed buffer to the producer."""
-        if not hasattr(self, "_freeBuffers") or not hasattr(self, "_leasedIndex"):
-            return
         with self._frameMutex:
             self._releaseLeaseLocked()
 
@@ -417,6 +436,7 @@ class CameraHandle:
     def close(self):
         self._running = False
         self._frameReady.set()
+        self._bufferReturned.set()
         if self._thread is not None:
             self._thread.join(timeout=1.0)
         self.releaseFrame()

@@ -16,6 +16,7 @@ def makeHandle() -> CameraHandle:
     handle = object.__new__(CameraHandle)
     handle._frameQueue = queue.Queue(maxsize=1)
     handle._frameReady = threading.Event()
+    handle._bufferReturned = threading.Event()
     handle._frameMutex = threading.Lock()
     handle._bufferPool = [np.zeros((2, 2, 3), dtype=np.uint8)]
     handle._freeBuffers = queue.Queue(maxsize=1)
@@ -110,6 +111,11 @@ def test_leased_buffer_is_not_overwritten_by_capture_thread() -> None:
         time.sleep(0.02)
         assert int(frame[0, 0, 0]) == leasedValue
         assert handle.getCaptureStats()["dropped"] >= 1
+        with handle._frameMutex:
+            assert all(
+                isinstance(index, int) and 0 <= index < len(handle._bufferPool)
+                for index in handle._freeBuffers.queue
+            )
 
         handle.releaseFrame()
         startCount = fakeCamera.count
