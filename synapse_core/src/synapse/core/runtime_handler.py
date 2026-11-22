@@ -909,7 +909,9 @@ class RuntimeManager:
         processingLatency: seconds,
         fps: float,
     ) -> None:
-        current_time = time.time()
+        # Use the monotonic clock for cadence so NTP adjustments cannot stretch
+        # or skip latency report intervals.
+        current_time = time.monotonic()
         last_report_time = self._lastLatencyReportTime.get(cameraIndex, 0.0)
         if current_time - last_report_time < 1.0:
             return  # Skip sending
