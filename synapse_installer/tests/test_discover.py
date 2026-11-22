@@ -10,6 +10,10 @@ import synapse_installer.discover as discover_mod
 from synapse_installer.discover import _parseResponse, discoverDevices
 
 
+def _noDirectLinks(monkeypatch):
+    monkeypatch.setattr(discover_mod, "findDirectLinkInterfaces", lambda: [])
+
+
 def test_parse_response_valid():
     payload = json.dumps(
         {
@@ -79,6 +83,9 @@ class FakeSocket:
     def settimeout(self, timeout):
         self.timeout = timeout
 
+    def bind(self, address):
+        self.bound = address
+
     def sendto(self, data, address):
         self.sent.append((data, address))
 
@@ -92,6 +99,7 @@ class FakeSocket:
 
 
 def test_discover_devices(monkeypatch):
+    _noDirectLinks(monkeypatch)
     response = json.dumps(
         {"ip": "10.0.0.5", "hostname": "robot", "nickname": "robot"}
     ).encode()
@@ -110,6 +118,7 @@ def test_discover_devices(monkeypatch):
 
 
 def test_discover_devices_deduplicates(monkeypatch):
+    _noDirectLinks(monkeypatch)
     response = json.dumps({"ip": "10.0.0.5", "nickname": "robot"}).encode()
     fake = FakeSocket(
         [
@@ -126,6 +135,8 @@ def test_discover_devices_deduplicates(monkeypatch):
 
 
 def test_discover_devices_send_failure(monkeypatch):
+    _noDirectLinks(monkeypatch)
+
     class FailingSocket(FakeSocket):
         def sendto(self, data, address):
             raise OSError("network down")
@@ -136,3 +147,56 @@ def test_discover_devices_send_failure(monkeypatch):
 
     assert discoverDevices() == []
     assert fake.closed is True
+
+
+def test_parse_response_link_local_uses_source_ip():
+    payload = json.dumps(
+        {
+            "ip": "10.0.0.5",
+            "addresses": ["10.0.0.5", "169.254.2.10"],
+            "hostname": "robot",
+            "directLink": True,
+        }
+    ).encode()
+
+    device = _parseResponse(payload, ("169.254.2.10", 45454))
+
+    assert device is not None
+    assert device.ip == "169.254.2.10"
+    assert device.isDirectLink is True
+    assert device.addresses == ["10.0.0.5", "169.254.2.10"]
+
+
+def test_parse_response_prefers_same_subnet_address():
+    payload = json.dumps(
+        {
+            "ip": "10.72.176.5",
+            "addresses": ["10.72.176.5", "192.168.1.10"],
+            "hostname": "robot",
+        }
+    ).encode()
+
+    device = _parseResponse(payload, ("192.168.1.20", 45454))
+
+    assert device is not None
+    assert device.ip == "192.168.1.10"
+
+
+def test_discover_devices_broadcasts_on_direct_links(monkeypatch):
+    from synapse_installer.direct_connect import DirectLinkInterface
+
+    monkeypatch.setattr(
+        discover_mod,
+        "findDirectLinkInterfaces",
+        lambda: [DirectLinkInterface("usb0", "169.254.2.100", "255.255.0.0", True)],
+    )
+    fake = FakeSocket([])
+
+    monkeypatch.setattr(discover_mod.socket, "socket", lambda *a, **k: fake)
+    counter = itertools.count(0, 0.1)
+    monkeypatch.setattr(discover_mod.time, "monotonic", lambda: next(counter))
+
+    discoverDevices(timeout=2.0)
+
+    assert (b"PING_DISCOVERY", ("255.255.255.255", 45454)) in fake.sent
+    assert (b"PING_DISCOVERY", ("169.254.255.255", 45454)) in fake.sent

@@ -128,6 +128,39 @@ class Platform(Enum):
         return Path("/usr/local/frc/bin/frcRunRobot.sh").exists()
 
     @classmethod
+    def supportsUsbGadget(cls) -> bool:
+        """Whether this platform can act as a USB device (gadget).
+
+        USB device mode depends on the SoC and the physical port, so this is a
+        fast capability hint. The definitive check is discovering a UDC in
+        ``/sys/class/udc`` (see ``UsbGadgetManager.isAvailable``).
+        """
+        return cls.getCurrentPlatform() in (
+            Platform.LINUX_RASPBIAN32,
+            Platform.LINUX_RASPBIAN64,
+            Platform.LINUX_RK3588_64,
+            Platform.LINUX_AARCH64,
+        )
+
+    @classmethod
+    def getUsbGadgetUdc(cls) -> Optional[str]:
+        """Return the first available USB Device Controller, if any.
+
+        UDC names are board-specific (for example ``fe980000.usb`` on a Pi 4
+        and ``f980000.usb`` on a Pi Zero), so they must be discovered rather
+        than hard-coded. Returns ``None`` on hosts without device-mode
+        controllers (including Windows and macOS).
+        """
+        udc_root = Path("/sys/class/udc")
+        try:
+            for entry in sorted(udc_root.iterdir()):
+                if entry.is_dir() or entry.is_symlink():
+                    return entry.name
+        except OSError:
+            return None
+        return None
+
+    @classmethod
     def getCurrentPlatform(cls) -> "Platform":
         os_name = os.uname().sysname if hasattr(os, "uname") else os.name
         os_arch = (

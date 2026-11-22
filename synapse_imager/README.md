@@ -49,6 +49,34 @@ NetworkManager use a `netplan` drop-in, and anything else falls back to
 `ip addr` with a worker that reapplies the address if the interface is reset.
 All of these paths keep DHCP enabled.
 
+## Direct USB / Ethernet connection (USB gadget mode)
+
+On boards with a USB device-mode controller (Raspberry Pi 4/Zero 2 W, RK3588
+boards such as Orange Pi 5 and Radxa Rock 5B), images install and enable a
+`synapse-usb-gadget` service. Plug a USB cable from the computer into the
+coprocessor's device-mode port and the board presents a composite USB device:
+
+- **USB Ethernet** (ECM, NCM, or RNDIS, chosen from what the kernel provides)
+  for SSH, deploy, dashboard, and file transfer. The gadget uses an IPv4
+  link-local address (`169.254.x.x`), which Windows, macOS, and Linux assign
+  automatically. No computer-side network configuration is required.
+- **USB Mass Storage** with a small FAT image containing connection details and
+  a drop folder.
+
+The resolver derives a stable link-local address from the board's serial, so the
+device keeps the same address across reboots. Discovery broadcasts on all host
+interfaces and the responder returns an address on the link the ping arrived
+over, so `python -m synapse_installer device add` finds USB-connected devices
+without router networking.
+
+Everything is discovered at runtime via `Platform` and configfs: the UDC name,
+function, network interface, and address are never hard-coded. Unsupported
+boards (for example x86_64 mini PCs) skip gadget startup cleanly and continue to
+work over ordinary Ethernet.
+
+To disable installation of the gadget service, pass `--no-usb-gadget` to
+`provision.sh`.
+
 ## Platform registry
 
 `synapse_imager/platforms.ini` is the single place to add a board. Each

@@ -29,6 +29,7 @@ EXTRAS="${SYNAPSE_EXTRAS:-}"
 SKIP_SYSTEM_PACKAGES=0
 CLEAN_APT=0
 CLEANUP=0
+USB_GADGET=-1  # -1 = auto-detect from staged assets
 
 DEFAULT_PACKAGES=(
   python3
@@ -44,6 +45,7 @@ DEFAULT_PACKAGES=(
   libxrender1
   libopencv-dev
   v4l-utils
+  mtools
 )
 
 usage() {
@@ -62,6 +64,8 @@ Options:
   --app-dir PATH           Project path on the device (default: <home>/Synapse).
   --service-name NAME      systemd unit name (default: synapse-runtime).
   --extras EXTRAS          Comma-separated pip extras, for example "yolo".
+  --usb-gadget             Force-install USB gadget mode (default: auto-detect).
+  --no-usb-gadget          Do not install USB gadget mode.
   --skip-system-packages   Do not install OS packages.
   --clean-apt              Remove apt lists and caches after provisioning.
   --cleanup                Remove this staging directory when finished.
@@ -109,6 +113,14 @@ while [[ $# -gt 0 ]]; do
     --extras)
       EXTRAS="${2:?--extras requires a value}"
       shift 2
+      ;;
+    --usb-gadget)
+      USB_GADGET=1
+      shift
+      ;;
+    --no-usb-gadget)
+      USB_GADGET=0
+      shift
       ;;
     --skip-system-packages)
       SKIP_SYSTEM_PACKAGES=1
@@ -312,6 +324,36 @@ fi
 WANTS_DIR="/etc/systemd/system/multi-user.target.wants"
 mkdir -p "${WANTS_DIR}"
 ln -sfn "${SERVICE_FILE}" "${WANTS_DIR}/${SERVICE_NAME}.service"
+
+# ---------------------------------------------------------------------------
+# USB gadget (direct USB/Ethernet connection)
+# ---------------------------------------------------------------------------
+
+GADGET_SRC="${SCRIPT_DIR}/usb_gadget"
+if [[ "${USB_GADGET}" -eq -1 ]]; then
+  USB_GADGET=0
+  [[ -d "${GADGET_SRC}" ]] && USB_GADGET=1
+fi
+
+if [[ "${USB_GADGET}" -eq 1 ]]; then
+  if [[ -d "${GADGET_SRC}" ]]; then
+    install -d -m 0755 /usr/local/sbin /var/lib/synapse/usb_gadget
+    install -m 0755 "${GADGET_SRC}/synapse-usb-gadget.sh" /usr/local/sbin/synapse-usb-gadget.sh
+    install -m 0644 "${GADGET_SRC}/synapse-usb-gadget.service" \
+      /etc/systemd/system/synapse-usb-gadget.service
+    sed -i "s|/opt/synapse/venv/bin/python|${VENV_DIR}/bin/python|g" \
+      /usr/local/sbin/synapse-usb-gadget.sh
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl daemon-reload >/dev/null 2>&1 || true
+      systemctl enable synapse-usb-gadget >/dev/null 2>&1 || true
+    fi
+    ln -sfn /etc/systemd/system/synapse-usb-gadget.service \
+      "${WANTS_DIR}/synapse-usb-gadget.service"
+    echo "USB gadget mode installed"
+  else
+    echo "USB gadget assets not found in ${GADGET_SRC}" >&2
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # Cleanup

@@ -5,4 +5,6 @@ export type DiscoveryResponse = {
   team_number: number;
   version: string;
   username: string;
+  addresses?: string[];
+  directLink?: boolean;
 };

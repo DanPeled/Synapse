@@ -52,6 +52,22 @@ class TestPlatformDetection(unittest.TestCase):
         with patch("builtins.open", side_effect=FileNotFoundError):
             self.assertFalse(Platform.fileHasText("/not/found", "text"))
 
+    def test_supports_usb_gadget(self):
+        with patch.object(Platform, "getCurrentPlatform", return_value=Platform.LINUX_RASPBIAN64):
+            self.assertTrue(Platform.supportsUsbGadget())
+        with patch.object(Platform, "getCurrentPlatform", return_value=Platform.WINDOWS_64):
+            self.assertFalse(Platform.supportsUsbGadget())
+
+    def test_get_usb_gadget_udc(self):
+        with patch("synapse.hardware.metrics.Path") as pathCls:
+            pathCls.return_value.iterdir.return_value = [
+                MagicMock(name="fe980000.usb"),
+            ]
+            for entry in pathCls.return_value.iterdir.return_value:
+                entry.is_dir.return_value = True
+                entry.name = "fe980000.usb"
+            self.assertEqual(Platform.getUsbGadgetUdc(), "fe980000.usb")
+
 
 class TestShellExec(unittest.TestCase):
     @patch("subprocess.run")

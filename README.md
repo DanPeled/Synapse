@@ -29,6 +29,16 @@
 - `synapse_imager`: Builds release images for coprocessors with the runtime and a sample project preinstalled.
 - `synapse_gradle_plugin`: GradleRIO plugin that deploys the Synapse coprocessor project with robot code and runs Synapse simulation alongside robot simulation. Published through [JitPack](https://jitpack.io/#DanPeled/Synapse); see [its README](synapse_gradle_plugin/README.md).
 
+## Direct coprocessor connection
+
+Synapse images support USB gadget mode on boards with a USB device-mode port.
+Connect the coprocessor directly to a computer with a USB cable and it appears
+as both a USB Ethernet adapter (for SSH, deploy, and the dashboard) and a USB
+mass-storage drive (for files). Link-local addressing and multi-interface
+discovery mean no manual network setup is needed on Windows, macOS, or Linux.
+See [the imager README](synapse_imager/README.md#direct-usb--ethernet-connection-usb-gadget-mode)
+for details.
+
 ## License
 
 This project is licensed under the [GNU V3 License](LICENSE).

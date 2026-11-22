@@ -96,6 +96,8 @@ cp -a "${STAGE_SRC}" "${STAGE_DST}"
 
 install -m 0755 "${IMAGER_DIR}/common/provision.sh" \
   "${STAGE_DST}/00-synapse/files/provision.sh"
+cp -a "${IMAGER_DIR}/common/usb_gadget" \
+  "${STAGE_DST}/00-synapse/files/usb_gadget"
 # Keep the release wheel's PEP 427 filename; pip rejects a bare
 # "synapsefrc.whl" as an invalid wheel name.
 install -m 0644 "${WHEEL}" "${STAGE_DST}/00-synapse/files/$(basename "${WHEEL}")"

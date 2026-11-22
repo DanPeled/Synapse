@@ -10,10 +10,16 @@ pub struct DiscoveryResponse {
     pub team_number: u32,
     pub version: String,
     pub username: String,
+    #[serde(default)]
+    pub addresses: Vec<String>,
+    #[serde(default, rename = "directLink")]
+    pub direct_link: bool,
 }
 
 const PORT: u16 = 45454;
 const PING: &str = "PING_DISCOVERY";
+// Address for IPv4 link-local subnets, used by USB gadget direct connections.
+const LINK_LOCAL_BROADCAST: &str = "169.254.255.255";
 
 #[derive(Serialize)]
 pub struct ScanResult {
@@ -26,9 +32,17 @@ fn discover_devices_with_socket(socket: &UdpSocket) -> Vec<DiscoveryResponse> {
         .set_read_timeout(Some(Duration::from_millis(100)))
         .ok();
 
-    let target = format!("255.255.255.255:{PORT}");
+    // Both the global broadcast (router/robot network) and the link-local
+    // broadcast (USB gadget direct connection) are covered. Sending to an
+    // unused broadcast address is harmless.
+    let targets = [
+        format!("255.255.255.255:{PORT}"),
+        format!("{LINK_LOCAL_BROADCAST}:{PORT}"),
+    ];
 
-    socket.send_to(PING.as_bytes(), &target).ok();
+    for target in &targets {
+        socket.send_to(PING.as_bytes(), target).ok();
+    }
 
     let mut buf = [0u8; 2048];
     let mut results = Vec::new();

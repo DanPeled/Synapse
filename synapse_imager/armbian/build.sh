@@ -105,6 +105,7 @@ rm -rf "${USERPATCHES}"
 mkdir -p "${OVERLAY}"
 
 install -m 0755 "${IMAGER_DIR}/common/provision.sh" "${OVERLAY}/provision.sh"
+cp -a "${IMAGER_DIR}/common/usb_gadget" "${OVERLAY}/usb_gadget"
 # Preserve the release wheel's PEP 427 filename. pip rejects a bare
 # "synapsefrc.whl" with "Invalid wheel filename (wrong number of parts)".
 install -m 0644 "${WHEEL}" "${OVERLAY}/$(basename "${WHEEL}")"
