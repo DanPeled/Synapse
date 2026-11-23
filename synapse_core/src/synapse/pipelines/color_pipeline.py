@@ -120,6 +120,10 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
         self._mask: Optional[np.ndarray] = None
         self._output: Optional[np.ndarray] = None
         self._kernels: Dict[int, np.ndarray] = {}
+        # Threshold bounds are rebuilt only when the HSV settings change.
+        self._thresholdKey: Optional[Tuple[Tuple[int, ...], ...]] = None
+        self._lower: Optional[np.ndarray] = None
+        self._upper: Optional[np.ndarray] = None
 
     def _ensureScratch(self, img: Frame) -> None:
         shape = img.shape
@@ -130,20 +134,29 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
         self._mask = np.empty(shape[:2], dtype=np.uint8)
         self._output = np.empty(shape, dtype=img.dtype)
 
-    def _createMask(self, hsv: np.ndarray) -> np.ndarray:
-        """Apply HSV thresholding and morphological operations to generate a mask."""
+    def _thresholds(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Return cached HSV bounds, rebuilding them only when settings change."""
         h = self.getSetting(self.settings.h)
         s = self.getSetting(self.settings.s)
         v = self.getSetting(self.settings.v)
-        lower = np.array(
-            [min(h), min(s), min(v)],
-            dtype=np.uint8,
-        )
+        key = (tuple(h), tuple(s), tuple(v))
 
-        upper = np.array(
-            [max(h), max(s), max(v)],
-            dtype=np.uint8,
-        )
+        if key != self._thresholdKey or self._lower is None or self._upper is None:
+            self._thresholdKey = key
+            self._lower = np.array(
+                [min(h), min(s), min(v)],
+                dtype=np.uint8,
+            )
+            self._upper = np.array(
+                [max(h), max(s), max(v)],
+                dtype=np.uint8,
+            )
+
+        return self._lower, self._upper
+
+    def _createMask(self, hsv: np.ndarray) -> np.ndarray:
+        """Apply HSV thresholding and morphological operations to generate a mask."""
+        lower, upper = self._thresholds()
 
         assert self._mask is not None
         mask = cv2.inRange(hsv, lower, upper, dst=self._mask)
@@ -215,24 +228,9 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
         mask = self._createMask(self._hsv)
         detections = self._findDetections(mask)
         main_detection = self._selectMainDetection(detections, img.shape)
-
-        # Draw detections into a reusable destination instead of allocating a
-        # full frame copy per result.
-        np.copyto(self._output, img)
-        output = self._output
         publish_all = self.getSetting(self.settings.publish_all_detections)
-        for det in detections:
-            if det == main_detection:
-                color = (0, 255, 0)  # Green for main
-            else:
-                color = (0, 0, 255)  # Red for others
-            if publish_all or det == main_detection:
-                x, y, w, h = det.bbox
-                cv2.rectangle(
-                    output, (int(x), int(y)), (int(x + w), int(y + h)), color, 2
-                )
 
-        # Publish results
+        # Publish results before deciding whether the frame needs annotation.
         result = ColorResult(
             timestamp=timestamp,
             detections=detections
@@ -241,5 +239,26 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
             main_detection=main_detection,
         )
         self.setResults(result)
+
+        # Nothing to draw: return the captured frame directly instead of
+        # copying a full-resolution image for an unchanged output.
+        if not detections or (not publish_all and main_detection is None):
+            return img
+
+        # Draw detections into a reusable destination instead of allocating a
+        # full frame copy per result.
+        np.copyto(self._output, img)
+        output = self._output
+        if publish_all:
+            for det in detections:
+                color = (0, 255, 0) if det is main_detection else (0, 0, 255)
+                x, y, w, h = det.bbox
+                cv2.rectangle(
+                    output, (int(x), int(y)), (int(x + w), int(y + h)), color, 2
+                )
+        else:
+            assert main_detection is not None
+            x, y, w, h = main_detection.bbox
+            cv2.rectangle(output, (int(x), int(y)), (int(x + w), int(y + h)), (0, 255, 0), 2)
 
         return output
