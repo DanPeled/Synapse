@@ -7,6 +7,7 @@ from typing import Callable, cast
 from unittest.mock import MagicMock, patch
 
 from synapse.core.pipeline import Pipeline, PipelineResult, PipelineSettings
+from synapse.core.settings_api import CameraSettings
 from synapse_net.generated.messages.v1 import MessageProto, MessageTypeProto
 from synapse_net.socketServer import WebSocketServer
 
@@ -98,3 +99,17 @@ def test_no_websocket_message_is_built_without_clients() -> None:
 
     createMessage.assert_not_called()
     ws.sendToAllSync.assert_not_called()
+
+
+def test_resolution_parsing_is_cached_until_the_setting_changes() -> None:
+    pipeline = DummyPipeline()
+
+    assert pipeline.getResolution() == (1920, 1080)
+    cached = pipeline._resolutionCache
+    assert pipeline.getResolution() == (1920, 1080)
+    assert pipeline._resolutionCache is cached
+
+    pipeline.setCameraSetting(CameraSettings.resolution, "640x480")
+
+    assert pipeline.getResolution() == (640, 480)
+    assert pipeline._resolutionCache is not cached
