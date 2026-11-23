@@ -551,3 +551,12 @@ def test_invalid_loaded_setting_keeps_default(tmp_path: Path, monkeypatch):
 
     assert settings.getSetting("x") == 5
     assert settings.getSetting("file") == ""
+
+
+def test_missing_setting_uses_string_none_and_field_default():
+    settings = _LoadedSettings()
+    missingField = settingField(NumberConstraint(0, 10), default=7)
+    missingField.key = "missing"
+
+    assert settings.getSetting("missing") is None
+    assert settings.getSetting(missingField) == 7

@@ -123,18 +123,31 @@ class _PublishLane:
                     pass
 
     def enqueue(self, frame: Frame, fps: Optional[int]) -> None:
-        buffer, pooled, generation = self._acquire(frame)
+        # If a frame is already queued, replace it and reuse its buffer. This
+        # avoids taking a second buffer from the pool when the lane is behind,
+        # which would otherwise force a one-off full-frame allocation.
+        buffer: Optional[np.ndarray] = None
+        pooled = False
+        generation = 0
+        try:
+            staleBuffer, stalePooled, staleGeneration, _ = self.frames.get_nowait()
+        except queue.Empty:
+            pass
+        else:
+            with self._lock:
+                self.dropped += 1
+            if staleBuffer.shape == frame.shape and staleBuffer.dtype == frame.dtype:
+                buffer = staleBuffer
+                pooled = stalePooled
+                generation = staleGeneration
+            else:
+                self._release(staleBuffer, stalePooled, staleGeneration)
+
+        if buffer is None:
+            buffer, pooled, generation = self._acquire(frame)
+
         np.copyto(buffer, frame)
         item = (buffer, pooled, generation, fps)
-
-        if self.frames.full():
-            try:
-                stale, stalePooled, staleGeneration, _ = self.frames.get_nowait()
-                self._release(stale, stalePooled, staleGeneration)
-                with self._lock:
-                    self.dropped += 1
-            except queue.Empty:
-                pass
 
         try:
             self.frames.put_nowait(item)
@@ -834,37 +847,45 @@ class CameraHandler:
             return
         lane.enqueue(frame, fps)
 
+    @staticmethod
+    def _drawFps(frame: Frame, fps: Optional[int]) -> None:
+        """Draw the FPS overlay on an already-resized stream frame."""
+        if fps is None:
+            return
+
+        # Scaling the text with the output height keeps the overlay readable on
+        # a small preview without paying for a full-resolution text draw first.
+        scale = min(FPSView.fontScale, max(0.5, frame.shape[0] / 720.0 * FPSView.fontScale))
+        thickness = 2 if scale >= 2.0 else 1
+        position = (10, max(12, int(30 * scale / FPSView.fontScale)))
+        try:
+            cv2.putText(
+                frame,
+                f"FPS: {int(fps)}",
+                position,
+                FPSView.font,
+                scale,
+                FPSView.color,
+                thickness,
+                lineType=cv2.LINE_8,
+            )
+        except Exception:
+            pass
+
     def _publishFrameSync(
         self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
     ) -> None:
         """Resize and write a frame; called on the per-camera publication lane."""
         cameraIndex = handle.cameraIndex
 
-        # Draw only on frames that survive the stream throttle. At higher camera
-        # FPS this avoids full-frame text draws on frames nobody will see.
-        if fps is not None:
-            try:
-                cv2.putText(
-                    frame,
-                    f"FPS: {int(fps)}",
-                    FPSView.position,
-                    FPSView.font,
-                    FPSView.fontScale,
-                    FPSView.color,
-                    FPSView.thickness,
-                    lineType=cv2.LINE_8,
-                )
-            except Exception:
-                pass
-
         streamSize = self.streamSizes.get(cameraIndex)
         if streamSize is None:
             streamSize = self.getStreamRes(cameraIndex)
-        resized_frame = self._resizeFrame(
+        streamFrame = self._resizeFrame(
             frame, streamSize, self._streamFrameBuffers, cameraIndex
         )
-
-        self.getOutput(cameraIndex).putFrame(resized_frame)
+        self._drawFps(streamFrame, fps)
+        self.getOutput(cameraIndex).putFrame(streamFrame)
 
         if self.recordingStatus.get(cameraIndex, False):
             videoWriter = self.getRecordOutput(cameraIndex)
@@ -872,11 +893,14 @@ class CameraHandler:
             if recordRes is None:
                 recordRes = self.cameraHandles[cameraIndex].camera.getResolution()
                 self.recordingResolutions[cameraIndex] = recordRes
-            videoWriter.write(
-                self._resizeFrame(
-                    frame, recordRes, self._recordFrameBuffers, cameraIndex
-                )
+            recordFrame = self._resizeFrame(
+                frame, recordRes, self._recordFrameBuffers, cameraIndex
             )
+            # When the stream frame was the source frame, a resized recording
+            # already contains the overlay; drawing again would double it.
+            if recordFrame is not streamFrame and streamFrame is not frame:
+                self._drawFps(recordFrame, fps)
+            videoWriter.write(recordFrame)
 
         elif cameraIndex in self.recordingOutputs:
             log.info(

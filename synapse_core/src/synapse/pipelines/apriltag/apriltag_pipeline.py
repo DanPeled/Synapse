@@ -95,7 +95,9 @@ def filterTagsByIds(
     if not tagIds:
         return tags
 
-    allowedIds = set(tagIds)
+    allowedIds = (
+        tagIds if isinstance(tagIds, (set, frozenset)) else set(tagIds)
+    )
     return [tag for tag in tags if tag.tagID in allowedIds]
 
 
@@ -304,6 +306,8 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.__cropSignature: Optional[Tuple[int, int, Tuple, Tuple]] = None
         self.__cropBounds: Optional[Tuple[int, int, int, int]] = None
         self.__grayscaleBuffer: Optional[np.ndarray] = None
+        self.__tagFilterValue: Optional[Tuple[int, ...]] = None
+        self.__tagFilterSet: Optional[frozenset[int]] = None
         self.tagEstimates: List[ApriltagDetectionResult] = []
         self.poseEstimator: PnPPoseEstimator = PnPPoseEstimator(
             PnPPoseEstimator.Config(
@@ -459,10 +463,12 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         cropped = self.__toGrayscale(cropped_color)
 
         tags = self.apriltagDetector.detect(cast(Buffer, cropped))
-        tags = filterTagsByIds(
-            tags,
-            self.getSetting(self.settings.tag_filter),
-        )
+        tagFilter = self.getSetting(self.settings.tag_filter) or ()
+        filterValue = tuple(tagFilter)
+        if filterValue != self.__tagFilterValue:
+            self.__tagFilterValue = filterValue
+            self.__tagFilterSet = frozenset(filterValue) if filterValue else None
+        tags = filterTagsByIds(tags, self.__tagFilterSet)
 
         if not tags:
             if self.__hadResults:

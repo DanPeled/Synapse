@@ -15,6 +15,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -110,6 +111,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         self._ntDataTable = None
         self._ntPublishers = {}
         self._wsCoalesceKeys: Dict[str, tuple[int, int, Hashable]] = {}
+        self._resolutionCache: Optional[Tuple[str, Resolution]] = None
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         self.invalidateCachedEntries()
@@ -355,8 +357,14 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
 
     def getResolution(self) -> Resolution:
         resString = self.getCameraSetting(CameraSettings.resolution)
+        cached = self._resolutionCache
+        if cached is not None and cached[0] == resString:
+            return cached[1]
+
         split = resString.split("x")
-        return int(split[0]), int(split[1])
+        resolution = (int(split[0]), int(split[1]))
+        self._resolutionCache = (resString, resolution)
+        return resolution
 
     def getDistCoeffs(self, cameraIndex: CameraID) -> Optional[List[float]]:
         data = GlobalSettings.getCameraConfig(cameraIndex)

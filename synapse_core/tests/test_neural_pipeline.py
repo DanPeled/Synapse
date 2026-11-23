@@ -288,3 +288,35 @@ def test_create_model_falls_back_to_rtdetr_loader():
 
     assert isinstance(model, FakeRTDETR)
     assert model.path == "model.pt"
+
+
+def test_camera_pose_is_cached_until_a_pose_setting_changes():
+    pipeline = YOLOPipeline(YOLOSettings())
+
+    first = pipeline._cameraPose()
+    assert pipeline._cameraPose() is first
+
+    pipeline.setSetting(pipeline.settings.camera_x, 2.0)
+    second = pipeline._cameraPose()
+
+    assert second is not first
+    assert second["x"] == 2.0
+
+
+def test_draw_detections_reuses_the_display_buffer():
+    pipeline = YOLOPipeline(YOLOSettings())
+    frame = np.zeros((120, 160, 3), dtype=np.uint8)
+    detections = [_detection(bbox=(10.0, 10.0, 50.0, 50.0))]
+
+    first = pipeline.draw_detections(frame, detections)
+    assert first is pipeline._displayBuffer
+    assert first is not frame
+
+    second = pipeline.draw_detections(frame, detections)
+    assert second is first
+
+    resized = pipeline.draw_detections(
+        np.zeros((60, 80, 3), dtype=np.uint8), detections
+    )
+    assert resized is pipeline._displayBuffer
+    assert resized is not first

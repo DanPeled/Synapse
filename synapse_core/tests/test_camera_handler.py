@@ -60,6 +60,16 @@ class TestPublishFrame(unittest.TestCase):
         resize.assert_not_called()
         self.output.putFrame.assert_called_once_with(frame)
 
+    def test_fps_overlay_is_drawn_on_the_resized_stream_frame(self):
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        with patch("synapse.core.camera_handler.cv2.putText") as putText:
+            self.handler.publishFrame(frame, self.handle, fps=30)
+
+        drawn = putText.call_args.args[0]
+        self.assertEqual(drawn.shape, (240, 320, 3))
+        self.assertIsNot(drawn, frame)
+
     def test_publication_can_be_disabled_for_headless_benchmarks(self):
         frame = np.zeros((240, 320, 3), dtype=np.uint8)
         self.handler.setPublishingEnabled(False)
@@ -102,6 +112,30 @@ class TestPublishFrame(unittest.TestCase):
             assert time.perf_counter() - startedAt < 0.1
 
             assert self.handler.getPublishStats(0)["dropped"] >= 1
+        finally:
+            release.set()
+            lane.stop()
+
+    def test_publish_lane_reuses_the_replaced_buffer(self):
+        self.handler.cameraHandles[0] = self.handle
+        started = threading.Event()
+        release = threading.Event()
+        self.output.putFrame.side_effect = lambda *_: (
+            started.set(),
+            release.wait(1.0),
+        )
+        lane = self.handler._startPublishLane(0)
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        try:
+            self.handler.publishFrame(frame, self.handle)
+            assert started.wait(1.0)
+
+            self.handler.publishFrame(frame.copy(), self.handle)
+            queued = lane.frames.queue[0][0]
+            self.handler.publishFrame(frame.copy(), self.handle)
+
+            assert lane.frames.queue[0][0] is queued
         finally:
             release.set()
             lane.stop()
