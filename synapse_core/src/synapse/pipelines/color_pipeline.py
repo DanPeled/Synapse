@@ -121,7 +121,7 @@ class ColorPipeline(Pipeline[ColorDetectSettings, ColorResult]):
         self._output: Optional[np.ndarray] = None
         self._kernels: Dict[int, np.ndarray] = {}
         # Threshold bounds are rebuilt only when the HSV settings change.
-        self._thresholdKey: Optional[Tuple[Tuple[int, ...], ...]] = None
+        self._thresholdKey: Optional[Tuple[Tuple[float, ...], ...]] = None
         self._lower: Optional[np.ndarray] = None
         self._upper: Optional[np.ndarray] = None
 

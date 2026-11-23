@@ -24,6 +24,7 @@ def test_process_frame_returns_input_when_nothing_detected(monkeypatch):
     img = np.zeros((48, 64, 3), dtype=np.uint8)
     img[..., 2] = 255
     pipeline._ensureScratch(img)
+    assert pipeline._output is not None
     pipeline._output.fill(0)
 
     result = pipeline.processFrame(img, 0.0)
@@ -120,10 +121,12 @@ def test_threshold_arrays_are_reused_until_settings_change():
 def test_kernel_is_reused_for_the_same_size():
     pipeline = _pipeline()
     pipeline._ensureScratch(np.zeros((16, 16, 3), dtype=np.uint8))
+    hsv = pipeline._hsv
+    assert hsv is not None
 
-    first = pipeline._createMask(pipeline._hsv)
+    first = pipeline._createMask(hsv)
     kernel = pipeline._kernels[5]
-    second = pipeline._createMask(pipeline._hsv)
+    second = pipeline._createMask(hsv)
 
     assert first is pipeline._mask
     assert second is pipeline._mask
