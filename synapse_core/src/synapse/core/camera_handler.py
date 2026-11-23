@@ -225,6 +225,12 @@ class CameraHandler:
     DEFAULT_STREAM_SIZE: Final[Tuple[int, int]] = (320, 240)
     """Default resolution (width, height) used when no specific stream size is configured."""
 
+    # INTER_AREA is a good downscaling filter, but it is an order of magnitude
+    # slower than INTER_LINEAR for the large reductions used by live streams
+    # (for example 1920x1080 -> 320x240). The preview is transient, so prefer
+    # the much cheaper filter there and keep INTER_AREA for recorded frames.
+    STREAM_INTERPOLATION: Final[int] = cv2.INTER_LINEAR
+
     DEFAULT_CHANGE_POLL_INTERVAL: Final[float] = 0.25
     """How often platforms with a device-node signal check for hotplug changes."""
 
@@ -765,6 +771,7 @@ class CameraHandler:
         size: Resolution,
         buffers: Dict[CameraID, np.ndarray],
         cameraIndex: CameraID,
+        interpolation: int = cv2.INTER_AREA,
     ) -> Frame:
         """
         Resizes `frame` to `size`, reusing a per-camera destination buffer.
@@ -778,6 +785,7 @@ class CameraHandler:
             size (Resolution): Target (width, height).
             buffers (Dict[CameraID, np.ndarray]): Destination cache to use.
             cameraIndex (CameraID): Camera the frame belongs to.
+            interpolation (int): OpenCV interpolation flag for the resize.
 
         Returns:
             Frame: The resized frame (or `frame` itself if no resize is needed).
@@ -801,7 +809,7 @@ class CameraHandler:
             frame,
             (width, height),
             dst=destination,
-            interpolation=cv2.INTER_AREA,
+            interpolation=interpolation,
         )
 
     def _startPublishLane(self, cameraIndex: CameraID) -> _PublishLane:
@@ -882,7 +890,11 @@ class CameraHandler:
         if streamSize is None:
             streamSize = self.getStreamRes(cameraIndex)
         streamFrame = self._resizeFrame(
-            frame, streamSize, self._streamFrameBuffers, cameraIndex
+            frame,
+            streamSize,
+            self._streamFrameBuffers,
+            cameraIndex,
+            interpolation=self.STREAM_INTERPOLATION,
         )
         self._drawFps(streamFrame, fps)
         self.getOutput(cameraIndex).putFrame(streamFrame)

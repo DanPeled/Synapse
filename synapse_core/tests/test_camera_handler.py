@@ -8,6 +8,7 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+import cv2
 import numpy as np
 from synapse.core.camera_handler import CameraHandler
 
@@ -90,6 +91,31 @@ class TestPublishFrame(unittest.TestCase):
 
         self.assertEqual(first.shape, (240, 320, 3))
         self.assertIs(first, second)
+
+    def test_stream_resize_uses_linear_interpolation(self):
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        with patch("synapse.core.camera_handler.cv2.resize") as resize:
+            self.handler.publishFrame(frame, self.handle)
+
+        resize.assert_called_once()
+        self.assertEqual(resize.call_args.kwargs["interpolation"], cv2.INTER_LINEAR)
+
+    def test_recording_resize_keeps_area_interpolation(self):
+        self.handler.recordingStatus[0] = True
+        self.handler.recordingResolutions[0] = (320, 240)
+        self.handler.cameraHandles[0] = MagicMock()
+        self.handler.recordingOutputs[0] = MagicMock()
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        with patch("synapse.core.camera_handler.cv2.resize") as resize:
+            self.handler.publishFrame(frame, self.handle)
+
+        self.assertEqual(resize.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["interpolation"] for call in resize.call_args_list],
+            [cv2.INTER_LINEAR, cv2.INTER_AREA],
+        )
 
     def test_publish_lane_replaces_stale_frames_without_blocking(self):
         self.handler.cameraHandles[0] = self.handle
