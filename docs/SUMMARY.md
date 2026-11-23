@@ -13,7 +13,6 @@
   * [Selecting Hardware](getting-started/hardware-selection/selecting-hardware.md)
   * [Deploying on Custom Hardware](getting-started/hardware-selection/deploying-on-custom-hardware.md)
   * [Performance Matrix](getting-started/hardware-selection/performance-matrix.md)
-  * [Multi-Camera Performance](getting-started/hardware-selection/multi-camera-performance.md)
 * [Installing Software](getting-started/installing-software.md)
 * [How Synapse Works](getting-started/how-synapse-works.md)
 
