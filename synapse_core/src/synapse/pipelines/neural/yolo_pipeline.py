@@ -235,6 +235,8 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         self._cameraMatrix = np.eye(3, dtype=np.float64)
         self._distCoeffs = np.zeros(5, dtype=np.float64)
         self._calibResolution: Resolution = (640, 480)
+        self._displayBuffer: Optional[np.ndarray] = None
+        self._cameraPoseCache: Optional[Dict[str, float]] = None
         self._loadObjectDimensions()
         self.poseEstimator = PositionEstimator(self._poseEstimatorConfig())
 
@@ -427,7 +429,10 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         return str(classId)
 
     def _cameraPose(self) -> Dict[str, float]:
-        return {
+        if self._cameraPoseCache is not None:
+            return self._cameraPoseCache
+
+        pose = {
             "x": float(self.getSetting(self.settings.camera_x)),
             "y": float(self.getSetting(self.settings.camera_y)),
             "z": float(self.getSetting(self.settings.camera_z)),
@@ -435,6 +440,8 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
             "pitch": math.radians(float(self.getSetting(self.settings.camera_pitch))),
             "yaw": math.radians(float(self.getSetting(self.settings.camera_yaw))),
         }
+        self._cameraPoseCache = pose
+        return pose
 
     def detect_objects(self, frame: Frame) -> List[NeuralDetection]:
         """Run the model and estimate a position for every detection."""
@@ -501,7 +508,16 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
 
     def draw_detections(self, frame: Frame, detections: List[NeuralDetection]) -> Frame:
         """Draw detection boxes, labels, and estimated distances."""
-        display = np.asarray(frame).copy()
+        source = np.asarray(frame)
+        display = self._displayBuffer
+        if (
+            display is None
+            or display.shape != source.shape
+            or display.dtype != source.dtype
+        ):
+            display = np.empty_like(source)
+            self._displayBuffer = display
+        np.copyto(display, source)
 
         for detection in detections:
             x1, y1, x2, y2 = (int(value) for value in detection.bbox)
@@ -544,6 +560,16 @@ class YOLOPipeline(Pipeline[YOLOSettings, NeuralResult]):
         return display
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
+        if setting.key in {
+            self.settings.camera_x.key,
+            self.settings.camera_y.key,
+            self.settings.camera_z.key,
+            self.settings.camera_roll.key,
+            self.settings.camera_pitch.key,
+            self.settings.camera_yaw.key,
+        }:
+            self._cameraPoseCache = None
+
         if setting.key == self.settings.model_file.key:
             newValue = value.strip() if isinstance(value, str) else ""
             if newValue == self._loadedModelValue:
