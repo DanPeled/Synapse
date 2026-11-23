@@ -56,6 +56,10 @@ SettingsValue = Any
 SettingsMap = Dict[str, SettingsValue]
 TSettingValueType = TypeVar("TSettingValueType")
 
+# Sentinel used by SettingsCollection.getSetting to distinguish a missing key
+# from a setting whose value is None.
+_MISSING_VALUE = object()
+
 
 @dataclass
 class ValidationResult(Generic[TSettingValueType]):
@@ -1219,8 +1223,12 @@ class SettingsCollection:
             Optional[Any]: Value if found, otherwise None or default.
         """
         key = setting if isinstance(setting, str) else setting.key
-        if key in self._settingsApi.settings.keys():
-            return self._settingsApi.getValue(key)
+        # Values is the authoritative map and is updated for every registered
+        # setting, so a single lookup replaces a membership test plus a second
+        # dict access. This method is called several times per processed frame.
+        value = self._settingsApi.values.get(key, _MISSING_VALUE)
+        if value is not _MISSING_VALUE:
+            return value
         err(f"'{self.__class__.__name__}' object has no setting '{key}'")
         return None if isinstance(setting, str) else setting.defaultValue
 
