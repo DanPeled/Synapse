@@ -205,6 +205,17 @@ class TestFilterTagsByIds(unittest.TestCase):
 
         self.assertEqual([tag.tagID for tag in filtered], [2, 3])
 
+    def test_filter_accepts_precomputed_set(self):
+        tags = [
+            self.makeDetection(1),
+            self.makeDetection(2),
+            self.makeDetection(3),
+        ]
+
+        filtered = filterTagsByIds(tags, frozenset({1, 3}))
+
+        self.assertEqual([tag.tagID for tag in filtered], [1, 3])
+
     def test_filter_with_no_matches_returns_empty_list(self):
         tags = [self.makeDetection(1)]
 
