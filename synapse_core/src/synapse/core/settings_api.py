@@ -17,6 +17,7 @@ from typing import (
     List,
     Optional,
     Set,
+    Tuple,
     TypeVar,
     Union,
     cast,
@@ -1393,8 +1394,22 @@ def setEntryValue(entry: NetworkTableEntry, value):
         raise ValueError("Unsupported type")
 
 
+def _parseResolutionKey(value: object) -> Optional[Tuple[int, int]]:
+    if not isinstance(value, str):
+        return None
+    try:
+        widthText, heightText = value.lower().split("x", 1)
+        width, height = int(widthText), int(heightText)
+    except ValueError:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    return width, height
+
+
 class CameraSettings(SettingsCollection):
     kCameraPropsCategory = "<Camera/> Camera Properties"
+    _preferredResolution = "1920x1080"
 
     brightness = settingField(
         NumberConstraint(0, 100),
@@ -1442,7 +1457,7 @@ class CameraSettings(SettingsCollection):
                 "320x180",
             ]
         ),
-        default="1920x1080",
+        default=_preferredResolution,
         category=kCameraPropsCategory,
         description="Camera Resolution",
     )
@@ -1485,11 +1500,45 @@ class CameraSettings(SettingsCollection):
                     continue
                 self.generateSettingFromProp(prop)
 
-        self.resolution.constraint = EnumeratedConstraint(
-            options=list(
-                set(map(lambda s: f"{s[0]}x{s[1]}", camera.getSupportedResolutions()))
+        self._updateResolutionConstraint(camera)
+
+    def _updateResolutionConstraint(self, camera: SynapseCamera) -> None:
+        supportedResolutions = list(
+            dict.fromkeys(
+                f"{width}x{height}"
+                for width, height in camera.getSupportedResolutions()
             )
         )
+        if not supportedResolutions:
+            return
+
+        supported = set(supportedResolutions)
+        defaultResolution = type(self)._preferredResolution
+        if defaultResolution not in supported:
+            preferredSize = _parseResolutionKey(defaultResolution) or (1920, 1080)
+            targetArea = preferredSize[0] * preferredSize[1]
+
+            def distance(option: str) -> Tuple[int, int, int, str]:
+                size = _parseResolutionKey(option)
+                if size is None:
+                    return (2**63 - 1, 2**63 - 1, 2**63 - 1, option)
+                return (
+                    abs(size[0] * size[1] - targetArea),
+                    abs(size[0] - preferredSize[0]),
+                    abs(size[1] - preferredSize[1]),
+                    option,
+                )
+
+            defaultResolution = min(supportedResolutions, key=distance)
+
+        # The default and the live value must both be valid options. Otherwise
+        # the UI receives a default/current resolution that cannot be selected
+        # for this camera, and binding the pipeline leaves the stale value in
+        # NetworkTables even though the camera was switched to a real mode.
+        self.resolution.defaultValue = defaultResolution
+        self.resolution.constraint = EnumeratedConstraint(options=supportedResolutions)
+        if self.getAPI().getValue(self.resolution.key) not in supported:
+            self._settingsApi.setValue(self.resolution.key, defaultResolution)
 
 
 class PipelineSettings(SettingsCollection):
