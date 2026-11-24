@@ -22,6 +22,21 @@ capture/stream-only stage measures the real sensor format rather than a
 fallback mode. Every report records the effective resolution, FPS, pixel
 format, hotplug mode, pipeline mode, stream mode, USB topology, and host sample
 so a result can be reproduced or compared with a later run.
+
+Measurement notes for future capture experiments:
+
+* CSCore's ``grabFrameDirect`` family only returns a timestamp from Python and
+  leaves the supplied NumPy array untouched. Its pixel data is owned by the
+  sink and invalidated by the next grab, so it cannot back the camera handle's
+  lease without a full copy. Do not replace ``grabFrame`` with it on the basis
+  of API name alone.
+* ``--opencv-threads`` exists to A/B OpenCV's global worker count without
+  editing code. Two-camera measurements on the development computer did not
+  show a throughput or CPU gain from reducing the default count, so the default
+  remains unchanged.
+* Uncompressed YUYV modes avoid JPEG decode but trade away frame rate or use
+  more CPU for format conversion. Any switch must be a user-visible video-mode
+  choice, never a silent fallback.
 """
 
 from __future__ import annotations
@@ -37,6 +52,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import cv2
 import psutil
 from synapse.core.config import Config
 from synapse.core.global_settings import GlobalSettings
@@ -110,6 +126,7 @@ def createRuntime(
     publishStreams: bool = False,
     allowHotplug: bool = True,
     usePipelines: bool = True,
+    opencvThreads: Optional[int] = None,
 ) -> RuntimeManager:
     """Configure and start a headless runtime for a camera project.
 
@@ -117,7 +134,11 @@ def createRuntime(
     cameras are measured. ``usePipelines=False`` applies configured video
     modes through the normal pipeline setup path and then unbinds the
     pipelines, isolating capture and publication without changing resolution.
+    ``opencvThreads`` changes OpenCV's global worker count so multi-camera
+    A/B runs can test whether per-call threading is oversubscribing the host.
     """
+    if opencvThreads is not None:
+        cv2.setNumThreads(opencvThreads)
     configPath = project / "config" / "settings.yml"
     if not configPath.exists():
         raise FileNotFoundError(f"Missing project config: {configPath}")
@@ -229,6 +250,7 @@ def buildReport(
         "stream_publication": "enabled" if publishStreams else "disabled",
         "hotplug_scan": "enabled" if allowHotplug else "disabled",
         "pipelines": "enabled" if usePipelines else "disabled",
+        "opencv_threads": cv2.getNumThreads(),
     }
     summary["host"] = {
         "platform": platform.platform(),
@@ -295,6 +317,12 @@ def parseArgs(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Measure capture and stream publication without vision pipelines",
     )
     parser.add_argument(
+        "--opencv-threads",
+        type=int,
+        default=None,
+        help="Set OpenCV's global worker count for the measurement",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -317,6 +345,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         publishStreams=args.streams,
         allowHotplug=not args.no_hotplug,
         usePipelines=not args.no_pipelines,
+        opencvThreads=args.opencv_threads,
     )
     try:
         if args.warmup:
