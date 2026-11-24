@@ -34,6 +34,11 @@ Measurement notes for future capture experiments:
   editing code. Two-camera measurements on the development computer did not
   show a throughput or CPU gain from reducing the default count, so the default
   remains unchanged.
+* ``--gil-switch-interval`` is a diagnostic control for CPython thread handoffs.
+  Simulated 1/2/4/8-camera runs showed no effect at a normal source rate, and
+  an extreme 8-camera stream load showed no gain over the default. Use
+  ``scripts/benchmark_simulated_cameras.py`` for hardware-free thread scaling
+  checks; simulated results must not be reported as real-camera throughput.
 * Uncompressed YUYV modes avoid JPEG decode but trade away frame rate or use
   more CPU for format conversion. Any switch must be a user-visible video-mode
   choice, never a silent fallback.
@@ -47,6 +52,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -127,6 +133,7 @@ def createRuntime(
     allowHotplug: bool = True,
     usePipelines: bool = True,
     opencvThreads: Optional[int] = None,
+    gilSwitchInterval: Optional[float] = None,
 ) -> RuntimeManager:
     """Configure and start a headless runtime for a camera project.
 
@@ -136,9 +143,14 @@ def createRuntime(
     pipelines, isolating capture and publication without changing resolution.
     ``opencvThreads`` changes OpenCV's global worker count so multi-camera
     A/B runs can test whether per-call threading is oversubscribing the host.
+    ``gilSwitchInterval`` changes how often CPython yields the GIL between
+    threads, which can affect the many per-camera producer, worker, and publish
+    lanes even when native capture releases the GIL.
     """
     if opencvThreads is not None:
         cv2.setNumThreads(opencvThreads)
+    if gilSwitchInterval is not None:
+        sys.setswitchinterval(gilSwitchInterval)
     configPath = project / "config" / "settings.yml"
     if not configPath.exists():
         raise FileNotFoundError(f"Missing project config: {configPath}")
@@ -251,6 +263,8 @@ def buildReport(
         "hotplug_scan": "enabled" if allowHotplug else "disabled",
         "pipelines": "enabled" if usePipelines else "disabled",
         "opencv_threads": cv2.getNumThreads(),
+        "python_switch_interval_seconds": sys.getswitchinterval(),
+        "python_threads": threading.active_count(),
     }
     summary["host"] = {
         "platform": platform.platform(),
@@ -323,6 +337,12 @@ def parseArgs(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Set OpenCV's global worker count for the measurement",
     )
     parser.add_argument(
+        "--gil-switch-interval",
+        type=float,
+        default=None,
+        help="Set CPython's GIL switch interval in seconds for the measurement",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -346,6 +366,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         allowHotplug=not args.no_hotplug,
         usePipelines=not args.no_pipelines,
         opencvThreads=args.opencv_threads,
+        gilSwitchInterval=args.gil_switch_interval,
     )
     try:
         if args.warmup:
