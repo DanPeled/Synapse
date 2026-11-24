@@ -161,7 +161,9 @@ def test_leased_buffer_is_not_overwritten_by_capture_thread() -> None:
         assert frame is not None
 
         leasedValue = int(frame[0, 0, 0])
-        time.sleep(0.02)
+        # The grabber drains a stalled sink on a 20 ms ceiling, so allow more
+        # than one drain window before asserting the counter moved.
+        time.sleep(0.05)
         assert int(frame[0, 0, 0]) == leasedValue
         assert handle.getCaptureStats()["dropped"] >= 1
         with handle._frameMutex:

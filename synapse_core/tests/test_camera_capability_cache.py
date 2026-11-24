@@ -2,9 +2,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 from typing import List, Optional, cast
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 from cscore import VideoMode
 from synapse.core.camera.camera_handle import CameraHandle
 from synapse.core.camera.cscore_camera import CsCoreCamera
@@ -170,3 +172,49 @@ def test_video_mode_comparison_includes_fps_and_pixel_format() -> None:
         handle._activeVideoMode = VideoMode(PixelFormat.YUYV, 640, 480, 60)
         handle.setVideoMode(VideoMode(MJPEG, 640, 480, 60))
         assert len(camera.setVideoModeCalls) == 2
+
+
+def test_concurrent_video_mode_changes_apply_once() -> None:
+    camera = FakeCamera()
+    handle = makeHandle(camera)
+    barrier = threading.Barrier(8)
+    errors: List[Exception] = []
+
+    def changeMode() -> None:
+        try:
+            barrier.wait(timeout=5)
+            handle.setVideoMode(VideoMode(MJPEG, 1920, 1080, 30))
+        except Exception as error:
+            errors.append(error)
+
+    threads = [threading.Thread(target=changeMode) for _ in range(8)]
+    with patch("synapse.core.camera.camera_handle.time.sleep"):
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=5)
+
+    assert not errors
+    assert all(not thread.is_alive() for thread in threads)
+    assert len(camera.setVideoModeCalls) == 1
+    assert handle._bufferPool[0].shape == (1080, 1920, 3)
+
+
+def test_video_mode_allocation_does_not_hold_frame_mutex() -> None:
+    camera = FakeCamera()
+    handle = makeHandle(camera)
+    originalZeros = np.zeros
+    mutexHeld: List[bool] = []
+
+    def checkedZeros(*args, **kwargs):
+        mutexHeld.append(handle._frameMutex.locked())
+        return originalZeros(*args, **kwargs)
+
+    with (
+        patch("synapse.core.camera.camera_handle.np.zeros", side_effect=checkedZeros),
+        patch("synapse.core.camera.camera_handle.time.sleep"),
+    ):
+        handle.setVideoMode(VideoMode(MJPEG, 1920, 1080, 30))
+
+    assert mutexHeld
+    assert not any(mutexHeld)
