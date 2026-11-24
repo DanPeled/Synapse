@@ -11,7 +11,7 @@ import time
 import traceback
 from asyncio import Queue
 from pathlib import Path
-from typing import Any, Dict, Final, Iterable, List, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, Iterable, List, Optional, Tuple, TypeAlias, cast
 
 import cv2
 import numpy as np
@@ -393,7 +393,8 @@ class RuntimeManager:
                         pass
 
                 try:
-                    entry.set(metrics)
+                    numericMetrics: List[Any] = [float(value) for value in metrics]
+                    entry.set(cast(List[Any], numericMetrics))
                 except Exception:
                     pass
 
