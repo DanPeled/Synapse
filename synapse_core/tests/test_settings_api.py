@@ -586,3 +586,71 @@ def test_camera_settings_do_not_share_class_level_settings():
     assert "1920x1080" not in [
         option.value for option in second.resolution.constraint.options
     ]
+
+
+def test_camera_resolution_default_follows_supported_modes():
+    camera = MagicMock()
+    camera.getPropertyMeta.return_value = {}
+    camera.getProperties.return_value = []
+    camera.getSupportedResolutions.return_value = [
+        (320, 240),
+        (640, 480),
+        (800, 600),
+        (1280, 720),
+        (1280, 800),
+    ]
+
+    settings = CameraSettings()
+    settings.fromCamera(camera)
+
+    assert isinstance(settings.resolution.constraint, EnumeratedConstraint)
+    options = [option.value for option in settings.resolution.constraint.options]
+    assert "1920x1080" not in options
+    assert "1280x800" in options
+    assert settings.resolution.defaultValue == "1280x800"
+    assert settings.getSetting(CameraSettings.resolution) == "1280x800"
+
+    meta = settingToProto(settings.resolution, "<Camera/> Camera Properties")
+    assert protoToSettingValue(meta.default) == "1280x800"
+
+    # The class-level template is shared by descriptor lookups and must keep
+    # the original preference for cameras that do support 1080p.
+    assert CameraSettings.resolution.defaultValue == "1920x1080"
+
+
+def test_camera_resolution_keeps_valid_configured_value():
+    camera = MagicMock()
+    camera.getPropertyMeta.return_value = {}
+    camera.getProperties.return_value = []
+    camera.getSupportedResolutions.return_value = [(640, 480), (1280, 800)]
+
+    settings = CameraSettings({"resolution": "640x480"})
+    settings.fromCamera(camera)
+
+    assert settings.getSetting(CameraSettings.resolution) == "640x480"
+    assert settings.resolution.defaultValue == "1280x800"
+
+
+def test_camera_resolution_replaces_unsupported_configured_value():
+    camera = MagicMock()
+    camera.getPropertyMeta.return_value = {}
+    camera.getProperties.return_value = []
+    camera.getSupportedResolutions.return_value = [(640, 480), (1280, 800)]
+
+    settings = CameraSettings({"resolution": "1920x1080"})
+    settings.fromCamera(camera)
+
+    assert settings.getSetting(CameraSettings.resolution) == "1280x800"
+
+
+def test_camera_resolution_prefers_1080p_when_supported():
+    camera = MagicMock()
+    camera.getPropertyMeta.return_value = {}
+    camera.getProperties.return_value = []
+    camera.getSupportedResolutions.return_value = [(640, 480), (1920, 1080)]
+
+    settings = CameraSettings({"resolution": "640x480"})
+    settings.fromCamera(camera)
+
+    assert settings.resolution.defaultValue == "1920x1080"
+    assert settings.getSetting(CameraSettings.resolution) == "640x480"
