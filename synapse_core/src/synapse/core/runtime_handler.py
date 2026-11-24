@@ -138,6 +138,17 @@ def _cameraFpsLimit(handle: CameraHandle) -> Optional[float]:
     return min(candidates) if candidates else None
 
 
+def _cameraModeGeneration(handle: CameraHandle) -> int:
+    """Return a camera's mode generation, or 0 for backends without one."""
+    try:
+        generation = handle.videoModeGeneration
+    except Exception:
+        return 0
+    if isinstance(generation, bool) or not isinstance(generation, int):
+        return 0
+    return generation
+
+
 class RuntimeManager:
     """
     Handles the loading, configuration, and runtime execution of vision pipelines
@@ -170,6 +181,7 @@ class RuntimeManager:
         self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
         self._frameRateMeters: Dict[CameraID, FrameRateMeter] = {}
         self._cameraFpsLimits: Dict[CameraID, float] = {}
+        self._cameraFpsLimitGenerations: Dict[CameraID, int] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
         self._performanceLock = threading.Lock()
         self._performanceTrackers: Dict[CameraID, CameraPerformanceTracker] = {}
@@ -674,9 +686,7 @@ class RuntimeManager:
         # physical bound used to sanity-check reported FPS.
         handle = self.cameraHandler.getCameraHandle(cameraIndex)
         if handle is not None:
-            limit = _cameraFpsLimit(handle)
-            if limit is not None:
-                self._cameraFpsLimits[cameraIndex] = limit
+            self._refreshCameraFpsLimit(cameraIndex, handle)
         self.onPipelineChanged.call(pipelineIndex, cameraIndex)
         log.info(f"Set pipeline #{pipelineIndex} for camera ({cameraIndex})")
 
@@ -724,9 +734,7 @@ class RuntimeManager:
         except Exception:
             maxFps = 30.0
 
-        limit = _cameraFpsLimit(handle)
-        if limit is not None:
-            self._cameraFpsLimits[cameraIndex] = limit
+        self._refreshCameraFpsLimit(cameraIndex, handle)
 
         try:
             log.info(
@@ -778,11 +786,7 @@ class RuntimeManager:
         # stall or mode switch, so a 30 FPS camera could report 100+ FPS.
         # Count intervals over a full monotonic window instead and clip to the
         # active mode's rate, which is a hard physical bound.
-        limit = self._cameraFpsLimits.get(cameraIndex)
-        if limit is None:
-            limit = _cameraFpsLimit(handle)
-            if limit is not None:
-                self._cameraFpsLimits[cameraIndex] = limit
+        limit = self._refreshCameraFpsLimit(cameraIndex, handle)
         meter = self._frameRateMeters.get(cameraIndex)
         if meter is None:
             meter = FrameRateMeter(windowSeconds=FRAME_FPS_WINDOW_SECONDS)
@@ -868,6 +872,22 @@ class RuntimeManager:
 
         return transferredLease
 
+    def _refreshCameraFpsLimit(
+        self, cameraIndex: CameraID, handle: CameraHandle
+    ) -> Optional[float]:
+        """Return the cached mode bound, refreshing it after a mode change."""
+        generation = _cameraModeGeneration(handle)
+        if self._cameraFpsLimitGenerations.get(cameraIndex) == generation:
+            return self._cameraFpsLimits.get(cameraIndex)
+
+        limit = _cameraFpsLimit(handle)
+        self._cameraFpsLimitGenerations[cameraIndex] = generation
+        if limit is None:
+            self._cameraFpsLimits.pop(cameraIndex, None)
+        else:
+            self._cameraFpsLimits[cameraIndex] = limit
+        return limit
+
     def _getPerformanceTracker(self, cameraIndex: CameraID) -> CameraPerformanceTracker:
         with self._performanceLock:
             tracker = self._performanceTrackers.get(cameraIndex)
@@ -902,9 +922,10 @@ class RuntimeManager:
                 stats["free_capture_buffers"] = capture["free"]
                 stats["capture_buffer_pool"] = capture["pool"]
 
-            stats["dropped_stream_frames"] = self.cameraHandler.getPublishStats(index)[
-                "dropped"
-            ]
+            publish = self.cameraHandler.getPublishStats(index)
+            stats["dropped_stream_frames"] = publish["dropped"]
+            stats["queued_stream_frames"] = publish["queued"]
+            stats["failed_stream_frames"] = publish["failed"]
             if cameraIndex is None:
                 results[index] = stats
             else:

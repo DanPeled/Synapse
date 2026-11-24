@@ -82,6 +82,10 @@ class CameraHandle:
         self._leasedIndex: Optional[int] = None
         self._leasedGeneration: Optional[int] = None
         self._bufferGeneration = 0
+        # Consumers cache mode-dependent values such as the physical FPS
+        # bound. A monotonically increasing generation lets them notice a
+        # video-mode change without querying the camera on every frame.
+        self._videoModeGeneration = 0
         self._capturedFrames = 0
         self._droppedFrames = 0
         self._staleFrames = 0
@@ -160,6 +164,7 @@ class CameraHandle:
                 self._leasedGeneration = None
                 self._frameCondition.notify_all()
                 self._bufferCondition.notify_all()
+                self._videoModeGeneration += 1
 
             self._activeVideoMode = effectiveMode
 
@@ -454,6 +459,11 @@ class CameraHandle:
         generation, index = lease
         with self._frameMutex:
             self._returnBufferLocked(generation, index)
+
+    @property
+    def videoModeGeneration(self) -> int:
+        """Generation incremented after every successful video-mode change."""
+        return self._videoModeGeneration
 
     def getCaptureStats(self) -> Dict[str, int]:
         """Return counters useful for diagnosing multi-camera capture drops."""

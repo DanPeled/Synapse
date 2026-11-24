@@ -518,11 +518,57 @@ class CameraHandler:
         return False
 
     @staticmethod
+    def _cameraUID(info: cs.UsbCameraInfo, base: str, sequence: int) -> str:
+        """Return a stable, distinct UID for one USB camera.
+
+        The historical ``name_productId`` UID remains valid for a single
+        camera of a given model. Identical cameras need a device-specific
+        suffix or they collapse into one dictionary entry and the second
+        camera can never be registered.
+        """
+        if sequence == 0:
+            return base
+
+        dev = getattr(info, "dev", None)
+        if dev not in (None, ""):
+            discriminator = f"dev{dev}"
+        else:
+            path = getattr(info, "path", "")
+            discriminator = (
+                str(path).strip("/").replace("/", "_") if path else f"port{sequence}"
+            )
+
+        uid = f"{base}_{discriminator}"
+        return uid if uid not in (base,) else f"{base}_{sequence}"
+
+    @staticmethod
     def _enumerateUsbCameras() -> UsbCameraInfos:
-        return {
-            f"{info.name}_{info.productId}": info
-            for info in cs.UsbCamera.enumerateUsbCameras()
-        }
+        infos = sorted(
+            cs.UsbCamera.enumerateUsbCameras(),
+            key=lambda info: (
+                str(getattr(info, "dev", "")),
+                str(getattr(info, "path", "")),
+                str(getattr(info, "name", "")),
+            ),
+        )
+        bases = [
+            f"{info.name}_{info.productId}" for info in infos
+        ]
+        counts: Dict[str, int] = {}
+        for base in bases:
+            counts[base] = counts.get(base, 0) + 1
+
+        seen: Dict[str, int] = {}
+        result: UsbCameraInfos = {}
+        for info, base in zip(infos, bases):
+            sequence = seen.get(base, 0)
+            seen[base] = sequence + 1
+            uid = CameraHandler._cameraUID(info, base, sequence)
+            while uid in result:
+                uid = f"{base}_port{sequence}"
+                sequence += 1
+            result[uid] = info
+        return result
 
     @staticmethod
     def _usbInfoSignature(infos: UsbCameraInfos) -> UsbInfoSignature:
@@ -640,50 +686,45 @@ class CameraHandler:
         self._cameraProbeInterval = self.cameraScanMinInterval
         self._pendingUsbCameraInfos = None
 
-        found: List[int] = []
+        for uid, info in self.usbCameraInfos.items():
+            if uid in self.cameraUIDs:
+                continue
 
-        for info in self.usbCameraInfos.values():
-            id = f"{info.name}_{info.productId}"
-            if info.productId not in found and id not in self.cameraUIDs:
-                found.append(info.productId)
-                newIndex = 0
-
-                if len(self.requestedCameraUIDs.keys()) > 0:
-                    if id in self.requestedCameraUIDs.keys():
-                        newIndex = self.requestedCameraUIDs.pop(id)
-                    else:
-                        newIndex = (
-                            max(
-                                chain(
-                                    self.requestedCameraUIDs.values(),
-                                    self.cameraHandles.keys(),
-                                )
-                            )
-                            + 1
-                        )
+            newIndex = 0
+            if len(self.requestedCameraUIDs.keys()) > 0:
+                if uid in self.requestedCameraUIDs.keys():
+                    newIndex = self.requestedCameraUIDs.pop(uid)
                 else:
-                    m = max(self.cameraHandles.keys(), default=-1)
-                    newIndex = m + 1
-
-                cameraIndex = newIndex
-                cameraConfig = CameraConfig(
-                    name=info.name,
-                    id=id,
-                    defaultPipeline=0,
-                    calibration={},
-                    streamRes=self.DEFAULT_STREAM_SIZE,
-                )
-
-                if cameraConfig.id not in self.cameraUIDs:
-                    log.info(
-                        f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
+                    newIndex = (
+                        max(
+                            chain(
+                                self.requestedCameraUIDs.values(),
+                                self.cameraHandles.keys(),
+                            )
+                        )
+                        + 1
                     )
-                    GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
-                    self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
-                    if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
-                        continue
-                    else:
-                        self.cameraUIDs.append(cameraConfig.id)
+            else:
+                m = max(self.cameraHandles.keys(), default=-1)
+                newIndex = m + 1
+
+            cameraIndex = newIndex
+            cameraConfig = CameraConfig(
+                name=info.name,
+                id=uid,
+                defaultPipeline=0,
+                calibration={},
+                streamRes=self.DEFAULT_STREAM_SIZE,
+            )
+
+            log.info(
+                f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
+            )
+            GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
+            self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
+            if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
+                continue
+            self.cameraUIDs.append(cameraConfig.id)
 
     def getCameraHandle(self, cameraIndex: CameraID) -> Optional[CameraHandle]:
         """
@@ -1110,13 +1151,16 @@ class CameraHandler:
         """Return bounded-lane queue depth and dropped-frame counters."""
         if cameraIndex is not None:
             lane = self._publishLanes.get(cameraIndex)
-            return {"queued": 0, "dropped": 0} if lane is None else lane.stats()
+            if lane is None:
+                return {"queued": 0, "dropped": 0, "failed": 0}
+            return lane.stats()
 
-        totals = {"queued": 0, "dropped": 0}
+        totals = {"queued": 0, "dropped": 0, "failed": 0}
         for lane in self._publishLanes.values():
             stats = lane.stats()
             totals["queued"] += stats["queued"]
             totals["dropped"] += stats["dropped"]
+            totals["failed"] += stats["failed"]
         return totals
 
     def resetPublishStats(self, cameraIndex: Optional[CameraID] = None) -> None:

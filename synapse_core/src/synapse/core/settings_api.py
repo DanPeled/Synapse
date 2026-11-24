@@ -1480,13 +1480,13 @@ class CameraSettings(SettingsCollection):
                 propMeta, CameraPropKeys.kBrightness.value
             )
             self.saturation.constraint = getPropNumberConstraint(
-                propMeta, CameraPropKeys.kBrightness.value
+                propMeta, CameraPropKeys.kSaturation.value
             )
             self.sharpness.constraint = getPropNumberConstraint(
-                propMeta, CameraPropKeys.kBrightness.value
+                propMeta, CameraPropKeys.kSharpness.value
             )
             self.gain.constraint = getPropNumberConstraint(
-                propMeta, CameraPropKeys.kBrightness.value
+                propMeta, CameraPropKeys.kGain.value
             )
             for prop in camera.getProperties():
                 if (
