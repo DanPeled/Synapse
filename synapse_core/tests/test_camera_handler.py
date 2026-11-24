@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
-from synapse.core.camera_handler import CameraHandler
+from synapse.core.camera_handler import CameraHandler, _PublishLane
 
 
 class TestCameraHandler(unittest.TestCase):
@@ -183,6 +183,23 @@ class TestPublishFrame(unittest.TestCase):
 
             assert self.output.putFrame.called
             assert time.perf_counter() - startedAt < 0.2
+        finally:
+            lane.stop()
+
+    def test_publish_lane_reports_sink_failures(self):
+        def fail(*_):
+            raise RuntimeError("sink failed")
+
+        lane = _PublishLane(0, fail)
+        lane.start()
+
+        try:
+            lane.enqueue(np.zeros((2, 2, 3), dtype=np.uint8), None)
+            deadline = time.perf_counter() + 2.0
+            while lane.stats()["failed"] == 0 and time.perf_counter() < deadline:
+                time.sleep(0.005)
+
+            assert lane.stats()["failed"] == 1
         finally:
             lane.stop()
 

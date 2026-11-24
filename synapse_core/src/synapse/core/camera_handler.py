@@ -81,6 +81,8 @@ class _PublishLane:
         self._dtype: Optional[np.dtype] = None
         self._generation = 0
         self.dropped = 0
+        self.failed = 0
+        self._publishErrors = log.ExceptionThrottle()
 
     def start(self) -> None:
         self.thread.start()
@@ -88,7 +90,14 @@ class _PublishLane:
     def stop(self) -> None:
         self.stopEvent.set()
         self._frameReady.set()
-        self.thread.join(timeout=1.0)
+        if self.thread.ident is None:
+            return
+        self.thread.join(timeout=2.0)
+        if self.thread.is_alive():
+            log.warn(
+                f"Stream publisher for camera #{self.cameraIndex} did not stop "
+                "within 2s; a sink is still blocking publication."
+            )
 
     def _acquire(self, frame: Frame) -> Tuple[np.ndarray, bool, int]:
         shape = tuple(frame.shape)
@@ -108,9 +117,10 @@ class _PublishLane:
             try:
                 return self._free.get_nowait(), True, generation
             except queue.Empty:
-                # A resize can leave both pooled buffers in flight. A one-off
-                # copy is cheaper than blocking the camera loop.
-                return frame.copy(), False, generation
+                # A resize can leave both pooled buffers in flight. Allocate
+                # uninitialized storage; ``enqueue`` is about to do the single
+                # copy into it. ``frame.copy()`` here would copy twice.
+                return np.empty_like(frame), False, generation
 
     def _release(self, buffer: np.ndarray, pooled: bool, generation: int) -> None:
         if not pooled:
@@ -160,17 +170,20 @@ class _PublishLane:
     def stats(self) -> Dict[str, int]:
         with self._lock:
             dropped = self.dropped
-        return {"queued": self.frames.qsize(), "dropped": dropped}
+            failed = self.failed
+        return {"queued": self.frames.qsize(), "dropped": dropped, "failed": failed}
 
     def resetStats(self) -> None:
         with self._lock:
             self.dropped = 0
+            self.failed = 0
 
     def _run(self) -> None:
         while not self.stopEvent.is_set():
-            # Event wait avoids the 200 ms idle wakeup while still draining every
-            # frame already queued when the lane was busy.
-            self._frameReady.wait(0.2)
+            # ``enqueue`` and ``stop`` both set the event, so an unbounded wait
+            # removes five idle wakeups per second per camera without adding
+            # latency to the first frame after an idle period.
+            self._frameReady.wait()
             self._frameReady.clear()
 
             while not self.stopEvent.is_set():
@@ -181,8 +194,26 @@ class _PublishLane:
 
                 try:
                     self._publish(buffer, fps)
-                except Exception:
-                    pass
+                except Exception as error:
+                    publishError = error
+                    with self._lock:
+                        self.failed += 1
+                    message = self._publishErrors.exceptionDetail(
+                        self.cameraIndex,
+                        publishError,
+                        lambda: "".join(
+                            traceback.format_exception(
+                                type(publishError),
+                                publishError,
+                                publishError.__traceback__,
+                            )
+                        ),
+                    )
+                    if message:
+                        log.warn(
+                            f"Stream publish failed on camera #{self.cameraIndex}: "
+                            f"{message}"
+                        )
                 finally:
                     self._release(buffer, pooled, generation)
 
@@ -835,12 +866,21 @@ class CameraHandler:
         )
 
     def _startPublishLane(self, cameraIndex: CameraID) -> _PublishLane:
-        lane = _PublishLane(
-            cameraIndex,
-            lambda frame, fps, index=cameraIndex: self._publishFrameSync(
-                frame, self.cameraHandles[index], fps
-            ),
-        )
+        # Bind the handle now instead of looking it up on every frame. Cleanup
+        # clears ``cameraHandles`` while a slow lane may still be publishing;
+        # a captured reference keeps that lane from raising KeyError on a
+        # shutdown race.
+        handle = self.cameraHandles.get(cameraIndex)
+
+        def publish(frame: Frame, fps: Optional[int]) -> None:
+            activeHandle = handle
+            if activeHandle is None:
+                activeHandle = self.cameraHandles.get(cameraIndex)
+            if activeHandle is None:
+                return
+            self._publishFrameSync(frame, activeHandle, fps)
+
+        lane = _PublishLane(cameraIndex, publish)
         self._publishLanes[cameraIndex] = lane
         lane.start()
         return lane
