@@ -286,6 +286,9 @@ class CameraHandler:
 
         self.stopCameraScanEvent = threading.Event()
         self._cameraScanRequested = threading.Event()
+        # Set before the scanner is stopped so an in-flight scan cannot create
+        # new cameras, handles or worker threads after cleanup has begun.
+        self._shuttingDown = False
         self._pendingUsbCameraInfos: Optional[UsbCameraInfos] = None
         self._lastDeviceSignature: Optional[UsbDeviceSignature] = None
         self._lastUsbInfoSignature: UsbInfoSignature = ()
@@ -328,14 +331,31 @@ class CameraHandler:
             return
 
         def cameraScanAction() -> None:
-            while not self.stopCameraScanEvent.is_set():
+            while not self.stopCameraScanEvent.is_set() and not self._shuttingDown:
                 if not self._waitForCameraChange():
                     break
-                if self.stopCameraScanEvent.is_set():
+                if self.stopCameraScanEvent.is_set() or self._shuttingDown:
                     break
                 usbCameraInfos = self._pendingUsbCameraInfos
                 self._pendingUsbCameraInfos = None
-                self.scanCameras(usbCameraInfos=usbCameraInfos)
+
+                try:
+                    self.scanCameras(usbCameraInfos=usbCameraInfos)
+                except Exception as error:
+                    log.warn(
+                        f"Camera scan failed ({type(error).__name__}): {error}. "
+                        "The change will be retried."
+                    )
+                    self._pendingUsbCameraInfos = None
+                    # Signatures are updated when a change is detected, so
+                    # relying on another signature diff would consume the
+                    # failed change and leave hotplug detection dead after one
+                    # native hiccup. Force a fresh rescan after backing off.
+                    self._cameraScanRequested.set()
+                    if self.stopCameraScanEvent.wait(
+                        min(1.0, self.cameraScanMaxInterval)
+                    ):
+                        break
 
         self.cameraScanningThread = threading.Thread(
             target=cameraScanAction, daemon=True, name="Camera scanner"
@@ -350,7 +370,7 @@ class CameraHandler:
 
     def _waitForCameraChange(self) -> bool:
         """Waits for a detected camera change or an explicit scan request."""
-        while not self.stopCameraScanEvent.is_set():
+        while not self.stopCameraScanEvent.is_set() and not self._shuttingDown:
             if self._checkForCameraChanges():
                 return True
             self._cameraScanRequested.wait(self._cameraProbeInterval)
@@ -503,6 +523,8 @@ class CameraHandler:
             usbCameraInfos: USB camera map collected by the caller. When None,
                 cameras are enumerated here (e.g. for an explicit rescan).
         """
+        if self._shuttingDown:
+            return
         if usbCameraInfos is None:
             usbCameraInfos = self._enumerateUsbCameras()
 
@@ -863,7 +885,9 @@ class CameraHandler:
 
         # Scaling the text with the output height keeps the overlay readable on
         # a small preview without paying for a full-resolution text draw first.
-        scale = min(FPSView.fontScale, max(0.5, frame.shape[0] / 720.0 * FPSView.fontScale))
+        scale = min(
+            FPSView.fontScale, max(0.5, frame.shape[0] / 720.0 * FPSView.fontScale)
+        )
         thickness = 2 if scale >= 2.0 else 1
         position = (10, max(12, int(30 * scale / FPSView.fontScale)))
         try:
@@ -988,6 +1012,16 @@ class CameraHandler:
         cameraConfig: CameraConfig,
         handle: CameraHandle,
     ):
+        if self._shuttingDown:
+            # A scan that was in flight when cleanup started must not leave a
+            # new grabber thread or native camera behind.
+            try:
+                handle.close()
+                handle.camera.close()
+            except Exception:
+                pass
+            return
+
         self.cameraHandles[cameraIndex] = handle
 
         handle.setIndex(cameraIndex)
@@ -1040,8 +1074,15 @@ class CameraHandler:
 
         return updated_settings
 
-    def cleanup(self) -> None:
-        """Stop the camera scanner and release cameras, streams, and recordings."""
+    def stopCameraScanning(self) -> None:
+        """Stop the hotplug scanner before anything tears down its output.
+
+        Idempotent so runtime cleanup can call it early and camera-handler
+        cleanup can call it again without a duplicate join or duplicate log.
+        """
+        if self._shuttingDown and self.stopCameraScanEvent.is_set():
+            return
+        self._shuttingDown = True
         log.info("Stopping camera scanner...")
         self.stopCameraScanEvent.set()
         # Wake the scanner immediately so cleanup does not wait for a probe interval.
@@ -1054,6 +1095,10 @@ class CameraHandler:
             timeout=2.0,
         ):
             log.info("Camera scanner stopped.")
+
+    def cleanup(self) -> None:
+        """Stop the camera scanner and release cameras, streams, and recordings."""
+        self.stopCameraScanning()
 
         for cameraIndex, lane in list(self._publishLanes.items()):
             lane.stop()

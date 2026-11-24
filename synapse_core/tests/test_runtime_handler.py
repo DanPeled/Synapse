@@ -401,6 +401,23 @@ class TestRuntimeManager(unittest.TestCase):
 
         self.mock_camera_handler.cleanup.assert_called_once()
 
+    def test_cleanup_stops_camera_scanner_before_releasing_resources(self):
+        calls = MagicMock()
+        calls.attach_mock(self.mock_camera_handler.stopCameraScanning, "stopScanning")
+        calls.attach_mock(self.mock_camera_handler.cleanup, "cleanup")
+
+        self.handler.cleanup()
+
+        self.assertEqual(calls.mock_calls, [call.stopScanning(), call.cleanup()])
+
+    def test_late_camera_addition_does_not_start_worker_after_cleanup(self):
+        addCamera = self.mock_camera_handler.onAddCamera.add.call_args_list[0][0][0]
+
+        self.handler.cleanup()
+        addCamera(0, "late", MagicMock())
+
+        self.assertNotIn(0, self.handler.cameraManagementThreads)
+
 
 class TestHandleFramePublishing(unittest.TestCase):
     def setUp(self):

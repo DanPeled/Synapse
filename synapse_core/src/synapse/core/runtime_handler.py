@@ -206,6 +206,9 @@ class RuntimeManager:
         self._saveDebounceSeconds = SAVE_DEBOUNCE_SECONDS
 
         def onAddCamera(cameraID: CameraID, name: str, handle: CameraHandle):
+            with self._cleanupLock:
+                if self._cleanedUp:
+                    return
             # Trackers are long-lived, so create them before the process thread
             # starts. The hot path can then record without a global lock.
             with self._performanceLock:
@@ -231,8 +234,11 @@ class RuntimeManager:
 
             thread = threading.Thread(target=self.processCamera, args=(cameraID,))
             thread.daemon = True
-            thread.start()
-            self.cameraManagementThreads[cameraID] = thread
+            with self._cleanupLock:
+                if self._cleanedUp:
+                    return
+                thread.start()
+                self.cameraManagementThreads[cameraID] = thread
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
@@ -1294,12 +1300,19 @@ class RuntimeManager:
         log.info("Releasing runtime workers and resources...")
         self.requestStop()
 
-        cameraThreadCount = len(self.cameraManagementThreads)
+        # Stop hotplug scanning first: it creates camera workers and handles,
+        # so it must be quiescent before those collections are joined and
+        # cleared below.
+        self.cameraHandler.stopCameraScanning()
+
+        with self._cleanupLock:
+            cameraThreads = list(self.cameraManagementThreads.items())
+            self.cameraManagementThreads.clear()
+        cameraThreadCount = len(cameraThreads)
         if cameraThreadCount:
             log.info(f"Stopping {cameraThreadCount} camera worker thread(s)...")
-        for cameraIndex, thread in self.cameraManagementThreads.items():
+        for cameraIndex, thread in cameraThreads:
             joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0)
-        self.cameraManagementThreads.clear()
         if cameraThreadCount:
             log.info("Camera workers stopped.")
 
