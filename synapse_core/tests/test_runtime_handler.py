@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, PropertyMock, call, patch
 
 import cv2
 import numpy as np
+import pytest
 from ntcore import ValueEventData
 from synapse import Pipeline, PipelineSettings
 from synapse.core.pipeline import FrameResult, PipelineResult
@@ -155,6 +156,49 @@ class TestRuntimeManager(unittest.TestCase):
         assert table.getDoubleTopic.call_count == 2
         publishers["captureLatency"].set.assert_called_with(0.1)
         assert publishers["processLatency"].set.call_args_list[-1].args == (0.3,)
+
+    def test_reported_fps_never_exceeds_camera_limit(self):
+        """A short inter-frame gap must not report an impossible camera FPS."""
+        camera = MagicMock()
+        camera.getVideoMode.return_value.fps = 30
+        camera.getMaxFPS.return_value = 30
+        handle = MagicMock()
+        handle.camera = camera
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=None)
+        self.handler.sendLatency = MagicMock()
+        self.handler.cameraHandler.publishFrame = MagicMock()
+
+        clock = {"now": 900.0}
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        def reportedFps() -> int:
+            return self.handler.cameraHandler.publishFrame.call_args.kwargs["fps"]
+
+        with patch(
+            "synapse.core.runtime_handler.time.perf_counter", lambda: clock["now"]
+        ):
+            for _ in range(30):
+                clock["now"] += 1.0 / 30.0
+                self.handler._processAndPublishFrame(0, frame)
+
+            assert reportedFps() == pytest.approx(30, abs=1)
+
+            # A burst after an idle period used to report 1 / 0.005 = 200 FPS.
+            clock["now"] += 2.0
+            self.handler._processAndPublishFrame(0, frame)
+            clock["now"] += 0.005
+            self.handler._processAndPublishFrame(0, frame)
+
+            assert reportedFps() <= 30
+            assert self.handler.sendLatency.call_args.args[-1] <= 30
+
+            # Slow pipelines lower the rate rather than being masked by the cap.
+            self.handler._frameRateMeters[0].reset()
+            for _ in range(3):
+                clock["now"] += 0.25
+                self.handler._processAndPublishFrame(0, frame)
+            assert reportedFps() <= 5
 
     def test_setup_calls_all_components(self):
         with (
