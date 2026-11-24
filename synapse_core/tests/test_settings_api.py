@@ -588,6 +588,39 @@ def test_camera_settings_do_not_share_class_level_settings():
     ]
 
 
+def test_camera_property_constraints_use_their_own_metadata():
+    camera = MagicMock()
+    camera.getPropertyMeta.return_value = {
+        "brightness": {"min": 0, "max": 100, "default": 50},
+        "saturation": {"min": 10, "max": 90, "default": 50},
+        "sharpness": {"min": 20, "max": 80, "default": 50},
+        "gain": {"min": 30, "max": 70, "default": 50},
+    }
+    camera.getProperties.return_value = []
+    camera.getSupportedResolutions.return_value = [(1920, 1080)]
+
+    settings = CameraSettings()
+    settings.fromCamera(camera)
+
+    brightness = settings.brightness.constraint
+    saturation = settings.saturation.constraint
+    sharpness = settings.sharpness.constraint
+    gain = settings.gain.constraint
+    assert isinstance(brightness, NumberConstraint)
+    assert isinstance(saturation, NumberConstraint)
+    assert isinstance(sharpness, NumberConstraint)
+    assert isinstance(gain, NumberConstraint)
+
+    assert brightness.minValue == 0
+    assert brightness.maxValue == 100
+    assert saturation.minValue == 10
+    assert saturation.maxValue == 90
+    assert sharpness.minValue == 20
+    assert sharpness.maxValue == 80
+    assert gain.minValue == 30
+    assert gain.maxValue == 70
+
+
 def test_camera_resolution_default_follows_supported_modes():
     camera = MagicMock()
     camera.getPropertyMeta.return_value = {}
