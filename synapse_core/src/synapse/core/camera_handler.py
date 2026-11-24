@@ -11,7 +11,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain
-from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cscore as cs
 import cv2
@@ -55,6 +55,7 @@ class FPSView:
 UsbCameraInfos = Dict[CameraUID, cs.UsbCameraInfo]
 UsbDeviceSignature = Tuple[Tuple[str, int, int], ...]
 UsbInfoSignature = Tuple[Tuple[CameraUID, str, str, Tuple[str, ...], int, int], ...]
+PublishItem = Tuple[np.ndarray, bool, int, Optional[int], Optional[Callable[[], None]]]
 
 
 class _PublishLane:
@@ -63,9 +64,10 @@ class _PublishLane:
     def __init__(self, cameraIndex: CameraID, publish) -> None:
         self.cameraIndex = cameraIndex
         self._publish = publish
-        self.frames: "queue.Queue[Tuple[np.ndarray, bool, int, Optional[int]]]" = (
-            queue.Queue(maxsize=1)
-        )
+        # Items are (frame, pooled, generation, fps, releaseLease). A borrowed
+        # frame carries a callback that returns the camera buffer lease once
+        # the sink is done with it, avoiding a full-resolution copy per frame.
+        self.frames: "queue.Queue[PublishItem]" = queue.Queue(maxsize=1)
         self.stopEvent = threading.Event()
         self._frameReady = threading.Event()
         self.thread = threading.Thread(
@@ -81,6 +83,8 @@ class _PublishLane:
         self._dtype: Optional[np.dtype] = None
         self._generation = 0
         self.dropped = 0
+        self.failed = 0
+        self._publishErrors = log.ExceptionThrottle()
 
     def start(self) -> None:
         self.thread.start()
@@ -88,7 +92,26 @@ class _PublishLane:
     def stop(self) -> None:
         self.stopEvent.set()
         self._frameReady.set()
-        self.thread.join(timeout=1.0)
+        if self.thread.ident is not None:
+            self.thread.join(timeout=2.0)
+            if self.thread.is_alive():
+                log.warn(
+                    f"Stream publisher for camera #{self.cameraIndex} did not stop "
+                    "within 2s; a sink is still blocking publication."
+                )
+
+        # Stopping can leave one stale frame in the bounded queue. Return its
+        # camera lease or pooled buffer so shutdown does not strand a capture
+        # buffer that the producer expects to reuse.
+        while True:
+            try:
+                buffer, pooled, generation, _, releaseLease = self.frames.get_nowait()
+            except queue.Empty:
+                break
+            if releaseLease is not None:
+                releaseLease()
+            else:
+                self._release(buffer, pooled, generation)
 
     def _acquire(self, frame: Frame) -> Tuple[np.ndarray, bool, int]:
         shape = tuple(frame.shape)
@@ -108,9 +131,10 @@ class _PublishLane:
             try:
                 return self._free.get_nowait(), True, generation
             except queue.Empty:
-                # A resize can leave both pooled buffers in flight. A one-off
-                # copy is cheaper than blocking the camera loop.
-                return frame.copy(), False, generation
+                # A resize can leave both pooled buffers in flight. Allocate
+                # uninitialized storage; ``enqueue`` is about to do the single
+                # copy into it. ``frame.copy()`` here would copy twice.
+                return np.empty_like(frame), False, generation
 
     def _release(self, buffer: np.ndarray, pooled: bool, generation: int) -> None:
         if not pooled:
@@ -130,13 +154,23 @@ class _PublishLane:
         pooled = False
         generation = 0
         try:
-            staleBuffer, stalePooled, staleGeneration, _ = self.frames.get_nowait()
+            (
+                staleBuffer,
+                stalePooled,
+                staleGeneration,
+                _,
+                staleRelease,
+            ) = self.frames.get_nowait()
         except queue.Empty:
             pass
         else:
             with self._lock:
                 self.dropped += 1
-            if staleBuffer.shape == frame.shape and staleBuffer.dtype == frame.dtype:
+            if staleRelease is not None:
+                staleRelease()
+            if staleRelease is None and (
+                staleBuffer.shape == frame.shape and staleBuffer.dtype == frame.dtype
+            ):
                 buffer = staleBuffer
                 pooled = stalePooled
                 generation = staleGeneration
@@ -147,43 +181,108 @@ class _PublishLane:
             buffer, pooled, generation = self._acquire(frame)
 
         np.copyto(buffer, frame)
-        item = (buffer, pooled, generation, fps)
+        self._push(buffer, pooled, generation, fps, None)
 
+    def enqueueBorrowed(
+        self,
+        frame: Frame,
+        fps: Optional[int],
+        releaseLease: Callable[[], None],
+    ) -> None:
+        """Queue a frame whose buffer belongs to the camera handle.
+
+        The callback returns the lease after the sink has finished with the
+        frame. This removes a full-resolution copy from the camera worker's
+        critical path at maximum camera resolution.
+        """
+        try:
+            staleBuffer, stalePooled, staleGeneration, _, staleRelease = (
+                self.frames.get_nowait()
+            )
+        except queue.Empty:
+            pass
+        else:
+            with self._lock:
+                self.dropped += 1
+            if staleRelease is not None:
+                staleRelease()
+            else:
+                self._release(staleBuffer, stalePooled, staleGeneration)
+
+        self._push(frame, False, 0, fps, releaseLease)
+
+    def _push(
+        self,
+        buffer: np.ndarray,
+        pooled: bool,
+        generation: int,
+        fps: Optional[int],
+        releaseLease: Optional[Callable[[], None]],
+    ) -> None:
+        item = (buffer, pooled, generation, fps, releaseLease)
         try:
             self.frames.put_nowait(item)
             self._frameReady.set()
         except queue.Full:
-            self._release(buffer, pooled, generation)
+            if releaseLease is not None:
+                releaseLease()
+            else:
+                self._release(buffer, pooled, generation)
             with self._lock:
                 self.dropped += 1
 
     def stats(self) -> Dict[str, int]:
         with self._lock:
             dropped = self.dropped
-        return {"queued": self.frames.qsize(), "dropped": dropped}
+            failed = self.failed
+        return {"queued": self.frames.qsize(), "dropped": dropped, "failed": failed}
 
     def resetStats(self) -> None:
         with self._lock:
             self.dropped = 0
+            self.failed = 0
 
     def _run(self) -> None:
         while not self.stopEvent.is_set():
-            # Event wait avoids the 200 ms idle wakeup while still draining every
-            # frame already queued when the lane was busy.
-            self._frameReady.wait(0.2)
+            # ``enqueue`` and ``stop`` both set the event, so an unbounded wait
+            # removes five idle wakeups per second per camera without adding
+            # latency to the first frame after an idle period.
+            self._frameReady.wait()
             self._frameReady.clear()
 
             while not self.stopEvent.is_set():
                 try:
-                    buffer, pooled, generation, fps = self.frames.get_nowait()
+                    buffer, pooled, generation, fps, releaseLease = (
+                        self.frames.get_nowait()
+                    )
                 except queue.Empty:
                     break
 
                 try:
                     self._publish(buffer, fps)
-                except Exception:
-                    pass
+                except Exception as error:
+                    publishError = error
+                    with self._lock:
+                        self.failed += 1
+                    message = self._publishErrors.exceptionDetail(
+                        self.cameraIndex,
+                        publishError,
+                        lambda: "".join(
+                            traceback.format_exception(
+                                type(publishError),
+                                publishError,
+                                publishError.__traceback__,
+                            )
+                        ),
+                    )
+                    if message:
+                        log.warn(
+                            f"Stream publish failed on camera #{self.cameraIndex}: "
+                            f"{message}"
+                        )
                 finally:
+                    if releaseLease is not None:
+                        releaseLease()
                     self._release(buffer, pooled, generation)
 
 
@@ -240,6 +339,12 @@ class CameraHandler:
     DEFAULT_SCAN_MAX_INTERVAL: Final[float] = 30.0
     """Upper bound for the adaptive fallback probe interval while stable."""
 
+    MAX_PUBLISH_FPS: Final[float] = 120.0
+    """Guard against publishing a stream faster than CSCore can consume it."""
+
+    PUBLISH_TIMING_TOLERANCE: Final[float] = 0.002
+    """Accept frames that are up to 2 ms early to avoid cadence beat skips."""
+
     def __init__(self) -> None:
         """
         Initializes empty dictionaries to hold camera instances, output streams,
@@ -270,6 +375,7 @@ class CameraHandler:
 
         self.lastPublishTime: Dict[CameraID, float] = {}
         self.publishInterval: float = 1.0 / 30.0
+        self._publishIntervals: Dict[CameraID, float] = {}
 
         # Reusable resize destinations, keyed by camera. Streaming resizes every
         # captured frame, so allocating a new output image per frame shows up in
@@ -286,6 +392,9 @@ class CameraHandler:
 
         self.stopCameraScanEvent = threading.Event()
         self._cameraScanRequested = threading.Event()
+        # Set before the scanner is stopped so an in-flight scan cannot create
+        # new cameras, handles or worker threads after cleanup has begun.
+        self._shuttingDown = False
         self._pendingUsbCameraInfos: Optional[UsbCameraInfos] = None
         self._lastDeviceSignature: Optional[UsbDeviceSignature] = None
         self._lastUsbInfoSignature: UsbInfoSignature = ()
@@ -328,14 +437,31 @@ class CameraHandler:
             return
 
         def cameraScanAction() -> None:
-            while not self.stopCameraScanEvent.is_set():
+            while not self.stopCameraScanEvent.is_set() and not self._shuttingDown:
                 if not self._waitForCameraChange():
                     break
-                if self.stopCameraScanEvent.is_set():
+                if self.stopCameraScanEvent.is_set() or self._shuttingDown:
                     break
                 usbCameraInfos = self._pendingUsbCameraInfos
                 self._pendingUsbCameraInfos = None
-                self.scanCameras(usbCameraInfos=usbCameraInfos)
+
+                try:
+                    self.scanCameras(usbCameraInfos=usbCameraInfos)
+                except Exception as error:
+                    log.warn(
+                        f"Camera scan failed ({type(error).__name__}): {error}. "
+                        "The change will be retried."
+                    )
+                    self._pendingUsbCameraInfos = None
+                    # Signatures are updated when a change is detected, so
+                    # relying on another signature diff would consume the
+                    # failed change and leave hotplug detection dead after one
+                    # native hiccup. Force a fresh rescan after backing off.
+                    self._cameraScanRequested.set()
+                    if self.stopCameraScanEvent.wait(
+                        min(1.0, self.cameraScanMaxInterval)
+                    ):
+                        break
 
         self.cameraScanningThread = threading.Thread(
             target=cameraScanAction, daemon=True, name="Camera scanner"
@@ -350,7 +476,7 @@ class CameraHandler:
 
     def _waitForCameraChange(self) -> bool:
         """Waits for a detected camera change or an explicit scan request."""
-        while not self.stopCameraScanEvent.is_set():
+        while not self.stopCameraScanEvent.is_set() and not self._shuttingDown:
             if self._checkForCameraChanges():
                 return True
             self._cameraScanRequested.wait(self._cameraProbeInterval)
@@ -503,6 +629,8 @@ class CameraHandler:
             usbCameraInfos: USB camera map collected by the caller. When None,
                 cameras are enumerated here (e.g. for an explicit rescan).
         """
+        if self._shuttingDown:
+            return
         if usbCameraInfos is None:
             usbCameraInfos = self._enumerateUsbCameras()
 
@@ -551,6 +679,7 @@ class CameraHandler:
                         f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
                     )
                     GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
+                    self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:
@@ -813,12 +942,21 @@ class CameraHandler:
         )
 
     def _startPublishLane(self, cameraIndex: CameraID) -> _PublishLane:
-        lane = _PublishLane(
-            cameraIndex,
-            lambda frame, fps, index=cameraIndex: self._publishFrameSync(
-                frame, self.cameraHandles[index], fps
-            ),
-        )
+        # Bind the handle now instead of looking it up on every frame. Cleanup
+        # clears ``cameraHandles`` while a slow lane may still be publishing;
+        # a captured reference keeps that lane from raising KeyError on a
+        # shutdown race.
+        handle = self.cameraHandles.get(cameraIndex)
+
+        def publish(frame: Frame, fps: Optional[int]) -> None:
+            activeHandle = handle
+            if activeHandle is None:
+                activeHandle = self.cameraHandles.get(cameraIndex)
+            if activeHandle is None:
+                return
+            self._publishFrameSync(frame, activeHandle, fps)
+
+        lane = _PublishLane(cameraIndex, publish)
         self._publishLanes[cameraIndex] = lane
         lane.start()
         return lane
@@ -827,33 +965,76 @@ class CameraHandler:
         """Enable or disable stream/record publication without stopping cameras."""
         self._publishingEnabled = bool(enabled)
 
+    def _getPublishInterval(self, handle: CameraHandle) -> float:
+        """Return the per-camera publication interval.
+
+        A 30 FPS global cap threw away two thirds of a 100 FPS camera's frames
+        even though the zero-copy publish lane can keep up. Cameras within the
+        CSCore-safe cap are not throttled at all; faster cameras are capped once
+        their maximum is queried and cached per camera index.
+        """
+        cameraIndex = handle.cameraIndex
+        interval = self._publishIntervals.get(cameraIndex)
+        if interval is None:
+            try:
+                reportedFps = handle.camera.getMaxFPS()
+                if not isinstance(reportedFps, (int, float)) or isinstance(
+                    reportedFps, bool
+                ):
+                    raise ValueError("camera did not report a numeric max FPS")
+                maxFps = float(reportedFps)
+            except Exception:
+                # Headless callers and tests can set an explicit interval.
+                interval = self.publishInterval
+            else:
+                if maxFps <= 0.0 or maxFps <= self.MAX_PUBLISH_FPS:
+                    # The bounded lane already drops stale frames when a sink
+                    # cannot keep up. Throttling below the camera's own rate
+                    # would only discard deliverable frames.
+                    interval = 0.0
+                else:
+                    interval = 1.0 / self.MAX_PUBLISH_FPS
+            self._publishIntervals[cameraIndex] = interval
+        return interval
+
     def publishFrame(
-        self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
-    ) -> None:
+        self,
+        frame: Frame,
+        handle: CameraHandle,
+        fps: Optional[int] = None,
+        lease: Optional[Tuple[int, int]] = None,
+    ) -> bool:
         """Hand a throttled frame to the camera's stream/record lane.
 
-        The camera processing thread only copies into a pooled buffer and never
-        waits on ``CvSource.putFrame`` or ``VideoWriter.write``. When the lane
-        is behind, the stale queued frame is replaced so latency stays bounded.
+        Returns True when the camera buffer lease was transferred to the lane.
+        The camera worker must not release the frame in that case. At maximum
+        resolution this also avoids copying the full frame on the worker.
         """
         assert frame is not None
         if not self._publishingEnabled:
-            return
+            return False
 
         now = time.perf_counter()
         cameraIndex = handle.cameraIndex
 
         lastTime = self.lastPublishTime.get(cameraIndex, 0.0)
-        if now - lastTime < self.publishInterval:
-            return
+        interval = self._getPublishInterval(handle)
+        if interval > 0.0 and now + self.PUBLISH_TIMING_TOLERANCE < lastTime + interval:
+            return False
         self.lastPublishTime[cameraIndex] = now
 
         lane = self._publishLanes.get(cameraIndex)
         if lane is None:
             # Tests and headless callers can publish without a managed camera.
             self._publishFrameSync(frame, handle, fps)
-            return
-        lane.enqueue(frame, fps)
+            return False
+
+        if lease is None:
+            lane.enqueue(frame, fps)
+            return False
+
+        lane.enqueueBorrowed(frame, fps, lambda lease=lease: handle.returnLease(lease))
+        return True
 
     @staticmethod
     def _drawFps(frame: Frame, fps: Optional[int]) -> None:
@@ -863,7 +1044,9 @@ class CameraHandler:
 
         # Scaling the text with the output height keeps the overlay readable on
         # a small preview without paying for a full-resolution text draw first.
-        scale = min(FPSView.fontScale, max(0.5, frame.shape[0] / 720.0 * FPSView.fontScale))
+        scale = min(
+            FPSView.fontScale, max(0.5, frame.shape[0] / 720.0 * FPSView.fontScale)
+        )
         thickness = 2 if scale >= 2.0 else 1
         position = (10, max(12, int(30 * scale / FPSView.fontScale)))
         try:
@@ -988,6 +1171,16 @@ class CameraHandler:
         cameraConfig: CameraConfig,
         handle: CameraHandle,
     ):
+        if self._shuttingDown:
+            # A scan that was in flight when cleanup started must not leave a
+            # new grabber thread or native camera behind.
+            try:
+                handle.close()
+                handle.camera.close()
+            except Exception:
+                pass
+            return
+
         self.cameraHandles[cameraIndex] = handle
 
         handle.setIndex(cameraIndex)
@@ -1040,8 +1233,15 @@ class CameraHandler:
 
         return updated_settings
 
-    def cleanup(self) -> None:
-        """Stop the camera scanner and release cameras, streams, and recordings."""
+    def stopCameraScanning(self) -> None:
+        """Stop the hotplug scanner before anything tears down its output.
+
+        Idempotent so runtime cleanup can call it early and camera-handler
+        cleanup can call it again without a duplicate join or duplicate log.
+        """
+        if self._shuttingDown and self.stopCameraScanEvent.is_set():
+            return
+        self._shuttingDown = True
         log.info("Stopping camera scanner...")
         self.stopCameraScanEvent.set()
         # Wake the scanner immediately so cleanup does not wait for a probe interval.
@@ -1054,6 +1254,10 @@ class CameraHandler:
             timeout=2.0,
         ):
             log.info("Camera scanner stopped.")
+
+    def cleanup(self) -> None:
+        """Stop the camera scanner and release cameras, streams, and recordings."""
+        self.stopCameraScanning()
 
         for cameraIndex, lane in list(self._publishLanes.items()):
             lane.stop()

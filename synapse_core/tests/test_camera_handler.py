@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
-from synapse.core.camera_handler import CameraHandler
+from synapse.core.camera_handler import CameraHandler, _PublishLane
 
 
 class TestCameraHandler(unittest.TestCase):
@@ -185,6 +185,101 @@ class TestPublishFrame(unittest.TestCase):
             assert time.perf_counter() - startedAt < 0.2
         finally:
             lane.stop()
+
+    def test_publish_lane_reports_sink_failures(self):
+        def fail(*_):
+            raise RuntimeError("sink failed")
+
+        lane = _PublishLane(0, fail)
+        lane.start()
+
+        try:
+            lane.enqueue(np.zeros((2, 2, 3), dtype=np.uint8), None)
+            deadline = time.perf_counter() + 2.0
+            while lane.stats()["failed"] == 0 and time.perf_counter() < deadline:
+                time.sleep(0.005)
+
+            assert lane.stats()["failed"] == 1
+        finally:
+            lane.stop()
+
+    def test_publish_lane_releases_a_queued_lease_on_stop(self):
+        lane = _PublishLane(0, MagicMock())
+        release = MagicMock()
+        lane.enqueueBorrowed(np.zeros((2, 2, 3), dtype=np.uint8), None, release)
+
+        lane.stop()
+
+        release.assert_called_once_with()
+        assert lane.stats()["queued"] == 0
+
+    def test_publish_frame_transfers_camera_buffer_lease(self):
+        self.handler.cameraHandles[0] = self.handle
+        lane = MagicMock()
+        self.handler._publishLanes[0] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+        lease = (4, 2)
+
+        transferred = self.handler.publishFrame(frame, self.handle, lease=lease)
+
+        assert transferred is True
+        args = lane.enqueueBorrowed.call_args.args
+        assert args[0] is frame
+        assert args[1] is None
+
+        release = args[2]
+        self.handle.returnLease.assert_not_called()
+        release()
+        self.handle.returnLease.assert_called_once_with(lease)
+
+    def test_publish_throttle_uses_the_camera_maximum_fps(self):
+        handle = MagicMock()
+        handle.cameraIndex = 5
+        handle.camera.getMaxFPS.return_value = 100
+        lane = MagicMock()
+        self.handler._publishLanes[5] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch(
+            "synapse.core.camera_handler.time.perf_counter", side_effect=[1.0, 1.015]
+        ):
+            self.handler.publishFrame(frame, handle)
+            self.handler.publishFrame(frame, handle)
+
+        assert lane.enqueue.call_count == 2
+        assert self.handler._publishIntervals[5] == 0.0
+
+    def test_publish_tolerance_accepts_slightly_early_frames_when_capped(self):
+        handle = MagicMock()
+        handle.cameraIndex = 7
+        handle.camera.getMaxFPS.return_value = 240
+        lane = MagicMock()
+        self.handler._publishLanes[7] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch(
+            "synapse.core.camera_handler.time.perf_counter", side_effect=[1.0, 1.007]
+        ):
+            self.handler.publishFrame(frame, handle)
+            self.handler.publishFrame(frame, handle)
+
+        assert lane.enqueue.call_count == 2
+
+    def test_publish_does_not_throttle_cameras_within_the_cap(self):
+        handle = MagicMock()
+        handle.cameraIndex = 6
+        handle.camera.getMaxFPS.return_value = 30
+        lane = MagicMock()
+        self.handler._publishLanes[6] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch(
+            "synapse.core.camera_handler.time.perf_counter", side_effect=[1.0, 1.005]
+        ):
+            self.handler.publishFrame(frame, handle)
+            self.handler.publishFrame(frame, handle)
+
+        assert lane.enqueue.call_count == 2
 
     def test_recording_resizes_and_releases_buffer(self):
         self.handler.recordingStatus[0] = True

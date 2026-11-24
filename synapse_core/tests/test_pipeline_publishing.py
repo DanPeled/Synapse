@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 from typing import Callable, cast
 from unittest.mock import MagicMock, patch
 
@@ -113,3 +114,36 @@ def test_resolution_parsing_is_cached_until_the_setting_changes() -> None:
 
     assert pipeline.getResolution() == (640, 480)
     assert pipeline._resolutionCache is not cached
+
+
+def test_publisher_cache_survives_concurrent_rebinds() -> None:
+    pipeline = DummyPipeline()
+    pipeline.ntTable = MagicMock()
+    errors: list[Exception] = []
+    start = threading.Barrier(2)
+
+    def publish() -> None:
+        try:
+            start.wait()
+            for index in range(200):
+                pipeline.setDataValue(f"key{index % 8}", index)
+        except Exception as e:
+            errors.append(e)
+
+    def rebind() -> None:
+        try:
+            start.wait()
+            for _ in range(200):
+                pipeline.invalidateCachedEntries()
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=publish), threading.Thread(target=rebind)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+
+    assert errors == []
+    assert set(pipeline._ntPublishers).issubset({f"key{i}" for i in range(8)})

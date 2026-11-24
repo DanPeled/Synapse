@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -174,6 +175,7 @@ def test_runtime_rebind_replaces_only_renamed_camera_nt_state():
     setattr(manager, "_RuntimeManager__pipelineEntryCache", {0: "entry0", 1: "entry1"})
     manager._ntListenerKeys = {(0, "pipeline", ""): 10, (1, "pipeline", ""): 11}
     manager._ntListeners = [10, 11]
+    manager._ntListenerLock = threading.Lock()
 
     with (
         patch("synapse.core.runtime_handler.NetworkTableInstance.getDefault") as nt,

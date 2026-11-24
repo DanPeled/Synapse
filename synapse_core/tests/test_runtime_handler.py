@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, call, patch
@@ -305,6 +306,30 @@ class TestRuntimeManager(unittest.TestCase):
         assert self.handler._ntListeners == [10]
         assert self.handler._ntListenerKeys == {(0, "settings", "brightness"): 10}
 
+    def test_concurrent_nt_listener_registration_is_deduplicated(self):
+        entry = MagicMock()
+        start = threading.Barrier(8)
+
+        def register() -> None:
+            start.wait()
+            self.handler._addNtListener(
+                entry, 1, lambda event: None, key=(0, "settings", "brightness")
+            )
+
+        with patch(
+            "synapse.core.runtime_handler.NetworkTableInstance.getDefault"
+        ) as nt:
+            nt.return_value.addListener.return_value = 10
+            threads = [threading.Thread(target=register) for _ in range(8)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=5)
+                assert not thread.is_alive()
+
+        assert nt.return_value.addListener.call_count == 1
+        assert self.handler._ntListeners == [10]
+
     def test_pipeline_nt_listener_binds_each_camera_index(self):
         self.mock_camera_handler.cameraHandles = {0: MagicMock(), 1: MagicMock()}
         self.handler.pipelineHandler.defaultPipelineIndexes = {0: 0, 1: 1}
@@ -400,6 +425,99 @@ class TestRuntimeManager(unittest.TestCase):
         self.handler.cleanup()
 
         self.mock_camera_handler.cleanup.assert_called_once()
+
+    def test_cleanup_stops_camera_scanner_before_releasing_resources(self):
+        calls = MagicMock()
+        calls.attach_mock(self.mock_camera_handler.stopCameraScanning, "stopScanning")
+        calls.attach_mock(self.mock_camera_handler.cleanup, "cleanup")
+
+        self.handler.cleanup()
+
+        self.assertEqual(calls.mock_calls, [call.stopScanning(), call.cleanup()])
+
+    def test_late_camera_addition_does_not_start_worker_after_cleanup(self):
+        addCamera = self.mock_camera_handler.onAddCamera.add.call_args_list[0][0][0]
+
+        self.handler.cleanup()
+        addCamera(0, "late", MagicMock())
+
+        self.assertNotIn(0, self.handler.cameraManagementThreads)
+
+    def test_camera_buffer_is_borrowed_when_pipeline_returns_the_same_frame(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = True
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        self.handler._processAndPublishFrame(0, frame)
+
+        handle.takeLease.assert_called_once_with()
+        assert self.mock_camera_handler.publishFrame.call_args.kwargs["lease"] == (7, 1)
+        handle.returnLease.assert_not_called()
+
+    def test_derived_frame_is_not_borrowed_from_the_camera_pool(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = False
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        derived = np.ones((4, 4, 3), dtype=np.uint8)
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        with patch.object(self.handler, "handleResults", return_value=derived):
+            self.handler._processAndPublishFrame(0, frame)
+
+        handle.takeLease.assert_not_called()
+        assert self.mock_camera_handler.publishFrame.call_args.kwargs["lease"] is None
+
+    def test_untransferred_lease_is_returned_after_throttled_publication(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = False
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        self.handler._processAndPublishFrame(0, frame)
+
+        handle.returnLease.assert_called_once_with((7, 1))
+
+    def test_metrics_worker_survives_a_sensor_failure(self):
+        manager = MagicMock()
+        manager.getCpuTemp.side_effect = [RuntimeError("sensor offline"), 42.0]
+
+        with (
+            patch("synapse.hardware.metrics.MetricsManager", return_value=manager),
+            patch("synapse.core.runtime_handler.NetworkTableInstance.getDefault"),
+            patch.object(WebSocketServer, "kInstance", None),
+        ):
+            self.handler.startMetricsThread()
+            thread = self.handler.metricsThread
+            assert thread is not None
+
+            deadline = time.monotonic() + 2.0
+            while manager.getCpuTemp.call_count < 2 and time.monotonic() < deadline:
+                time.sleep(0.005)
+
+            self.handler.requestStop()
+            thread.join(timeout=2.0)
+
+        assert manager.getCpuTemp.call_count >= 2
+        assert not thread.is_alive()
 
 
 class TestHandleFramePublishing(unittest.TestCase):

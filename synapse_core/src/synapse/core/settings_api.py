@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import copy
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -1191,14 +1192,27 @@ class SettingsCollection:
         return self._settingsApi.settings
 
     def _initializeSettings(self):
-        """Initialize declared settings by inspecting class-level attributes."""
+        """Initialize declared settings by inspecting class-level attributes.
+
+        Class attributes are templates. Registering them directly would let
+        ``fromCamera()`` on one camera rewrite the constraints of every other
+        camera while those settings are being serialized on another thread.
+        """
         for attrName in dir(self.__class__):
             if not attrName.startswith("_"):
                 attrValue = getattr(self.__class__, attrName)
                 if isinstance(attrValue, Setting):
+                    # Keep the class template's key usable as a descriptor in
+                    # call sites like ``getCameraSetting(CameraSettings.resolution)``.
+                    # Constraints stay per-instance, so ``fromCamera`` can no
+                    # longer rewrite another camera's limits.
                     if attrValue.key != attrName:
                         attrValue.key = attrName
-                    self.addSetting(attrValue, attrName)
+                    instanceSetting = copy.copy(attrValue)
+                    instanceSetting.constraint = copy.copy(attrValue.constraint)
+                    instanceSetting.key = attrName
+                    setattr(self, attrName, instanceSetting)
+                    self.addSetting(instanceSetting, attrName)
 
     def addSetting(self, setting: Setting, name: str):
         self._settingsApi.addSetting(setting)

@@ -88,7 +88,10 @@ class CameraHandle:
 
         self._running: bool = True
         self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
+        # Serializes the check -> native set -> pool swap sequence. Without it,
+        # two control threads can both observe "unchanged" and leave the camera
+        # in one mode with buffers sized for the other.
+        self._modeLock = threading.Lock()
 
         self._startFrameThread()
 
@@ -113,54 +116,59 @@ class CameraHandle:
 
         effectiveMode = VideoMode(pixelFormat, mode.width, mode.height, mode.fps)
 
-        # Applying a video mode can rebuild frame buffers and stall the camera.
-        # Avoid both when the camera is already in the requested mode.
-        if self._isActiveVideoMode(effectiveMode):
-            return
+        with self._modeLock:
+            # Applying a video mode can rebuild frame buffers and stall the
+            # camera. Avoid both when the camera is already in the requested
+            # mode. The check and the native write must be one atomic action.
+            if self._isActiveVideoMode(effectiveMode):
+                return
 
-        # Apply it
-        try:
-            self.camera.setVideoMode(effectiveMode)
-        except Exception:
             try:
-                # Try to set with exact requested values
-                self.camera.setVideoMode(videoMode)
+                self.camera.setVideoMode(effectiveMode)
+            except Exception:
+                try:
+                    # Try to set with exact requested values
+                    self.camera.setVideoMode(videoMode)
+                except Exception:
+                    return
+                effectiveMode = VideoMode(
+                    pixelFormat, videoMode.width, videoMode.height, videoMode.fps
+                )
+
+            H, W = effectiveMode.height, effectiveMode.width
+
+            # Allocate outside the frame mutex: a 1080p pool can take several
+            # milliseconds and must not stall the consumer or the grabber.
+            try:
+                newPool = [
+                    np.zeros((H, W, 3), dtype=np.uint8) for _ in range(self._poolSize)
+                ]
             except Exception:
                 return
-            effectiveMode = VideoMode(
-                pixelFormat, videoMode.width, videoMode.height, videoMode.fps
-            )
 
-        H, W = effectiveMode.height, effectiveMode.width
+            # Swap atomically. The generation counter invalidates any frame
+            # already in flight so the consumer cannot use a stale buffer.
+            with self._frameMutex:
+                generation = self._bufferGeneration + 1
+                self._bufferGeneration = generation
+                self._bufferPool = newPool
+                self._frameQueue.clear()
+                self._freeBuffers.clear()
+                for index in range(self._poolSize):
+                    self._freeBuffers.append((generation, index))
+                self._leasedIndex = None
+                self._leasedGeneration = None
+                self._frameCondition.notify_all()
+                self._bufferCondition.notify_all()
 
-        # Atomically rebuild buffers. The generation counter invalidates any
-        # frame already in flight so the consumer cannot use a stale buffer.
-        try:
-            with self._lock:
-                with self._frameMutex:
-                    generation = self._bufferGeneration + 1
-                    self._bufferGeneration = generation
-                    self._bufferPool = [
-                        np.zeros((H, W, 3), dtype=np.uint8)
-                        for _ in range(self._poolSize)
-                    ]
-                    self._frameQueue.clear()
-                    self._freeBuffers.clear()
-                    for index in range(self._poolSize):
-                        self._freeBuffers.append((generation, index))
-                    self._leasedIndex = None
-                    self._leasedGeneration = None
-                    self._frameCondition.notify_all()
-                    self._bufferCondition.notify_all()
-        except Exception:
-            return
+            self._activeVideoMode = effectiveMode
 
-        self._activeVideoMode = effectiveMode
-
-        # Give camera a moment to start producing frames
+        # Give camera a moment to start producing frames. This is intentionally
+        # outside the mode lock so a second mode change is not blocked by it.
         time.sleep(0.01)
 
     def _isActiveVideoMode(self, mode: VideoMode) -> bool:
+        """Read the active mode; callers changing it must hold ``_modeLock``."""
         active = self._activeVideoMode
         if active is None:
             return False
@@ -272,6 +280,10 @@ class CameraHandle:
         lastDrain = 0.0
         lastConnectionCheck = 0.0
         connected = False
+        # Exponential backoff replaces the old 2-5 ms busy polls. Waiting on
+        # the buffer condition still lets ``close()`` wake the loop immediately.
+        disconnectedBackoff = 0.005
+        grabBackoff = 0.005
 
         while self._running:
             now = time.monotonic()
@@ -283,17 +295,21 @@ class CameraHandle:
                     connected = False
 
             if not connected:
-                time.sleep(0.005)
+                with self._bufferCondition:
+                    self._bufferCondition.wait(disconnectedBackoff)
+                disconnectedBackoff = min(disconnectedBackoff * 2.0, 0.25)
                 continue
+
+            disconnectedBackoff = 0.005
 
             acquired: Optional[Tuple[int, int, List[np.ndarray]]] = None
             with self._bufferCondition:
                 acquired = self._acquireBufferLocked()
                 if acquired is None:
-                    # Wait for a lease to return. The predicate is rechecked
-                    # after waking, so a return cannot be missed between a
-                    # timeout and an event clear.
-                    self._bufferCondition.wait(0.005)
+                    # Wait for a lease to return, with a 20 ms ceiling so a
+                    # stalled sink is still drained periodically. The predicate
+                    # is rechecked after waking, so a return cannot be missed.
+                    self._bufferCondition.wait(0.02)
                     shouldDrain = time.monotonic() - lastDrain >= 0.02
                     drainPool = self._bufferPool if shouldDrain else None
                 else:
@@ -331,15 +347,20 @@ class CameraHandle:
             except Exception:
                 with self._frameMutex:
                     self._returnBufferLocked(generation, index)
-                time.sleep(0.002)
+                with self._bufferCondition:
+                    self._bufferCondition.wait(grabBackoff)
+                grabBackoff = min(grabBackoff * 2.0, 0.25)
                 continue
 
             if not (timestamp and timestamp > 0):
                 with self._frameMutex:
                     self._returnBufferLocked(generation, index)
-                # small yield only on failure (prevents CPU spin)
-                time.sleep(0.002)
+                with self._bufferCondition:
+                    self._bufferCondition.wait(grabBackoff)
+                grabBackoff = min(grabBackoff * 2.0, 0.25)
                 continue
+
+            grabBackoff = 0.005
 
             with self._frameMutex:
                 if generation != self._bufferGeneration:
@@ -412,6 +433,28 @@ class CameraHandle:
         with self._frameMutex:
             self._releaseLeaseLocked()
 
+    def takeLease(self) -> Optional[Tuple[int, int]]:
+        """Transfer ownership of the current lease to another thread.
+
+        The next :meth:`grabFrame` must not auto-release a buffer that a
+        publish lane is still reading, so this clears the single-lease slot and
+        returns a token that :meth:`returnLease` can release later.
+        """
+        with self._frameMutex:
+            index = self._leasedIndex
+            generation = self._leasedGeneration
+            self._leasedIndex = None
+            self._leasedGeneration = None
+        if index is None or generation is None:
+            return None
+        return generation, index
+
+    def returnLease(self, lease: Tuple[int, int]) -> None:
+        """Release a lease previously returned by :meth:`takeLease`."""
+        generation, index = lease
+        with self._frameMutex:
+            self._returnBufferLocked(generation, index)
+
     def getCaptureStats(self) -> Dict[str, int]:
         """Return counters useful for diagnosing multi-camera capture drops."""
         if not hasattr(self, "_freeBuffers"):
@@ -439,8 +482,13 @@ class CameraHandle:
             self._running = False
             self._frameCondition.notify_all()
             self._bufferCondition.notify_all()
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
+        if self._thread is not None and self._thread.ident is not None:
+            self._thread.join(timeout=2.0)
+            if self._thread.is_alive():
+                warn(
+                    f"Frame grabber for camera #{self.cameraIndex} did not stop "
+                    "within 2s; the native sink may still be busy."
+                )
         self.releaseFrame()
 
     def setIndex(self, cameraIndex: CameraID) -> None:

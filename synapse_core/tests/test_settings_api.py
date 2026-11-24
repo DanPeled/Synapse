@@ -4,9 +4,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from synapse.core.settings_api import (
     BooleanConstraint,
+    CameraSettings,
     ColorConstraint,
     ColorFormat,
     ConstraintTypeProto,
@@ -560,3 +562,27 @@ def test_missing_setting_uses_string_none_and_field_default():
 
     assert settings.getSetting("missing") is None
     assert settings.getSetting(missingField) == 7
+
+
+def test_camera_settings_do_not_share_class_level_settings():
+    def cameraWithResolutions(resolutions):
+        camera = MagicMock()
+        camera.getPropertyMeta.return_value = {}
+        camera.getProperties.return_value = []
+        camera.getSupportedResolutions.return_value = resolutions
+        return camera
+
+    first = CameraSettings()
+    second = CameraSettings()
+    second.fromCamera(cameraWithResolutions([(640, 480)]))
+    first.fromCamera(cameraWithResolutions([(1920, 1080)]))
+
+    assert first.resolution is not second.resolution
+    assert isinstance(first.resolution.constraint, EnumeratedConstraint)
+    assert isinstance(second.resolution.constraint, EnumeratedConstraint)
+    assert "1920x1080" in [
+        option.value for option in first.resolution.constraint.options
+    ]
+    assert "1920x1080" not in [
+        option.value for option in second.resolution.constraint.options
+    ]

@@ -23,6 +23,7 @@ class ShutdownStack:
         self._callbacks: List[Tuple[str, Callable[[], None]]] = []
         self._lock = threading.Lock()
         self._shutdownStarted = False
+        self._shutdownDone = threading.Event()
 
     def register(self, name: str, callback: Callable[[], None]) -> None:
         """Register a resource cleanup callback.
@@ -39,25 +40,41 @@ class ShutdownStack:
             self._callbacks.append((name, callback))
 
     def shutdown(self) -> None:
-        """Run all registered callbacks once, in reverse registration order."""
+        """Run all registered callbacks once, in reverse registration order.
+
+        Concurrent callers wait for the shutdown to complete instead of
+        returning while resources are still being released. This matters for
+        FORMAT/RESTART commands, which delete or replace configuration after
+        shutdown returns.
+        """
         with self._lock:
             if self._shutdownStarted:
-                return
-            self._shutdownStarted = True
-            callbacks = list(reversed(self._callbacks))
-            self._callbacks.clear()
-
-        for name, callback in callbacks:
-            log.info(f"Shutting down {name}...")
-            start = time.perf_counter()
-            try:
-                callback()
-            except Exception as error:
-                elapsed = time.perf_counter() - start
-                log.err(f"Failed to shut down {name} after {elapsed:.2f}s: {error}")
+                alreadyRunning = True
+                callbacks: List[Tuple[str, Callable[[], None]]] = []
             else:
-                elapsed = time.perf_counter() - start
-                log.info(f"Finished shutting down {name} ({elapsed:.2f}s)")
+                alreadyRunning = False
+                self._shutdownStarted = True
+                callbacks = list(reversed(self._callbacks))
+                self._callbacks.clear()
+
+        if alreadyRunning:
+            self._shutdownDone.wait()
+            return
+
+        try:
+            for name, callback in callbacks:
+                log.info(f"Shutting down {name}...")
+                start = time.perf_counter()
+                try:
+                    callback()
+                except Exception as error:
+                    elapsed = time.perf_counter() - start
+                    log.err(f"Failed to shut down {name} after {elapsed:.2f}s: {error}")
+                else:
+                    elapsed = time.perf_counter() - start
+                    log.info(f"Finished shutting down {name} ({elapsed:.2f}s)")
+        finally:
+            self._shutdownDone.set()
 
 
 def joinThread(

@@ -5,7 +5,7 @@
 import threading
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from synapse.core.camera_handler import CameraHandler
 
@@ -149,3 +149,68 @@ def test_explicit_request_forces_fresh_scan() -> None:
     assert handler._checkForCameraChanges() is True
     assert handler._pendingUsbCameraInfos is None
     assert not handler._cameraScanRequested.is_set()
+
+
+def test_failed_scan_does_not_consume_hotplug_change() -> None:
+    """A transient scan failure must be retried, not silently drop hotplug."""
+    handler = CameraHandler()
+    handler.cameraChangePollInterval = 0.01
+    stable = (("video0", 1, 1),)
+    plugged = stable + (("video1", 2, 2),)
+    signatureValues = [stable, plugged, plugged]
+
+    def nextSignature():
+        if len(signatureValues) > 1:
+            return signatureValues.pop(0)
+        return signatureValues[0]
+
+    succeeded = threading.Event()
+    calls = []
+
+    def scan(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise RuntimeError("native hiccup")
+        succeeded.set()
+
+    with (
+        patch("synapse.core.camera_handler.os.makedirs"),
+        patch.object(handler, "createCameras"),
+        patch(
+            "synapse.core.camera_handler._getUsbDeviceSignature",
+            side_effect=nextSignature,
+        ),
+        patch.object(handler, "scanCameras", side_effect=scan),
+    ):
+        try:
+            handler.setup()
+            assert succeeded.wait(2.0), "scanner did not retry after failure"
+        finally:
+            handler.cleanup()
+
+    assert len(calls) >= 2
+    assert handler._lastDeviceSignature == plugged
+
+
+def test_shutdown_prevents_late_camera_registration() -> None:
+    handler = CameraHandler()
+    handle = MagicMock()
+    config = MagicMock()
+    config.name = "late"
+    config.id = "late_1"
+
+    handler._shuttingDown = True
+    handler.addCameraData(0, config, handle)
+
+    assert 0 not in handler.cameraHandles
+    handle.close.assert_called_once()
+    handle.camera.close.assert_called_once()
+
+
+def test_stop_camera_scanning_is_idempotent() -> None:
+    handler = CameraHandler()
+    handler.stopCameraScanning()
+    handler.stopCameraScanning()
+
+    assert handler._shuttingDown
+    assert handler.stopCameraScanEvent.is_set()

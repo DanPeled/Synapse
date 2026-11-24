@@ -11,7 +11,7 @@ import time
 import traceback
 from asyncio import Queue
 from pathlib import Path
-from typing import Any, Dict, Final, Iterable, List, Optional, Tuple, TypeAlias
+from typing import Any, Dict, Final, Iterable, List, Optional, Tuple, TypeAlias, cast
 
 import cv2
 import numpy as np
@@ -157,10 +157,12 @@ class RuntimeManager:
         # every camera frame. This reports the first failure per camera, then
         # periodic counts.
         self._pipelineErrorThrottle = log.ExceptionThrottle()
+        self._metricsErrorThrottle = log.ExceptionThrottle()
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
         self._ntListeners: List[int] = []
         self._ntListenerKeys: Dict[Tuple[CameraID, str, str], int] = {}
+        self._ntListenerLock = threading.Lock()
 
         # ``running`` is set while the runtime should keep going. ``stopped`` is
         # the inverse, so worker loops can block until shutdown is requested.
@@ -206,6 +208,9 @@ class RuntimeManager:
         self._saveDebounceSeconds = SAVE_DEBOUNCE_SECONDS
 
         def onAddCamera(cameraID: CameraID, name: str, handle: CameraHandle):
+            with self._cleanupLock:
+                if self._cleanedUp:
+                    return
             # Trackers are long-lived, so create them before the process thread
             # starts. The hot path can then record without a global lock.
             with self._performanceLock:
@@ -231,8 +236,11 @@ class RuntimeManager:
 
             thread = threading.Thread(target=self.processCamera, args=(cameraID,))
             thread.daemon = True
-            thread.start()
-            self.cameraManagementThreads[cameraID] = thread
+            with self._cleanupLock:
+                if self._cleanedUp:
+                    return
+                thread.start()
+                self.cameraManagementThreads[cameraID] = thread
 
         self.cameraHandler.onAddCamera.add(onAddCamera)
         self.cameraHandler.onAddCamera.add(self.pipelineHandler.onAddCamera)
@@ -318,30 +326,49 @@ class RuntimeManager:
                 .publish()
             )
 
+            lastMetrics = [0.0] * 8
+
             while self.running.is_set():
                 cycleStart = _metricsMonotonic()
 
-                cpuTemp = metricsManager.getCpuTemp()
-                # Pass the cycle start so the CPU sample uses an explicit
-                # timestamp instead of relying on psutil's blocking interval.
-                cpuUsage = metricsManager.sampleCpuUtilization(now=cycleStart)
-                memory = metricsManager.getMemory()
-                uptime = metricsManager.getUptime()
-                gpuMemorySplit = metricsManager.getGPUMemorySplit()
-                usedRam = metricsManager.getUsedRam()
-                usedDiskPct = metricsManager.getUsedDiskPct()
-                npuUsage = metricsManager.getNpuUsage()
+                try:
+                    cpuTemp = metricsManager.getCpuTemp()
+                    # Pass the cycle start so the CPU sample uses an explicit
+                    # timestamp instead of relying on psutil's blocking interval.
+                    cpuUsage = metricsManager.sampleCpuUtilization(now=cycleStart)
+                    memory = metricsManager.getMemory()
+                    uptime = metricsManager.getUptime()
+                    gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                    usedRam = metricsManager.getUsedRam()
+                    usedDiskPct = metricsManager.getUsedDiskPct()
+                    npuUsage = metricsManager.getNpuUsage()
 
-                metrics = [
-                    cpuTemp,
-                    cpuUsage,
-                    memory,
-                    uptime,
-                    gpuMemorySplit,
-                    usedRam,
-                    usedDiskPct,
-                    npuUsage,
-                ]
+                    lastMetrics = [
+                        cpuTemp,
+                        cpuUsage,
+                        memory,
+                        uptime,
+                        gpuMemorySplit,
+                        usedRam,
+                        usedDiskPct,
+                        npuUsage,
+                    ]
+                except Exception as error:
+                    # A single unavailable sensor must not kill metrics
+                    # reporting for the rest of the runtime's lifetime.
+                    detail = self._metricsErrorThrottle.exceptionDetail(
+                        "metrics",
+                        error,
+                        lambda error=error: "".join(
+                            traceback.format_exception(
+                                type(error), error, error.__traceback__
+                            )
+                        ),
+                    )
+                    if detail is not None:
+                        log.warn(f"Metrics collection failed: {detail}")
+
+                metrics = lastMetrics
 
                 ws = WebSocketServer.kInstance
                 if ws is not None and ws.hasClients:
@@ -366,7 +393,8 @@ class RuntimeManager:
                         pass
 
                 try:
-                    entry.set(metrics)
+                    numericMetrics: List[Any] = [float(value) for value in metrics]
+                    entry.set(cast(List[Any], numericMetrics))
                 except Exception:
                     pass
 
@@ -670,6 +698,7 @@ class RuntimeManager:
             pass
 
         while self.running.is_set():
+            transferredLease = False
             try:
                 # CameraHandle's producer owns connection checks and its own
                 # bounded retry delay. Checking again here only adds a native
@@ -688,20 +717,19 @@ class RuntimeManager:
                         # Try again quickly without going to no-signal
                         time.sleep(0.002)
                         continue
-                    try:
-                        self._processAndPublishFrame(cameraIndex, frame, captureLatency)
-                    except Exception:
-                        pass
+
+                    transferredLease = self._processAndPublishFrame(
+                        cameraIndex, frame, captureLatency
+                    )
                 finally:
-                    # Always return the buffer so a slow pipeline cannot cause
-                    # the capture thread to overwrite the frame in use.
-                    handle.releaseFrame()
+                    if not transferredLease:
+                        handle.releaseFrame()
             except Exception:
                 time.sleep(0.002)
 
     def _processAndPublishFrame(
         self, cameraIndex: CameraID, frame: Frame, captureLatency: float = 0.0
-    ):
+    ) -> bool:
         camera_handles = self.cameraHandler.cameraHandles
         handle = camera_handles[cameraIndex]
 
@@ -760,10 +788,27 @@ class RuntimeManager:
         except Exception:
             pass
 
+        # Only a frame that is still the camera's own buffer can be borrowed.
+        # Pipelines that return a derived array must be copied by the publish
+        # lane while the original lease is still held by this worker.
+        lease = None
+        if processedFrame is frame:
+            takeLease = getattr(handle, "takeLease", None)
+            if takeLease is not None:
+                lease = takeLease()
+
+        transferredLease = False
         try:
-            self.cameraHandler.publishFrame(processedFrame, handle, fps=int(cameraFps))
+            transferredLease = self.cameraHandler.publishFrame(
+                processedFrame, handle, fps=int(cameraFps), lease=lease
+            )
         except Exception:
             pass
+        finally:
+            if lease is not None and not transferredLease:
+                returnLease = getattr(handle, "returnLease", None)
+                if returnLease is not None:
+                    returnLease(lease)
 
         try:
             tracker = self._performanceTrackers.get(cameraIndex)
@@ -778,6 +823,8 @@ class RuntimeManager:
             )
         except Exception:
             pass
+
+        return transferredLease
 
     def _getPerformanceTracker(self, cameraIndex: CameraID) -> CameraPerformanceTracker:
         with self._performanceLock:
@@ -1234,12 +1281,13 @@ class RuntimeManager:
 
     def savePipelines(self) -> None:
         cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}  # TODO
-        for (
-            cameraid,
-            pipelinesSet,
-        ) in self.pipelineHandler.pipelineInstanceBindings.items():
+        # Snapshot the outer and inner maps: pipeline switching runs on the
+        # command thread while the save worker serializes this configuration.
+        for cameraid, pipelinesSet in list(
+            self.pipelineHandler.pipelineInstanceBindings.items()
+        ):
             cameraSettingsDict[cameraid] = {}
-            for pipelineid, pipeline in pipelinesSet.items():
+            for pipelineid, pipeline in list(pipelinesSet.items()):
                 cameraSettingsDict[cameraid][pipelineid] = pipeline.toDict(
                     (getPipelineTypename(type(pipeline))), cameraid
                 )
@@ -1294,12 +1342,19 @@ class RuntimeManager:
         log.info("Releasing runtime workers and resources...")
         self.requestStop()
 
-        cameraThreadCount = len(self.cameraManagementThreads)
+        # Stop hotplug scanning first: it creates camera workers and handles,
+        # so it must be quiescent before those collections are joined and
+        # cleared below.
+        self.cameraHandler.stopCameraScanning()
+
+        with self._cleanupLock:
+            cameraThreads = list(self.cameraManagementThreads.items())
+            self.cameraManagementThreads.clear()
+        cameraThreadCount = len(cameraThreads)
         if cameraThreadCount:
             log.info(f"Stopping {cameraThreadCount} camera worker thread(s)...")
-        for cameraIndex, thread in self.cameraManagementThreads.items():
+        for cameraIndex, thread in cameraThreads:
             joinThread(thread, f"Camera-{cameraIndex}", timeout=2.0)
-        self.cameraManagementThreads.clear()
         if cameraThreadCount:
             log.info("Camera workers stopped.")
 
@@ -1364,40 +1419,47 @@ class RuntimeManager:
         ``key`` makes registration idempotent, which matters because switching
         pipelines re-runs the settings setup for the same camera and topics.
         """
-        if key is not None and key in self._ntListenerKeys:
-            return
-        listener = NetworkTableInstance.getDefault().addListener(entry, flags, callback)
-        self._ntListeners.append(listener)
-        if key is not None:
-            self._ntListenerKeys[key] = listener
+        with self._ntListenerLock:
+            if key is not None and key in self._ntListenerKeys:
+                return
+            listener = NetworkTableInstance.getDefault().addListener(
+                entry, flags, callback
+            )
+            self._ntListeners.append(listener)
+            if key is not None:
+                self._ntListenerKeys[key] = listener
 
     def _removeNtListeners(self, cameraID: Optional[CameraID] = None) -> None:
         """Remove runtime NetworkTables listeners, optionally for one camera."""
         instance = NetworkTableInstance.getDefault()
+        with self._ntListenerLock:
+            if cameraID is None:
+                for listener in self._ntListeners:
+                    try:
+                        instance.removeListener(listener)
+                    except Exception as error:
+                        log.err(
+                            f"Failed to remove NetworkTables listener {listener}: {error}"
+                        )
+                self._ntListeners.clear()
+                self._ntListenerKeys.clear()
+                return
 
-        if cameraID is None:
-            for listener in self._ntListeners:
+            removed = []
+            for key, listener in list(self._ntListenerKeys.items()):
+                if key[0] != cameraID:
+                    continue
                 try:
                     instance.removeListener(listener)
                 except Exception as error:
                     log.err(
                         f"Failed to remove NetworkTables listener {listener}: {error}"
                     )
-            self._ntListeners.clear()
-            self._ntListenerKeys.clear()
-            return
-
-        removed = []
-        for key, listener in list(self._ntListenerKeys.items()):
-            if key[0] != cameraID:
-                continue
-            try:
-                instance.removeListener(listener)
-            except Exception as error:
-                log.err(f"Failed to remove NetworkTables listener {listener}: {error}")
-            removed.append(listener)
-            del self._ntListenerKeys[key]
-        self._ntListeners = [item for item in self._ntListeners if item not in removed]
+                removed.append(listener)
+                del self._ntListenerKeys[key]
+            self._ntListeners = [
+                item for item in self._ntListeners if item not in removed
+            ]
 
     def _closeCameraPublishers(self, cameraID: CameraID) -> None:
         """Release cached publishers/entries bound to a camera's old NT path."""
