@@ -72,6 +72,16 @@ class CsCoreCamera(SynapseCamera):
         return self.propertyMeta
 
     def grabFrame(self, buffer: np.ndarray) -> Tuple[int, Optional[np.ndarray]]:
+        """Grab the next frame into ``buffer`` using CSCore's decoded BGR path.
+
+        Profiling note from real-camera, multi-camera runs: CSCore's MJPEG ->
+        BGR conversion inside this call dominates capture-thread samples (JPEG
+        IDCT and YCC conversion). Direct-grab APIs avoid that work but return
+        sink-owned compressed bytes without a portable length/ownership
+        contract, so they are not a drop-in replacement. Use
+        ``scripts/benchmark_multi_camera.py`` for an A/B before changing this
+        path, and preserve the configured resolution and FPS in the comparison.
+        """
         return self.sink.grabFrame(buffer)
 
     def isConnected(self) -> bool:
