@@ -47,6 +47,38 @@ def test_create_cameras_enumerates_once_and_reuses_map() -> None:
     addCamera.assert_called_once()
 
 
+def test_identical_cameras_get_distinct_uids_and_are_both_registered() -> None:
+    """Same-model cameras must not collapse into one hotplug entry."""
+    handler = CameraHandler()
+    # Deliberately out of order: UIDs must follow a stable device discriminator.
+    infos = [_usbInfo("cam", 10, 2), _usbInfo("cam", 10, 0)]
+
+    with (
+        patch(
+            "synapse.core.camera_handler.GlobalSettings.getCameraConfigMap",
+            return_value={},
+        ),
+        patch(
+            "synapse.core.camera_handler.cs.UsbCamera.enumerateUsbCameras",
+            return_value=infos,
+        ),
+        patch("synapse.core.camera_handler.GlobalSettings.setCameraConfig"),
+        patch.object(
+            handler,
+            "addCamera",
+            side_effect=lambda index, config, path: (
+                handler.cameraHandles.update({index: MagicMock()}) or True
+            ),
+        ) as addCamera,
+    ):
+        handler.createCameras()
+
+    assert list(handler.usbCameraInfos) == ["cam_10", "cam_10_dev2"]
+    assert handler.cameraUIDs == ["cam_10", "cam_10_dev2"]
+    assert addCamera.call_count == 2
+    assert [call.args[0] for call in addCamera.call_args_list] == [0, 1]
+
+
 def test_explicit_request_wakes_scanner_without_long_wait() -> None:
     handler = CameraHandler()
     scanned = threading.Event()

@@ -78,7 +78,9 @@ class TestPublishFrame(unittest.TestCase):
         self.handler.publishFrame(frame, self.handle)
 
         self.output.putFrame.assert_not_called()
-        self.assertEqual(self.handler.getPublishStats(), {"queued": 0, "dropped": 0})
+        self.assertEqual(
+            self.handler.getPublishStats(), {"queued": 0, "dropped": 0, "failed": 0}
+        )
 
     def test_resizes_and_reuses_destination_buffer(self):
         frame = np.zeros((480, 640, 3), dtype=np.uint8)

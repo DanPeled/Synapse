@@ -158,6 +158,21 @@ class TestRuntimeManager(unittest.TestCase):
         publishers["captureLatency"].set.assert_called_with(0.1)
         assert publishers["processLatency"].set.call_args_list[-1].args == (0.3,)
 
+    def test_performance_stats_include_publish_lane_backpressure(self):
+        self.mock_camera_handler.getCameraHandle.return_value = None
+        self.mock_camera_handler.getPublishStats.return_value = {
+            "queued": 1,
+            "dropped": 2,
+            "failed": 3,
+        }
+        self.handler._getPerformanceTracker(0).record(0.0, 0.0, 0.0)
+
+        stats = self.handler.getPerformanceStats(0)
+
+        self.assertEqual(stats["queued_stream_frames"], 1)
+        self.assertEqual(stats["dropped_stream_frames"], 2)
+        self.assertEqual(stats["failed_stream_frames"], 3)
+
     def test_reported_fps_never_exceeds_camera_limit(self):
         """A short inter-frame gap must not report an impossible camera FPS."""
         camera = MagicMock()
@@ -201,6 +216,45 @@ class TestRuntimeManager(unittest.TestCase):
                 clock["now"] += 0.25
                 self.handler._processAndPublishFrame(0, frame)
             assert reportedFps() <= 5
+
+    def test_reported_fps_follows_video_mode_changes(self):
+        """A mode switch must invalidate the cached physical FPS bound."""
+        camera = MagicMock()
+        camera.getVideoMode.return_value.fps = 30
+        camera.getMaxFPS.return_value = 30
+        handle = MagicMock()
+        handle.camera = camera
+        handle.videoModeGeneration = 0
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=None)
+        self.handler.sendLatency = MagicMock()
+        publishFrame = MagicMock()
+        self.handler.cameraHandler.publishFrame = publishFrame
+
+        clock = {"now": 900.0}
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        def reportedFps() -> int:
+            return publishFrame.call_args.kwargs["fps"]
+
+        with patch(
+            "synapse.core.runtime_handler.time.perf_counter", lambda: clock["now"]
+        ):
+            for _ in range(30):
+                clock["now"] += 1.0 / 30.0
+                self.handler._processAndPublishFrame(0, frame)
+            assert reportedFps() == pytest.approx(30, abs=1)
+
+            camera.getVideoMode.return_value.fps = 100
+            camera.getMaxFPS.return_value = 100
+            handle.videoModeGeneration = 1
+            # Outlast the one-second measurement window so old 30 FPS samples
+            # are evicted and only the new mode contributes to the estimate.
+            for _ in range(150):
+                clock["now"] += 1.0 / 100.0
+                self.handler._processAndPublishFrame(0, frame)
+            self.assertEqual(self.handler._cameraFpsLimits[0], 100)
+            assert reportedFps() == pytest.approx(100, abs=5)
 
     def test_setup_calls_all_components(self):
         with (
