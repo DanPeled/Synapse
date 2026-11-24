@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import faulthandler
+import math
 import os
 import tempfile
 import threading
@@ -47,7 +48,7 @@ from .camera_handler import CameraHandler
 from .config import Config, NetworkConfig, yaml
 from .lifecycle import joinThread
 from .nt_keys import NTKeys
-from .performance import CameraPerformanceTracker
+from .performance import CameraPerformanceTracker, FrameRateMeter
 from .pipeline import (
     FrameResult,
     Pipeline,
@@ -69,6 +70,9 @@ def sendWebUIIP():
 SettingChangedCallback: TypeAlias = Callback[[str, Any, CameraID]]
 DEFAULT_PIPELINE_FOR_NEW_CAMERA: Final[PipelineID] = 0
 METRICS_INTERVAL_SECONDS: Final[float] = 1.0
+# FPS is reported at most once per second by sendLatency; use the same span
+# for the measurement window so the published value describes that interval.
+FRAME_FPS_WINDOW_SECONDS: Final[float] = 1.0
 _ROTATIONS: Final[dict[int, int]] = {
     90: cv2.ROTATE_90_CLOCKWISE,
     180: cv2.ROTATE_180,
@@ -116,6 +120,24 @@ def _metricsMonotonic() -> float:
     return time.monotonic()
 
 
+def _cameraFpsLimit(handle: CameraHandle) -> Optional[float]:
+    """Best known physical frame-rate bound for a camera, if available.
+
+    Prefer the active video mode: a 120 FPS sensor configured for 30 FPS must
+    not be allowed to report 120. ``getMaxFPS()`` is the fallback for backends
+    that do not expose a usable mode.
+    """
+    candidates: List[float] = []
+    for getter in (lambda: handle.camera.getVideoMode().fps, handle.camera.getMaxFPS):
+        try:
+            fps = float(getter())
+        except Exception:
+            continue
+        if math.isfinite(fps) and fps > 0:
+            candidates.append(fps)
+    return min(candidates) if candidates else None
+
+
 class RuntimeManager:
     """
     Handles the loading, configuration, and runtime execution of vision pipelines
@@ -146,7 +168,8 @@ class RuntimeManager:
         self.cameraViewIDs: Dict[CameraID, str] = {}
         self.propPubs: Dict[Tuple[CameraID, str], Publisher] = {}
         self._latencyPubs: Dict[Tuple[CameraID, str], DoublePublisher] = {}
-        self._lastFrameTime: dict[CameraID, float] = {}
+        self._frameRateMeters: Dict[CameraID, FrameRateMeter] = {}
+        self._cameraFpsLimits: Dict[CameraID, float] = {}
         self._lastLatencyReportTime: dict[CameraID, float] = {}
         self._performanceLock = threading.Lock()
         self._performanceTrackers: Dict[CameraID, CameraPerformanceTracker] = {}
@@ -216,6 +239,10 @@ class RuntimeManager:
             with self._performanceLock:
                 self._performanceTrackers.setdefault(
                     cameraID, CameraPerformanceTracker()
+                )
+                self._frameRateMeters.setdefault(
+                    cameraID,
+                    FrameRateMeter(windowSeconds=FRAME_FPS_WINDOW_SECONDS),
                 )
             if cameraID not in self.pipelineBindings:
                 self.pipelineBindings[cameraID] = DEFAULT_PIPELINE_FOR_NEW_CAMERA
@@ -643,6 +670,13 @@ class RuntimeManager:
             cameraIndex=cameraIndex,
             pipeline_config=settings,
         )
+        # Pipeline setup can change the camera's video mode; refresh the
+        # physical bound used to sanity-check reported FPS.
+        handle = self.cameraHandler.getCameraHandle(cameraIndex)
+        if handle is not None:
+            limit = _cameraFpsLimit(handle)
+            if limit is not None:
+                self._cameraFpsLimits[cameraIndex] = limit
         self.onPipelineChanged.call(pipelineIndex, cameraIndex)
         log.info(f"Set pipeline #{pipelineIndex} for camera ({cameraIndex})")
 
@@ -690,6 +724,10 @@ class RuntimeManager:
         except Exception:
             maxFps = 30.0
 
+        limit = _cameraFpsLimit(handle)
+        if limit is not None:
+            self._cameraFpsLimits[cameraIndex] = limit
+
         try:
             log.info(
                 f"Started {getattr(handle, 'name', cameraIndex)} loop (maxFPS={maxFps})"
@@ -735,17 +773,21 @@ class RuntimeManager:
 
         now = time.perf_counter()
 
-        # ---- Camera FPS (frame-to-frame) ----
-        lastTime = self._lastFrameTime.get(cameraIndex)
-        if lastTime is not None:
-            frameInterval = now - lastTime
-            if frameInterval > 0:
-                cameraFps = 1.0 / frameInterval
-            else:
-                cameraFps = 0.0
-        else:
-            cameraFps = 0.0
-        self._lastFrameTime[cameraIndex] = now
+        # ---- Camera FPS (windowed, bounded by the camera's mode) ----
+        # A single frame-to-frame interval can be arbitrarily short after a
+        # stall or mode switch, so a 30 FPS camera could report 100+ FPS.
+        # Count intervals over a full monotonic window instead and clip to the
+        # active mode's rate, which is a hard physical bound.
+        limit = self._cameraFpsLimits.get(cameraIndex)
+        if limit is None:
+            limit = _cameraFpsLimit(handle)
+            if limit is not None:
+                self._cameraFpsLimits[cameraIndex] = limit
+        meter = self._frameRateMeters.get(cameraIndex)
+        if meter is None:
+            meter = FrameRateMeter(windowSeconds=FRAME_FPS_WINDOW_SECONDS)
+            self._frameRateMeters[cameraIndex] = meter
+        cameraFps = meter.record(now, limit=limit)
 
         # ---- Processing latency ----
         processStart = now
@@ -875,10 +917,15 @@ class RuntimeManager:
             if cameraIndex is None:
                 for tracker in self._performanceTrackers.values():
                     tracker.reset()
+                for meter in self._frameRateMeters.values():
+                    meter.reset()
             else:
                 tracker = self._performanceTrackers.get(cameraIndex)
                 if tracker is not None:
                     tracker.reset()
+                meter = self._frameRateMeters.get(cameraIndex)
+                if meter is not None:
+                    meter.reset()
         if cameraIndex is None:
             for handle in self.cameraHandler.cameraHandles.values():
                 if hasattr(handle, "resetCaptureStats"):
