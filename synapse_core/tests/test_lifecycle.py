@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -69,6 +71,38 @@ def test_register_after_shutdown_raises():
 
     with pytest.raises(RuntimeError, match="shutdown has already started"):
         stack.register("late", lambda: None)
+
+
+def test_concurrent_shutdown_waits_for_completion():
+    stack = ShutdownStack()
+    release = threading.Event()
+    entered = threading.Event()
+    finished = []
+
+    def slow():
+        entered.set()
+        release.wait(timeout=5)
+
+    stack.register("slow", slow)
+    first = threading.Thread(
+        target=lambda: (stack.shutdown(), finished.append("first"))
+    )
+    first.start()
+    assert entered.wait(timeout=5)
+
+    secondDone = threading.Event()
+    second = threading.Thread(
+        target=lambda: (stack.shutdown(), finished.append("second"), secondDone.set())
+    )
+    second.start()
+    time.sleep(0.05)
+    assert not secondDone.is_set(), "second shutdown returned before cleanup finished"
+
+    release.set()
+    first.join(timeout=5)
+    second.join(timeout=5)
+    assert secondDone.is_set()
+    assert finished == ["first", "second"]
 
 
 def test_join_thread_ignores_missing_thread():
