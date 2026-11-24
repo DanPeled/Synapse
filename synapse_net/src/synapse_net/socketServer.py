@@ -97,12 +97,15 @@ class WebSocketServer:
         self._pendingFlushScheduled = False
         self._clientLock = threading.Lock()
         self._openClientCount = 0
+        # Producers read this on every result publish. Maintaining the boolean
+        # when the client set changes avoids taking a cross-thread lock in the
+        # camera worker just to discover that no UI is connected.
+        self._hasClients = False
 
     @property
     def hasClients(self) -> bool:
         """Whether at least one websocket client is currently open."""
-        with self._clientLock:
-            return self._openClientCount > 0
+        return self._hasClients
 
     def registerClient(self, client: WebSocketServerProtocol) -> None:
         """Track a client without scanning the mutable client set per result."""
@@ -110,12 +113,14 @@ class WebSocketServer:
             self.clients.add(client)
             if getattr(client, "open", False):
                 self._openClientCount += 1
+            self._hasClients = self._openClientCount > 0
 
     def unregisterClient(self, client: WebSocketServerProtocol) -> None:
         with self._clientLock:
             self.clients.discard(client)
             if getattr(client, "open", False):
                 self._openClientCount = max(0, self._openClientCount - 1)
+            self._hasClients = self._openClientCount > 0
 
     def on(self, event: SocketEvent):
         def decorator(func: Callable[..., Coroutine]):

@@ -181,23 +181,29 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
                 return "string[]"
         raise TypeError(f"Unsupported NT type: {type(value)}")
 
-    def _getPublisher(self, key: str, typeString: str) -> Optional[GenericPublisher]:
-        with self._ntLock:
-            pub = self._ntPublishers.get(key)
-            if pub:
-                return pub
-
-            table = self._getDataTable()
-            if not table:
-                return None
-
-            topic = table.getTopic(key)
-            pub = topic.genericPublish(typeString)
-            self._ntPublishers[key] = pub
+    def _getPublisherLocked(
+        self, key: str, typeString: str
+    ) -> Optional[GenericPublisher]:
+        """Return a publisher with ``_ntLock`` already held by the caller."""
+        pub = self._ntPublishers.get(key)
+        if pub:
             return pub
 
+        table = self._getDataTable()
+        if not table:
+            return None
+
+        topic = table.getTopic(key)
+        pub = topic.genericPublish(typeString)
+        self._ntPublishers[key] = pub
+        return pub
+
+    def _getPublisher(self, key: str, typeString: str) -> Optional[GenericPublisher]:
+        with self._ntLock:
+            return self._getPublisherLocked(key, typeString)
+
     def setDataValue(self, key: str, value: Any, isMsgpack: bool = False) -> None:
-        if value == bytes():
+        if isinstance(value, bytes) and not value:
             parsed = bytes()
         elif isinstance(value, (bytes, int, float, str, bool)):
             parsed = value
@@ -210,7 +216,7 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         ws = WebSocketServer.kInstance
 
         with self._ntLock:
-            pub = self._getPublisher(key, typeString)
+            pub = self._getPublisherLocked(key, typeString)
             if pub:
                 pub.set(_makeNtValue(parsed, isMsgpack=isMsgpack))
 
