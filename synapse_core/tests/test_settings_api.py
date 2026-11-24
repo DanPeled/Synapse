@@ -603,6 +603,7 @@ def test_camera_resolution_default_follows_supported_modes():
     settings = CameraSettings()
     settings.fromCamera(camera)
 
+    assert isinstance(settings.resolution.constraint, EnumeratedConstraint)
     options = [option.value for option in settings.resolution.constraint.options]
     assert "1920x1080" not in options
     assert "1280x800" in options
