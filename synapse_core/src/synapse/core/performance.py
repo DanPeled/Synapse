@@ -148,16 +148,17 @@ class CameraPerformanceTracker:
         self._pendingFrameBytes = 0
         self._pendingLastResultAt: Optional[float] = None
 
-        # FPS comes from a monotonic window with a minimum elapsed interval so
-        # a burst of frames right after reset() cannot report an impossible rate.
-        self._rateMeter = FrameRateMeter(
-            windowSeconds=windowSeconds,
-            # Benchmarks use a 10 s window but can be much shorter; one tenth
-            # of the window is enough to reject a burst without delaying a
-            # short run by half the window.
-            minElapsedRatio=0.1,
-            clock=time.perf_counter,
+        # FPS comes from a separate timestamp window. Keeping a second
+        # FrameRateMeter would recompute and prune an almost identical sliding
+        # window on every frame; here snapshots prune the window and derive the
+        # rate once. The bound is enough for the benchmark's synthetic stress
+        # rate over the full window without letting the deque grow forever.
+        self._fpsWindowSeconds = max(0.01, float(windowSeconds))
+        self._fpsMinElapsed = self._fpsWindowSeconds * 0.1
+        self._fpsTimestamps: Deque[float] = deque(
+            maxlen=max(historySize, int(self._fpsWindowSeconds * 4096))
         )
+        self._lastProcessedFps = 0.0
 
     def _commitPendingLocked(self, now: float) -> None:
         """Move pending samples into committed state; ``_pendingLock`` is held."""
@@ -209,7 +210,8 @@ class CameraPerformanceTracker:
                 self._pendingFrames = 0
                 self._pendingFrameBytes = 0
                 self._pendingLastResultAt = None
-            self._rateMeter.reset()
+            self._fpsTimestamps.clear()
+            self._lastProcessedFps = 0.0
 
     def record(
         self,
@@ -234,7 +236,7 @@ class CameraPerformanceTracker:
             ):
                 self._commitPendingLocked(now)
 
-            self._rateMeter.record(now)
+        self._fpsTimestamps.append(now)
 
     def snapshot(self, now: Optional[float] = None) -> Dict[str, Any]:
         now = time.perf_counter() if now is None else now
@@ -248,7 +250,19 @@ class CameraPerformanceTracker:
 
                 elapsed = max(now - self._createdAt, 0.0)
                 windowElapsed = min(elapsed, self._windowSeconds)
-                processedFps = self._rateMeter.rate(now)
+
+                fpsCutoff = now - self._fpsWindowSeconds
+                while self._fpsTimestamps and self._fpsTimestamps[0] < fpsCutoff:
+                    self._fpsTimestamps.popleft()
+                if not self._fpsTimestamps:
+                    self._lastProcessedFps = 0.0
+                elif len(self._fpsTimestamps) >= 2:
+                    fpsSpan = self._fpsTimestamps[-1] - self._fpsTimestamps[0]
+                    if fpsSpan >= self._fpsMinElapsed:
+                        self._lastProcessedFps = max(
+                            0.0, (len(self._fpsTimestamps) - 1) / fpsSpan
+                        )
+                processedFps = self._lastProcessedFps
 
                 processedFrames = self._processedFrames
                 windowFrames = len(self._timestamps)
