@@ -157,10 +157,12 @@ class RuntimeManager:
         # every camera frame. This reports the first failure per camera, then
         # periodic counts.
         self._pipelineErrorThrottle = log.ExceptionThrottle()
+        self._metricsErrorThrottle = log.ExceptionThrottle()
         self.frameQueues: Dict[CameraID, Queue] = {}
         self.cameraManagementThreads: Dict[CameraID, threading.Thread] = {}
         self._ntListeners: List[int] = []
         self._ntListenerKeys: Dict[Tuple[CameraID, str, str], int] = {}
+        self._ntListenerLock = threading.Lock()
 
         # ``running`` is set while the runtime should keep going. ``stopped`` is
         # the inverse, so worker loops can block until shutdown is requested.
@@ -324,30 +326,49 @@ class RuntimeManager:
                 .publish()
             )
 
+            lastMetrics = [0.0] * 8
+
             while self.running.is_set():
                 cycleStart = _metricsMonotonic()
 
-                cpuTemp = metricsManager.getCpuTemp()
-                # Pass the cycle start so the CPU sample uses an explicit
-                # timestamp instead of relying on psutil's blocking interval.
-                cpuUsage = metricsManager.sampleCpuUtilization(now=cycleStart)
-                memory = metricsManager.getMemory()
-                uptime = metricsManager.getUptime()
-                gpuMemorySplit = metricsManager.getGPUMemorySplit()
-                usedRam = metricsManager.getUsedRam()
-                usedDiskPct = metricsManager.getUsedDiskPct()
-                npuUsage = metricsManager.getNpuUsage()
+                try:
+                    cpuTemp = metricsManager.getCpuTemp()
+                    # Pass the cycle start so the CPU sample uses an explicit
+                    # timestamp instead of relying on psutil's blocking interval.
+                    cpuUsage = metricsManager.sampleCpuUtilization(now=cycleStart)
+                    memory = metricsManager.getMemory()
+                    uptime = metricsManager.getUptime()
+                    gpuMemorySplit = metricsManager.getGPUMemorySplit()
+                    usedRam = metricsManager.getUsedRam()
+                    usedDiskPct = metricsManager.getUsedDiskPct()
+                    npuUsage = metricsManager.getNpuUsage()
 
-                metrics = [
-                    cpuTemp,
-                    cpuUsage,
-                    memory,
-                    uptime,
-                    gpuMemorySplit,
-                    usedRam,
-                    usedDiskPct,
-                    npuUsage,
-                ]
+                    lastMetrics = [
+                        cpuTemp,
+                        cpuUsage,
+                        memory,
+                        uptime,
+                        gpuMemorySplit,
+                        usedRam,
+                        usedDiskPct,
+                        npuUsage,
+                    ]
+                except Exception as error:
+                    # A single unavailable sensor must not kill metrics
+                    # reporting for the rest of the runtime's lifetime.
+                    detail = self._metricsErrorThrottle.exceptionDetail(
+                        "metrics",
+                        error,
+                        lambda error=error: "".join(
+                            traceback.format_exception(
+                                type(error), error, error.__traceback__
+                            )
+                        ),
+                    )
+                    if detail is not None:
+                        log.warn(f"Metrics collection failed: {detail}")
+
+                metrics = lastMetrics
 
                 ws = WebSocketServer.kInstance
                 if ws is not None and ws.hasClients:
@@ -1259,12 +1280,13 @@ class RuntimeManager:
 
     def savePipelines(self) -> None:
         cameraSettingsDict: Dict[CameraID, Dict[PipelineID, Dict]] = {}  # TODO
-        for (
-            cameraid,
-            pipelinesSet,
-        ) in self.pipelineHandler.pipelineInstanceBindings.items():
+        # Snapshot the outer and inner maps: pipeline switching runs on the
+        # command thread while the save worker serializes this configuration.
+        for cameraid, pipelinesSet in list(
+            self.pipelineHandler.pipelineInstanceBindings.items()
+        ):
             cameraSettingsDict[cameraid] = {}
-            for pipelineid, pipeline in pipelinesSet.items():
+            for pipelineid, pipeline in list(pipelinesSet.items()):
                 cameraSettingsDict[cameraid][pipelineid] = pipeline.toDict(
                     (getPipelineTypename(type(pipeline))), cameraid
                 )
@@ -1396,40 +1418,47 @@ class RuntimeManager:
         ``key`` makes registration idempotent, which matters because switching
         pipelines re-runs the settings setup for the same camera and topics.
         """
-        if key is not None and key in self._ntListenerKeys:
-            return
-        listener = NetworkTableInstance.getDefault().addListener(entry, flags, callback)
-        self._ntListeners.append(listener)
-        if key is not None:
-            self._ntListenerKeys[key] = listener
+        with self._ntListenerLock:
+            if key is not None and key in self._ntListenerKeys:
+                return
+            listener = NetworkTableInstance.getDefault().addListener(
+                entry, flags, callback
+            )
+            self._ntListeners.append(listener)
+            if key is not None:
+                self._ntListenerKeys[key] = listener
 
     def _removeNtListeners(self, cameraID: Optional[CameraID] = None) -> None:
         """Remove runtime NetworkTables listeners, optionally for one camera."""
         instance = NetworkTableInstance.getDefault()
+        with self._ntListenerLock:
+            if cameraID is None:
+                for listener in self._ntListeners:
+                    try:
+                        instance.removeListener(listener)
+                    except Exception as error:
+                        log.err(
+                            f"Failed to remove NetworkTables listener {listener}: {error}"
+                        )
+                self._ntListeners.clear()
+                self._ntListenerKeys.clear()
+                return
 
-        if cameraID is None:
-            for listener in self._ntListeners:
+            removed = []
+            for key, listener in list(self._ntListenerKeys.items()):
+                if key[0] != cameraID:
+                    continue
                 try:
                     instance.removeListener(listener)
                 except Exception as error:
                     log.err(
                         f"Failed to remove NetworkTables listener {listener}: {error}"
                     )
-            self._ntListeners.clear()
-            self._ntListenerKeys.clear()
-            return
-
-        removed = []
-        for key, listener in list(self._ntListenerKeys.items()):
-            if key[0] != cameraID:
-                continue
-            try:
-                instance.removeListener(listener)
-            except Exception as error:
-                log.err(f"Failed to remove NetworkTables listener {listener}: {error}")
-            removed.append(listener)
-            del self._ntListenerKeys[key]
-        self._ntListeners = [item for item in self._ntListeners if item not in removed]
+                removed.append(listener)
+                del self._ntListenerKeys[key]
+            self._ntListeners = [
+                item for item in self._ntListeners if item not in removed
+            ]
 
     def _closeCameraPublishers(self, cameraID: CameraID) -> None:
         """Release cached publishers/entries bound to a camera's old NT path."""
