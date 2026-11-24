@@ -4,10 +4,11 @@
 
 """Thread-safe per-camera performance counters used by the runtime and benchmark."""
 
+import math
 import threading
 import time
 from collections import deque
-from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Deque, Dict, Final, Iterable, List, Optional, Sequence
 
 
 def percentile(sortedValues: Sequence[float], fraction: float) -> Optional[float]:
@@ -32,6 +33,81 @@ def latencyPercentiles(values: Iterable[float]) -> Dict[str, Optional[float]]:
         "p95": None if (value := percentile(ordered, 0.95)) is None else value * 1000.0,
         "p99": None if (value := percentile(ordered, 0.99)) is None else value * 1000.0,
     }
+
+
+class FrameRateMeter:
+    """Estimate a frame rate from timestamps taken on one monotonic clock.
+
+    An instantaneous ``1 / (t_n - t_{n-1})`` reading is unbounded: two frames
+    delivered back-to-back after a stall, reconnect or mode switch can report
+    several times the camera's real rate. Count the *intervals* inside a
+    sliding window instead, and withhold a value until the window has actually
+    covered enough time. Using ``samples - 1`` intervals also avoids the
+    phantom extra frame that ``samples / window`` produces whenever a window
+    boundary falls between two samples.
+    """
+
+    WINDOW_SECONDS: Final[float] = 1.0
+    MIN_SAMPLES: Final[int] = 2
+    MIN_ELAPSED_RATIO: Final[float] = 0.5
+
+    def __init__(
+        self,
+        windowSeconds: float = WINDOW_SECONDS,
+        minSamples: int = MIN_SAMPLES,
+        minElapsedRatio: float = MIN_ELAPSED_RATIO,
+        clock: Callable[[], float] = time.perf_counter,
+    ) -> None:
+        self._windowSeconds = max(0.01, float(windowSeconds))
+        self._minSamples = max(2, int(minSamples))
+        self._minElapsed = self._windowSeconds * min(
+            1.0, max(0.0, float(minElapsedRatio))
+        )
+        self._clock = clock
+        self._timestamps: Deque[float] = deque()
+        self._lastRate = 0.0
+
+    def record(
+        self, now: Optional[float] = None, limit: Optional[float] = None
+    ) -> float:
+        """Add one frame sample and return the current rate estimate."""
+        sampleTime = self._clock() if now is None else float(now)
+        self._timestamps.append(sampleTime)
+        return self.rate(now=sampleTime, limit=limit)
+
+    def rate(self, now: Optional[float] = None, limit: Optional[float] = None) -> float:
+        """Return the rate over the trailing window without adding a sample.
+
+        ``limit`` is an optional physical upper bound (the camera's active
+        video mode). A camera cannot produce more frames than its mode allows,
+        so clipping an impossible reading is correcting the math, not hiding
+        a slow pipeline: genuine slowdowns still lower the reported rate.
+        """
+        sampleTime = self._clock() if now is None else float(now)
+        cutoff = sampleTime - self._windowSeconds
+        while self._timestamps and self._timestamps[0] < cutoff:
+            self._timestamps.popleft()
+
+        if len(self._timestamps) < self._minSamples:
+            # An empty window means the camera stopped producing frames; do
+            # not keep reporting the last rate from a previous connection.
+            if not self._timestamps:
+                self._lastRate = 0.0
+            return self._lastRate
+        span = self._timestamps[-1] - self._timestamps[0]
+        if span < self._minElapsed:
+            return self._lastRate
+
+        fps = (len(self._timestamps) - 1) / span
+        if limit is not None and math.isfinite(limit) and limit > 0:
+            fps = min(fps, float(limit))
+        self._lastRate = max(0.0, fps)
+        return self._lastRate
+
+    def reset(self) -> None:
+        """Discard the measurement window (e.g. before a benchmark run)."""
+        self._timestamps.clear()
+        self._lastRate = 0.0
 
 
 class CameraPerformanceTracker:
@@ -71,6 +147,17 @@ class CameraPerformanceTracker:
         self._pendingFrames = 0
         self._pendingFrameBytes = 0
         self._pendingLastResultAt: Optional[float] = None
+
+        # FPS comes from a monotonic window with a minimum elapsed interval so
+        # a burst of frames right after reset() cannot report an impossible rate.
+        self._rateMeter = FrameRateMeter(
+            windowSeconds=windowSeconds,
+            # Benchmarks use a 10 s window but can be much shorter; one tenth
+            # of the window is enough to reject a burst without delaying a
+            # short run by half the window.
+            minElapsedRatio=0.1,
+            clock=time.perf_counter,
+        )
 
     def _commitPendingLocked(self, now: float) -> None:
         """Move pending samples into committed state; ``_pendingLock`` is held."""
@@ -122,6 +209,7 @@ class CameraPerformanceTracker:
                 self._pendingFrames = 0
                 self._pendingFrameBytes = 0
                 self._pendingLastResultAt = None
+            self._rateMeter.reset()
 
     def record(
         self,
@@ -146,6 +234,8 @@ class CameraPerformanceTracker:
             ):
                 self._commitPendingLocked(now)
 
+            self._rateMeter.record(now)
+
     def snapshot(self, now: Optional[float] = None) -> Dict[str, Any]:
         now = time.perf_counter() if now is None else now
         with self._pendingLock:
@@ -156,9 +246,9 @@ class CameraPerformanceTracker:
                 ):
                     self._timestamps.popleft()
 
-                elapsed = max(now - self._createdAt, 1e-9)
+                elapsed = max(now - self._createdAt, 0.0)
                 windowElapsed = min(elapsed, self._windowSeconds)
-                processedFps = len(self._timestamps) / windowElapsed
+                processedFps = self._rateMeter.rate(now)
 
                 processedFrames = self._processedFrames
                 windowFrames = len(self._timestamps)
