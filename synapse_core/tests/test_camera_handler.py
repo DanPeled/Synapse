@@ -160,9 +160,12 @@ class TestPublishFrame(unittest.TestCase):
             assert started.wait(1.0)
 
             self.handler.publishFrame(frame.copy(), self.handle)
-            queued = lane._slot[0]
+            queuedItem = lane._slot
+            assert queuedItem is not None
+            queued = queuedItem[0]
             self.handler.publishFrame(frame.copy(), self.handle)
 
+            assert lane._slot is not None
             assert lane._slot[0] is queued
         finally:
             release.set()
