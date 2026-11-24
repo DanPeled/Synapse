@@ -232,6 +232,55 @@ class TestPublishFrame(unittest.TestCase):
         release()
         self.handle.returnLease.assert_called_once_with(lease)
 
+    def test_publish_throttle_uses_the_camera_maximum_fps(self):
+        handle = MagicMock()
+        handle.cameraIndex = 5
+        handle.camera.getMaxFPS.return_value = 100
+        lane = MagicMock()
+        self.handler._publishLanes[5] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch(
+            "synapse.core.camera_handler.time.perf_counter", side_effect=[1.0, 1.015]
+        ):
+            self.handler.publishFrame(frame, handle)
+            self.handler.publishFrame(frame, handle)
+
+        assert lane.enqueue.call_count == 2
+        assert self.handler._publishIntervals[5] == 0.0
+
+    def test_publish_tolerance_accepts_slightly_early_frames_when_capped(self):
+        handle = MagicMock()
+        handle.cameraIndex = 7
+        handle.camera.getMaxFPS.return_value = 240
+        lane = MagicMock()
+        self.handler._publishLanes[7] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch(
+            "synapse.core.camera_handler.time.perf_counter", side_effect=[1.0, 1.007]
+        ):
+            self.handler.publishFrame(frame, handle)
+            self.handler.publishFrame(frame, handle)
+
+        assert lane.enqueue.call_count == 2
+
+    def test_publish_does_not_throttle_cameras_within_the_cap(self):
+        handle = MagicMock()
+        handle.cameraIndex = 6
+        handle.camera.getMaxFPS.return_value = 30
+        lane = MagicMock()
+        self.handler._publishLanes[6] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch(
+            "synapse.core.camera_handler.time.perf_counter", side_effect=[1.0, 1.005]
+        ):
+            self.handler.publishFrame(frame, handle)
+            self.handler.publishFrame(frame, handle)
+
+        assert lane.enqueue.call_count == 2
+
     def test_recording_resizes_and_releases_buffer(self):
         self.handler.recordingStatus[0] = True
         self.handler.recordingResolutions[0] = (320, 240)

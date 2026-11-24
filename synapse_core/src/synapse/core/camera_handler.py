@@ -339,6 +339,12 @@ class CameraHandler:
     DEFAULT_SCAN_MAX_INTERVAL: Final[float] = 30.0
     """Upper bound for the adaptive fallback probe interval while stable."""
 
+    MAX_PUBLISH_FPS: Final[float] = 120.0
+    """Guard against publishing a stream faster than CSCore can consume it."""
+
+    PUBLISH_TIMING_TOLERANCE: Final[float] = 0.002
+    """Accept frames that are up to 2 ms early to avoid cadence beat skips."""
+
     def __init__(self) -> None:
         """
         Initializes empty dictionaries to hold camera instances, output streams,
@@ -369,6 +375,7 @@ class CameraHandler:
 
         self.lastPublishTime: Dict[CameraID, float] = {}
         self.publishInterval: float = 1.0 / 30.0
+        self._publishIntervals: Dict[CameraID, float] = {}
 
         # Reusable resize destinations, keyed by camera. Streaming resizes every
         # captured frame, so allocating a new output image per frame shows up in
@@ -958,6 +965,38 @@ class CameraHandler:
         """Enable or disable stream/record publication without stopping cameras."""
         self._publishingEnabled = bool(enabled)
 
+    def _getPublishInterval(self, handle: CameraHandle) -> float:
+        """Return the per-camera publication interval.
+
+        A 30 FPS global cap threw away two thirds of a 100 FPS camera's frames
+        even though the zero-copy publish lane can keep up. Cameras within the
+        CSCore-safe cap are not throttled at all; faster cameras are capped once
+        their maximum is queried and cached per camera index.
+        """
+        cameraIndex = handle.cameraIndex
+        interval = self._publishIntervals.get(cameraIndex)
+        if interval is None:
+            try:
+                reportedFps = handle.camera.getMaxFPS()
+                if not isinstance(reportedFps, (int, float)) or isinstance(
+                    reportedFps, bool
+                ):
+                    raise ValueError("camera did not report a numeric max FPS")
+                maxFps = float(reportedFps)
+            except Exception:
+                # Headless callers and tests can set an explicit interval.
+                interval = self.publishInterval
+            else:
+                if maxFps <= 0.0 or maxFps <= self.MAX_PUBLISH_FPS:
+                    # The bounded lane already drops stale frames when a sink
+                    # cannot keep up. Throttling below the camera's own rate
+                    # would only discard deliverable frames.
+                    interval = 0.0
+                else:
+                    interval = 1.0 / self.MAX_PUBLISH_FPS
+            self._publishIntervals[cameraIndex] = interval
+        return interval
+
     def publishFrame(
         self,
         frame: Frame,
@@ -979,7 +1018,8 @@ class CameraHandler:
         cameraIndex = handle.cameraIndex
 
         lastTime = self.lastPublishTime.get(cameraIndex, 0.0)
-        if now - lastTime < self.publishInterval:
+        interval = self._getPublishInterval(handle)
+        if interval > 0.0 and now + self.PUBLISH_TIMING_TOLERANCE < lastTime + interval:
             return False
         self.lastPublishTime[cameraIndex] = now
 
