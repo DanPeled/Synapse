@@ -67,7 +67,10 @@ class _PublishLane:
         # Items are (frame, pooled, generation, fps, releaseLease). A borrowed
         # frame carries a callback that returns the camera buffer lease once
         # the sink is done with it, avoiding a full-resolution copy per frame.
-        self.frames: "queue.Queue[PublishItem]" = queue.Queue(maxsize=1)
+        # A single-slot mailbox keeps the newest frame without constructing and
+        # catching a ``queue.Empty`` exception on every handoff.
+        self._slot: Optional[PublishItem] = None
+        self._slotLock = threading.Lock()
         self.stopEvent = threading.Event()
         self._frameReady = threading.Event()
         self.thread = threading.Thread(
@@ -89,6 +92,13 @@ class _PublishLane:
     def start(self) -> None:
         self.thread.start()
 
+    def _takeItem(self) -> Optional[PublishItem]:
+        """Remove and return the pending frame, if any."""
+        with self._slotLock:
+            item = self._slot
+            self._slot = None
+            return item
+
     def stop(self) -> None:
         self.stopEvent.set()
         self._frameReady.set()
@@ -100,14 +110,14 @@ class _PublishLane:
                     "within 2s; a sink is still blocking publication."
                 )
 
-        # Stopping can leave one stale frame in the bounded queue. Return its
-        # camera lease or pooled buffer so shutdown does not strand a capture
-        # buffer that the producer expects to reuse.
+        # Stopping can leave one stale frame in the mailbox. Return its camera
+        # lease or pooled buffer so shutdown does not strand a capture buffer
+        # that the producer expects to reuse.
         while True:
-            try:
-                buffer, pooled, generation, _, releaseLease = self.frames.get_nowait()
-            except queue.Empty:
+            item = self._takeItem()
+            if item is None:
                 break
+            buffer, pooled, generation, _, releaseLease = item
             if releaseLease is not None:
                 releaseLease()
             else:
@@ -146,26 +156,27 @@ class _PublishLane:
                 except queue.Full:
                     pass
 
+    def _countDropped(self) -> None:
+        with self._slotLock:
+            self.dropped += 1
+
     def enqueue(self, frame: Frame, fps: Optional[int]) -> None:
-        # If a frame is already queued, replace it and reuse its buffer. This
+        # If a frame is already pending, replace it and reuse its buffer. This
         # avoids taking a second buffer from the pool when the lane is behind,
         # which would otherwise force a one-off full-frame allocation.
         buffer: Optional[np.ndarray] = None
         pooled = False
         generation = 0
-        try:
+        stale = self._takeItem()
+        if stale is not None:
+            self._countDropped()
             (
                 staleBuffer,
                 stalePooled,
                 staleGeneration,
                 _,
                 staleRelease,
-            ) = self.frames.get_nowait()
-        except queue.Empty:
-            pass
-        else:
-            with self._lock:
-                self.dropped += 1
+            ) = stale
             if staleRelease is not None:
                 staleRelease()
             if staleRelease is None and (
@@ -195,15 +206,10 @@ class _PublishLane:
         frame. This removes a full-resolution copy from the camera worker's
         critical path at maximum camera resolution.
         """
-        try:
-            staleBuffer, stalePooled, staleGeneration, _, staleRelease = (
-                self.frames.get_nowait()
-            )
-        except queue.Empty:
-            pass
-        else:
-            with self._lock:
-                self.dropped += 1
+        stale = self._takeItem()
+        if stale is not None:
+            self._countDropped()
+            staleBuffer, stalePooled, staleGeneration, _, staleRelease = stale
             if staleRelease is not None:
                 staleRelease()
             else:
@@ -220,26 +226,37 @@ class _PublishLane:
         releaseLease: Optional[Callable[[], None]],
     ) -> None:
         item = (buffer, pooled, generation, fps, releaseLease)
-        try:
-            self.frames.put_nowait(item)
-            self._frameReady.set()
-        except queue.Full:
-            if releaseLease is not None:
-                releaseLease()
+        stale: Optional[PublishItem] = None
+        with self._slotLock:
+            if self._slot is None:
+                self._slot = item
             else:
-                self._release(buffer, pooled, generation)
-            with self._lock:
+                stale = self._slot
+                self._slot = item
                 self.dropped += 1
+        # A second producer can only win a race here; the newest frame is still
+        # the one in the slot, so wake the lane even after replacing a stale
+        # item in case it was about to sleep.
+        self._frameReady.set()
+        if stale is not None:
+            staleBuffer, stalePooled, staleGeneration, _, staleRelease = stale
+            if staleRelease is not None:
+                staleRelease()
+            else:
+                self._release(staleBuffer, stalePooled, staleGeneration)
 
     def stats(self) -> Dict[str, int]:
-        with self._lock:
+        with self._slotLock:
+            queued = 1 if self._slot is not None else 0
             dropped = self.dropped
+        with self._lock:
             failed = self.failed
-        return {"queued": self.frames.qsize(), "dropped": dropped, "failed": failed}
+        return {"queued": queued, "dropped": dropped, "failed": failed}
 
     def resetStats(self) -> None:
-        with self._lock:
+        with self._slotLock:
             self.dropped = 0
+        with self._lock:
             self.failed = 0
 
     def _run(self) -> None:
@@ -251,12 +268,10 @@ class _PublishLane:
             self._frameReady.clear()
 
             while not self.stopEvent.is_set():
-                try:
-                    buffer, pooled, generation, fps, releaseLease = (
-                        self.frames.get_nowait()
-                    )
-                except queue.Empty:
+                item = self._takeItem()
+                if item is None:
                     break
+                buffer, pooled, generation, fps, releaseLease = item
 
                 try:
                     self._publish(buffer, fps)
