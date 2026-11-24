@@ -203,6 +203,16 @@ class TestPublishFrame(unittest.TestCase):
         finally:
             lane.stop()
 
+    def test_publish_lane_releases_a_queued_lease_on_stop(self):
+        lane = _PublishLane(0, MagicMock())
+        release = MagicMock()
+        lane.enqueueBorrowed(np.zeros((2, 2, 3), dtype=np.uint8), None, release)
+
+        lane.stop()
+
+        release.assert_called_once_with()
+        assert lane.stats()["queued"] == 0
+
     def test_publish_frame_transfers_camera_buffer_lease(self):
         self.handler.cameraHandles[0] = self.handle
         lane = MagicMock()

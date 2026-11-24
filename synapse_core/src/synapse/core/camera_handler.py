@@ -92,14 +92,26 @@ class _PublishLane:
     def stop(self) -> None:
         self.stopEvent.set()
         self._frameReady.set()
-        if self.thread.ident is None:
-            return
-        self.thread.join(timeout=2.0)
-        if self.thread.is_alive():
-            log.warn(
-                f"Stream publisher for camera #{self.cameraIndex} did not stop "
-                "within 2s; a sink is still blocking publication."
-            )
+        if self.thread.ident is not None:
+            self.thread.join(timeout=2.0)
+            if self.thread.is_alive():
+                log.warn(
+                    f"Stream publisher for camera #{self.cameraIndex} did not stop "
+                    "within 2s; a sink is still blocking publication."
+                )
+
+        # Stopping can leave one stale frame in the bounded queue. Return its
+        # camera lease or pooled buffer so shutdown does not strand a capture
+        # buffer that the producer expects to reuse.
+        while True:
+            try:
+                buffer, pooled, generation, _, releaseLease = self.frames.get_nowait()
+            except queue.Empty:
+                break
+            if releaseLease is not None:
+                releaseLease()
+            else:
+                self._release(buffer, pooled, generation)
 
     def _acquire(self, frame: Frame) -> Tuple[np.ndarray, bool, int]:
         shape = tuple(frame.shape)
