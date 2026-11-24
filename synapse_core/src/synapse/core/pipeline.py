@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
@@ -112,6 +113,10 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         self._ntPublishers = {}
         self._wsCoalesceKeys: Dict[str, tuple[int, int, Hashable]] = {}
         self._resolutionCache: Optional[Tuple[str, Resolution]] = None
+        # Camera workers publish results while the command/NT threads rebind
+        # pipelines and clear these caches. One reentrant lock keeps publisher
+        # creation, close and use serialized without blocking message encoding.
+        self._ntLock = threading.RLock()
 
     def bind(self, cameraIndex: CameraID, camera: SynapseCamera):
         self.invalidateCachedEntries()
@@ -132,17 +137,18 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         self.invalidateCachedEntries()
 
     def invalidateCachedEntries(self) -> None:
-        for pub in self._ntPublishers.values():
-            try:
-                close = getattr(pub, "close", None)
-                if close is not None:
-                    close()
-                else:
-                    del pub
-            except Exception:
-                pass
-        self._ntPublishers.clear()
-        self._ntDataTable = None
+        with self._ntLock:
+            publishers = list(self._ntPublishers.values())
+            self._ntPublishers.clear()
+            self._ntDataTable = None
+            self._wsCoalesceKeys.clear()
+            for pub in publishers:
+                try:
+                    close = getattr(pub, "close", None)
+                    if close is not None:
+                        close()
+                except Exception:
+                    pass
 
     def _getDataTable(self) -> Optional[NetworkTable]:
         if not self.ntTable:
@@ -176,18 +182,19 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
         raise TypeError(f"Unsupported NT type: {type(value)}")
 
     def _getPublisher(self, key: str, typeString: str) -> Optional[GenericPublisher]:
-        pub = self._ntPublishers.get(key)
-        if pub:
+        with self._ntLock:
+            pub = self._ntPublishers.get(key)
+            if pub:
+                return pub
+
+            table = self._getDataTable()
+            if not table:
+                return None
+
+            topic = table.getTopic(key)
+            pub = topic.genericPublish(typeString)
+            self._ntPublishers[key] = pub
             return pub
-
-        table = self._getDataTable()
-        if not table:
-            return None
-
-        topic = table.getTopic(key)
-        pub = topic.genericPublish(typeString)
-        self._ntPublishers[key] = pub
-        return pub
 
     def setDataValue(self, key: str, value: Any, isMsgpack: bool = False) -> None:
         if value == bytes():
@@ -200,16 +207,18 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
             parsed = parsePipelineResult(value)
 
         typeString = self._ntTypeString(parsed, isMsgpack)
-        pub = self._getPublisher(key, typeString)
-        if pub:
-            pub.set(_makeNtValue(parsed, isMsgpack=isMsgpack))
-
         ws = WebSocketServer.kInstance
-        if ws and ws.hasClients:
-            try:
-                cameraid = max(self.cameraIndex, 0)
-                pipelineIndex = self.pipelineIndex
-                coalesceKey: Hashable
+
+        with self._ntLock:
+            pub = self._getPublisher(key, typeString)
+            if pub:
+                pub.set(_makeNtValue(parsed, isMsgpack=isMsgpack))
+
+            hasClients = bool(ws and ws.hasClients)
+            cameraid = max(self.cameraIndex, 0)
+            pipelineIndex = self.pipelineIndex
+            coalesceKey: Optional[Hashable] = None
+            if hasClients:
                 cachedKey = self._wsCoalesceKeys.get(key)
                 if (
                     cachedKey is not None
@@ -226,6 +235,8 @@ class Pipeline(ABC, Generic[TSettingsType, TResultType]):
                     )
                     self._wsCoalesceKeys[key] = (cameraid, pipelineIndex, coalesceKey)
 
+        if ws and hasClients and coalesceKey is not None:
+            try:
                 # Build the protobuf only if this value survives coalescing.
                 # Results can be produced much faster than the UI can consume
                 # them; serializing every superseded value would burn CPU without

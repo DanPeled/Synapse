@@ -696,11 +696,8 @@ class RuntimeManager:
                         time.sleep(0.002)
                         continue
 
-                    # Transfer the lease before processing so the next grab
-                    # cannot auto-release a buffer the publish lane is reading.
-                    lease = handle.takeLease()
                     transferredLease = self._processAndPublishFrame(
-                        cameraIndex, frame, captureLatency, lease
+                        cameraIndex, frame, captureLatency
                     )
                 finally:
                     if not transferredLease:
@@ -709,11 +706,7 @@ class RuntimeManager:
                 time.sleep(0.002)
 
     def _processAndPublishFrame(
-        self,
-        cameraIndex: CameraID,
-        frame: Frame,
-        captureLatency: float = 0.0,
-        lease: Optional[Tuple[int, int]] = None,
+        self, cameraIndex: CameraID, frame: Frame, captureLatency: float = 0.0
     ) -> bool:
         camera_handles = self.cameraHandler.cameraHandles
         handle = camera_handles[cameraIndex]
@@ -773,6 +766,15 @@ class RuntimeManager:
         except Exception:
             pass
 
+        # Only a frame that is still the camera's own buffer can be borrowed.
+        # Pipelines that return a derived array must be copied by the publish
+        # lane while the original lease is still held by this worker.
+        lease = None
+        if processedFrame is frame:
+            takeLease = getattr(handle, "takeLease", None)
+            if takeLease is not None:
+                lease = takeLease()
+
         transferredLease = False
         try:
             transferredLease = self.cameraHandler.publishFrame(
@@ -780,6 +782,11 @@ class RuntimeManager:
             )
         except Exception:
             pass
+        finally:
+            if lease is not None and not transferredLease:
+                returnLease = getattr(handle, "returnLease", None)
+                if returnLease is not None:
+                    returnLease(lease)
 
         try:
             tracker = self._performanceTrackers.get(cameraIndex)

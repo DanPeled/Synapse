@@ -418,6 +418,59 @@ class TestRuntimeManager(unittest.TestCase):
 
         self.assertNotIn(0, self.handler.cameraManagementThreads)
 
+    def test_camera_buffer_is_borrowed_when_pipeline_returns_the_same_frame(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = True
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        self.handler._processAndPublishFrame(0, frame)
+
+        handle.takeLease.assert_called_once_with()
+        assert self.mock_camera_handler.publishFrame.call_args.kwargs["lease"] == (7, 1)
+        handle.returnLease.assert_not_called()
+
+    def test_derived_frame_is_not_borrowed_from_the_camera_pool(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = False
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        derived = np.ones((4, 4, 3), dtype=np.uint8)
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        with patch.object(self.handler, "handleResults", return_value=derived):
+            self.handler._processAndPublishFrame(0, frame)
+
+        handle.takeLease.assert_not_called()
+        assert self.mock_camera_handler.publishFrame.call_args.kwargs["lease"] is None
+
+    def test_untransferred_lease_is_returned_after_throttled_publication(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = False
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+
+        self.handler._processAndPublishFrame(0, frame)
+
+        handle.returnLease.assert_called_once_with((7, 1))
+
 
 class TestHandleFramePublishing(unittest.TestCase):
     def setUp(self):
