@@ -579,6 +579,28 @@ class TestRuntimeManager(unittest.TestCase):
         handle.takeLease.assert_not_called()
         assert self.mock_camera_handler.publishFrame.call_args.kwargs["lease"] is None
 
+    def test_rotated_fixture_frame_is_not_borrowed_from_the_camera_pool(self):
+        handle = MagicMock()
+        handle.takeLease.return_value = (7, 1)
+        self.mock_camera_handler.cameraHandles = {0: handle}
+        self.mock_camera_handler.publishFrame.return_value = False
+        self.handler.pipelineBindings = {0: 0}
+        self.handler.sendLatency = MagicMock()
+        pipeline = MagicMock()
+        pipeline.processFrame.return_value = None
+        cameraSettings = MagicMock()
+        cameraSettings.getSetting.side_effect = lambda key: (
+            90 if key == CameraSettings.orientation.key else None
+        )
+        pipeline.getCameraSettings.return_value = cameraSettings
+        self.handler.pipelineHandler.getPipeline = MagicMock(return_value=pipeline)
+        frame = np.zeros((4, 6, 3), dtype=np.uint8)
+
+        self.handler._processAndPublishFrame(0, frame)
+
+        handle.takeLease.assert_not_called()
+        assert self.mock_camera_handler.publishFrame.call_args.kwargs["lease"] is None
+
     def test_untransferred_lease_is_returned_after_throttled_publication(self):
         handle = MagicMock()
         handle.takeLease.return_value = (7, 1)
