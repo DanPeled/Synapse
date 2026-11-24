@@ -3,10 +3,25 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Run Synapse against real cameras and report multi-camera throughput/latency.
+"""Measure Synapse throughput and latency against real cameras.
 
-Use a project whose ``config/settings.yml`` contains the cameras to measure:
-one camera for the baseline run and four cameras for the comparison run.
+The project passed with ``--project`` supplies the camera set through its
+``config/settings.yml``; this script never assumes specific device paths or a
+particular host. A typical comparison is:
+
+1. Capture a single-camera baseline with ``--no-hotplug``.
+2. Capture the multi-camera result with the same flag and the same warmup and
+   duration.
+3. Optionally pass ``--baseline-json`` to evaluate the per-camera and aggregate
+   throughput ratios against that baseline.
+
+``--no-hotplug`` keeps the measured set equal to the configured set, which
+otherwise grows silently as USB cameras are discovered. ``--no-pipelines``
+still applies each configured video mode before unbinding pipelines, so a
+capture/stream-only stage measures the real sensor format rather than a
+fallback mode. Every report records the effective resolution, FPS, pixel
+format, hotplug mode, pipeline mode, stream mode, USB topology, and host sample
+so a result can be reproduced or compared with a later run.
 """
 
 from __future__ import annotations
@@ -27,6 +42,7 @@ from synapse.core.config import Config
 from synapse.core.global_settings import GlobalSettings
 from synapse.core.performance import summarizeCameras
 from synapse.core.runtime_handler import RuntimeManager
+from synapse.hardware.deploy_dir import DeployDirectory
 from synapse_net.nt_client import NtClient
 
 DEFAULT_THRESHOLD = 0.83
@@ -89,20 +105,48 @@ def readBaselineFps(path: Path) -> float:
     return float(cameras[0]["processed_fps"])
 
 
-def createRuntime(project: Path, publishStreams: bool = False) -> RuntimeManager:
-    """Configure and start a runtime without UI, websocket, or network setup."""
+def createRuntime(
+    project: Path,
+    publishStreams: bool = False,
+    allowHotplug: bool = True,
+    usePipelines: bool = True,
+) -> RuntimeManager:
+    """Configure and start a headless runtime for a camera project.
+
+    ``allowHotplug=False`` disables the background scanner so only configured
+    cameras are measured. ``usePipelines=False`` applies configured video
+    modes through the normal pipeline setup path and then unbinds the
+    pipelines, isolating capture and publication without changing resolution.
+    """
     configPath = project / "config" / "settings.yml"
     if not configPath.exists():
         raise FileNotFoundError(f"Missing project config: {configPath}")
 
     config = Config()
     config.load(configPath)
+    DeployDirectory.setup(project)
     settings = config.getConfigMap()
     GlobalSettings.setup(settings.get("global", {}))
     NtClient.NT_TABLE = config.network.name or NtClient.NT_TABLE
 
     runtime = RuntimeManager(project)
+    if not allowHotplug:
+        # Keep the measured camera set exactly as configured. The hotplug
+        # scanner would otherwise add every attached USB camera and silently
+        # turn a single-camera baseline into a multi-camera measurement.
+        setattr(runtime.cameraHandler, "scanCameras", lambda *args, **kwargs: None)
+    if not usePipelines:
+        # Capture/stream-only stage: skip default pipeline creation and bind no
+        # pipeline so measurement isolates the capture and publish layers.
+        setattr(runtime, "assignDefaultPipelines", lambda: None)
     runtime.setup(project, sendSettingsInNT=False)
+    if not usePipelines:
+        # Apply the configured camera settings (including video mode), then
+        # unbind pipelines so processing is excluded from the measurement.
+        for cameraIndex in runtime.cameraHandler.cameraHandles:
+            pipelineIndex = runtime.pipelineHandler.getDefaultPipeline(cameraIndex)
+            runtime.setPipelineByIndex(cameraIndex, pipelineIndex)
+            runtime.pipelineBindings[cameraIndex] = -1
     # Headless measurements should not spend memory bandwidth encoding MJPEG
     # streams nobody is watching. Recording stays available in normal runs.
     runtime.cameraHandler.setPublishingEnabled(publishStreams)
@@ -160,6 +204,8 @@ def buildReport(
     baselineFps: Optional[float],
     threshold: float,
     publishStreams: bool,
+    allowHotplug: bool,
+    usePipelines: bool,
     topology: Dict[str, Any],
     hostSample: Dict[str, Any],
     startedAt: datetime,
@@ -181,6 +227,8 @@ def buildReport(
         "warmup_seconds": warmupSeconds,
         "duration_seconds": durationSeconds,
         "stream_publication": "enabled" if publishStreams else "disabled",
+        "hotplug_scan": "enabled" if allowHotplug else "disabled",
+        "pipelines": "enabled" if usePipelines else "disabled",
     }
     summary["host"] = {
         "platform": platform.platform(),
@@ -237,6 +285,16 @@ def parseArgs(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="Keep stream/record publication enabled during measurement",
     )
     parser.add_argument(
+        "--no-hotplug",
+        action="store_true",
+        help="Use only the cameras declared in the project config",
+    )
+    parser.add_argument(
+        "--no-pipelines",
+        action="store_true",
+        help="Measure capture and stream publication without vision pipelines",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -254,7 +312,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.baseline_json is not None:
         baselineFps = readBaselineFps(args.baseline_json)
 
-    runtime = createRuntime(args.project.resolve(), publishStreams=args.streams)
+    runtime = createRuntime(
+        args.project.resolve(),
+        publishStreams=args.streams,
+        allowHotplug=not args.no_hotplug,
+        usePipelines=not args.no_pipelines,
+    )
     try:
         if args.warmup:
             time.sleep(args.warmup)
@@ -268,6 +331,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             baselineFps=baselineFps,
             threshold=args.threshold,
             publishStreams=args.streams,
+            allowHotplug=not args.no_hotplug,
+            usePipelines=not args.no_pipelines,
             topology=collectUsbTopology(),
             hostSample=hostSample,
             startedAt=startedAt,
