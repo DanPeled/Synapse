@@ -672,6 +672,7 @@ class CameraHandler:
                         f"Found non-registered camera: {info.name} (i={cameraIndex}), adding automatically"
                     )
                     GlobalSettings.setCameraConfig(cameraIndex, cameraConfig)
+                    self.cameraConfigBindings = GlobalSettings.getCameraConfigMap()
                     if not (self.addCamera(cameraIndex, cameraConfig, info.dev)):
                         continue
                     else:

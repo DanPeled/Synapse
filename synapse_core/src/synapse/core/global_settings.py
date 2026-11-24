@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import threading
 from typing import Dict, Optional, Union, overload
 
 import yaml
@@ -25,6 +26,10 @@ class GlobalSettingsMeta(type):
     kCamerasListKey: str = "cameras"
     __settings: Optional[SettingsCollection] = None
     __cameraConfigs: Dict[CameraID, CameraConfig] = {}
+    # Camera workers and the hotplug scanner read the config map while it can
+    # be replaced. Publishing a fresh mapping under the lock lets readers use
+    # a stable snapshot without taking a lock on every frame.
+    __cameraConfigsLock = threading.RLock()
 
     def setup(cls, settings: SettingsMap) -> bool:
         """Initializes the global settings with the provided settings map.
@@ -38,8 +43,8 @@ class GlobalSettingsMeta(type):
             bool: True if initialization succeeded and camera configs were provided,
                   False otherwise.
         """
-        cls.__settings = SettingsCollection(settings)
-        cls.__cameraConfigs: Dict[CameraID, CameraConfig] = {}
+        cameraConfigs: Dict[CameraID, CameraConfig] = {}
+        settingsCollection = SettingsCollection(settings)
 
         if cls.kCamerasListKey in settings:
             cameras = settings[cls.kCamerasListKey]
@@ -52,11 +57,15 @@ class GlobalSettingsMeta(type):
                 if path.exists():
                     with open(path) as f:
                         camera_settings = yaml.full_load(f)
-                        cls.__cameraConfigs[camera] = CameraConfig.fromDict(
+                        cameraConfigs[camera] = CameraConfig.fromDict(
                             camera_settings.get("camera_configs") or {}
                         )
                 else:
                     warn(f"No camera configs file exists for camra {camera}...")
+
+        with cls.__cameraConfigsLock:
+            cls.__settings = settingsCollection
+            cls.__cameraConfigs = cameraConfigs
 
             # for index, camData in dict(settings[cls.kCameraConfigsKey]).items():
             #     camConfig: CameraConfig = CameraConfig.fromDict(camData)
@@ -83,18 +92,19 @@ class GlobalSettingsMeta(type):
         Returns:
             Optional[CameraConfig]: The camera configuration, or None if not available.
         """
-        if cls.hasCameraData(cameraIndex):
-            return cls.__cameraConfigs[cameraIndex]
-        return None
+        return cls.__cameraConfigs.get(cameraIndex)
 
     def setCameraConfig(cls, cameraIndex: CameraID, cameraConfig: CameraConfig) -> None:
-        cls.__cameraConfigs[cameraIndex] = cameraConfig
+        with cls.__cameraConfigsLock:
+            updated = dict(cls.__cameraConfigs)
+            updated[cameraIndex] = cameraConfig
+            cls.__cameraConfigs = updated
 
     def getCameraConfigMap(cls) -> Dict[CameraID, CameraConfig]:
-        """Returns the full map of camera configurations.
+        """Return a stable snapshot of the camera configuration map.
 
-        Returns:
-            Dict[CameraID, CameraConfig]: Mapping from camera ID to configuration.
+        Callers can iterate the result while the hotplug scanner publishes a
+        new configuration without observing a dict that changes mid-iteration.
         """
         return cls.__cameraConfigs
 
