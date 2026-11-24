@@ -167,13 +167,14 @@ class TestRuntimeManager(unittest.TestCase):
         self.mock_camera_handler.cameraHandles = {0: handle}
         self.handler.pipelineHandler.getPipeline = MagicMock(return_value=None)
         self.handler.sendLatency = MagicMock()
-        self.handler.cameraHandler.publishFrame = MagicMock()
+        publishFrame = MagicMock()
+        self.handler.cameraHandler.publishFrame = publishFrame
 
         clock = {"now": 900.0}
         frame = np.zeros((4, 4, 3), dtype=np.uint8)
 
         def reportedFps() -> int:
-            return self.handler.cameraHandler.publishFrame.call_args.kwargs["fps"]
+            return publishFrame.call_args.kwargs["fps"]
 
         with patch(
             "synapse.core.runtime_handler.time.perf_counter", lambda: clock["now"]

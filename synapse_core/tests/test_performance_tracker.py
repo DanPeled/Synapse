@@ -107,6 +107,7 @@ def test_frame_rate_meter_rejects_short_bursts_and_respects_camera_limit() -> No
     assert meter.record(limit=30.0) == 0.0
 
     # A steady 30 FPS stream produces a meaningful rate once the window fills.
+    fps = 0.0
     for _ in range(30):
         clock["now"] += 1.0 / 30.0
         fps = meter.record(limit=30.0)
