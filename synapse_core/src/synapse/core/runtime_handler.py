@@ -795,6 +795,7 @@ class RuntimeManager:
 
         # ---- Processing latency ----
         processStart = now
+        cameraFrame = frame
 
         pipeline_bindings = self.pipelineBindings
         pipeline = self.pipelineHandler.getPipeline(
@@ -835,10 +836,13 @@ class RuntimeManager:
             pass
 
         # Only a frame that is still the camera's own buffer can be borrowed.
-        # Pipelines that return a derived array must be copied by the publish
-        # lane while the original lease is still held by this worker.
+        # The orientation fixture replaces ``frame`` with a reusable rotated
+        # destination, so compare against the original camera buffer rather
+        # than the possibly rebound local. Pipelines and fixtures that return
+        # a derived array must be copied by the publish lane while the original
+        # lease is still held by this worker.
         lease = None
-        if processedFrame is frame:
+        if processedFrame is cameraFrame:
             takeLease = getattr(handle, "takeLease", None)
             if takeLease is not None:
                 lease = takeLease()
