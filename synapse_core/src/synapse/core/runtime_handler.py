@@ -676,6 +676,7 @@ class RuntimeManager:
             pass
 
         while self.running.is_set():
+            transferredLease = False
             try:
                 # CameraHandle's producer owns connection checks and its own
                 # bounded retry delay. Checking again here only adds a native
@@ -694,20 +695,26 @@ class RuntimeManager:
                         # Try again quickly without going to no-signal
                         time.sleep(0.002)
                         continue
-                    try:
-                        self._processAndPublishFrame(cameraIndex, frame, captureLatency)
-                    except Exception:
-                        pass
+
+                    # Transfer the lease before processing so the next grab
+                    # cannot auto-release a buffer the publish lane is reading.
+                    lease = handle.takeLease()
+                    transferredLease = self._processAndPublishFrame(
+                        cameraIndex, frame, captureLatency, lease
+                    )
                 finally:
-                    # Always return the buffer so a slow pipeline cannot cause
-                    # the capture thread to overwrite the frame in use.
-                    handle.releaseFrame()
+                    if not transferredLease:
+                        handle.releaseFrame()
             except Exception:
                 time.sleep(0.002)
 
     def _processAndPublishFrame(
-        self, cameraIndex: CameraID, frame: Frame, captureLatency: float = 0.0
-    ):
+        self,
+        cameraIndex: CameraID,
+        frame: Frame,
+        captureLatency: float = 0.0,
+        lease: Optional[Tuple[int, int]] = None,
+    ) -> bool:
         camera_handles = self.cameraHandler.cameraHandles
         handle = camera_handles[cameraIndex]
 
@@ -766,8 +773,11 @@ class RuntimeManager:
         except Exception:
             pass
 
+        transferredLease = False
         try:
-            self.cameraHandler.publishFrame(processedFrame, handle, fps=int(cameraFps))
+            transferredLease = self.cameraHandler.publishFrame(
+                processedFrame, handle, fps=int(cameraFps), lease=lease
+            )
         except Exception:
             pass
 
@@ -784,6 +794,8 @@ class RuntimeManager:
             )
         except Exception:
             pass
+
+        return transferredLease
 
     def _getPerformanceTracker(self, cameraIndex: CameraID) -> CameraPerformanceTracker:
         with self._performanceLock:

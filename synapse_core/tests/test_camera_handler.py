@@ -203,6 +203,25 @@ class TestPublishFrame(unittest.TestCase):
         finally:
             lane.stop()
 
+    def test_publish_frame_transfers_camera_buffer_lease(self):
+        self.handler.cameraHandles[0] = self.handle
+        lane = MagicMock()
+        self.handler._publishLanes[0] = lane
+        frame = np.zeros((2, 2, 3), dtype=np.uint8)
+        lease = (4, 2)
+
+        transferred = self.handler.publishFrame(frame, self.handle, lease=lease)
+
+        assert transferred is True
+        args = lane.enqueueBorrowed.call_args.args
+        assert args[0] is frame
+        assert args[1] is None
+
+        release = args[2]
+        self.handle.returnLease.assert_not_called()
+        release()
+        self.handle.returnLease.assert_called_once_with(lease)
+
     def test_recording_resizes_and_releases_buffer(self):
         self.handler.recordingStatus[0] = True
         self.handler.recordingResolutions[0] = (320, 240)

@@ -11,7 +11,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain
-from typing import Any, Dict, Final, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Final, List, Optional, Tuple, Type, Union
 
 import cscore as cs
 import cv2
@@ -55,6 +55,7 @@ class FPSView:
 UsbCameraInfos = Dict[CameraUID, cs.UsbCameraInfo]
 UsbDeviceSignature = Tuple[Tuple[str, int, int], ...]
 UsbInfoSignature = Tuple[Tuple[CameraUID, str, str, Tuple[str, ...], int, int], ...]
+PublishItem = Tuple[np.ndarray, bool, int, Optional[int], Optional[Callable[[], None]]]
 
 
 class _PublishLane:
@@ -63,9 +64,10 @@ class _PublishLane:
     def __init__(self, cameraIndex: CameraID, publish) -> None:
         self.cameraIndex = cameraIndex
         self._publish = publish
-        self.frames: "queue.Queue[Tuple[np.ndarray, bool, int, Optional[int]]]" = (
-            queue.Queue(maxsize=1)
-        )
+        # Items are (frame, pooled, generation, fps, releaseLease). A borrowed
+        # frame carries a callback that returns the camera buffer lease once
+        # the sink is done with it, avoiding a full-resolution copy per frame.
+        self.frames: "queue.Queue[PublishItem]" = queue.Queue(maxsize=1)
         self.stopEvent = threading.Event()
         self._frameReady = threading.Event()
         self.thread = threading.Thread(
@@ -140,13 +142,23 @@ class _PublishLane:
         pooled = False
         generation = 0
         try:
-            staleBuffer, stalePooled, staleGeneration, _ = self.frames.get_nowait()
+            (
+                staleBuffer,
+                stalePooled,
+                staleGeneration,
+                _,
+                staleRelease,
+            ) = self.frames.get_nowait()
         except queue.Empty:
             pass
         else:
             with self._lock:
                 self.dropped += 1
-            if staleBuffer.shape == frame.shape and staleBuffer.dtype == frame.dtype:
+            if staleRelease is not None:
+                staleRelease()
+            if staleRelease is None and (
+                staleBuffer.shape == frame.shape and staleBuffer.dtype == frame.dtype
+            ):
                 buffer = staleBuffer
                 pooled = stalePooled
                 generation = staleGeneration
@@ -157,13 +169,53 @@ class _PublishLane:
             buffer, pooled, generation = self._acquire(frame)
 
         np.copyto(buffer, frame)
-        item = (buffer, pooled, generation, fps)
+        self._push(buffer, pooled, generation, fps, None)
 
+    def enqueueBorrowed(
+        self,
+        frame: Frame,
+        fps: Optional[int],
+        releaseLease: Callable[[], None],
+    ) -> None:
+        """Queue a frame whose buffer belongs to the camera handle.
+
+        The callback returns the lease after the sink has finished with the
+        frame. This removes a full-resolution copy from the camera worker's
+        critical path at maximum camera resolution.
+        """
+        try:
+            staleBuffer, stalePooled, staleGeneration, _, staleRelease = (
+                self.frames.get_nowait()
+            )
+        except queue.Empty:
+            pass
+        else:
+            with self._lock:
+                self.dropped += 1
+            if staleRelease is not None:
+                staleRelease()
+            else:
+                self._release(staleBuffer, stalePooled, staleGeneration)
+
+        self._push(frame, False, 0, fps, releaseLease)
+
+    def _push(
+        self,
+        buffer: np.ndarray,
+        pooled: bool,
+        generation: int,
+        fps: Optional[int],
+        releaseLease: Optional[Callable[[], None]],
+    ) -> None:
+        item = (buffer, pooled, generation, fps, releaseLease)
         try:
             self.frames.put_nowait(item)
             self._frameReady.set()
         except queue.Full:
-            self._release(buffer, pooled, generation)
+            if releaseLease is not None:
+                releaseLease()
+            else:
+                self._release(buffer, pooled, generation)
             with self._lock:
                 self.dropped += 1
 
@@ -188,7 +240,9 @@ class _PublishLane:
 
             while not self.stopEvent.is_set():
                 try:
-                    buffer, pooled, generation, fps = self.frames.get_nowait()
+                    buffer, pooled, generation, fps, releaseLease = (
+                        self.frames.get_nowait()
+                    )
                 except queue.Empty:
                     break
 
@@ -215,6 +269,8 @@ class _PublishLane:
                             f"{message}"
                         )
                 finally:
+                    if releaseLease is not None:
+                        releaseLease()
                     self._release(buffer, pooled, generation)
 
 
@@ -890,32 +946,42 @@ class CameraHandler:
         self._publishingEnabled = bool(enabled)
 
     def publishFrame(
-        self, frame: Frame, handle: CameraHandle, fps: Optional[int] = None
-    ) -> None:
+        self,
+        frame: Frame,
+        handle: CameraHandle,
+        fps: Optional[int] = None,
+        lease: Optional[Tuple[int, int]] = None,
+    ) -> bool:
         """Hand a throttled frame to the camera's stream/record lane.
 
-        The camera processing thread only copies into a pooled buffer and never
-        waits on ``CvSource.putFrame`` or ``VideoWriter.write``. When the lane
-        is behind, the stale queued frame is replaced so latency stays bounded.
+        Returns True when the camera buffer lease was transferred to the lane.
+        The camera worker must not release the frame in that case. At maximum
+        resolution this also avoids copying the full frame on the worker.
         """
         assert frame is not None
         if not self._publishingEnabled:
-            return
+            return False
 
         now = time.perf_counter()
         cameraIndex = handle.cameraIndex
 
         lastTime = self.lastPublishTime.get(cameraIndex, 0.0)
         if now - lastTime < self.publishInterval:
-            return
+            return False
         self.lastPublishTime[cameraIndex] = now
 
         lane = self._publishLanes.get(cameraIndex)
         if lane is None:
             # Tests and headless callers can publish without a managed camera.
             self._publishFrameSync(frame, handle, fps)
-            return
-        lane.enqueue(frame, fps)
+            return False
+
+        if lease is None:
+            lane.enqueue(frame, fps)
+            return False
+
+        lane.enqueueBorrowed(frame, fps, lambda lease=lease: handle.returnLease(lease))
+        return True
 
     @staticmethod
     def _drawFps(frame: Frame, fps: Optional[int]) -> None:

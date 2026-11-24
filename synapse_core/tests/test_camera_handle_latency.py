@@ -81,6 +81,38 @@ def test_grab_frame_wakes_on_frame_condition() -> None:
     assert elapsed < 0.25
 
 
+def test_taken_lease_is_not_released_by_the_next_grab() -> None:
+    handle = makeHandle()
+    handle._bufferPool.append(np.zeros((2, 2, 3), dtype=np.uint8))
+    publishFrame(handle, int(time.monotonic() * 1_000_000))
+
+    ok, frame, _ = handle.grabFrame(timeout=0.1)
+    assert ok is True
+    assert frame is handle._bufferPool[0]
+
+    lease = handle.takeLease()
+    assert lease == (0, 0)
+    assert handle._leasedIndex is None
+
+    with handle._frameMutex:
+        # ``publishFrame`` bypasses the free list; clear its initial entry so
+        # the assertion below only observes releases performed by grabFrame.
+        handle._freeBuffers.clear()
+        handle._freeBuffers.append((0, 1))
+        handle._frameQueue.append((int(time.monotonic() * 1_000_000), 0, 1))
+        handle._frameCondition.notify()
+
+    ok, nextFrame, _ = handle.grabFrame(timeout=0.1)
+    assert ok is True
+    assert nextFrame is handle._bufferPool[1]
+    with handle._frameMutex:
+        assert (0, 0) not in handle._freeBuffers
+
+    handle.returnLease(cast(Any, lease))
+    with handle._frameMutex:
+        assert (0, 0) in handle._freeBuffers
+
+
 def test_connection_checks_are_throttled() -> None:
     handle = makeHandle()
     handle._bufferPool = [

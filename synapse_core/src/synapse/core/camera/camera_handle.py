@@ -433,6 +433,28 @@ class CameraHandle:
         with self._frameMutex:
             self._releaseLeaseLocked()
 
+    def takeLease(self) -> Optional[Tuple[int, int]]:
+        """Transfer ownership of the current lease to another thread.
+
+        The next :meth:`grabFrame` must not auto-release a buffer that a
+        publish lane is still reading, so this clears the single-lease slot and
+        returns a token that :meth:`returnLease` can release later.
+        """
+        with self._frameMutex:
+            index = self._leasedIndex
+            generation = self._leasedGeneration
+            self._leasedIndex = None
+            self._leasedGeneration = None
+        if index is None or generation is None:
+            return None
+        return generation, index
+
+    def returnLease(self, lease: Tuple[int, int]) -> None:
+        """Release a lease previously returned by :meth:`takeLease`."""
+        generation, index = lease
+        with self._frameMutex:
+            self._returnBufferLocked(generation, index)
+
     def getCaptureStats(self) -> Dict[str, int]:
         """Return counters useful for diagnosing multi-camera capture drops."""
         if not hasattr(self, "_freeBuffers"):
