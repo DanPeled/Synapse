@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { baseCardColor, teamColor } from "@/services/style";
-import { Column, Row } from "@/widgets/containers";
-import { Lock, Save, Unlock, Video, VideoOff } from "lucide-react";
+import { Column } from "@/widgets/containers";
+import { Save, Video, VideoOff } from "lucide-react";
 import { ReactNode } from "react";
 
 export function ActionButton({
@@ -17,7 +17,7 @@ export function ActionButton({
   return (
     <Button
       variant="outline"
-      className="rounded-md cursor-pointer bg-gray-800 hover:bg-gray-700 border-none h-full"
+      className="rounded-md cursor-pointer bg-gray-800 hover:bg-gray-700 border-none h-12 shrink-0"
       onClick={onClick}
     >
       <span
@@ -32,14 +32,10 @@ export function ActionButton({
 }
 
 export function SaveActionsDialog({
-  locked,
-  setLocked,
   save,
   recordingStatus,
   setRecordingStatus,
 }: {
-  locked: boolean;
-  setLocked: (locked: boolean) => void;
   save: () => void;
   recordingStatus: boolean;
   setRecordingStatus: (status: boolean) => void;
@@ -47,41 +43,26 @@ export function SaveActionsDialog({
   return (
     <Card
       style={{ backgroundColor: baseCardColor }}
-      className="border-gray-700 flex flex-col h-full p-2"
+      className="border-gray-700 flex flex-col self-stretch p-2"
     >
-      <CardContent>
-        <Column gap="gap-4" justify="center">
+      <CardContent className="flex-1 flex flex-col p-0">
+        <Column gap="gap-4" justify="center" className="h-full">
           <ActionButton
             text="Save"
-            icon={<Save className="size-10" />}
+            icon={<Save className="size-5" />}
             onClick={save}
           />
-          {locked ? (
-            <ActionButton
-              text="Unlock"
-              icon={<Unlock className="size-10" />}
-              onClick={() => setLocked(false)}
-            />
-          ) : (
-            <ActionButton
-              text="Lock"
-              icon={<Lock className="size-10" />}
-              onClick={() => setLocked(true)}
-            />
-          )}
-          {recordingStatus ? (
-            <ActionButton
-              text="Stop Recording"
-              icon={<VideoOff className="size-10" />}
-              onClick={() => setRecordingStatus(false)}
-            />
-          ) : (
-            <ActionButton
-              text="Record"
-              icon={<Video className="size-10" />}
-              onClick={() => setRecordingStatus(true)}
-            />
-          )}
+          <ActionButton
+            text={recordingStatus ? "Stop Recording" : "Record"}
+            icon={
+              recordingStatus ? (
+                <VideoOff className="size-5" />
+              ) : (
+                <Video className="size-5" />
+              )
+            }
+            onClick={() => setRecordingStatus(!recordingStatus)}
+          />
         </Column>
       </CardContent>
     </Card>
