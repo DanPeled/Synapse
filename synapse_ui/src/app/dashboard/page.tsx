@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { background, teamColor, baseCardColor } from "@/services/style";
 import { CameraStream } from "@/widgets/cameraStream";
@@ -13,7 +13,7 @@ import {
 import { ResultsView } from "./results_view";
 import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
-import { Activity, Camera } from "lucide-react";
+import { Activity } from "lucide-react";
 import {
   CameraPerformanceProto,
   CameraProto,

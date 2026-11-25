@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Copy,
-  Edit,
-  Plus,
-  Trash2,
-  MoreVertical,
-  Star,
-  Ban,
-  Trash,
-} from "lucide-react";
+import { Copy, Edit, Plus, MoreVertical, Star, Ban, Trash } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
