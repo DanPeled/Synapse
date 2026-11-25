@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { baseCardColor, teamColor } from "@/services/style";
 import { darken } from "polished";
+import { ArrowRight, ArrowRightCircle, Play } from "lucide-react";
 
 interface SliderProps {
   min?: number;
@@ -111,7 +112,9 @@ export function Slider({
             color: teamColor,
           }}
         >
-          <span className="select-none">&minus;</span>
+          <span className="select-none">
+            <Play fill={"#ff66c4"} className="rotate-180 size-3" />{" "}
+          </span>
         </Button>
         <p className="italic">{min}</p>
         <input
@@ -154,7 +157,10 @@ export function Slider({
             color: teamColor,
           }}
         >
-          <span className="select-none">+</span>
+          <span className="select-none">
+            {" "}
+            <Play fill={"#ff66c4"} className="size-3" />{" "}
+          </span>
         </Button>
 
         <input

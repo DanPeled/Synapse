@@ -83,7 +83,7 @@ export function Button({
           : "0 2px 6px rgba(0,0,0,0.5)",
         transform: isPressed ? "scale(0.95)" : "scale(1)",
       }}
-      className={className}
+      className={`inline-flex items-center gap-2 justify-center ${className}`}
     >
       {children}
     </button>
@@ -183,7 +183,7 @@ export function DangerButton({
         enabledColors={enabledColors}
         disabledColors={disabledColors}
         onClickAction={handleClick}
-        className={className}
+        className={`inline-flex items-center gap-2 ${className}`}
         disabled={disabled}
         {...props}
       >

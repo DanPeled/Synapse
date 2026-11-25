@@ -12,7 +12,7 @@ import { Column, Row } from "@/widgets/containers";
 import { Dropdown } from "@/widgets/dropdown";
 import TextInput from "@/widgets/textInput";
 import ToggleButton from "@/widgets/toggleButtons";
-import { Network, TriangleAlert } from "lucide-react";
+import { Network, Save, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -178,14 +178,14 @@ export function NetworkSettings({}) {
       style={{ backgroundColor: baseCardColor, color: teamColor }}
       className="border-gray-700 min-w-[450px]"
     >
-      <CardHeader className="pb-0">
-        <CardTitle className="flex items-center gap-2 text-lg">
+      <CardHeader className="pb-0 gap-0">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Network />
           Network Settings
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Column gap="gap-3 text-lg">
+        <Column gap="gap-3 text-base">
           <TextInput
             label="Team Number"
             pattern={teamNumberRegex}
@@ -194,7 +194,7 @@ export function NetworkSettings({}) {
             onChange={(val) => {
               setTeamNumber(+val);
             }}
-            textSize="text-lg"
+            textSize="text-base"
           />
           <TextInput
             label="NetworkTable"
@@ -202,7 +202,7 @@ export function NetworkSettings({}) {
             onChange={(val) => {
               setNetworkTable(val);
             }}
-            textSize="text-lg"
+            textSize="text-base"
           />
           <ToggleButton
             label="Manage Device Networking"
@@ -225,7 +225,7 @@ export function NetworkSettings({}) {
           />
           {staticEnabled ? (
             <Column gap="gap-1">
-              <Row className="items-center gap-3" wrap={false}>
+              <Row className="items-center gap-3 text-base" wrap={false}>
                 <TextInput
                   label="Static IP"
                   value={staticIPAddr}
@@ -233,7 +233,6 @@ export function NetworkSettings({}) {
                   errorMessage="Invalid IPv4 Address"
                   onChange={setStaticIPAddr}
                   pattern={ipv4Regex}
-                  textSize="text-lg"
                   disabled={!manageDeviceNetworking}
                 />
                 <TextInput
@@ -243,7 +242,6 @@ export function NetworkSettings({}) {
                   maxLength={2}
                   onChange={setPrefixLength}
                   value={prefixLength}
-                  textSize="text-lg"
                   disabled={!manageDeviceNetworking}
                   inputWidth="w-14"
                   allowedChars="[0-9]"
@@ -277,7 +275,7 @@ export function NetworkSettings({}) {
             onChange={setPropHostname}
             disabled={!manageDeviceNetworking}
             value={hostname ?? "Unknown"}
-            textSize="text-lg"
+            textSize="text-base"
           />
           <Dropdown<string>
             label="Network Interface"
@@ -290,10 +288,10 @@ export function NetworkSettings({}) {
               setSelectedNetworkInterface(val);
             }}
             disabled={!manageDeviceNetworking || !staticEnabled}
-            textSize="text-lg"
+            textSize="text-base"
           />
           <Button
-            className="mt-8"
+            className="mt-2"
             onClickAction={() => {
               const error = validate();
               if (error) {
@@ -304,13 +302,13 @@ export function NetworkSettings({}) {
             }}
             disabled={!connection.backend || !manageDeviceNetworking}
           >
-            Save
+            <Save /> Save
           </Button>
         </Column>
       </CardContent>
       <AlertDialog visible={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <Column gap="gap-4" className="max-w-[420px]">
-          <h3 className="flex items-center gap-2 text-lg font-bold">
+          <h3 className="flex items-center gap-2 text-base font-bold">
             <TriangleAlert className="text-yellow-400" />
             Apply network settings?
           </h3>

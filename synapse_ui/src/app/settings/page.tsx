@@ -68,9 +68,9 @@ function DeviceInfo({}) {
       style={{ backgroundColor: baseCardColor, color: teamColor }}
       className="border-gray-700"
     >
-      <CardHeader className="pb-0">
+      <CardHeader className="gap-0">
         <Row className="items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle className="flex items-center gap-2 text-base">
             <ChartColumnBig className="w-5 h-5" />
             Device Status
           </CardTitle>
@@ -83,9 +83,9 @@ function DeviceInfo({}) {
         </Row>
       </CardHeader>
       <CardContent>
-        <Column gap="gap-4">
+        <Column gap="gap-2">
           <h2 className="font-bold">Device Info</h2>
-          <Table className="w-full border rounded-lg text-center text-lg">
+          <Table className="w-full border rounded-lg text-center text-base">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="text-center">Version</TableHead>
@@ -108,7 +108,7 @@ function DeviceInfo({}) {
             </TableBody>
           </Table>
           <h2 className="font-bold">Hardware Metrics</h2>
-          <Table className="w-full border rounded-lg text-center text-lg">
+          <Table className="w-full border rounded-lg text-center text-base">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="text-center">CPU Temp</TableHead>
@@ -157,7 +157,7 @@ function DeviceInfo({}) {
 function DangerZone({ socket }: { socket?: WebSocketWrapper }) {
   return (
     <Column gap="gap-5">
-      <h2 className="text-yellow-400 text-lg flex gap-2 items-center">
+      <h2 className="text-yellow-400 text-base flex gap-2 items-center">
         <AlertTriangle /> Danger Zone
       </h2>
       <Row gap="gap-4">
@@ -228,8 +228,8 @@ function DeviceControls({}) {
       style={{ backgroundColor: baseCardColor, color: teamColor }}
       className="border-gray-700"
     >
-      <CardHeader className="pb-0">
-        <CardTitle className="flex items-center gap-2 text-lg">
+      <CardHeader className="gap-0">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Computer className="w-5 h-5" />
           Device Control
         </CardTitle>
@@ -300,13 +300,13 @@ export default function Settings({}) {
         }}
       >
         <Row gap="gap-2" className="h-full">
-          <Column className="flex-[1.5] space-y-2 h-full">
+          <Column className="flex-[1] space-y-2 h-full">
             <DeviceInfo />
-            <DeviceControls />
+            <NetworkSettings />
           </Column>
 
           <Column className="flex-[1.2] space-y-2 h-full">
-            <NetworkSettings />
+            <DeviceControls />
           </Column>
         </Row>
       </div>

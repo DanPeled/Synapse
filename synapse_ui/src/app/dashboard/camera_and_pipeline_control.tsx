@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Copy,
-  Edit,
-  Plus,
-  Trash2,
-  MoreVertical,
-  Star,
-  Ban,
-  Trash,
-} from "lucide-react";
+import { Copy, Edit, Plus, MoreVertical, Star, Ban, Trash } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,9 +120,10 @@ export function CameraAndPipelineControls({
         className="border-gray-700 w-full"
       >
         {" "}
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           {/* Camera Selection */}
           <Dropdown
+            textSize="text-sm"
             label="Camera"
             value={selectedCameraIndex}
             onValueChange={(val) => setSelectedCameraIndex(val)}
@@ -170,6 +162,7 @@ export function CameraAndPipelineControls({
             ) : (
               <>
                 <Dropdown
+                  textSize="text-sm"
                   label="Pipeline"
                   value={selectedPipelineIndex}
                   onValueChange={(val) => setSelectedPipelineIndex(val)}
@@ -280,6 +273,7 @@ export function CameraAndPipelineControls({
 
           {/* Pipeline Type */}
           <Dropdown
+            textSize="text-sm"
             label="Pipeline Type"
             value={selectedPipelineType?.type}
             onValueChange={(val) => {

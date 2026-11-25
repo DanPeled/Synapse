@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { JSX, useEffect, useState } from "react";
 import * as Icons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Row } from "@/widgets/containers";
 
 function CategoryName({ text }: { text: string }) {
   const parts = text.split(/(<\w+\s*\/>)/g);
@@ -129,13 +130,14 @@ export function PipelineConfigControl({
       className="border-gray-700 flex-grow overflow-auto"
     >
       <CardHeader>
+        <Row></Row>
         <Tabs
           defaultValue="<Camera/> Camera Properties"
           className="w-full"
           style={{ color: teamColor }}
         >
           <TabsList
-            className="grid w-full border-gray-600 rounded-xl gap-2"
+            className="grid w-full border-gray-600 rounded-xl gap-2 text-sm"
             style={{
               backgroundColor: baseCardColor,
               gridTemplateColumns: `repeat(${controls.size}, minmax(0, 1fr))`,
@@ -170,11 +172,11 @@ export function PipelineConfigControl({
             <TabsContent
               key={category}
               value={category}
-              className="p-6 space-y-6 pt-1"
+              className="p-3 space-y-0 pt-1 text-sm"
             >
               <div style={{ color: teamColor }}>
                 {items.length > 0 ? (
-                  <div className="space-y-2">{items}</div>
+                  <div>{items}</div>
                 ) : (
                   <div className="text-center" style={{ color: teamColor }}>
                     <CategoryName text={category} />
@@ -186,16 +188,6 @@ export function PipelineConfigControl({
               </div>
             </TabsContent>
           ))}
-
-          {/* <TabsContent value="output" className="p-6"> */}
-          {/*   <div className="text-center" style={{ color: teamColor }}> */}
-          {/*     <Activity className="w-16 h-16 mx-auto mb-2 opacity-50" /> */}
-          {/*     <p className="select-none">Output Configuration</p> */}
-          {/*     <p className="text-sm select-none"> */}
-          {/*       Configure output streams and data */}
-          {/*     </p> */}
-          {/*   </div> */}
-          {/* </TabsContent> */}
         </Tabs>
       </CardHeader>
     </Card>

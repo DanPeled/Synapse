@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { background, teamColor, baseCardColor } from "@/services/style";
 import { CameraStream } from "@/widgets/cameraStream";
@@ -13,7 +13,7 @@ import {
 import { ResultsView } from "./results_view";
 import { CameraAndPipelineControls } from "./camera_and_pipeline_control";
 import { PipelineConfigControl } from "./pipeline_config_control";
-import { Activity, Camera } from "lucide-react";
+import { Activity } from "lucide-react";
 import {
   CameraPerformanceProto,
   CameraProto,
@@ -42,7 +42,7 @@ function CameraView({ selectedCamera, cameraPerformance }: CameraViewProps) {
   return (
     <Card
       style={{ backgroundColor: baseCardColor }}
-      className="flex flex-col h-[440px] border-gray-700 p-2"
+      className="flex flex-col h-[380px] border-gray-700 p-2 w-full"
     >
       <Badge
         variant="secondary"
@@ -80,7 +80,6 @@ export default function Dashboard() {
   // ===== State: only indexes / minimal info =====
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedPipelineIndex, setSelectedPipelineIndex] = useState(0);
-  const [locked, setLocked] = useState(false);
   const [selectedCameraRecordingStatus, setSelectedCameraRecordingStatus] =
     useState(false);
 
@@ -210,47 +209,9 @@ export default function Dashboard() {
           <Column className="flex-[2] space-y-2 h-full">
             {" "}
             <Row className="w-full">
-              <SaveActionsDialog
-                locked={locked}
-                setLocked={setLocked}
-                save={() => {
-                  socket?.sendBinary(
-                    MessageProto.encode(
-                      MessageProto.create({
-                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE,
-                      }),
-                    ).finish(),
-                  );
-                }}
-                recordingStatus={selectedCameraRecordingStatus}
-                setRecordingStatus={(status) => {
-                  if (selectedCamera) {
-                    const payload = MessageProto.create({
-                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS,
-                      setCameraRecordingStatus:
-                        SetCameraRecordingStatusMessageProto.create({
-                          cameraIndex: selectedCamera.index,
-                          record: status,
-                        }),
-                    });
-                    socket?.sendBinary(MessageProto.encode(payload).finish());
-                  }
-                }}
-              />
-              <CameraAndPipelineControls
-                cameras={cameras}
-                pipelines={pipelines.get(selectedCameraIndex) ?? new Map()}
-                pipelinetypes={pipelinetypes}
-                socket={socket}
-                selectedCameraIndex={selectedCameraIndex}
-                setSelectedCameraIndexAction={setSelectedCameraIndex}
-                selectedPipelineIndex={selectedPipelineIndex}
-                setSelectedPipelineIndexAction={
-                  setPipelineIndexForSelectedCamera
-                }
-                selectedPipelineType={selectedPipelineType}
-                setSelectedPipelineTypeAction={setPipelineTypeForSelectedCamera}
-                setpipelinesAction={setPipelinesOfSelectedCamera}
+              <CameraView
+                selectedCamera={selectedCamera}
+                cameraPerformance={selectedCameraPerformance}
               />
             </Row>
             <PipelineConfigControl
@@ -275,16 +236,54 @@ export default function Dashboard() {
                   socket?.sendBinary(MessageProto.encode(payload).finish());
                 }
               }}
-              locked={locked}
+              locked={false}
             />
           </Column>
           {/* Controls + Results */}
           <Column className="flex-[1.5] space-y-2 h-full">
-            <CameraView
-              selectedCamera={selectedCamera}
-              cameraPerformance={selectedCameraPerformance}
-            />
+            <Row className="items-stretch">
+              <SaveActionsDialog
+                save={() => {
+                  socket?.sendBinary(
+                    MessageProto.encode(
+                      MessageProto.create({
+                        type: MessageTypeProto.MESSAGE_TYPE_PROTO_SAVE,
+                      }),
+                    ).finish(),
+                  );
+                }}
+                recordingStatus={selectedCameraRecordingStatus}
+                setRecordingStatus={(status) => {
+                  if (selectedCamera) {
+                    const payload = MessageProto.create({
+                      type: MessageTypeProto.MESSAGE_TYPE_PROTO_SET_CAMERA_RECORDING_STATUS,
+                      setCameraRecordingStatus:
+                        SetCameraRecordingStatusMessageProto.create({
+                          cameraIndex: selectedCamera.index,
+                          record: status,
+                        }),
+                    });
+                    socket?.sendBinary(MessageProto.encode(payload).finish());
+                  }
+                }}
+              />
 
+              <CameraAndPipelineControls
+                cameras={cameras}
+                pipelines={pipelines.get(selectedCameraIndex) ?? new Map()}
+                pipelinetypes={pipelinetypes}
+                socket={socket}
+                selectedCameraIndex={selectedCameraIndex}
+                setSelectedCameraIndexAction={setSelectedCameraIndex}
+                selectedPipelineIndex={selectedPipelineIndex}
+                setSelectedPipelineIndexAction={
+                  setPipelineIndexForSelectedCamera
+                }
+                selectedPipelineType={selectedPipelineType}
+                setSelectedPipelineTypeAction={setPipelineTypeForSelectedCamera}
+                setpipelinesAction={setPipelinesOfSelectedCamera}
+              />
+            </Row>
             <ResultsView results={selectedPipelineResults} />
           </Column>
         </Row>
