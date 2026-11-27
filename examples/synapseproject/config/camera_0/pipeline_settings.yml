@@ -21,6 +21,7 @@ pipeline_configs:
       stick_to_ground: false
       tag_family: tag36h11
       tag_size: 0.1651
+      field_map_file: deploy/fmap.json
       verbosity: 0
       brightness: 50
       gain: 50

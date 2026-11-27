@@ -12,6 +12,7 @@ from typing import cast
 from unittest.mock import patch
 
 import numpy as np
+from synapse.core.settings_api import FileConstraint
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection,
     AprilTagDetector,
@@ -19,7 +20,12 @@ from synapse.pipelines.apriltag.apriltag_detector import (
     makeCorners,
 )
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
-from synapse.pipelines.apriltag.apriltag_pipeline import filterTagsByIds
+from synapse.pipelines.apriltag.apriltag_pipeline import (
+    DEFAULT_FIELD_MAP_FILE,
+    ApriltagPipeline,
+    ApriltagPipelineSettings,
+    filterTagsByIds,
+)
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
 from typing_extensions import Buffer
 
@@ -35,6 +41,77 @@ FIELD_JSON = {
     ],
     "field": {"length": 16.0, "width": 8.0},
 }
+
+
+def _fieldJson(tagId: int, length: float) -> dict:
+    return {
+        "tags": [
+            {
+                "ID": tagId,
+                "pose": {
+                    "translation": {"x": 1.0, "y": 2.0, "z": 3.0},
+                    "rotation": {
+                        "quaternion": {"W": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0}
+                    },
+                },
+            }
+        ],
+        "field": {"length": length, "width": 8.0},
+    }
+
+
+def _pipelineWithFieldMap(monkeypatch, root: Path, value: str) -> ApriltagPipeline:
+    monkeypatch.setattr("synapse.core.settings_api._getSettingsRoot", lambda: root)
+    monkeypatch.setattr(
+        "synapse.pipelines.apriltag.apriltag_pipeline._projectRoot", lambda: root
+    )
+
+    settings = ApriltagPipelineSettings()
+    result = settings.getAPI().setValue("field_map_file", value)
+    assert result.isValid, result.errorMessage
+
+    with patch(
+        "synapse.pipelines.apriltag.apriltag_pipeline.NapaApriltagDetector"
+    ):
+        return ApriltagPipeline(settings)
+
+
+def test_apriltag_settings_expose_field_map_file_setting():
+    settings = ApriltagPipelineSettings()
+    setting = settings.getAPI().getSetting("field_map_file")
+
+    assert setting is not None
+    assert isinstance(setting.constraint, FileConstraint)
+    assert setting.defaultValue == DEFAULT_FIELD_MAP_FILE
+    assert setting.constraint.fileTypes == {".json"}
+
+
+def test_pipeline_loads_field_map_from_setting_and_reloads(tmp_path, monkeypatch):
+    (tmp_path / "first.json").write_text(json.dumps(_fieldJson(1, 16.0)))
+    (tmp_path / "second.json").write_text(json.dumps(_fieldJson(2, 17.0)))
+
+    pipeline = _pipelineWithFieldMap(monkeypatch, tmp_path, "first.json")
+
+    assert pipeline.fmap.getTagPose(1) is not None
+    assert pipeline.fmap.getTagPose(2) is None
+
+    pipeline.setSetting(pipeline.settings.field_map_file, "second.json")
+
+    assert pipeline.fmap.getTagPose(2) is not None
+    assert pipeline.fmap.getTagPose(1) is None
+
+
+def test_pipeline_handles_missing_field_map_without_crashing(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "synapse.pipelines.apriltag.apriltag_pipeline._projectRoot", lambda: tmp_path
+    )
+
+    with patch(
+        "synapse.pipelines.apriltag.apriltag_pipeline.NapaApriltagDetector"
+    ):
+        pipeline = ApriltagPipeline(ApriltagPipelineSettings())
+
+    assert pipeline.fmap.fieldMap == {}
 
 
 class TestApriltagFieldJson(unittest.TestCase):

@@ -26,9 +26,14 @@ class ApriltagFieldJson:
             return ApriltagFieldJson.loadFieldJson(jsonDict)
 
     @staticmethod
-    @lru_cache(maxsize=1)
+    def empty() -> "ApriltagFieldJson":
+        """Return an unusable map for projects without a configured field file."""
+        return ApriltagFieldJson({}, 0.0, 0.0)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
     def loadFieldCached(filePath: str | Path) -> "ApriltagFieldJson":
-        """Loads a field map once, reusing it for every pipeline instance."""
+        """Load each selected field file once and reuse it per path."""
         return ApriltagFieldJson.loadField(filePath)
 
     @staticmethod

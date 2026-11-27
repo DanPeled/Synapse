@@ -6,10 +6,12 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
+from pathlib import Path
 from typing import Any, Dict, Final, Iterable, List, Optional, Set, Tuple, cast
 
 import cv2
 import numpy as np
+from synapse.core.config import Config
 from synapse.core.pipeline import (
     FrameResult,
     Pipeline,
@@ -22,13 +24,13 @@ from synapse.core.pipeline import (
 from synapse.core.settings_api import (
     BooleanConstraint,
     EnumeratedConstraint,
+    FileConstraint,
     ListConstraint,
     NumberConstraint,
     RangeConstraint,
     SettingsMap,
     settingField,
 )
-from synapse.hardware.deploy_dir import DeployDirectory
 from synapse.log import warn
 from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection,
@@ -101,6 +103,35 @@ def filterTagsByIds(
     return [tag for tag in tags if tag.tagID in allowedIds]
 
 
+DEFAULT_FIELD_MAP_FILE: Final[str] = "deploy/fmap.json"
+
+
+def _projectRoot() -> Path:
+    """Resolve file setting values against the Synapse project root."""
+    try:
+        return Config.getInstance().path.parent.parent.resolve()
+    except (AttributeError, TypeError, OSError):
+        return Path.cwd().resolve()
+
+
+def _resolveFieldMapPath(value: SettingsValue) -> Optional[Path]:
+    """Resolve the field-map file setting to a filesystem path."""
+    if isinstance(value, Path):
+        valueStr = value.as_posix()
+    elif isinstance(value, str):
+        valueStr = value.strip()
+    else:
+        return None
+
+    if not valueStr:
+        return None
+
+    path = Path(valueStr).expanduser()
+    if not path.is_absolute():
+        path = _projectRoot() / path
+    return path
+
+
 class ApriltagPipelineSettings(PipelineSettings):
     # WPILib detector options are no longer exposed. They are kept in the
     # detector implementation but are ignored when loading older configs.
@@ -154,6 +185,12 @@ class ApriltagPipelineSettings(PipelineSettings):
         EnumeratedConstraint(["tag36h11", "tag16h5"]),
         default="tag36h11",
         description="AprilTag family to detect.",
+        category="<Toolbox/> Target",
+    )
+    field_map_file = settingField(
+        FileConstraint(path="deploy", fileTypes=["json"]),
+        default=DEFAULT_FIELD_MAP_FILE,
+        description="JSON field map used for tag poses and camera pose estimation.",
         category="<Toolbox/> Target",
     )
 
@@ -297,9 +334,9 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             self.settings.getSetting(self.settings.tag_family)
         )
 
-        ApriltagPipeline.fmap = ApriltagFieldJson.loadFieldCached(
-            DeployDirectory.getDir() / "fmap.json"
-        )
+        self.fmap: ApriltagFieldJson = ApriltagFieldJson.empty()
+        self._loadedFieldMapValue = ""
+        self._loadFieldMap()
 
         self.__hadResults: bool = False
         self.__lastTagID: Optional[int] = None
@@ -318,6 +355,29 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                 ),
             )
         )
+
+    def _currentFieldMapValue(self) -> str:
+        value = self.getSetting(self.settings.field_map_file)
+        return value.strip() if isinstance(value, str) else ""
+
+    def _loadFieldMap(self) -> None:
+        """Load the field map selected by the file setting."""
+        self._loadedFieldMapValue = self._currentFieldMapValue()
+        path = _resolveFieldMapPath(self._loadedFieldMapValue)
+        if path is None:
+            self.fmap = ApriltagFieldJson.empty()
+            return
+
+        if not path.is_file():
+            warn(f"Field map file not found: {path}")
+            self.fmap = ApriltagFieldJson.empty()
+            return
+
+        try:
+            self.fmap = ApriltagFieldJson.loadField(path)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            warn(f"Failed to load field map from '{path.name}': {error}")
+            self.fmap = ApriltagFieldJson.empty()
 
     def close(self) -> None:
         """Release the native AprilTag detector."""
@@ -348,6 +408,13 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.apriltagDetector.setFamily(self.getSetting(self.settings.tag_family))
 
     def onSettingChanged(self, setting: Setting, value: SettingsValue) -> None:
+        if setting.key == self.settings.field_map_file.key:
+            newValue = value.strip() if isinstance(value, str) else ""
+            if newValue == getattr(self, "_loadedFieldMapValue", None):
+                return
+            self._loadFieldMap()
+            return
+
         if setting.key in [
             self.settings.crop_x,
             self.settings.crop_y,
