@@ -36,7 +36,7 @@ from synapse.pipelines.apriltag.apriltag_detector import (
     AprilTagDetection,
     AprilTagDetector,
     CameraPoseEstimate,
-    drawTagDetectionMarker,
+    drawTagDetectionOverlays,
 )
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
@@ -529,15 +529,15 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         cropped_color = self.cropImageToFit(img, img)
         cropped = self.__toGrayscale(cropped_color)
 
-        tags = self.apriltagDetector.detect(cast(Buffer, cropped))
+        detections = self.apriltagDetector.detect(cast(Buffer, cropped))
         tagFilter = self.getSetting(self.settings.tag_filter) or ()
         filterValue = tuple(tagFilter)
         if filterValue != self.__tagFilterValue:
             self.__tagFilterValue = filterValue
             self.__tagFilterSet = frozenset(filterValue) if filterValue else None
-        tags = filterTagsByIds(tags, self.__tagFilterSet)
+        tags = filterTagsByIds(detections, self.__tagFilterSet)
 
-        if not tags:
+        if not detections:
             if self.__hadResults:
                 self.__hadResults = False
                 self.setDataValue("hasResults", False)
@@ -547,22 +547,21 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
         self.tagEstimates.clear()
 
         for tag in tags:
-            self.processTag(
-                tag,
-                timestamp,
-            )
+            self.processTag(tag, timestamp)
 
-            drawTagDetectionMarker(
-                tag=tag,
-                img=img,
-            )
+        # Only tags present in the field map can contribute to a field pose.
+        # Keep that set once so drawing and pose estimation agree on which
+        # detections are usable without repeating field-map lookups per overlay.
+        usableTags = [
+            tag for tag in tags if self.fmap.getTagPose(tag.tagID) is not None
+        ]
 
         fieldposeEnabled = self.getSetting(self.settings.publish_camera_field_pose)
         stickToGround = self.getSetting(self.settings.stick_to_ground)
         # estimateTag3DPose = self.getSetting(self.settings.publish_tag_pose_3d)
 
         cameraPoseEstimate: Optional[CameraPoseEstimate] = (
-            self.poseEstimator.estimate(tags, self.fmap.getTagPose)
+            self.poseEstimator.estimate(usableTags, self.fmap.getTagPose)
             if fieldposeEnabled
             else None
         )
@@ -579,6 +578,28 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
                         0, 0, cameraPoseEstimate.cameraPoseEstimate.rotation().Z()
                     ),
                 )
+
+        drawTagDetectionOverlays(
+            img=img,
+            tags=detections,
+            processedTags=usableTags,
+            getTagPose=self.fmap.getTagPose,
+            cameraPose=(
+                cameraPoseEstimate.cameraPoseEstimate
+                if cameraPoseEstimate is not None
+                else None
+            ),
+            tagSize=float(self.getSetting(self.settings.tag_size)),
+            cameraMatrix=self.poseEstimator.config.cameraMatrix,
+            distCoeffs=self.poseEstimator.config.distCoeffs,
+        )
+
+        if not tags:
+            if self.__hadResults:
+                self.__hadResults = False
+                self.setDataValue("hasResults", False)
+                self.setResults(None)
+            return img
 
         if not self.__hadResults:
             self.__hadResults = True

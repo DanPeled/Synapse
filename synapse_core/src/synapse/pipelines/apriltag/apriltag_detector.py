@@ -6,7 +6,8 @@
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from functools import lru_cache
+from typing import Callable, Final, Iterable, List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -17,6 +18,11 @@ from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d
 Homography = Tuple[float, float, float, float, float, float, float, float, float]
 Corners = Tuple[float, float, float, float, float, float, float, float]
 Scalar = Sequence[float | int]
+Color = Tuple[int, int, int]
+
+TAG_BORDER_RED: Final[Color] = (0, 0, 255)
+TAG_BORDER_GREEN: Final[Color] = (0, 255, 0)
+TAG_ID_BLUE: Final[Color] = (255, 0, 0)
 
 
 def makeCorners(
@@ -160,49 +166,173 @@ class AprilTagDetector(ABC):
         pass
 
 
+def _tagBorderPoints(tag: AprilTagDetection) -> np.ndarray:
+    """Return the four tag corners as one contiguous OpenCV polygon."""
+    corners = tag.corners
+    points = np.empty((4, 2), dtype=np.int32)
+    points[0, 0], points[0, 1] = round(corners[0]), round(corners[1])
+    points[1, 0], points[1, 1] = round(corners[2]), round(corners[3])
+    points[2, 0], points[2, 1] = round(corners[4]), round(corners[5])
+    points[3, 0], points[3, 1] = round(corners[6]), round(corners[7])
+    return points
+
+
+def drawTagBorders(
+    img: Frame,
+    tags: Iterable[AprilTagDetection],
+    color: Scalar = TAG_BORDER_GREEN,
+    thickness: int = 2,
+) -> None:
+    """Draw all tag borders with one OpenCV call."""
+    contours = [_tagBorderPoints(tag) for tag in tags]
+    if contours:
+        cv2.polylines(img, contours, True, color, thickness)
+
+
+def drawTagIds(
+    img: Frame,
+    tags: Iterable[AprilTagDetection],
+    color: Scalar = TAG_ID_BLUE,
+) -> None:
+    """Draw each tag's ID in blue over the tag center by default."""
+    for tag in tags:
+        centerX, centerY = tag.center
+        cv2.putText(
+            img,
+            str(tag.tagID),
+            (int(centerX) - 8, int(centerY) + 5),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+
+
+@lru_cache(maxsize=32)
+def poseCubeObjectPoints(tagSize: float) -> np.ndarray:
+    """Return cached OpenCV object points for a cube anchored at a tag.
+
+    WPILib tag poses use +X as the tag normal, with the face spanning Y and Z.
+    The returned points extend along that normal, and are converted to OpenCV's
+    object-point axes so they can be passed directly to ``projectPoints``.
+    """
+    halfSize = tagSize * 0.5
+    wpilibPoints = np.array(
+        [
+            (0.0, halfSize, -halfSize),
+            (0.0, -halfSize, -halfSize),
+            (0.0, -halfSize, halfSize),
+            (0.0, halfSize, halfSize),
+            (tagSize, halfSize, -halfSize),
+            (tagSize, -halfSize, -halfSize),
+            (tagSize, -halfSize, halfSize),
+            (tagSize, halfSize, halfSize),
+        ],
+        dtype=np.float64,
+    )
+    return np.ascontiguousarray(
+        np.column_stack(
+            (-wpilibPoints[:, 1], -wpilibPoints[:, 2], wpilibPoints[:, 0])
+        )
+    )
+
+
+def _wpilibTransformToOpenCvVectors(
+    transform: Transform3d,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Convert a WPILib camera-to-tag transform to OpenCV rvec/tvec arrays."""
+    translation = transform.translation()
+    rotation = transform.rotation()
+    axis = rotation.axis()
+    angle = rotation.angle
+    tvec = np.array(
+        [[-translation.Y()], [-translation.Z()], [translation.X()]],
+        dtype=np.float64,
+    )
+    rvec = np.array(
+        [[-axis[1] * angle], [-axis[2] * angle], [axis[0] * angle]],
+        dtype=np.float64,
+    )
+    return rvec, tvec
+
+
+def drawTagPoseCube(
+    img: Frame,
+    cameraToTag: Transform3d,
+    tagSize: float,
+    cameraMatrix: np.ndarray,
+    distCoeffs: np.ndarray,
+) -> None:
+    """Project and draw a cube from the tag face along the tag's normal."""
+    rvec, tvec = _wpilibTransformToOpenCvVectors(cameraToTag)
+    projected, _ = cv2.projectPoints(
+        poseCubeObjectPoints(float(tagSize)), rvec, tvec, cameraMatrix, distCoeffs
+    )
+    points = projected.reshape(8, 2).round().astype(np.int32)
+
+    # One call draws the face, the far face, and all four connecting edges.
+    contours = [
+        points[:4],
+        points[4:],
+        *[np.array((points[index], points[index + 4]), dtype=np.int32) for index in range(4)],
+    ]
+    cv2.polylines(img, contours, True, TAG_BORDER_GREEN, 2)
+
+
+def drawTagDetectionOverlays(
+    img: Frame,
+    tags: Iterable[AprilTagDetection],
+    processedTags: Iterable[AprilTagDetection],
+    getTagPose: Callable[[int], Optional[Pose3d]],
+    cameraPose: Optional[Pose3d],
+    tagSize: float,
+    cameraMatrix: np.ndarray,
+    distCoeffs: np.ndarray,
+) -> None:
+    """Draw color-coded tag borders, IDs, and 3D cubes for processed tags.
+
+    Red borders mark detections excluded by the tag filter or missing a field
+    pose. Green borders mark detections with a usable field pose. Cubes are
+    only drawn when a camera pose was estimated from those field poses.
+    """
+    allTags = list(tags)
+    usableTags = list(processedTags)
+    usableIds = {tag.tagID for tag in usableTags}
+    rejectedTags = [tag for tag in allTags if tag.tagID not in usableIds]
+
+    if cameraPose is not None:
+        for tag in usableTags:
+            tagPose = getTagPose(tag.tagID)
+            if tagPose is None:
+                continue
+            drawTagPoseCube(
+                img,
+                tagPose - cameraPose,
+                tagSize,
+                cameraMatrix,
+                distCoeffs,
+            )
+
+    drawTagBorders(img, rejectedTags, TAG_BORDER_RED)
+    drawTagBorders(img, usableTags, TAG_BORDER_GREEN)
+    drawTagIds(img, allTags)
+
+
 def drawTagDetectionMarker(
     tag: AprilTagDetection,
     img: Frame,
     color: Scalar = (255, 255, 0),
 ) -> None:
-    """Draw a 2D bounding box, center, and ID for an AprilTag on an image.
+    """Draw a standalone 2D border, center, and ID for an AprilTag."""
+    drawTagBorders(img, (tag,), TAG_BORDER_GREEN)
 
-    Args:
-        tag (AprilTagDetection): The AprilTag detection data.
-        img (Frame): Image frame on which to draw.
-    """
-    # Convert flat tuple to 4 (x, y) points
     corners = tag.corners
-    points = np.array(
-        [
-            (corners[0], corners[1]),
-            (corners[2], corners[3]),
-            (corners[4], corners[5]),
-            (corners[6], corners[7]),
-        ],
-        dtype=np.int32,
-    )
+    centerX = int((corners[0] + corners[2] + corners[4] + corners[6]) / 4)
+    centerY = int((corners[1] + corners[3] + corners[5] + corners[7]) / 4)
+    cv2.circle(img, (centerX, centerY), radius=4, color=TAG_BORDER_RED, thickness=-1)
 
-    # Draw the boundary with a single call instead of four separate lines
-    cv2.polylines(img, [points], True, (0, 255, 0), 2)
-
-    # Draw the center
-    center_x = int((corners[0] + corners[2] + corners[4] + corners[6]) / 4)
-    center_y = int((corners[1] + corners[3] + corners[5] + corners[7]) / 4)
-    cv2.circle(img, (center_x, center_y), radius=4, color=(0, 0, 255), thickness=-1)
-
-    # Draw the tag ID above the tag
-    tag_id = tag.tagID
-    cv2.putText(
-        img,
-        str(tag_id),
-        (center_x - 10, center_y - 10),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        color,
-        2,
-        cv2.LINE_AA,
-    )
+    drawTagIds(img, (tag,), color)
 
 
 def opencvToWPI(opencv: Transform3d) -> Transform3d:
