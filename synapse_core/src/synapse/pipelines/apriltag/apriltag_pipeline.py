@@ -583,12 +583,7 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             img=img,
             tags=detections,
             processedTags=usableTags,
-            getTagPose=self.fmap.getTagPose,
-            cameraPose=(
-                cameraPoseEstimate.cameraPoseEstimate
-                if cameraPoseEstimate is not None
-                else None
-            ),
+            drawCubes=cameraPoseEstimate is not None,
             tagSize=float(self.getSetting(self.settings.tag_size)),
             cameraMatrix=self.poseEstimator.config.cameraMatrix,
             distCoeffs=self.poseEstimator.config.distCoeffs,

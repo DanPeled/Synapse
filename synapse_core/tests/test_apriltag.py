@@ -8,7 +8,7 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
-from typing import Optional, cast
+from typing import cast
 from unittest.mock import patch
 
 import numpy as np
@@ -192,17 +192,11 @@ def test_pose_cube_points_extend_along_tag_normal():
 
 
 def test_draw_tag_detection_overlays_colors_and_projects_cube():
-    tagPose = Pose3d(Translation3d(3.0, 0.0, 0.0), Rotation3d(0.0, 0.0, 0.0))
-    cameraPose = Pose3d(Translation3d(0.0, 0.0, 0.0), Rotation3d(0.0, 0.0, 0.0))
     cameraMatrix = np.array(
         [[500.0, 0.0, 640.0], [0.0, 500.0, 360.0], [0.0, 0.0, 1.0]]
     )
-    cameraPoseEstimate = CameraPoseEstimate(0.0, cameraPose)
     processed = [_detection(1, 200, 100)]
     rejected = [_detection(2, 400, 100)]
-
-    def getTagPose(tagId: int) -> Optional[Pose3d]:
-        return tagPose if tagId == 1 else None
 
     withoutCube = np.zeros((720, 1280, 3), dtype=np.uint8)
     withCube = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -211,8 +205,7 @@ def test_draw_tag_detection_overlays_colors_and_projects_cube():
         withoutCube,
         processed + rejected,
         processed,
-        getTagPose,
-        None,
+        False,
         0.2,
         cameraMatrix,
         np.zeros(5),
@@ -221,8 +214,7 @@ def test_draw_tag_detection_overlays_colors_and_projects_cube():
         withCube,
         processed + rejected,
         processed,
-        getTagPose,
-        cameraPoseEstimate.cameraPoseEstimate,
+        True,
         0.2,
         cameraMatrix,
         np.zeros(5),
