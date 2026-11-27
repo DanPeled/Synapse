@@ -58,7 +58,9 @@ def test_create_project_basic(mock_load, mock_confirm, mock_text, fake_cwd):
 def test_bundled_field_map_matches_example_project():
     repoRoot = Path(__file__).resolve().parents[2]
     example = repoRoot / "examples" / "synapseproject" / "deploy" / "fmap.json"
-    bundled = files("synapse_installer").joinpath("assets", "fmap.json").read_bytes()
+    bundled = (
+        files("synapse_installer").joinpath("assets").joinpath("fmap.json").read_bytes()
+    )
 
     assert bundled == example.read_bytes()
 

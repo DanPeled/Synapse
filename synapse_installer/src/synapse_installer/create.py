@@ -39,7 +39,7 @@ def _writeDefaultFieldMap(deployDir: Path) -> None:
         return
 
     fieldMapPath.write_bytes(
-        files("synapse_installer").joinpath("assets", "fmap.json").read_bytes()
+        files("synapse_installer").joinpath("assets").joinpath("fmap.json").read_bytes()
     )
 
 
