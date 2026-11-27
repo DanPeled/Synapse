@@ -5,6 +5,7 @@
 
 import os
 from enum import Enum
+from importlib.resources import files
 from pathlib import Path
 from typing import Final, Optional, Tuple
 
@@ -24,6 +25,22 @@ from synapse.core import Synapse
 if __name__ == "__main__":
     Synapse.createAndRunRuntime(root=Path(os.getcwd()))
 """.lstrip()
+
+
+def _writeDefaultFieldMap(deployDir: Path) -> None:
+    """Seed new projects with the field map used by the example project.
+
+    The AprilTag pipeline's file setting defaults to ``deploy/fmap.json``.
+    Copying the example field map here makes that default valid immediately,
+    while leaving an existing project file untouched.
+    """
+    fieldMapPath = deployDir / "fmap.json"
+    if fieldMapPath.exists():
+        return
+
+    fieldMapPath.write_bytes(
+        files("synapse_installer").joinpath("assets").joinpath("fmap.json").read_bytes()
+    )
 
 
 class ConfirmProjectNameOptions(Enum):
@@ -85,6 +102,7 @@ def createProject() -> None:
         deployDir = projectPath / "deploy"
         if not (deployDir).exists():
             os.makedirs(deployDir)
+        _writeDefaultFieldMap(deployDir)
         deployReadme = f"# {projectName} Deploy Directory\nPlace here all files you want to deploy onto the coprocessor"
 
         with open(deployDir / "readme.md", "w") as readmeFile:

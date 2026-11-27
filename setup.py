@@ -117,6 +117,7 @@ setup(
     },
     include_package_data=True,
     package_data={
+        "synapse_installer": ["assets/*.json"],
         "synapse_sim": [
             "assets/*.glb",
             "assets/*.json",

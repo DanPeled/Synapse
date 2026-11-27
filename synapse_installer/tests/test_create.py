@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import json
+from importlib.resources import files
 from pathlib import Path
 from unittest import mock
 
@@ -42,11 +44,25 @@ def test_create_project_basic(mock_load, mock_confirm, mock_text, fake_cwd):
         .startswith("# TestProject Deploy")
     )
 
+    fieldMap = json.loads((project_dir / "deploy" / "fmap.json").read_text())
+    assert len(fieldMap["tags"]) == 32
+    assert fieldMap["field"]["length"] == 16.541
+
     main_py_content = (project_dir / "main.py").read_text()
     assert main_py_content == baseMainPy
 
     # Ensure device config was not triggered
     mock_load.assert_not_called()
+
+
+def test_bundled_field_map_matches_example_project():
+    repoRoot = Path(__file__).resolve().parents[2]
+    example = repoRoot / "examples" / "synapseproject" / "deploy" / "fmap.json"
+    bundled = (
+        files("synapse_installer").joinpath("assets").joinpath("fmap.json").read_bytes()
+    )
+
+    assert bundled == example.read_bytes()
 
 
 @mock.patch("questionary.text")
