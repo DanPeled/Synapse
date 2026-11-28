@@ -194,16 +194,21 @@ def drawTagIds(
     color: Scalar = TAG_ID_BLUE,
 ) -> None:
     """Draw each tag's ID in blue over the tag center by default."""
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fontScale = 1.5
+    thickness = 2
     for tag in tags:
+        label = str(tag.tagID)
+        (textWidth, textHeight), _ = cv2.getTextSize(label, font, fontScale, thickness)
         centerX, centerY = tag.center
         cv2.putText(
             img,
-            str(tag.tagID),
-            (int(centerX) - 8, int(centerY) + 5),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
+            label,
+            (int(centerX - textWidth / 2), int(centerY + textHeight / 2)),
+            font,
+            fontScale,
             color,
-            2,
+            thickness,
             cv2.LINE_AA,
         )
 
@@ -224,8 +229,8 @@ def drawTagDetectionOverlays(
     usableIds = {tag.tagID for tag in usableTags}
     rejectedTags = [tag for tag in allTags if tag.tagID not in usableIds]
 
-    drawTagBorders(img, rejectedTags, TAG_BORDER_RED)
-    drawTagBorders(img, usableTags, TAG_BORDER_GREEN)
+    drawTagBorders(img, rejectedTags, TAG_BORDER_RED, thickness=3)
+    drawTagBorders(img, usableTags, TAG_BORDER_GREEN, thickness=3)
     drawTagIds(img, allTags)
 
 
