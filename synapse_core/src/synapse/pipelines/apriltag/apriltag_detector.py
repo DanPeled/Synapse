@@ -376,5 +376,7 @@ def opencvToWPI(opencv: Transform3d) -> Transform3d:
 
 @dataclass
 class CameraPoseEstimate:
+    """Estimated camera pose in field coordinates."""
+
     reprojectionError: float
     cameraPoseEstimate: Pose3d

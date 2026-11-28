@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import math
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
@@ -12,6 +11,13 @@ from synapse.pipelines.apriltag.apriltag_detector import CameraPoseEstimate
 from synapse.pipelines.apriltag.apriltag_robotpy import AprilTagDetection
 from synapse.pipelines.apriltag.field_loader import TagId
 from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d, units
+
+# WPILib field axes are x forward, y left, z up. OpenCV camera axes are
+# x right, y down, z forward. These matrices convert between them.
+_WPILIB_TO_OPENCV = np.array(
+    [[0.0, -1.0, 0.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]], dtype=np.float64
+)
+_OPENCV_TO_WPILIB = _WPILIB_TO_OPENCV.T
 
 
 class PnPPoseEstimator:
@@ -30,24 +36,25 @@ class PnPPoseEstimator:
         tagPose: Pose3d,
         tagSize: units.meters,
     ) -> List:
-        corner_0 = tagPose + Transform3d(
-            Translation3d(0, tagSize / 2.0, -tagSize / 2.0), Rotation3d()
-        )
-        corner_1 = tagPose + Transform3d(
-            Translation3d(0, -tagSize / 2.0, -tagSize / 2.0), Rotation3d()
-        )
-        corner_2 = tagPose + Transform3d(
-            Translation3d(0, -tagSize / 2.0, tagSize / 2.0), Rotation3d()
-        )
-        corner_3 = tagPose + Transform3d(
-            Translation3d(0, tagSize / 2.0, tagSize / 2.0), Rotation3d()
-        )
+        """Return field corners in detector order: bottom-left, bottom-right, top-right, top-left.
 
+        The detector uses the tag's local +Y as right and +Z as up, so the
+        bottom-left corner is at negative local Y and Z.
+        """
+        halfSize = tagSize / 2.0
+        corners = (
+            (0.0, -halfSize, -halfSize),
+            (0.0, halfSize, -halfSize),
+            (0.0, halfSize, halfSize),
+            (0.0, -halfSize, halfSize),
+        )
         return [
-            wpilibTranslationToOpenCv(corner_0.translation()),
-            wpilibTranslationToOpenCv(corner_1.translation()),
-            wpilibTranslationToOpenCv(corner_2.translation()),
-            wpilibTranslationToOpenCv(corner_3.translation()),
+            wpilibTranslationToOpenCv(
+                (
+                    tagPose + Transform3d(Translation3d(*corner), Rotation3d())
+                ).translation()
+            )
+            for corner in corners
         ]
 
     def setConfig(self, config: Config) -> None:
@@ -80,41 +87,52 @@ class PnPPoseEstimator:
         objectPoints = np.asarray(objectPoints, dtype=np.float64).reshape(-1, 3)
         imagePoints = np.asarray(imagePoints, dtype=np.float64).reshape(-1, 2)
 
+        # IPPE_SQUARE expects a centred square in object space. The object
+        # points here are absolute field coordinates and may be rotated with
+        # the tag, so it produces an incorrect pose for a single tag. SQPNP
+        # handles that case without an initial estimate.
+        flags = cv2.SOLVEPNP_SQPNP if len(tags) == 1 else cv2.SOLVEPNP_ITERATIVE
         _, rvecs, tvecs, errors = cv2.solvePnPGeneric(
             objectPoints,
             imagePoints,
             self.config.cameraMatrix,
             self.config.distCoeffs,
-            flags=cv2.SOLVEPNP_IPPE_SQUARE
-            if len(tags) == 1
-            else cv2.SOLVEPNP_ITERATIVE,
+            flags=flags,
         )
 
-        best = int(np.argmin(errors))
+        errorArray = np.asarray(errors).reshape(-1)
+        best = int(np.argmin(errorArray))
 
-        camera_to_field_pose = openCvPoseToWpilib(tvecs[best], rvecs[best])
-        camera_to_field = Transform3d(
-            camera_to_field_pose.translation(), camera_to_field_pose.rotation()
-        )
-        field_to_camera = camera_to_field.inverse()
-        field_to_camera_pose = Pose3d(
-            field_to_camera.translation(), field_to_camera.rotation()
-        )
-
-        return CameraPoseEstimate(float(errors[best]), field_to_camera_pose)
+        # The published estimate is the camera pose in field coordinates.
+        cameraPose = openCvPoseToWpilib(tvecs[best], rvecs[best])
+        return CameraPoseEstimate(float(errorArray[best]), cameraPose)
 
 
 def openCvPoseToWpilib(tvec: np.ndarray, rvec: np.ndarray) -> Pose3d:
+    """Convert an OpenCV field-to-camera pose to a WPILib camera pose."""
+    translationVec = np.asarray(tvec, dtype=np.float64).reshape(3, 1)
+    rotationVec = np.asarray(rvec, dtype=np.float64).reshape(3, 1)
+    cameraFromFieldCv, _ = cv2.Rodrigues(rotationVec)
+
+    # solvePnP returns the camera origin in camera coordinates, so rotate it
+    # back into the OpenCV field frame before converting axes.
+    cameraInFieldCv = -cameraFromFieldCv.T @ translationVec
+    translation = _OPENCV_TO_WPILIB @ cameraInFieldCv
+    fieldFromCameraCv = cameraFromFieldCv.T
+    fieldFromCameraWpilib = _OPENCV_TO_WPILIB @ fieldFromCameraCv @ _WPILIB_TO_OPENCV
+
+    axisAngle, _ = cv2.Rodrigues(fieldFromCameraWpilib)
+    axis = axisAngle.ravel()
+    angle = float(np.linalg.norm(axis))
+    rotation = Rotation3d() if angle < 1e-12 else Rotation3d(axis / angle, angle)
+
     return Pose3d(
-        Translation3d(tvec[2][0], -tvec[0][0], -tvec[1][0]),
-        Rotation3d(
-            np.array([rvec[2][0], -rvec[0][0], -rvec[1][0]]),
-            math.sqrt(
-                math.pow(rvec[0][0], 2)
-                + math.pow(rvec[1][0], 2)
-                + math.pow(rvec[2][0], 2)
-            ),
+        Translation3d(
+            float(translation.item(0)),
+            float(translation.item(1)),
+            float(translation.item(2)),
         ),
+        rotation,
     )
 
 
