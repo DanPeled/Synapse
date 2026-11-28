@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
@@ -11,13 +12,6 @@ from synapse.pipelines.apriltag.apriltag_detector import CameraPoseEstimate
 from synapse.pipelines.apriltag.apriltag_robotpy import AprilTagDetection
 from synapse.pipelines.apriltag.field_loader import TagId
 from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d, units
-
-# WPILib field axes are x forward, y left, z up. OpenCV camera axes are
-# x right, y down, z forward. These matrices convert between them.
-_WPILIB_TO_OPENCV = np.array(
-    [[0.0, -1.0, 0.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]], dtype=np.float64
-)
-_OPENCV_TO_WPILIB = _WPILIB_TO_OPENCV.T
 
 
 class PnPPoseEstimator:
@@ -103,36 +97,26 @@ class PnPPoseEstimator:
         errorArray = np.asarray(errors).reshape(-1)
         best = int(np.argmin(errorArray))
 
-        # The published estimate is the camera pose in field coordinates.
-        cameraPose = openCvPoseToWpilib(tvecs[best], rvecs[best])
-        return CameraPoseEstimate(float(errorArray[best]), cameraPose)
+        # openCvPoseToWpilib returns the field-to-camera transform; invert it
+        # to publish the camera pose in field coordinates.
+        fieldToCamera = openCvPoseToWpilib(tvecs[best], rvecs[best])
+        cameraPose = Transform3d(
+            fieldToCamera.translation(), fieldToCamera.rotation()
+        ).inverse()
+        return CameraPoseEstimate(
+            float(errorArray[best]),
+            Pose3d(cameraPose.translation(), cameraPose.rotation()),
+        )
 
 
 def openCvPoseToWpilib(tvec: np.ndarray, rvec: np.ndarray) -> Pose3d:
-    """Convert an OpenCV field-to-camera pose to a WPILib camera pose."""
-    translationVec = np.asarray(tvec, dtype=np.float64).reshape(3, 1)
-    rotationVec = np.asarray(rvec, dtype=np.float64).reshape(3, 1)
-    cameraFromFieldCv, _ = cv2.Rodrigues(rotationVec)
-
-    # solvePnP returns the camera origin in camera coordinates, so rotate it
-    # back into the OpenCV field frame before converting axes.
-    cameraInFieldCv = -cameraFromFieldCv.T @ translationVec
-    translation = _OPENCV_TO_WPILIB @ cameraInFieldCv
-    fieldFromCameraCv = cameraFromFieldCv.T
-    fieldFromCameraWpilib = _OPENCV_TO_WPILIB @ fieldFromCameraCv @ _WPILIB_TO_OPENCV
-
-    axisAngle, _ = cv2.Rodrigues(fieldFromCameraWpilib)
-    axis = axisAngle.ravel()
-    angle = float(np.linalg.norm(axis))
-    rotation = Rotation3d() if angle < 1e-12 else Rotation3d(axis / angle, angle)
-
+    """Convert an OpenCV field-to-camera transform to WPILib coordinates."""
     return Pose3d(
-        Translation3d(
-            float(translation.item(0)),
-            float(translation.item(1)),
-            float(translation.item(2)),
+        Translation3d(tvec[2][0], -tvec[0][0], -tvec[1][0]),
+        Rotation3d(
+            np.array([rvec[2][0], -rvec[0][0], -rvec[1][0]]),
+            math.sqrt(rvec[0][0] ** 2 + rvec[1][0] ** 2 + rvec[2][0] ** 2),
         ),
-        rotation,
     )
 
 

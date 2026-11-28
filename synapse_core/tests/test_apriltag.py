@@ -463,14 +463,29 @@ def _projectedTagDetection(
     )
 
 
-def test_open_cv_pose_to_wpilib_uses_full_rotation():
+def test_open_cv_pose_to_wpilib_matches_upstream_convention():
     rvec = np.array([[0.0], [-np.pi], [0.0]])
     tvec = np.array([[-2.0], [0.5], [5.0]])
 
-    pose = openCvPoseToWpilib(tvec, rvec)
+    fieldToCamera = openCvPoseToWpilib(tvec, rvec)
 
-    np.testing.assert_allclose([pose.X(), pose.Y(), pose.Z()], [5.0, 2.0, 0.5])
-    assert abs(pose.rotation().angle - np.pi) < 1e-9
+    np.testing.assert_allclose(
+        [fieldToCamera.X(), fieldToCamera.Y(), fieldToCamera.Z()],
+        [5.0, 2.0, -0.5],
+    )
+    assert abs(fieldToCamera.rotation().angle - np.pi) < 1e-9
+
+    cameraPose = Transform3d(
+        fieldToCamera.translation(), fieldToCamera.rotation()
+    ).inverse()
+    np.testing.assert_allclose(
+        [
+            cameraPose.translation().X(),
+            cameraPose.translation().Y(),
+            cameraPose.translation().Z(),
+        ],
+        [5.0, 2.0, 0.5],
+    )
 
 
 def test_single_tag_pose_estimate_uses_detector_corner_order():
