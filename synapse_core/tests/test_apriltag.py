@@ -11,12 +11,18 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import patch
 
+import cv2
 import numpy as np
 from synapse.core.settings_api import FileConstraint
 from synapse.pipelines.apriltag.apriltag_detector import (
+    TAG_BORDER_GREEN,
+    TAG_BORDER_RED,
+    TAG_ID_BLUE,
     AprilTagDetection,
     AprilTagDetector,
+    CameraPoseEstimate,
     drawTagDetectionMarker,
+    drawTagDetectionOverlays,
     makeCorners,
 )
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
@@ -27,7 +33,13 @@ from synapse.pipelines.apriltag.apriltag_pipeline import (
     filterTagsByIds,
 )
 from synapse.pipelines.apriltag.field_loader import ApriltagFieldJson
+from synapse.pipelines.apriltag.pnp_pose_estimator import (
+    PnPPoseEstimator,
+    openCvPoseToWpilib,
+    wpilibTranslationToOpenCv,
+)
 from typing_extensions import Buffer
+from wpimath import Pose3d, Rotation3d, Transform3d, Translation3d
 
 FIELD_JSON = {
     "tags": [
@@ -60,6 +72,22 @@ def _fieldJson(tagId: int, length: float) -> dict:
     }
 
 
+def _detection(tagId: int, left: int, top: int, size: int = 40) -> AprilTagDetection:
+    return AprilTagDetection(
+        tagID=tagId,
+        homography=(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+        hamming=0,
+        corners=makeCorners(
+            left, top, left + size, top, left + size, top + size, left, top + size
+        ),
+        center=(left + size // 2, top + size // 2),
+    )
+
+
+def _hasColor(img: np.ndarray, color: tuple[int, int, int]) -> bool:
+    return bool(np.any(np.all(img == np.asarray(color, dtype=np.uint8), axis=2)))
+
+
 def _pipelineWithFieldMap(monkeypatch, root: Path, value: str) -> ApriltagPipeline:
     monkeypatch.setattr("synapse.core.settings_api._getSettingsRoot", lambda: root)
     monkeypatch.setattr(
@@ -70,9 +98,7 @@ def _pipelineWithFieldMap(monkeypatch, root: Path, value: str) -> ApriltagPipeli
     result = settings.getAPI().setValue("field_map_file", value)
     assert result.isValid, result.errorMessage
 
-    with patch(
-        "synapse.pipelines.apriltag.apriltag_pipeline.NapaApriltagDetector"
-    ):
+    with patch("synapse.pipelines.apriltag.apriltag_pipeline.NapaApriltagDetector"):
         return ApriltagPipeline(settings)
 
 
@@ -106,9 +132,7 @@ def test_pipeline_handles_missing_field_map_without_crashing(tmp_path, monkeypat
         "synapse.pipelines.apriltag.apriltag_pipeline._projectRoot", lambda: tmp_path
     )
 
-    with patch(
-        "synapse.pipelines.apriltag.apriltag_pipeline.NapaApriltagDetector"
-    ):
+    with patch("synapse.pipelines.apriltag.apriltag_pipeline.NapaApriltagDetector"):
         pipeline = ApriltagPipeline(ApriltagPipelineSettings())
 
     assert pipeline.fmap.fieldMap == {}
@@ -154,6 +178,49 @@ class TestDrawTagDetectionMarker(unittest.TestCase):
         self.assertTrue(np.any(img[:, :, 1]))
         self.assertTrue(np.any(img[:, :, 2]))
         self.assertTrue(np.any(img[40, 10:41, 1]))
+
+
+def test_draw_tag_detection_overlays_colors_borders_and_ids():
+    processed = [_detection(1, 200, 100)]
+    rejected = [_detection(2, 400, 100)]
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+    drawTagDetectionOverlays(img, processed + rejected, processed)
+
+    assert tuple(img[100, 200]) == TAG_BORDER_GREEN
+    assert tuple(img[100, 400]) == TAG_BORDER_RED
+    assert _hasColor(img, TAG_ID_BLUE)
+
+
+def test_pipeline_draws_rejected_and_unusable_tags_in_red(tmp_path, monkeypatch):
+    (tmp_path / "field.json").write_text(json.dumps(_fieldJson(1, 16.0)))
+    pipeline = _pipelineWithFieldMap(monkeypatch, tmp_path, "field.json")
+    pipeline.setSetting("tag_filter", [1, 3])
+
+    detections = [
+        _detection(1, 100, 100),
+        _detection(2, 200, 100),
+        _detection(3, 300, 100),
+    ]
+    cameraPose = Pose3d(Translation3d(0.0, 0.0, 0.0), Rotation3d(0.0, 0.0, 0.0))
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+    with (
+        patch.object(pipeline.apriltagDetector, "detect", return_value=detections),
+        patch.object(
+            pipeline.poseEstimator,
+            "estimate",
+            return_value=CameraPoseEstimate(0.0, cameraPose),
+        ),
+        patch.object(pipeline, "setDataValue"),
+        patch.object(pipeline, "setResults"),
+    ):
+        assert pipeline.processFrame(img, 0.0) is img
+
+    assert tuple(img[100, 100]) == TAG_BORDER_GREEN
+    assert tuple(img[100, 200]) == TAG_BORDER_RED
+    assert tuple(img[100, 300]) == TAG_BORDER_RED
+    assert _hasColor(img, TAG_ID_BLUE)
 
 
 class _FakeNapaDetector:
@@ -297,6 +364,111 @@ class TestFilterTagsByIds(unittest.TestCase):
         tags = [self.makeDetection(1)]
 
         self.assertEqual(filterTagsByIds(tags, [7]), [])
+
+
+def _cameraPoseToOpenCvVectors(
+    cameraPose: Pose3d,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert a WPILib field-space camera pose to OpenCV rvec/tvec."""
+    axis = cameraPose.rotation().axis()
+    angle = cameraPose.rotation().angle
+    rvec = np.array(
+        [[-axis[1] * angle], [-axis[2] * angle], [axis[0] * angle]],
+        dtype=np.float64,
+    )
+    translation = cameraPose.translation()
+    cameraInOpenCv = np.array(
+        [[-translation.Y()], [-translation.Z()], [translation.X()]],
+        dtype=np.float64,
+    )
+    cameraFromField, _ = cv2.Rodrigues(rvec)
+    tvec = (-cameraFromField @ cameraInOpenCv).reshape(3, 1)
+    return rvec, tvec
+
+
+def _projectedTagDetection(
+    tagPose: Pose3d,
+    cameraPose: Pose3d,
+    cameraMatrix: np.ndarray,
+    tagSize: float,
+) -> AprilTagDetection:
+    """Build a detection from a known tag and camera pose."""
+    halfSize = tagSize / 2.0
+    detectorOrder = (
+        (0.0, halfSize, -halfSize),
+        (0.0, -halfSize, -halfSize),
+        (0.0, -halfSize, halfSize),
+        (0.0, halfSize, halfSize),
+    )
+    objectPoints = np.array(
+        [
+            wpilibTranslationToOpenCv(
+                (
+                    tagPose + Transform3d(Translation3d(*corner), Rotation3d())
+                ).translation()
+            )
+            for corner in detectorOrder
+        ],
+        dtype=np.float64,
+    )
+    rvec, tvec = _cameraPoseToOpenCvVectors(cameraPose)
+    imagePoints = cv2.projectPoints(
+        objectPoints, rvec, tvec, cameraMatrix, np.zeros(5)
+    )[0].reshape(4, 2)
+    center = imagePoints.mean(axis=0)
+    return AprilTagDetection(
+        tagID=1,
+        homography=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+        hamming=0,
+        corners=makeCorners(*imagePoints.flatten().tolist()),
+        center=(int(center[0]), int(center[1])),
+    )
+
+
+def test_open_cv_pose_to_wpilib_matches_upstream_convention():
+    rvec = np.array([[0.0], [-np.pi], [0.0]])
+    tvec = np.array([[-2.0], [0.5], [5.0]])
+
+    fieldToCamera = openCvPoseToWpilib(tvec, rvec)
+
+    np.testing.assert_allclose(
+        [fieldToCamera.X(), fieldToCamera.Y(), fieldToCamera.Z()],
+        [5.0, 2.0, -0.5],
+    )
+    assert abs(fieldToCamera.rotation().angle - np.pi) < 1e-9
+
+    cameraPose = Transform3d(
+        fieldToCamera.translation(), fieldToCamera.rotation()
+    ).inverse()
+    np.testing.assert_allclose(
+        [
+            cameraPose.translation().X(),
+            cameraPose.translation().Y(),
+            cameraPose.translation().Z(),
+        ],
+        [5.0, 2.0, 0.5],
+    )
+
+
+def test_single_tag_pose_estimate_uses_upstream_detector_corner_order():
+    cameraMatrix = np.array([[500.0, 0.0, 640.0], [0.0, 500.0, 360.0], [0.0, 0.0, 1.0]])
+    tagSize = 0.1651
+    tagPose = Pose3d(Translation3d(3.0, 2.0, 0.5), Rotation3d(0.0, 0.0, np.pi))
+    cameraPose = Pose3d(Translation3d(5.0, 2.0, 0.5), Rotation3d(0.0, 0.0, np.pi))
+    detection = _projectedTagDetection(tagPose, cameraPose, cameraMatrix, tagSize)
+    estimator = PnPPoseEstimator(
+        PnPPoseEstimator.Config(tagSize, cameraMatrix, np.zeros(5))
+    )
+
+    result = estimator.estimate([detection], lambda _: tagPose)
+
+    assert result is not None
+    estimate = result.cameraPoseEstimate
+    np.testing.assert_allclose(
+        [estimate.X(), estimate.Y(), estimate.Z()], [5.0, 2.0, 0.5], atol=1e-6
+    )
+    assert abs(estimate.rotation().angle - np.pi) < 1e-6
+    assert result.reprojectionError < 1e-3
 
 
 if __name__ == "__main__":

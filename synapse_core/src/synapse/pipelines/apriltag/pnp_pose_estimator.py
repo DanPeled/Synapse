@@ -30,24 +30,26 @@ class PnPPoseEstimator:
         tagPose: Pose3d,
         tagSize: units.meters,
     ) -> List:
-        corner_0 = tagPose + Transform3d(
-            Translation3d(0, tagSize / 2.0, -tagSize / 2.0), Rotation3d()
-        )
-        corner_1 = tagPose + Transform3d(
-            Translation3d(0, -tagSize / 2.0, -tagSize / 2.0), Rotation3d()
-        )
-        corner_2 = tagPose + Transform3d(
-            Translation3d(0, -tagSize / 2.0, tagSize / 2.0), Rotation3d()
-        )
-        corner_3 = tagPose + Transform3d(
-            Translation3d(0, tagSize / 2.0, tagSize / 2.0), Rotation3d()
-        )
+        """Return field corners in upstream AprilTag order.
 
+        Detections expose corners as bottom-left, bottom-right, top-right,
+        top-left. In WPILib tag-local coordinates, +Y points left and +Z points
+        up, so bottom-left is at positive local Y and negative local Z.
+        """
+        halfSize = tagSize / 2.0
+        corners = (
+            (0.0, halfSize, -halfSize),
+            (0.0, -halfSize, -halfSize),
+            (0.0, -halfSize, halfSize),
+            (0.0, halfSize, halfSize),
+        )
         return [
-            wpilibTranslationToOpenCv(corner_0.translation()),
-            wpilibTranslationToOpenCv(corner_1.translation()),
-            wpilibTranslationToOpenCv(corner_2.translation()),
-            wpilibTranslationToOpenCv(corner_3.translation()),
+            wpilibTranslationToOpenCv(
+                (
+                    tagPose + Transform3d(Translation3d(*corner), Rotation3d())
+                ).translation()
+            )
+            for corner in corners
         ]
 
     def setConfig(self, config: Config) -> None:
@@ -80,40 +82,41 @@ class PnPPoseEstimator:
         objectPoints = np.asarray(objectPoints, dtype=np.float64).reshape(-1, 3)
         imagePoints = np.asarray(imagePoints, dtype=np.float64).reshape(-1, 2)
 
+        # IPPE_SQUARE expects a centred square in object space. The object
+        # points here are absolute field coordinates and may be rotated with
+        # the tag, so it produces an incorrect pose for a single tag. SQPNP
+        # handles that case without an initial estimate.
+        flags = cv2.SOLVEPNP_SQPNP if len(tags) == 1 else cv2.SOLVEPNP_ITERATIVE
         _, rvecs, tvecs, errors = cv2.solvePnPGeneric(
             objectPoints,
             imagePoints,
             self.config.cameraMatrix,
             self.config.distCoeffs,
-            flags=cv2.SOLVEPNP_IPPE_SQUARE
-            if len(tags) == 1
-            else cv2.SOLVEPNP_ITERATIVE,
+            flags=flags,
         )
 
-        best = int(np.argmin(errors))
+        errorArray = np.asarray(errors).reshape(-1)
+        best = int(np.argmin(errorArray))
 
-        camera_to_field_pose = openCvPoseToWpilib(tvecs[best], rvecs[best])
-        camera_to_field = Transform3d(
-            camera_to_field_pose.translation(), camera_to_field_pose.rotation()
+        # openCvPoseToWpilib returns the field-to-camera transform; invert it
+        # to publish the camera pose in field coordinates.
+        fieldToCamera = openCvPoseToWpilib(tvecs[best], rvecs[best])
+        cameraPose = Transform3d(
+            fieldToCamera.translation(), fieldToCamera.rotation()
+        ).inverse()
+        return CameraPoseEstimate(
+            float(errorArray[best]),
+            Pose3d(cameraPose.translation(), cameraPose.rotation()),
         )
-        field_to_camera = camera_to_field.inverse()
-        field_to_camera_pose = Pose3d(
-            field_to_camera.translation(), field_to_camera.rotation()
-        )
-
-        return CameraPoseEstimate(float(errors[best]), field_to_camera_pose)
 
 
 def openCvPoseToWpilib(tvec: np.ndarray, rvec: np.ndarray) -> Pose3d:
+    """Convert an OpenCV field-to-camera transform to WPILib coordinates."""
     return Pose3d(
         Translation3d(tvec[2][0], -tvec[0][0], -tvec[1][0]),
         Rotation3d(
             np.array([rvec[2][0], -rvec[0][0], -rvec[1][0]]),
-            math.sqrt(
-                math.pow(rvec[0][0], 2)
-                + math.pow(rvec[1][0], 2)
-                + math.pow(rvec[2][0], 2)
-            ),
+            math.sqrt(rvec[0][0] ** 2 + rvec[1][0] ** 2 + rvec[2][0] ** 2),
         ),
     )
 
