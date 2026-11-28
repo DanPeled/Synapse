@@ -433,10 +433,10 @@ def _projectedTagDetection(
     """Build a detection from a known tag and camera pose."""
     halfSize = tagSize / 2.0
     detectorOrder = (
-        (0.0, -halfSize, -halfSize),
         (0.0, halfSize, -halfSize),
-        (0.0, halfSize, halfSize),
+        (0.0, -halfSize, -halfSize),
         (0.0, -halfSize, halfSize),
+        (0.0, halfSize, halfSize),
     )
     objectPoints = np.array(
         [
@@ -488,7 +488,7 @@ def test_open_cv_pose_to_wpilib_matches_upstream_convention():
     )
 
 
-def test_single_tag_pose_estimate_uses_detector_corner_order():
+def test_single_tag_pose_estimate_uses_upstream_detector_corner_order():
     cameraMatrix = np.array([[500.0, 0.0, 640.0], [0.0, 500.0, 360.0], [0.0, 0.0, 1.0]])
     tagSize = 0.1651
     tagPose = Pose3d(Translation3d(3.0, 2.0, 0.5), Rotation3d(0.0, 0.0, np.pi))

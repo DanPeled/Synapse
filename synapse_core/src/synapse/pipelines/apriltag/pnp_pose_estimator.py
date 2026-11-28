@@ -30,17 +30,18 @@ class PnPPoseEstimator:
         tagPose: Pose3d,
         tagSize: units.meters,
     ) -> List:
-        """Return field corners in detector order: bottom-left, bottom-right, top-right, top-left.
+        """Return field corners in upstream AprilTag order.
 
-        The detector uses the tag's local +Y as right and +Z as up, so the
-        bottom-left corner is at negative local Y and Z.
+        Detections expose corners as bottom-left, bottom-right, top-right,
+        top-left. In WPILib tag-local coordinates, +Y points left and +Z points
+        up, so bottom-left is at positive local Y and negative local Z.
         """
         halfSize = tagSize / 2.0
         corners = (
-            (0.0, -halfSize, -halfSize),
             (0.0, halfSize, -halfSize),
-            (0.0, halfSize, halfSize),
+            (0.0, -halfSize, -halfSize),
             (0.0, -halfSize, halfSize),
+            (0.0, halfSize, halfSize),
         )
         return [
             wpilibTranslationToOpenCv(
