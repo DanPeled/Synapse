@@ -24,7 +24,6 @@ from synapse.pipelines.apriltag.apriltag_detector import (
     drawTagDetectionMarker,
     drawTagDetectionOverlays,
     makeCorners,
-    poseCubeObjectPoints,
 )
 from synapse.pipelines.apriltag.apriltag_napa import NapaApriltagDetector
 from synapse.pipelines.apriltag.apriltag_pipeline import (
@@ -87,12 +86,6 @@ def _detection(tagId: int, left: int, top: int, size: int = 40) -> AprilTagDetec
 
 def _hasColor(img: np.ndarray, color: tuple[int, int, int]) -> bool:
     return bool(np.any(np.all(img == np.asarray(color, dtype=np.uint8), axis=2)))
-
-
-def _countColor(img: np.ndarray, color: tuple[int, int, int]) -> int:
-    return int(
-        np.count_nonzero(np.all(img == np.asarray(color, dtype=np.uint8), axis=2))
-    )
 
 
 def _pipelineWithFieldMap(monkeypatch, root: Path, value: str) -> ApriltagPipeline:
@@ -187,47 +180,16 @@ class TestDrawTagDetectionMarker(unittest.TestCase):
         self.assertTrue(np.any(img[40, 10:41, 1]))
 
 
-def test_pose_cube_points_extend_along_tag_normal():
-    points = poseCubeObjectPoints(0.2)
-
-    assert points.shape == (8, 3)
-    np.testing.assert_allclose(points[:4, 2], 0.0)
-    np.testing.assert_allclose(points[4:, 2], 0.2)
-
-
-def test_draw_tag_detection_overlays_colors_and_projects_cube():
-    cameraMatrix = np.array([[500.0, 0.0, 640.0], [0.0, 500.0, 360.0], [0.0, 0.0, 1.0]])
+def test_draw_tag_detection_overlays_colors_borders_and_ids():
     processed = [_detection(1, 200, 100)]
     rejected = [_detection(2, 400, 100)]
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
 
-    withoutCube = np.zeros((720, 1280, 3), dtype=np.uint8)
-    withCube = np.zeros((720, 1280, 3), dtype=np.uint8)
+    drawTagDetectionOverlays(img, processed + rejected, processed)
 
-    drawTagDetectionOverlays(
-        withoutCube,
-        processed + rejected,
-        processed,
-        False,
-        0.2,
-        cameraMatrix,
-        np.zeros(5),
-    )
-    drawTagDetectionOverlays(
-        withCube,
-        processed + rejected,
-        processed,
-        True,
-        0.2,
-        cameraMatrix,
-        np.zeros(5),
-    )
-
-    assert _hasColor(withCube, TAG_BORDER_RED)
-    assert _hasColor(withCube, TAG_BORDER_GREEN)
-    assert _hasColor(withCube, TAG_ID_BLUE)
-    assert _countColor(withCube, TAG_BORDER_GREEN) > _countColor(
-        withoutCube, TAG_BORDER_GREEN
-    )
+    assert tuple(img[100, 200]) == TAG_BORDER_GREEN
+    assert tuple(img[100, 400]) == TAG_BORDER_RED
+    assert _hasColor(img, TAG_ID_BLUE)
 
 
 def test_pipeline_draws_rejected_and_unusable_tags_in_red(tmp_path, monkeypatch):

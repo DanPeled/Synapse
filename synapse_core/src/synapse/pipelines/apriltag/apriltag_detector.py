@@ -6,7 +6,6 @@
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Final, Iterable, List, Optional, Sequence, Tuple
 
 import cv2
@@ -209,126 +208,21 @@ def drawTagIds(
         )
 
 
-@lru_cache(maxsize=32)
-def poseCubeObjectPoints(tagSize: float) -> np.ndarray:
-    """Return cached OpenCV object points for a cube anchored at a tag.
-
-    WPILib tag poses use +X as the tag normal, with the face spanning Y and Z.
-    The returned points extend along that normal, and are converted to OpenCV's
-    object-point axes so they can be passed directly to ``projectPoints``.
-    """
-    halfSize = tagSize * 0.5
-    wpilibPoints = np.array(
-        [
-            (0.0, halfSize, -halfSize),
-            (0.0, -halfSize, -halfSize),
-            (0.0, -halfSize, halfSize),
-            (0.0, halfSize, halfSize),
-            (tagSize, halfSize, -halfSize),
-            (tagSize, -halfSize, -halfSize),
-            (tagSize, -halfSize, halfSize),
-            (tagSize, halfSize, halfSize),
-        ],
-        dtype=np.float64,
-    )
-    return np.ascontiguousarray(
-        np.column_stack(
-            (-wpilibPoints[:, 1], -wpilibPoints[:, 2], wpilibPoints[:, 0])
-        )
-    )
-
-
-def drawTagPoseCube(
-    img: Frame,
-    tag: AprilTagDetection,
-    tagSize: float,
-    cameraMatrix: np.ndarray,
-    distCoeffs: np.ndarray,
-) -> None:
-    """Draw a cube anchored to the detected tag and its observed normal.
-
-    The tag homography is decomposed with the camera matrix to recover the tag
-    axes in camera space. That keeps the cube attached to the detected corners
-    even when the field-pose estimate is unavailable or imperfect.
-    """
-    localPoints = poseCubeObjectPoints(float(tagSize))
-    facePoints = localPoints[:4, :2]
-    observed = np.array(_tagBorderPoints(tag), dtype=np.float32)
-
-    if np.any(distCoeffs):
-        observed = cv2.undistortPoints(
-            observed.reshape(4, 1, 2), cameraMatrix, distCoeffs, P=cameraMatrix
-        ).reshape(4, 2)
-
-    homography = cv2.getPerspectiveTransform(
-        facePoints.astype(np.float32), observed.astype(np.float32)
-    )
-    inverseCameraMatrix = np.linalg.inv(cameraMatrix)
-    cameraColumns = [inverseCameraMatrix @ homography[:, index] for index in range(3)]
-    scale = (np.linalg.norm(cameraColumns[0]) + np.linalg.norm(cameraColumns[1])) * 0.5
-    if scale <= 0.0:
-        return
-
-    axisX = cameraColumns[0] / scale
-    axisY = cameraColumns[1] / scale
-    translation = cameraColumns[2] / scale
-    # Cross(axisX, axisY) is the tag's OpenCV +Z, i.e. WPILib's tag normal.
-    axisNormal = np.cross(axisX, axisY)
-
-    basePoints = (
-        axisX * facePoints[:, 0:1]
-        + axisY * facePoints[:, 1:2]
-        + translation[None, :]
-    )
-    cubePoints = np.concatenate(
-        (basePoints, basePoints + float(tagSize) * axisNormal[None, :]), axis=0
-    )
-
-    if np.any(distCoeffs):
-        projected, _ = cv2.projectPoints(
-            cubePoints, np.zeros(3), np.zeros(3), cameraMatrix, distCoeffs
-        )
-        farPoints = projected.reshape(8, 2)[4:].round().astype(np.int32)
-    else:
-        homogeneous = (cameraMatrix @ cubePoints.T).T
-        pixels = homogeneous[:, :2] / homogeneous[:, 2:3]
-        farPoints = pixels[4:].round().astype(np.int32)
-
-    # The base uses the detected corners directly, so it always aligns with the
-    # green border. One call draws the far face and all four connecting edges.
-    basePixels = _tagBorderPoints(tag)
-    contours = [basePixels, farPoints]
-    for index in range(4):
-        contours.append(
-            np.array((basePixels[index], farPoints[index]), dtype=np.int32)
-        )
-    cv2.polylines(img, contours, True, TAG_BORDER_GREEN, 2)
-
-
 def drawTagDetectionOverlays(
     img: Frame,
     tags: Iterable[AprilTagDetection],
     processedTags: Iterable[AprilTagDetection],
-    drawCubes: bool,
-    tagSize: float,
-    cameraMatrix: np.ndarray,
-    distCoeffs: np.ndarray,
 ) -> None:
-    """Draw color-coded tag borders, IDs, and 3D cubes for processed tags.
+    """Draw color-coded tag borders and IDs for processed tags.
 
     Red borders mark detections excluded by the tag filter or missing a field
-    pose. Green borders mark detections with a usable field pose. Cubes are
-    only drawn when ``drawCubes`` is true, which the caller ties to a completed
-    3D pose step.
+    pose; green borders mark detections with a usable field pose. Tag IDs are
+    drawn in blue on every detection.
     """
     allTags = list(tags)
     usableTags = list(processedTags)
     usableIds = {tag.tagID for tag in usableTags}
     rejectedTags = [tag for tag in allTags if tag.tagID not in usableIds]
-
-    if drawCubes:
-        for tag in usableTags:
-            drawTagPoseCube(img, tag, tagSize, cameraMatrix, distCoeffs)
 
     drawTagBorders(img, rejectedTags, TAG_BORDER_RED)
     drawTagBorders(img, usableTags, TAG_BORDER_GREEN)

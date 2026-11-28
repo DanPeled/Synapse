@@ -583,10 +583,6 @@ class ApriltagPipeline(Pipeline[ApriltagPipelineSettings, ApriltagResult]):
             img=img,
             tags=detections,
             processedTags=usableTags,
-            drawCubes=cameraPoseEstimate is not None,
-            tagSize=float(self.getSetting(self.settings.tag_size)),
-            cameraMatrix=self.poseEstimator.config.cameraMatrix,
-            distCoeffs=self.poseEstimator.config.distCoeffs,
         )
 
         if not tags:
